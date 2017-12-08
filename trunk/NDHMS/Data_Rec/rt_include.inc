@@ -41,6 +41,7 @@
   ! REAL,    allocatable, DIMENSION(:,:)      :: ELRT,SOXRT,SOYRT,OVROUGHRT,RETDEPRT, QSUBBDRYTRT
   REAL :: QSUBBDRYTRT
   REAL,    allocatable, DIMENSION(:,:)      :: ELRT,SOXRT,SOYRT,OVROUGHRT,RETDEPRT
+  REAL,    allocatable, DIMENSION(:,:)      :: NEXP2DRT
   REAL,    allocatable, DIMENSION(:,:,:)    :: SO8RT
   INTEGER,    allocatable, DIMENSION(:,:,:) :: SO8RT_D, SO8LD_D
   REAL,    allocatable, DIMENSION(:,:)      :: SO8LD_Vmax
@@ -211,6 +212,7 @@
       REAL,    allocatable, DIMENSION(:,:)   :: SMCMAX1,SMCWLT1,SMCREF1
       INTEGER, allocatable, DIMENSION(:,:)   :: VEGTYP 
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
+      REAL, allocatable, DIMENSION(:,:)      :: NEXP2D
       REAL,    allocatable, DIMENSION(:)   :: SLDPTH
 
 !!! define constant/parameter
