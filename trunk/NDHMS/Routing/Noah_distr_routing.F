@@ -115,7 +115,7 @@
           SOYRT,LATKSATRT,SOLDEPRT,QSUBBDRYRT,QSUBBDRYTRT,      &    
           NSOIL,SMCRT,INFXSUBRT,SMCMAXRT,SMCREFRT,ZSOIL,IXRT,JXRT,DT,    &
           SMCWLTRT,SO8RT,SO8RT_D, rt_option,SLDPTH,junk4,CWATAVAIL, &
-          SATLYRCHK)
+          SATLYRCHK, NEXP2DRT)
 
 !       use module_mpp_land, only: write_restart_rt_3, write_restart_rt_2, &
 !            my_id
@@ -146,6 +146,8 @@
 	REAL, INTENT(IN)                          :: DT
 	REAL, INTENT(IN), DIMENSION(NSOIL)        :: ZSOIL
 	REAL, INTENT(IN), DIMENSION(NSOIL) 	  :: SLDPTH
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: NEXP2DRT
+
 	REAL, INTENT(INOUT)                       :: QSUBBDRYTRT
 	REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: INFXSUBRT
 	REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT,NSOIL) :: SMCMAXRT
@@ -275,7 +277,7 @@
 !     if(rt_option .eq. 1) then
         CALL ROUTE_SUBSURFACE1(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,  &   
                LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT, &   
-               SO8RT,SO8RT_D,CWATAVAIL,SUBDT)
+               SO8RT,SO8RT_D,CWATAVAIL,SUBDT,NEXP2DRT)
 !     else 
 !        CALL ROUTE_SUBSURFACE2(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,      &
 !               LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT,     &
@@ -1220,7 +1222,7 @@
           SUBROUTINE ROUTE_SUBSURFACE1(                                 &
                 dist,z,qsub,sox,soy,                                   &
                 latksat,soldep,XX,YY,QSUBDRY,QSUBDRYT,SO8RT,SO8RT_D,    &
-                CWATAVAIL,SUBDT)
+                CWATAVAIL,SUBDT, NEXP2DRT)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -1263,6 +1265,7 @@
         REAL*8, DIMENSION(XX,YY) :: qsub_tmp,QSUBDRY_tmp
 !yw        INTEGER, INTENT(OUT) :: flag
         REAL, INTENT(IN) :: dist(xx,yy,9),SUBDT
+        REAL, INTENT(IN), DIMENSION(XX,YY) :: NEXP2DRT
 
 !!! Declare Local Variables
 
@@ -1275,7 +1278,7 @@
 
 !!! Initialize variables
 
-        REAL, PARAMETER :: nexp=1.0      ! local power law exponent
+        REAL :: nexp     ! local power law exponent
         integer IXX0,JYY0,index,i,j
         real tmp_gsize
 
@@ -1330,6 +1333,8 @@
               end if
 
 ! do the rest if the lowest grid can be found.
+
+              nexp = NEXP2DRT(i,j)
               hh=(1-(z(i,j)/soldep(i,j)))**nexp
               ksat=latksat(i,j)
 
@@ -2408,7 +2413,7 @@
              RT_DOMAIN(did)%OVROUGHRT, RT_DOMAIN(did)%LAKE_MSKRT, &
              RT_DOMAIN(did)%LKSATRT, RT_DOMAIN(did)%OV_ROUGH2d, RT_DOMAIN(did)%SLDPTH, &
 	     RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, rt_domain(did)%ELRT, &
-             RT_DOMAIN(did)%iswater)
+             RT_DOMAIN(did)%iswater, RT_DOMAIN(did)%NEXP2D, RT_DOMAIN(did)%NEXP2DRT)
 
       end subroutine disaggregateDomain_drv
 
@@ -2417,8 +2422,8 @@
                SMCWLT1, VEGTYP, LKSAT, dist,INFXSWGT,OVROUGHRTFAC, &
                LKSATFAC, CH_NETRT,SH2OWGT,SMCREFRT, INFXSUBRT,SMCMAXRT, &
                SMCWLTRT,SMCRT, OVROUGHRT, LAKE_MSKRT, LKSATRT, OV_ROUGH2d,  &
-               SLDPTH, soiltypRT, soiltyp, elrt, iswater                        &
-            )
+               SLDPTH, soiltypRT, soiltyp, elrt, iswater,                        &
+               NEXP2D, NEXP2DRT)
 #ifdef MPP_LAND
         use module_mpp_land, only: left_id,down_id,right_id, &
               up_id,mpp_land_com_real, my_id, io_id, numprocs, &
@@ -2441,12 +2446,13 @@
         real,INTENT(OUT),DIMENSION(IXRT,JXRT,NSOIL)::SMCREFRT, SMCMAXRT, &
                SMCWLTRT,SMCRT
         real,INTENT(OUT),DIMENSION(IXRT,JXRT)::INFXSUBRT
-        real,INTENT(INOUT),DIMENSION(IXRT,JXRT)::OVROUGHRT, LKSATRT
+        real,INTENT(INOUT),DIMENSION(IXRT,JXRT)::OVROUGHRT, LKSATRT, NEXP2DRT
         integer,INTENT(INOUT), DIMENSION(IXRT,JXRT)  ::LAKE_MSKRT
                   
 
         real,INTENT(IN), DIMENSION(NSOIL)      :: SLDPTH
         REAL,dimension(ix,jx) ::    OV_ROUGH2d
+        REAL,INTENT(IN), dimension(ix,jx) ::    NEXP2D
 
 
         integer :: i, j, AGGFACYRT, AGGFACXRT, IXXRT, JYYRT,KRT, KF
@@ -2636,7 +2642,7 @@
                OVROUGHRT(IXXRT,JYYRT) = OV_ROUGH2d(i,j)*OVROUGHRTFAC(IXXRT,JYYRT)  ! Distributed calibration...1/17/2012
             END IF
 
-
+    NEXP2DRT(IXXRT,JYYRT) = NEXP2D(i,j)
 
 !DJG 6.12.08 Map lateral hydraulic conductivity and apply distributed scaling
 ! ---        factor that will be read in from hires terrain file
@@ -2753,7 +2759,8 @@
                      RT_DOMAIN(did)%SOYRT,RT_DOMAIN(did)%LKSATRT, RT_DOMAIN(did)%SOLDEPRT, &
                      RT_DOMAIN(did)%INFXSUBRT,RT_DOMAIN(did)%QSUBBDRYTRT, RT_DOMAIN(did)%QSUBBDRYRT,&
                      RT_DOMAIN(did)%QSUBRT ,nlst_rt(did)%rt_option, RT_DOMAIN(did)%dist, &
-                     RT_DOMAIN(did)%sub_resid,RT_DOMAIN(did)%SO8RT_D, RT_DOMAIN(did)%SO8RT)
+                     RT_DOMAIN(did)%sub_resid,RT_DOMAIN(did)%SO8RT_D, RT_DOMAIN(did)%SO8RT, &
+                     RT_DOMAIN(did)%NEXP2DRT)
              endif
 
          end subroutine SubsurfaceRouting_drv
@@ -2763,7 +2770,8 @@
                   ZSOIL, SLDPTH, &
                   DT,ZWATTABLRT,SOXRT,SOYRT,LKSATRT,&
                   SOLDEPRT,INFXSUBRT,QSUBBDRYTRT, QSUBBDRYRT,&
-                  QSUBRT ,rt_option, dist,sub_resid,SO8RT_D, SO8RT)
+                  QSUBRT ,rt_option, dist,sub_resid,SO8RT_D, SO8RT, &
+                  NEXP2DRT)
 #ifdef MPP_LAND
         use module_mpp_land, only:  mpp_land_com_real, mpp_land_com_integer
 #endif
@@ -2776,7 +2784,7 @@
          real,INTENT(INOUT) :: QSUBBDRYTRT
          REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBBDRYRT, QSUBRT
          REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT,NSOIL) :: SMCRT, SMCWLTRT, SMCMAXRT,SMCREFRT
-
+         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)   :: NEXP2DRT
 
          INTEGER :: SO8RT_D(IXRT,JXRT,3)
          REAL :: SO8RT(IXRT,JXRT,8)
@@ -2815,7 +2823,7 @@
     CALL SUBSFC_RTNG(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,  &
           LKSATRT,SOLDEPRT,QSUBBDRYRT,QSUBBDRYTRT,NSOIL,SMCRT,     &
           INFXSUBRT,SMCMAXRT,SMCREFRT,ZSOIL,IXRT,JXRT,DT,SMCWLTRT,SO8RT,    &
-          SO8RT_D, rt_option,SLDPTH,SUB_RESID,CWATAVAIL,SATLYRCHK)
+          SO8RT_D, rt_option,SLDPTH,SUB_RESID,CWATAVAIL,SATLYRCHK, NEXP2DRT)
 
 #ifdef HYDRO_D
     print *, "SUBROUTE routing called and returned..."
