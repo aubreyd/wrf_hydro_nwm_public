@@ -1072,15 +1072,15 @@
         do j=2,YY-1
           do i=2,XX-1
           if (h(I,J).GT.retent_dep(I,J)) then 
-             IXX0 = SO8RT_D(i,j,1)
-             JYY0 = SO8RT_D(i,j,2)
-             index = SO8RT_D(i,j,3)
-             tmp_gsize = 1.0/gsize(i,j,index)
-             sfx = so8RT(i,j,index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
              hmax = h(i,j)*0.001  !Specify max head for mass flux limit...
-             if(sfx .lt. 1E-20) then
-               call GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,so8rt,gsize(i,j,:),sfx,XX,YY)
-             end if
+
+             !ADCHANGE: Always call routine to check for steepest elev+head slope
+             !(this used to be only called if above sfx is 0 or negative).
+             !Updates IXX0, JYY0, sfx, and index for steepest slope neighbor.
+             call GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,so8rt,gsize(i,j,:),sfx,XX,YY,index)
+             tmp_gsize = 1.0/gsize(i,j,index)
+
+             !ADNOTE: GETMAX8DIR will return IXX0=-1 if steepest slope cannot be found
              if(IXX0 > 0) then  ! do the rest if the lowest grid can be found.
                  if(sfx .lt. 1E-20) then
 #ifdef HYDRO_D
@@ -1099,7 +1099,9 @@
                  qqsfc = alfax*hh53*dt * tmp_gsize
 
 !Courant check (simple mass limit on overland flow)...
+!ADNOTE: This check needs updating
                  if (qqsfc.ge.(hmax*dt*tmp_gsize)) qqsfc = hmax*dt*tmp_gsize
+                 !qqsfc = min(qqsfc, 0.6*hmax)
 
 ! Accumulate directional fluxes on routing subgrid...
                  if (IXX0.gt.i) then
@@ -1125,8 +1127,8 @@
 !DJG put adjustment in for (h) due to qqsfc
 
 !yw changed as following:
-                 tmp_adjust=qqsfc*1000
-                 if((h(i,j) - tmp_adjust) <0 )  then
+                 tmp_adjust = qqsfc*1000.
+                 if ( (h(i,j)-tmp_adjust) < 0 )  then
 #ifdef HYDRO_D
                    print*, "Error Warning: surface head is negative:  ",i,j,ixx0,jyy0, &
                        h(i,j) - tmp_adjust
@@ -1182,67 +1184,72 @@
 
 
 !DJG ----------------------------------------------------------------
-        SUBROUTINE GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,sox,tmp_gsize,max,XX,YY)
+!ADCHANGE: Update these routines to return steepest slope neighbor index
+        SUBROUTINE GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,sox,tmp_gsize,maxSlp,XX,YY,indxOut)
           implicit none
-          INTEGER:: IXX0,JYY0,IXX8,JYY8, XX, YY
-          INTEGER, INTENT(IN) :: I,J
-
+          INTEGER, INTENT(INOUT) :: IXX0,JYY0
+          INTEGER, INTENT(IN) :: I,J,XX,YY
+          INTEGER, INTENT(INOUT) :: indxOut
           REAL,INTENT(IN) :: H(XX,YY),RETENT_DEP(XX,YY),sox(XX,YY,8),tmp_gsize(9)
-          REAL  max
+          INTEGER :: IXX8,JYY8
+          REAL, INTENT(INOUT) :: maxSlp
+
           IXX0 = -1
-          max = 0
+          maxSlp = 0
+          indxOut = 0
           if (h(I,J).LE.retent_dep(I,J)) return
 
           IXX8 = I
           JYY8 = J+1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,1),IXX0,JYY0,max,tmp_gsize(1),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,1),IXX0,JYY0,maxSlp,tmp_gsize(1),XX,YY,1,indxOut)
 
           IXX8 = I+1
           JYY8 = J+1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,2),IXX0,JYY0,max,tmp_gsize(2),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,2),IXX0,JYY0,maxSlp,tmp_gsize(2),XX,YY,2,indxOut)
 
           IXX8 = I+1
           JYY8 = J
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,3),IXX0,JYY0,max,tmp_gsize(3),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,3),IXX0,JYY0,maxSlp,tmp_gsize(3),XX,YY,3,indxOut)
 
           IXX8 = I+1
           JYY8 = J-1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,4),IXX0,JYY0,max,tmp_gsize(4),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,4),IXX0,JYY0,maxSlp,tmp_gsize(4),XX,YY,4,indxOut)
 
           IXX8 = I
           JYY8 = J-1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,5),IXX0,JYY0,max,tmp_gsize(5),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,5),IXX0,JYY0,maxSlp,tmp_gsize(5),XX,YY,5,indxOut)
 
           IXX8 = I-1
           JYY8 = J-1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,6),IXX0,JYY0,max,tmp_gsize(6),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,6),IXX0,JYY0,maxSlp,tmp_gsize(6),XX,YY,6,indxOut)
 
           IXX8 = I-1
           JYY8 = J
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,7),IXX0,JYY0,max,tmp_gsize(7),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,7),IXX0,JYY0,maxSlp,tmp_gsize(7),XX,YY,7,indxOut)
 
           IXX8 = I-1
           JYY8 = J+1
-          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,8),IXX0,JYY0,max,tmp_gsize(8),XX,YY)
+          call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,8),IXX0,JYY0,maxSlp,tmp_gsize(8),XX,YY,8,indxOut)
         RETURN
         END SUBROUTINE GETMAX8DIR
 
         SUBROUTINE GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox   &
-            ,IXX0,JYY0,max,tmp_gsize,XX,YY)
+            ,IXX0,JYY0,maxSlp,tmp_gsize,XX,YY,indxIn,indxOut)
         implicit none
-        integer,INTENT(INOUT) ::IXX0,JYY0
-        INTEGER, INTENT(IN) :: I,J,IXX8,JYY8,XX,YY
+        integer,INTENT(INOUT) ::IXX0,JYY0,indxOut
+        INTEGER, INTENT(IN) :: I,J,IXX8,JYY8,XX,YY,indxIn
         REAL,INTENT(IN) :: H(XX,YY),RETENT_DEP(XX,YY),sox(XX,YY)
-        REAL, INTENT(INOUT) ::max
+        REAL, INTENT(INOUT) ::maxSlp
         real, INTENT(IN) :: tmp_gsize
         real :: sfx
 
              sfx = sox(i,j)-(h(IXX8,JYY8)-h(i,j))*0.001/tmp_gsize
              if(sfx .le. 0 ) return
-             if(max < sfx ) then
+             if(maxSlp < sfx ) then
                    IXX0 = IXX8
                    JYY0 = JYY8
-                   max = sfx
+                   maxSlp = sfx
+                   indxOut = indxIn
              end if
 
         END SUBROUTINE GET8DIR
