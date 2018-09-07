@@ -7056,6 +7056,7 @@ contains
   REAL                     :: WCND
   REAL                     :: SMCAV
   REAL                     :: INFMAX
+  REAL                     :: QINSUR_EFF ! effective Qin at surface, adjusted for imperviousness
   REAL, DIMENSION(1:NSOIL) :: DMAX
   INTEGER, PARAMETER       :: CVFRZ = 3
 ! --------------------------------------------------------------------------------
@@ -7063,6 +7064,12 @@ contains
     IF (QINSUR >  0.0) THEN
        DT1 = DT /86400.
        SMCAV = parameters%SMCMAX(1) - parameters%SMCWLT(1)
+
+! New effective imperviousness adjustment:
+!   Ieff = 0.0015*(100*imperv)^1.41 from Alley & Veenhuis 1983
+! We allow 1-Ieff to infiltrate, the rest goes straight to runoff.
+
+       QINSUR_EFF = QINSUR * ( 1. - (0.0015 * (100. * parameters%IMPERV)**1.41) )
 
 ! maximum infiltration rate
 
@@ -7081,7 +7088,7 @@ contains
 
        VAL = (1. - EXP ( - parameters%KDT * DT1))
        DDT = DD * VAL
-       PX  = MAX(0.,QINSUR * DT)
+       PX  = MAX(0.,QINSUR_EFF * DT)
        INFMAX = (PX * (DDT / (PX + DDT)))/ DT
 
 ! impermeable fraction due to frozen soil
@@ -7105,6 +7112,7 @@ contains
 
        INFMAX = INFMAX * FCR
 
+!!!OLD!!! This is now handled above.
 ! jref for urban areas
 !       IF ( parameters%urban_flag ) INFMAX == INFMAX * 0.05
 
