@@ -286,6 +286,7 @@ MODULE MODULE_SF_NOAHMPLSM
      REAL :: BATS_NIR_DIR !cosz factor for direct NIR snow albedo Yang97 eqn. 16
      REAL :: RSURF_SNOW   !surface resistance for snow(s/m)
      REAL :: RSURF_EXP    !exponent in the shape parameter for soil resistance option 1
+     REAL :: IMPERV       !impervious fraction (0-1)
 
 !------------------------------------------------------------------------------------------!
 ! From the SOILPARM.TBL tables, as functions of soil category.
@@ -8447,6 +8448,7 @@ MODULE NOAHMP_TABLES
     REAL :: BATS_NIR_DIR_TABLE  !cosz factor for direct NIR snow albedo Yang97 eqn. 16
     REAL :: RSURF_SNOW_TABLE    !surface resistance for snow(s/m)
     REAL :: RSURF_EXP_TABLE    !exponent in the shape parameter for soil resistance option 1
+    REAL :: IMPERV_TABLE    !impervious fraction (0-1)
 
 CONTAINS
 
@@ -8822,12 +8824,12 @@ CONTAINS
     REAL :: CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP
+	    RSURF_SNOW,RSURF_EXP,IMPERV
 
     NAMELIST / noahmp_global_parameters / CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP
+	    RSURF_SNOW,RSURF_EXP,IMPERV
 
 
     ! Initialize our variables to bad values, so that if the namelist read fails, we come to a screeching halt as soon as we try to use anything.
@@ -8851,6 +8853,7 @@ BATS_VIS_DIR_TABLE   = -1.E36
 BATS_NIR_DIR_TABLE   = -1.E36
 RSURF_SNOW_TABLE     = -1.E36
  RSURF_EXP_TABLE     = -1.E36
+    IMPERV_TABLE     = -1.E36
 
 #ifndef NCEP_WCOSS
     open(15, file="MPTABLE.TBL", status='old', form='formatted', action='read', iostat=ierr)
@@ -8885,6 +8888,7 @@ BATS_VIS_DIR_TABLE   = BATS_VIS_DIR
 BATS_NIR_DIR_TABLE   = BATS_NIR_DIR
 RSURF_SNOW_TABLE     = RSURF_SNOW
  RSURF_EXP_TABLE     = RSURF_EXP
+    IMPERV_TABLE     = IMPERV
 
   end subroutine read_mp_global_parameters
 

@@ -63,6 +63,7 @@ CONTAINS
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+                 IMPERV_2D,                                                   &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -158,6 +159,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  HVT_2D    ! Canopy Height
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MFSNO_2D  ! Snow cover m parameter
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFEXP_2D ! exponent in the shape parameter for soil resistance option 1
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  IMPERV_2D ! Impervious fraction (0-1)
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -645,6 +647,7 @@ CONTAINS
        parameters%hvt    = HVT_2D(I,J)            ! Canopy Height
        parameters%mfsno  = MFSNO_2D(I,J)          ! Snow cover m parameter
        parameters%rsurf_exp = RSURFEXP_2D(I,J)    ! exponent in the shape parameter for soil resistance option 1
+       parameters%imperv = IMPERV_2D(I,J)         ! Impervious fraction (0-1)
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,parameters)
        
@@ -1123,7 +1126,8 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
     parameters%MFSNO  =  MFSNO_TABLE(VEGTYPE)       !snowmelt m parameter ()
     parameters%HVT    =    HVT_TABLE(VEGTYPE)       !top of canopy (m)
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
-   parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+    parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+    parameters%IMPERV = IMPERV_TABLE                !impervious fraction (0-1)
 #endif
 
 ! ----------------------------------------------------------------------
