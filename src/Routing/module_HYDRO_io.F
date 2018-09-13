@@ -5844,7 +5844,7 @@ end subroutine mpp_output_chrt
 
     integer :: ncid,irt, dimid_ix, dimid_jx,  &
              dimid_ixrt, dimid_jxrt, varid, &
-             dimid_links, dimid_basns, dimid_soil, dimid_lakes
+             dimid_links, dimid_basns, dimid_soil, dimid_lakes, dimid_tracer
     integer :: iret
 
 
@@ -5871,6 +5871,7 @@ end subroutine mpp_output_chrt
 
 ! define dimension for variables
           iret = nf90_def_dim(ncid, "depth", nlst(did)%nsoil, dimid_soil)  !-- 3-d soils
+          if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_dim(ncid, "ntracer", nlst_rt(did)%NTRACER, dimid_tracer)  !wt calc   
 #ifdef MPP_LAND
           iret = nf90_def_dim(ncid, "ix", global_nx, dimid_ix)  !-- make a decimated grid
           iret = nf90_def_dim(ncid, "iy", global_ny, dimid_jx)
@@ -5910,6 +5911,27 @@ end subroutine mpp_output_chrt
              iret = nf90_def_var(ncid, "sh2ox"//trim(tmpStr), NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           end do
 
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+          if (nlst(did)%NTRACER .gt. 1) then
+            do n = 1, nlst(did)%NTRACER
+               if( n .lt. 10) then
+                  write(tmpStr, '(i1)') n
+               else
+                  write(tmpStr, '(i2)') n
+               endif
+               iret = nf_def_var(ncid,"smc_tr"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+               iret = nf_def_var(ncid,"sh2ox_tr"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+               iret = nf_def_var(ncid,"smc_sub"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+               iret = nf_def_var(ncid,"sh2ox_sub"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+            end do
+            iret = nf_def_var(ncid,"infxsrt_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+            iret = nf_def_var(ncid,"soldrain_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+            iret = nf_def_var(ncid,"sfcheadrt_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+          end if
+!--------------------------------------------------------
+
           !iret = nf90_def_var(ncid, "smcmax1", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           !iret = nf90_def_var(ncid, "smcref1", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           !iret = nf90_def_var(ncid, "smcwlt1", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
@@ -5929,6 +5951,14 @@ end subroutine mpp_output_chrt
             iret = nf90_def_var(ncid, "QBDRYRT", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
             iret = nf90_def_var(ncid, "infxswgt", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
             iret = nf90_def_var(ncid, "sfcheadsubrt", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+          if (nlst(did)%NTRACER .gt. 1) then
+            iret = nf90_def_var(ncid,"QBDRYRT_TR",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)
+            iret = nf90_def_var(ncid,"sfcheadsubrt_tr",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)
+          end if
+!--------------------------------------------------------
           do n = 1, nlst(did)%nsoil
              if( n .lt. 10) then
                 write(tmpStr, '(i1)') n
@@ -5950,6 +5980,15 @@ end subroutine mpp_output_chrt
          iret = nf90_def_var(ncid, "hlink", NF90_FLOAT, (/dimid_links/), varid)
          iret = nf90_def_var(ncid, "qlink1", NF90_FLOAT, (/dimid_links/), varid)
          iret = nf90_def_var(ncid, "qlink2", NF90_FLOAT, (/dimid_links/), varid)
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+          if (nlst(did)%NTRACER .gt. 1) then
+            iret = nf90_def_var(ncid,"hlink_tr",NF_FLOAT,1,(/dimid_links/),varid)
+            iret = nf90_def_var(ncid,"qlink1_tr",NF_FLOAT,1,(/dimid_links/),varid)
+            iret = nf90_def_var(ncid,"qlink2_tr",NF_FLOAT,1,(/dimid_links/),varid)
+          end if
+!--------------------------------------------------------
          if(nlst(did)%channel_option .eq. 3) &
               iret = nf90_def_var(ncid, "cvol", NF90_FLOAT, (/dimid_links/), varid)
          if(rt_domain(did)%nlakes .gt. 0) then
@@ -5961,6 +6000,7 @@ end subroutine mpp_output_chrt
          if( nlst(did)%channel_only       .eq. 0 .and. &
              nlst(did)%channelBucket_only .eq. 0         ) &
              iret = nf90_def_var(ncid, "lake_inflort", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
+             if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid,"lake_inflort_tr",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)      !wt calc
 
          !! JLM: who wants these? They can be put back if someone cares.
          !! But just calculate accQLateral locally so the redundant variable isnt held in
@@ -5980,6 +6020,16 @@ end subroutine mpp_output_chrt
 
             if(nlst(did)%UDMP_OPT .eq. 1) then
                iret = nf90_def_var(ncid, "z_gwsubbas", NF90_FLOAT, (/dimid_links/), varid)
+               if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid,"z_gwsubbas_tr",NF_FLOAT,1,(/dimid_links/),varid)     !wt calc
+               !-----partial mixing in gw buckets-------------
+               if (nlst(did)%PMOPT .gt. 10 .and. nlst(did)%PMOPT .lt. 20) then
+                 iret = nf90_def_var(ncid,"z_gwsubbas_passive",   NF_FLOAT,1,(/dimid_links/),varid)
+                 iret = nf90_def_var(ncid,"z_gwsubbas_active",    NF_FLOAT,1,(/dimid_links/),varid)
+                 iret = nf90_def_var(ncid,"z_gwsubbas_passive_tr",NF_FLOAT,1,(/dimid_links/),varid)
+                 iret = nf90_def_var(ncid,"z_gwsubbas_active_tr", NF_FLOAT,1,(/dimid_links/),varid)
+                 iret = nf90_def_var(ncid,"cm_gwsubbas",          NF_FLOAT,1,(/dimid_links/),varid)
+               end if
+               !-----end for partial mixing in gw buckets-----
             else
                iret = nf90_def_var(ncid, "z_gwsubbas", NF90_FLOAT, (/dimid_basns/), varid)
             endif
@@ -6036,6 +6086,20 @@ if( nlst(did)%channel_only       .eq. 0 .and. &
    call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%soldrain,"soldrain"  )
    call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm,"sfcheadrt"  )
 
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+   if (nlst(did)%NTRACER .gt. 1) then
+     call w_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%smc_tr,"smc_tr")
+     call w_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%sh2ox_tr,"sh2ox_tr")
+     call w_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%smc_sub,"smc_sub")
+     call w_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%sh2ox_sub,"sh2ox_sub")
+     call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT_TR,"infxsrt_tr"  )
+     call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%soldrain_tr,"soldrain_tr"  )
+     call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm_tr,"sfcheadrt_tr"  )
+   end if 
+!--------------------------------------------------------
+
 end if ! neither channel_only nor channelBucket_only
 
 if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
@@ -6051,6 +6115,14 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
       call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%QSTRMVOLRT_ACC, "qstrmvolrt" )
       !AD_CHANGE: Not needed in RESTART
       !call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%properties%retention_depth, "RETDEPRT" )
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+   if (nlst(did)%NTRACER .gt. 1) then
+     call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%control%boundary_flux_tr, "QBDRYRT_TR" )
+     call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%control%surface_water_head_routing_tr, "sfcheadsubrt_tr" )
+   end if
+!--------------------------------------------------------
    end if ! neither channel_only nor channelBucket_only
 
    if(nlst(did)%CHANRTSWCRT.eq.1) then
@@ -6068,6 +6140,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
               ,rt_domain(did)%gnlinksl&
 #endif
               )
+!--------------------------------------------
+         if (nlst(did)%NTRACER .gt. 1) then
+           call w_rst_crt_reach(ncid,rt_domain(did)%HLINK_TR, "hlink_tr"  &
+#ifdef MPP_LAND
+              ,rt_domain(did)%gnlinksl&
+#endif
+             )
+         end if
+!--------------------------------------------
         !call checkReach(99,rt_domain(did)%HLINK)
       endif
 
@@ -6083,6 +6164,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
               ,rt_domain(did)%gnlinksl &
 #endif
               )
+!--------------------------------------------
+         if (nlst(did)%NTRACER .gt. 1) then
+           call w_rst_crt_reach(ncid,rt_domain(did)%QLINK_TR(:,1), "qlink1_tr"  &
+#ifdef MPP_LAND   
+              ,rt_domain(did)%gnlinksl &
+#endif
+              )
+         end if
+!--------------------------------------------
       endif
 
       if(nlst(did)%channel_option .eq. 3) then
@@ -6097,6 +6187,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
               ,rt_domain(did)%gnlinksl &
 #endif
               )
+!--------------------------------------------
+         if (nlst(did)%NTRACER .gt. 1) then
+          call w_rst_crt_reach(ncid,rt_domain(did)%QLINK_TR(:,2), "qlink2_tr"  &
+#ifdef MPP_LAND   
+              ,rt_domain(did)%gnlinksl &
+#endif
+              )
+         end if
+!--------------------------------------------
 
 !! JLM If someone really wants the accumulated fluxes in the restart file, you can add them back.
 !! But Calculate accQLateral locally
@@ -6170,6 +6269,7 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
           nlst(did)%channelBucket_only .eq. 0         ) &
 
           call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake,"lake_inflort")
+          if (nlst(did)%NTRACER .gt. 1) call w_rst_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake_tr,"lake_inflort_tr")   !wt calc
 
    end if  !    if(nlst_rt(did)%CHANRTSWCRT.eq.1)
 
@@ -6185,6 +6285,44 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
                  ,rt_domain(did)%gnlinksl  &
 #endif
                  )
+!--------------------------------------------
+         if (nlst(did)%NTRACER .gt. 1) then
+           call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_tr, "z_gwsubbas_tr"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif
+                 )
+         end if
+!--------------------------------------------
+!--------partial mixing for GW bucket-----------
+         if (nlst(did)%PMOPT .gt. 10 .and. nlst(did)%PMOPT .lt. 20) then
+           call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_passive, "z_gwsubbas_passive"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif
+                 )
+           call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_active, "z_gwsubbas_active"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif
+                 )
+           call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_passive_tr, "z_gwsubbas_passive_tr"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif
+                 )
+           call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_active_tr, "z_gwsubbas_active_tr"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif   
+                 )
+            call w_rst_crt_reach(ncid,rt_domain(did)%cm_gwsubbas, "cm_gwsubbas"  &
+#ifdef MPP_LAND   
+                 ,rt_domain(did)%gnlinksl  &
+#endif   
+                 )
+         end if
+!------- end partial mixing for GW bucket-------
          else
             call w_rst_gwbucket_real(ncid,rt_domain(did)%numbasns,rt_domain(did)%gnumbasns, &
                  rt_domain(did)%basnsInd, rt_domain(did)%z_gwsubbas,"z_gwsubbas" )
@@ -6813,7 +6951,19 @@ if( nlst(did)%channel_only       .eq. 0 .and. &
       call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT,"infxsrt")
       call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm,"sfcheadrt")
       call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%soldrain,"soldrain")
-
+!----------------------------------------
+! Needed for water tracer vars
+!----------------------------------------
+      if (nlst(did)%NTRACER .gt. 1) then
+        call read_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%smc_tr,"smc_tr")
+        call read_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%sh2ox_tr,"sh2ox_tr")
+        call read_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%smc_sub,"smc_sub")
+        call read_rst_nc3(ncid,rt_domain(did)%ix,rt_domain(did)%jx,nlst(did)%NTRACER,rt_domain(did)%sh2ox_sub,"sh2ox_sub")
+        call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT_TR,"infxsrt_tr")
+        call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm_tr,"sfcheadrt_tr")
+        call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%soldrain_tr,"soldrain_tr")
+      end if
+!----------------------------------------
    end if ! rst_typ .eq. 1
    !yw check
 
@@ -6841,6 +6991,14 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          !No need to have in restart since live calculated.
          !call read_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%properties%retention_depth,"RETDEPRT")
          call read_rst_rt_nc3(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,nlst(did)%nsoil,rt_domain(did)%SH2OWGT,"sh2owgt")
+!----------------------------------------
+! Needed for water tracer vars
+!----------------------------------------
+        if (nlst(did)%NTRACER .gt. 1) then
+          call read_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%control%surface_water_head_routing_tr,"sfcheadsubrt_tr")
+          call read_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%control%boundary_flux_tr,"QBDRYRT_TR")
+        end if
+!----------------------------------------
       endif
 
    end if ! neither channel_only nor channelBucket_only
@@ -6864,6 +7022,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          !call read_rst_crt_reach_nc(ncid,rt_domain(did)%qSfcLatRunoff,"qSfcLatRunoff",rt_domain(did)%GNLINKSL)
          !call read_rst_crt_reach_nc(ncid,rt_domain(did)%accBucket,"accBucket",rt_domain(did)%GNLINKS)
          !endif
+!----------------------------------------
+! Needed for water tracer vars
+!----------------------------------------
+         if (nlst(did)%NTRACER .gt. 1) then
+           call read_rst_crt_reach_nc(ncid,rt_domain(did)%HLINK_TR,"hlink_tr",rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
+           call read_rst_crt_reach_nc(ncid,rt_domain(did)%QLINK_TR(:,1),"qlink1_tr",rt_domain(did)%GNLINKSL)
+           call read_rst_crt_reach_nc(ncid,rt_domain(did)%QLINK_TR(:,2),"qlink2_tr",rt_domain(did)%GNLINKSL)
+         end if
+!----------------------------------------
       endif
 
       if(rt_domain(did)%NLAKES .gt. 0) then
@@ -6877,6 +7044,7 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
 
          if(nlst(did)%SUBRTSWCRT.eq.1.or.nlst(did)%OVRTSWCRT.eq.1) then
             call read_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake,"lake_inflort")
+            if (nlst(did)%NTRACER .gt. 1) call read_rt_nc2(ncid,rt_domain(did)%ixrt,rt_domain(did)%jxrt,rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake_tr,"lake_inflort_tr")     !wt calc
          endif
       end if
 
@@ -6890,7 +7058,17 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
       if(nlst(did)%channel_only .eq. 0) then
          if(nlst(did)%UDMP_OPT .eq. 1) then
             call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas,"z_gwsubbas",rt_domain(did)%GNLINKSL)
-         else
+            if (nlst(did)%NTRACER .gt. 1) call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_tr,"z_gwsubbas_tr",rt_domain(did)%GNLINKSL)    !wt calc
+            !-----partial mixing for gw bucket-------------
+            if (nlst(did)%PMOPT .gt. 10 .and. nlst(did)%PMOPT .lt. 20) then
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_passive,"z_gwsubbas_passive",rt_domain(did)%GNLINKSL)
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_active,"z_gwsubbas_active",rt_domain(did)%GNLINKSL)
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_passive_tr,"z_gwsubbas_passive_tr",rt_domain(did)%GNLINKSL)
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_active_tr,"z_gwsubbas_active_tr",rt_domain(did)%GNLINKSL)
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%cm_gwsubbas,"cm_gwsubbas",rt_domain(did)%GNLINKSL)
+            end if
+            !-----end for partial mixing for gw bucket-----
+         else 
             call read_rst_gwbucket_real(ncid,rt_domain(did)%z_gwsubbas,rt_domain(did)%numbasns,&
                  rt_domain(did)%gnumbasns,rt_domain(did)%basnsInd, "z_gwsubbas")
          endif

@@ -18,18 +18,18 @@ module module_NWM_io_dict
 implicit none
 
 ! Declare parameter values for module.
-integer, parameter :: numChVars = 11
-integer, parameter :: numLdasVars = 116
+integer, parameter :: numChVars = 15  ! 4 tracer vars
+integer, parameter :: numLdasVars = 136  ! 20 tracer vars
 ! Note: if more ldas variables are added the logic will need to be changed in
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
-integer, parameter :: numLdasVars_crocus_off = 98
+integer, parameter :: numLdasVars_crocus_off = 98  !!ADFIX
 
-integer, parameter :: numRtDomainVars = 5
+integer, parameter :: numRtDomainVars = 8 ! 3 tracer vars
 integer, parameter :: numLakeVars = 2
 integer, parameter :: numChGrdVars = 1
-integer, parameter :: numLsmVars = 14
+integer, parameter :: numLsmVars = 19 ! 5 tracer vars
 integer, parameter :: numChObsVars = 1
-integer, parameter :: numGwVars = 4
+integer, parameter :: numGwVars = 12 ! 8 tracer vars
 integer :: i
 !integer :: nsoil = nlst_rt(1)%nsoil
 integer :: nsoil
@@ -746,7 +746,9 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
    !                            "qBtmVertRunoff","AccSfcLatRunoff","accBucket"/)
    chrtOutDict%varNames(:) = [character(len=64) :: "streamflow","nudge","q_lateral","velocity",&
                               "Head","qSfcLatRunoff","qBucket",&
-                              "qBtmVertRunoff","AccSfcLatRunoff","accBucket","qloss"]
+                              "qBtmVertRunoff","AccSfcLatRunoff","accBucket","qloss",&
+                              "streamflow_tr", "q_lateral_tr",                & !wt vars
+                              "Head_tr","qBucket_tr"]                           !wt vars
    chrtOutDict%longName(:) = [character(len=64) :: "River Flow","Amount of stream flow alteration",&
                               "Runoff into channel reach","River Velocity",&
                               "River Stage","Runoff from terrain routing",&
@@ -754,34 +756,45 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
                               "Runoff from bottom of soil to bucket",&
                               "Accumulated runoff from terrain routing",&
                               "Accumulated runoff from gw bucket",&
-                              "Channel Infiltration"]
+                              "Channel Infiltration",&
+                              "tracer River Flow", "tracer Runoff into channel reach", & ! tracers
+                              "tracer River Stage", "tracer Flux from gw bucket"]        ! tracers
    chrtOutDict%units(:) = [character(len=64) :: "m3 s-1","m3 s-1","m3 s-1","m s-1",&
                                                 "meter","m3 s-1","m3 s-1",&
-                                                "m3","m3","m3","m3 s-1"]
+                                                "m3","m3","m3","m3 s-1",&
+                                                "m3 s-1", "m3 s-1", "meter", "m3 s-1"]   ! tracers
    chrtOutDict%coordNames(:) = [character(len=64) :: "latitude longitude","latitude longitude",&
+                                 "latitude longitude","latitude longitude",&
+                                 "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude"]
    chrtOutDict%scaleFactor(:) = [0.01,0.01,0.1,0.01,0.01,0.00001,0.00001,0.001,&
-                                 0.01,0.01,0.1]
+                                 0.01,0.01,0.1,&
+                                 0.01,0.1,0.01,0.001]  ! tracers
    chrtOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,&
-                               0.0,0.0]
+                               0.0,0.0,&
+                               0.0,0.0,0.0,0.0]  ! tracers
    ! Initialize all output flags to 0. Modify (if absolutely necessary) in the
    ! output subroutine.
-   chrtOutDict%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,0]
-   chrtOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1]
+   chrtOutDict%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+   chrtOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
    chrtOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
+                              -9999.0,-9999.0,-9999.0,-9999.0]  ! tracers
    chrtOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                                 -9999.0]
+                                 -9999.0,&
+                                 -9999.0,-9999.0,-9999.0,-9999.0]  ! tracers
    chrtOutDict%validMinDbl(:) = [0.0d0, -50000.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
-                                  0.0d0, 0.0d0, 0.0d0]
+                                 0.0d0, 0.0d0, 0.0d0,&
+                                 0.0,0.0,0.0,0.0]  ! tracers
    chrtOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, &
-                                  20000.0d0, 20000.0d0, 20000.0d0, 50000.0d0, &
-                                  50000.0d0, 50000.0d0]
+                                 20000.0d0, 20000.0d0, 20000.0d0, 50000.0d0, &
+                                 50000.0d0, 50000.0d0,&
+                                 500000.0,500000.0,500000.0,500000.0]  ! tracers
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numChVars
@@ -1081,7 +1094,11 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                "PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE",&                    !105-107
                                "PSNOWTEMP","PSNOWDZ","PSNOWHIST",&                       !108-110
                                "PSNOWLIQ","PSNOWHEAT","PSNOWRHO",&                       !111-113
-                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW"]                      !114-116
+                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW",&                     !114-116
+                               "LH_TR","ECAN_TR","EDIR_TR","ETRAN_TR","UGDRNOFF_TR",&    !117-121 (tracers)
+                               "SFCRNOFF_TR","CANLIQ_TR","CANICE_TR","WA_TR","WT_TR",&   !122-126 (tracers)
+                               "SNICE_TR","SNLIQ_TR","SOIL_W_TR","SOIL_M_TR","FLUX_TR",& !127-131 (tracers)
+                               "SNOWH_TR","SNEQV_TR","QSNOW_TR","ACSNOW_TR","ACSNOM_TR"] !132-136 (tracers)
 
   ldasOutDict%longName(:) = [character(len=128) :: &
                               "Dominant vegetation category",&          !1
@@ -1182,24 +1199,44 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                               "snowpack albedo, direct",&               !96
                               "snowpack albedo, diffuse",&              !97
                               "Rainfall rate on the ground",&           !98
-                              "Glacier grid point",&                    !99
-                              "Glacier height",&                        !100
-                              "Snow albedo",&                           !101
-                              "Runoff from glacier",&                   !102
-                              "Total snow height",&                     !103
-                              "Total snow swe", &                       !104
-                               "Snow gran 1, optiacal diameter",&       !105
-                               "Snow gran 2, sphericity",&              !106
-                               "Snow age",&                             !107
-                               "Snow temperature",&                     !108
-                               "Snow thickness",&                       !109
-                               "Snow history",&                         !110
-                               "Liquid in snow",&                       !111
-                               "Snow heat",&                            !112
-                               "Snow density",&                         !113
-                               "Snow water equivalent", &               !114
-                               "Accumulated glacier melt from ice", &   !115
-                               "Accumulated glacier melt from snow"]    !116
+                              "Glacier grid point",&                    !99 (crocus)
+                              "Glacier height",&                        !100 (crocus)
+                              "Snow albedo",&                           !101 (crocus)
+                              "Runoff from glacier",&                   !102 (crocus)
+                              "Total snow height",&                     !103 (crocus)
+                              "Total snow swe", &                       !104 (crocus)
+                              "Snow gran 1, optiacal diameter",&        !105 (crocus)
+                              "Snow gran 2, sphericity",&               !106 (crocus)
+                              "Snow age",&                              !107 (crocus)
+                              "Snow temperature",&                      !108 (crocus)
+                              "Snow thickness",&                        !109 (crocus)
+                              "Snow history",&                          !110 (crocus)
+                              "Liquid in snow",&                        !111 (crocus)
+                              "Snow heat",&                             !112 (crocus)
+                              "Snow density",&                          !113 (crocus)
+                              "Snow water equivalent", &                !114 (crocus)
+                              "Accumulated glacier melt from ice", &    !115 (crocus)
+                              "Accumulated glacier melt from snow", &   !116 (crocus)
+                              "Total latent heat to the atmosphere from tracer", & !117 (tracers)
+                              "Canopy water evaporation rate from tracer", &       !118 (tracers)
+                              "Direct from soil evaporation rate from tracer", &   !119 (tracers)
+                              "Transpiration rate from tracer", &                  !120 (tracers)
+                              "Accumulated underground runoff from tracer", &      !121 (tracers)
+                              "Accumulated surface runoff from tracer", &          !122 (tracers)
+                              "Canopy liquid water content from tracer", &         !123 (tracers)
+                              "Canopy ice water content from tracer", &            !124 (tracers)
+                              "Water in aquifer from tracer", &                    !125 (tracers)
+                              "Water in aquifer and saturated soil from tracer", & !126 (tracers)
+                              "Snow layer ice from tracer", &                      !127 (tracers)
+                              "Snow layer liquid water from tracer", &             !128 (tracers)
+                              "liquid volumetric soil moisture from tracer", &     !129 (tracers)
+                              "volumetric soil moisture, the dimensionless ratio of water volume (m3) to soil volume (m3) from tracer", & !130 (tracers)
+                              "tracer fluxes at soil layer bottom", &              !131 (tracers)
+                              "Snow depth from tracer", &                          !132 (tracers)
+                              "Snow water equivalent from tracer", &               !133 (tracers)
+                              "Snowfall rate from tracer", &                       !134 (tracers)
+                              "accumulated snow fall from tracer", &               !135 (tracers)
+                              "accumulated melting water out of snow bottom from tracer"] !136 (tracers)
 
    ldasOutDict%units(:) = [character(len=64) :: &
                             "category","category","-","-","-", &               !1-5
@@ -1222,12 +1259,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             "g m-2s-1 C","g m-2s-1 C","umol CO2 m-2 s-1","W m-2","mm", & !86-90
                             "mm","1","1","1","K", &                            !91-95
                             "-","-","mm s-1",&                                 !96-98
-                            "-","m","-", &                                     !99-101
-                            "kg/(m2 s)","m","kg m-2",&                         !102-104
-                            "m","-","days since snowfall",&                    !105-107
-                            "K","m","-",&                                      !108-110
-                            "kg/m3","J/m2","m",&                               !111-113
-                            "kg m-2","kg/m2","kg/m2"]                          !114-116
+                            "-","m","-", &                                     !99-101 (crocus)
+                            "kg/(m2 s)","m","kg m-2",&                         !102-104 (crocus)
+                            "m","-","days since snowfall",&                    !105-107 (crocus)
+                            "K","m","-",&                                      !108-110 (crocus)
+                            "kg/m3","J/m2","m",&                               !111-113 (crocus)
+                            "kg m-2","kg/m2","kg/m2",&                         !114-116 (crocus)
+                            "W m-2","kg m-2s-1","kg m-2s-1","kg m-2s-1","mm",& !117-121 (tracers)
+                            "mm","mm","m","kg m-2","kg m-2",&                  !122-126 (tracers)
+                            "mm","mm","m3 m-3","m3 m-3","m",&                  !127-131 (tracers)
+                            "m","kg m-2","mm s-1","mm","mm"]                   !132-136 (tracers)
 
    ldasOutDict%scaleFactor(:) = [1.0, 1.0, 0.01, 0.1, 0.1, &                   !1-5
                                  0.1, 0.01, 0.1, 0.00001, 0.01, &              !6-10
@@ -1249,12 +1290,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  0.01, 0.01, 0.01, 0.01, 0.01, &               !86-90
                                  0.01, 0.01, 0.001, 0.001, 0.1, &              !91-95
                                  0.01, 0.01, 0.00001, &                        !96-98
-                                 1.0, 0.1, 0.01, &                             !99-101
-                                 0.0001, 0.0001, 0.1, &                        !102-104
-                                 0.01, 0.01, 0.01, &                           !105-107
-                                 0.1, 0.0001, 0.01, &                          !108-110
-                                 0.001, 1000.0, 0.1, &                         !111-113
-                                 0.1, 0.001, 0.001 ]                           !114-116
+                                 1.0, 0.1, 0.01, &                             !99-101 (crocus)
+                                 0.0001, 0.0001, 0.1, &                        !102-104 (crocus)
+                                 0.01, 0.01, 0.01, &                           !105-107 (crocus)
+                                 0.1, 0.0001, 0.01, &                          !108-110 (crocus)
+                                 0.001, 1000.0, 0.1, &                         !111-113 (crocus)
+                                 0.1, 0.001, 0.001, &                          !114-116 (crocus)
+                                 0.1, 0.000001, 0.000001, 0.000001, 0.01, &    !117-121 (tracers)
+                                 0.001, 0.01, 0.01, 0.01, 0.01, 0.01, &        !122-127 (tracers)
+                                 0.01, 0.01, 0.01, 0.001, &                    !128-131 (tracers)
+                                 0.1, 0.000001, 1.0, 0.01, 0.01]               !132-136 (tracers)
 
    ldasOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !1-10
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !11-20
@@ -1266,12 +1311,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !71-80
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !81-90
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &         !91-98
-                               0.0,0.0,0.0, &                             !99-101
-                               0.0,0.0,0.0, &                             !102-104
-                               0.0,0.0,0.0, &                             !105-107
-                               0.0,0.0,0.0, &                             !108-110
-                               0.0,0.0,0.0, &                             !111-113
-                               0.0,0.0,0.0]                               !114-116
+                               0.0,0.0,0.0, &                             !99-101 (crocus)
+                               0.0,0.0,0.0, &                             !102-104 (crocus)
+                               0.0,0.0,0.0, &                             !105-107 (crocus)
+                               0.0,0.0,0.0, &                             !108-110 (crocus)
+                               0.0,0.0,0.0, &                             !111-113 (crocus)
+                               0.0,0.0,0.0, &                             !114-116 (crocus)
+                               0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !117-126 (tracer)
+                               0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]   !127-136 (tracer)
 
    ! Note that output flags will be set in the the output routine, and will vary
    ! by the IOC flag specified in hydro.namelist.
@@ -1285,12 +1332,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                              0,0,0,0,0,0,0,0,0,0, & !71-80
                              0,0,0,0,0,0,0,0,0,0, & !81-90
                              0,0,0,0,0,0,0,0, &     !91-98
-                             0,0,0, &               !99-101
-                             0,0,0, &               !102-104
-                             0,0,0, &               !105-107
-                             0,0,0, &               !108-110
-                             0,0,0, &               !111-103
-                             0,0,0]                 !114-116
+                             0,0,0, &               !99-101 (crocus)
+                             0,0,0, &               !102-104 (crocus)
+                             0,0,0, &               !105-107 (crocus)
+                             0,0,0, &               !108-110 (crocus)
+                             0,0,0, &               !111-103 (crocus)
+                             0,0,0, &               !114-116 (crocus)
+                             0,0,0,0,0,0,0,0,0,0, & !117-126 (tracer)
+                             0,0,0,0,0,0,0,0,0,0]   !127-136 (tracer)
 
    ldasOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1, & !1-10
                                   1,1,1,1,1,1,1,1,1,1, & !11-20
@@ -1302,12 +1351,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                   1,1,1,1,1,1,1,1,1,1, & !71-80
                                   1,1,1,1,1,1,1,1,1,1, & !81-90
                                   1,1,1,1,1,1,1,1, &     !91-98
-                                  1,1,1, &               !99-101
-                                  1,1,1, &               !102-104
-                                  1,1,1, &               !105-107
-                                  1,1,1, &               !108-110
-                                  1,1,1, &               !111-113
-                                  1,1,1]                 !114-116
+                                  1,1,1, &               !99-101 (crocus)
+                                  1,1,1, &               !102-104 (crocus)
+                                  1,1,1, &               !105-107 (crocus)
+                                  1,1,1, &               !108-110 (crocus)
+                                  1,1,1, &               !111-113 (crocus)
+                                  1,1,1, &               !114-116 (crocus)
+                                  1,1,1,1,1,1,1,1,1,1, & !117-126 (tracer)
+                                  1,1,1,1,1,1,1,1,1,1]   !127-136 (tracer)
 
    ldasOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1, &  !1-10
                             1,1,1,1,1,1,1,1,1,1, &  !11-20
@@ -1319,12 +1370,15 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             1,1,1,1,1,1,1,1,1,1, &  !71-80
                             1,1,1,1,1,1,1,1,1,1, &  !81-90
                             1,1,1,1,1,2,2,1, &      !91-98
-                            1,1,1, &                !99-101
-                            1,1,1, &                !102-104
-                            40,40,40, &             !105-107
-                            40,40,40, &             !108-110
-                            40,40,40, &             !111-113
-                            40,1,1]                 !114-116
+                            1,1,1, &                !99-101 (crocus)
+                            1,1,1, &                !102-104 (crocus)
+                            40,40,40, &             !105-107 (crocus)
+                            40,40,40, &             !108-110 (crocus)
+                            40,40,40, &             !111-113 (crocus)
+                            40,1,1, &               !114-116 (crocus)
+                            1,1,1,1,1,1,1,1,1,1, &  !117-126 (tracer)
+                            3,3,4,4,4,1,1,1,1,1]    !127-136 (tracer)
+
    ldasOutDict%numLev(105:114) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
@@ -1347,12 +1401,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !86-90
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !91-95
                                  -9999.0,-9999.0,-999.0,                  & !96-98
-                                 -9999.0,-9999.0,-9999.0,                 & !99-101
-                                 -9999.0,-9999.0,-9999.0,                 & !102-104
-                                 -9999.0,-9999.0,-9999.0,                 & !105-107
-                                 -9999.0,-9999.0,-9999.0,                 & !108-110
-                                 -9999.0, 9999000.0,-9999.0,                 & !111-113
-                                 -9999.0,-9999.0,-9999.0 ]                  !114-116
+                                 -9999.0,-9999.0,-9999.0,                 & !99-101 (crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !102-104 (crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !105-107 (crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !108-110 (crocus)
+                                 -9999.0, 9999000.0,-9999.0,              & !111-113 (crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !114-116 (crocus)
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !117-121 (tracer)
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !122-126 (tracer)
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !127-131 (tracer)
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]   !132-136 (tracer)
 
    ldasOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10
@@ -1374,12 +1432,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !86-90
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !91-95
                               -9999.0,-9999.0,-999.0,                  & !96-98
-                              -9999.0,-9999.0,-9999.0,                 & !99-101
-                              -9999.0,-9999.0,-9999.0,                 & !102-104
-                              -9999.0,-9999.0,-9999.0,                 & !105-107
-                              -9999.0,-9999.0,-9999.0,                 & !108-110
-                              -9999.0, 9999000.0,-9999.0,                 & !111-113
-                              -9999.0,-9999.0,-9999.0 ]                  !114-116
+                              -9999.0,-9999.0,-9999.0,                 & !99-101 (crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !102-104 (crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !105-107 (crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !108-110 (crocus)
+                              -9999.0, 9999000.0,-9999.0,              & !111-113 (crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !114-116 (crocus)
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !117-121 (tracer)
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !122-126 (tracer)
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !127-131 (tracer)
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]   !132-136 (tracer)
 
    ldasOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                     !1-5
                                  -1000.0d0, -1.0d0, -1500.0d0, 0.0d0, 0.0d0, &            !6-10
@@ -1402,12 +1464,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  -5.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                    !91-95
                                  0.0d0, 0.0d0, 0.0d0,&                                    !96-98
    !! NBNB Check these values
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !99-101
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !102-104
-                                 -1.0d2, 0.0d0, 0.0d0, &                                  !105-107
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !108-110
-                                 0.0d0, -2.0d12, 0.0d0, &                                  !111-113
-                                 0.0d0, 0.0d0, 0.0d0 ]                                    !114-116
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !99-101 (crocus)
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !102-104 (crocus)
+                                 -1.0d2, 0.0d0, 0.0d0, &                                  !105-107 (crocus)
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !108-110 (crocus)
+                                 0.0d0, -2.0d12, 0.0d0, &                                 !111-113 (crocus)
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !114-116 (crocus)
+                                 -1500.0d0, -100.0d0, -100.0d0, -100.0d0, -100.0d0, &     !117-121 (tracer)
+                                 0.0d0, -5.0d0, -5.0d0, 0.0d0, 0.0d0, &                   !122-126 (tracer)
+                                 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                     !127-131 (tracer)
+                                 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0]                       !132-136 (tracer)
 
    ldasOutDict%validMaxDbl(:) = [100.0d0, 100.0d0, 1.0d0, 20.0d0, 20.0d0, &             !1-5
                                  3000.0d0, 1.0d0, 1500.0d0, 100.0d0, 1.0d0, &           !6-10
@@ -1430,12 +1496,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  30000.0d0, 1.0d0, 1.0d0, 1.0d0, 400.0d0, &             !91-95
                                  1.0d0, 1.0d0, 100.0d0,&                                !96-98
    ! NBNB Check these values
-                                 1.0d0, 1.0d4, 1.0d0, &                                 !99-101
-                                 1.0d5, 1.0d4, 1.0d8, &                                 !102-104
-                                 1.0D2, 1.0D2, 1.0d5, &                                 !105-107
-                                 300.0d0, 1.0d4, 1.0d2, &                               !108-110
-                                 1.0d5, 0.0d0, 1.0d3, &                                 !111-113
-                                 1.0d6, 1.d5, 1.d5]                                     !114-116
+                                 1.0d0, 1.0d4, 1.0d0, &                                 !99-101 (crocus)
+                                 1.0d5, 1.0d4, 1.0d8, &                                 !102-104 (crocus)
+                                 1.0D2, 1.0D2, 1.0d5, &                                 !105-107 (crocus)
+                                 300.0d0, 1.0d4, 1.0d2, &                               !108-110 (crocus)
+                                 1.0d5, 0.0d0, 1.0d3, &                                 !111-113 (crocus)
+                                 1.0d6, 1.d5, 1.d5, &                                   !114-116 (crocus)
+                                 1500.0d0, 100.0d0, 100.0d0, 100.0d0, 100000.0d0, &     !117-121 (tracer)
+                                 100000.0d0, 30000.0d0, 30000.0d0, 10000.0d0, 10000.0d0, & !122-126 (tracer)
+                                 100000.0d0, 100000.0d0, 1.0d0, 1.0d0, 100000.0d0, &    !127-131 (tracer)
+                                 100.0d0, 100000.0d0, 100.0d0, 100000.0d0, 100000.0d0]  !132-136 (tracer)
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
@@ -1768,21 +1838,46 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
 
    endif
 
-   rtDomainDict%varNames(:) = [character(len=64) :: "zwattablrt","sfcheadsubrt","QSTRMVOLRT",&
-                               "QBDRYRT","SOIL_M"]
-   rtDomainDict%longName(:) = [character(len=64) :: "depth to saturation, rounded to highest saturated layer",&
-                               "surface head","channel inflow",&
-                               "accumulated value of the boundary flux, + into domain - out of domain",&
-                               "volumetric soil moisture"]
-   rtDomainDict%units(:) = [character(len=64) :: "m","mm","mm","mm","m3 m-3"]
-   rtDomainDict%scaleFactor(:) = [0.1,1.0,1.0,1.0,0.01]
-   rtDomainDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0]
-   rtDomainDict%outFlag(:) = [0,0,0,0,0]
-   rtDomainDict%timeZeroFlag(:) = [1,1,1,1,1]
-   rtDomainDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
-   rtDomainDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
-   rtDomainDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, -1000000.0d0, 0.0d0]
-   rtDomainDict%validMaxDbl(:) = [100.0d0, 1000000.0d0, 1000000.0d0, 1000000.0d0, 100.0d0]
+   rtDomainDict%varNames(:) = [character(len=64) :: &
+                               "zwattablrt", "sfcheadsubrt", "QSTRMVOLRT", &
+                               "QBDRYRT", "SOIL_M", &
+                               "sfcheadsubrt_tr", "QBDRYRT_TR", "SOIL_M_TR"]  ! tracer
+   rtDomainDict%longName(:) = [character(len=64) :: &
+                               "depth to saturation, rounded to highest saturated layer", &
+                               "surface head", "channel inflow", &
+                               "accumulated value of the boundary flux, + into domain - out of domain", &
+                               "volumetric soil moisture", &
+                               "tracer surface head", &             ! tracer
+                               "tracer accumulated value of the boundary flux, + into domain - out of domain", & ! tracer
+                               "tracer volumetric soil moisture"]   ! tracer
+   rtDomainDict%units(:) = [character(len=64) :: &
+                               "m", "mm", "mm", &
+                               "mm", "m3 m-3", &
+                               "mm", "mm", "m3 m-3"]  ! tracer
+   rtDomainDict%scaleFactor(:) = [0.1, 1.0, 1.0, &
+                                  1.0, 0.01, &
+                                  1.0, 1.0, 0.1]  ! tracer
+   rtDomainDict%addOffset(:) = [0.0, 0.0, 0.0, &
+                                0.0, 0.0, &
+                                0.0, 0.0, 0.0]  ! tracer
+   rtDomainDict%outFlag(:) = [0, 0, 0, &
+                              0, 0, &
+                              0, 0, 0]  ! tracer
+   rtDomainDict%timeZeroFlag(:) = [1, 1, 1, &
+                                   1, 1, &
+                                   1, 1, 1]  ! tracer
+   rtDomainDict%missingReal(:) = [-9999.0, -9999.0, -9999.0, &
+                                  -9999.0, -9999.0, &
+                                  -9999.0, -9999.0, -9999.0]  ! tracer
+   rtDomainDict%fillReal(:) = [-9999.0, -9999.0, -9999.0, &
+                               -9999.0, -9999.0, &
+                               -9999.0, -9999.0, -9999.0]  ! tracer
+   rtDomainDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, &
+                                  -1000000.0d0, 0.0d0, &
+                                  0.0d0, -1000000.0d0, 0.0d0]  ! tracer
+   rtDomainDict%validMaxDbl(:) = [100.0d0, 1000000.0d0, 1000000.0d0, &
+                                  1000000.0d0, 100.0d0, &
+                                  1000000.0d0, 1000000.0d0, 100.0d0] ! tracer
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
@@ -2515,7 +2610,9 @@ subroutine initLsmOutDict(lsmOutDict,procId,diagFlag)
 
    lsmOutDict%varNames(:) = [character(len=64) :: "stc1","smc1","sh2ox1","stc2",&
                              "smc2","sh2ox2","stc3","smc3","sh2ox3","stc4",&
-                             "smc4","sh2ox4","infxsrt","sfcheadrt"]
+                             "smc4","sh2ox4","infxsrt","sfcheadrt", &
+                             "infxsrt_tr", "sh2ox1_tr","sh2ox2_tr", &    ! tracer
+                             "sh2ox3_tr","sh2ox4_tr"]                    ! tracer
    lsmOutDict%longName(:) = [character(len=64) :: "Soil temperature in the top layer",&
                              "Soil moisture in the top layer",&
                              "Volumetric soil moisture in the top layer",&
@@ -2528,25 +2625,39 @@ subroutine initLsmOutDict(lsmOutDict,procId,diagFlag)
                              "Soil temperature in the fourth layer",&
                              "Soil moisture in the fourth layer",&
                              "Volumetric soil moisture in the fourth layer",&
-                             "Infiltration excess","Surface head"]
-   lsmOutDict%units(:) = [character(len=64) :: "K","fraction","fraction",&
-                          "K","fraction","fraction","K","fraction",&
-                          "fraction","K","fraction","fraction",&
-                          "mm","mm"]
+                             "Infiltration excess","Surface head",   &
+                             "tracer infiltration excess",           &  ! tracer
+                             "tracer soil water in the top layer",   &  ! tracer
+                             "tracer soil water in the second layer",&  ! tracer
+                             "tracer soil water in the third layer", &  ! tracer
+                             "tracer soil water in the fourth layer"]   ! tracer
+   lsmOutDict%units(:) = [character(len=64) :: "K", "fraction", "fraction", &
+                          "K", "fraction", "fraction", "K", "fraction", &
+                          "fraction", "K", "fraction", "fraction", &
+                          "mm", "mm",  &
+                          "mm", "fraction", "fraction", "fraction", "fraction"]  ! tracer
    lsmOutDict%scaleFactor(:) = [0.1,0.01,0.01,0.1,0.01,0.01,0.1,0.01,0.01,&
-                                0.1,0.01,0.01,1.0,1.0]
+                                0.1,0.01,0.01,1.0,1.0, &
+                                1.0, 0.01, 0.01, 0.01, 0.01]  ! tracer
    lsmOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,&
-                              0.0,0.0,0.0,0.0]
-   lsmOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-   lsmOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                              0.0,0.0,0.0,0.0,&
+                              0.0, 0.0, 0.0, 0.0, 0.0]  ! tracer
+   lsmOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,&
+                                 1,1,1,1,1]  ! tracer
+   lsmOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,&
+                           1,1,1,1,1]  ! tracer
    lsmOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                                -9999.0,-9999.0,-9999.0,-9999.0]
+                                -9999.0,-9999.0,-9999.0,-9999.0,  &
+                                -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]  ! tracer
    lsmOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                             -9999.0,-9999.0,-9999.0,-9999.0]
+                             -9999.0,-9999.0,-9999.0,-9999.0, &
+                             -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]  ! tracer
    lsmOutDict%validMinDbl(:) = [150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, &
-                                 150.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0]
+                                150.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+                                0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0]  ! tracer
    lsmOutDict%validMaxDbl(:) = [400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, &
-                                 400.0d0, 1.0d0, 1.0d0, 100000.0d0, 100000.0d0]
+                                400.0d0, 1.0d0, 1.0d0, 100000.0d0, 100000.0d0, &
+                                100000.0d0, 1.0d0, 1.0d0, 1.0d0, 1.0d0]  ! tracer
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numLsmVars
@@ -2734,18 +2845,43 @@ subroutine initGwDict(gwOutDict)
    !gwOutDict%lonUnits = "degrees_east"
    !gwOutDict%lonStName = "longitude"
 
-   gwOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','loss','depth']
-   gwOutDict%longName(:) = [character(len=64) :: 'Bucket Inflow','Bucket Outflow','Bucket Loss','Bucket Depth']
-   gwOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1','m3 s-1','mm']
+   gwOutDict%varNames(:) = [character(len=64) :: &
+                            'inflow','outflow','loss','depth', &
+                            'inflow_tr','outflow_tr','depth_tr', &   ! tracer
+                            'depth_passive','depth_active', &        ! tracer
+                            'depth_passive_tr','depth_active_tr', &  ! tracer
+                            'cm_coef']                               ! tracer
+   gwOutDict%longName(:) = [character(len=64) :: &
+                            'Bucket Inflow', 'Bucket Outflow', 'Bucket Loss', 'Bucket Depth', &
+                            'tracer Bucket Inflow', 'tracer Bucket Outflow', 'tracer Bucket Depth', &  ! tracer
+                            'Bucket Depth for passive storage', 'Bucket Depth for active storage', &   ! tracer
+                            'tracer Bucket Depth for passive storage', 'tracer Bucket Depth for active storage', &  ! tracer
+                            'mixing coefficient between passive and active storages']  ! tracer
+   gwOutDict%units(:) = [character(len=64) :: &
+                         'm3 s-1', 'm3 s-1', 'm3 s-1', 'mm', &
+                         'm3 s-1', 'm3 s-1', 'mm', &  ! tracer
+                         'mm', 'mm', 'mm', 'mm', '1'] ! tracer
    !gwOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude','latitude longitude','latitude longitude','latitude longitude']
-   gwOutDict%scaleFactor(:) = [0.001,0.001,0.001,0.1]
-   gwOutDict%addOffset(:) = [0.0,0.0,0.0,0.0]
-   gwOutDict%outFlag(:) = [0,0,0,0]
-   gwOutDict%timeZeroFlag(:) = [0,0,0,1]
-   gwOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   gwOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   gwOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0]
-   gwOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 10000.0d0]
+   gwOutDict%scaleFactor(:) = [0.001, 0.001, 0.001, 0.1, &
+                               0.01, 0.01, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]  ! tracer
+   gwOutDict%addOffset(:) = [0.0, 0.0, 0.0, 0.0, &
+                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  ! tracer
+   gwOutDict%outFlag(:) = [0, 0, 0, 0, &
+                           0, 0, 0, 0, 0, 0, 0, 0]  ! tracer
+   gwOutDict%timeZeroFlag(:) = [0, 0, 0, 1, &
+                                0, 0, 0, 0, 0, 0, 0, 0]  ! tracer
+   gwOutDict%fillReal(:) = [-9999.0, -9999.0, -9999.0, -9999.0, & 
+                            -9999.0, -9999.0, -9999.0, -9999.0, &  ! tracer
+                            -9999.0, -9999.0, -9999.0, -9999.0]    ! tracer
+   gwOutDict%missingReal(:) = [-9999.0, -9999.0, -9999.0, -9999.0, &
+                               -9999.0, -9999.0, -9999.0, -9999.0, &  ! tracer
+                               -9999.0, -9999.0, -9999.0, -9999.0]    ! tracer
+   gwOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+                               0.0d0, 0.0d0, 0.0d0, 0.0d0, &  ! tracer
+                               0.0d0, 0.0d0, 0.0d0, 0.0d0]    ! tracer
+   gwOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 10000.0d0, &
+                               10000.0d0, 10000.0d0, 10000.0d0, 10000.0d0, &  ! tracer
+                               10000.0d0, 10000.0d0, 10000.0d0, 10000.0d0]    ! tracer
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.

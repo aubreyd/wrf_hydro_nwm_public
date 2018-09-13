@@ -27,6 +27,7 @@ module module_NoahMP_hrldas_driver
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
   USE modi_ini_csts
+  !USE module_sf_watertracer, only: tell_wt_flag, initialized_wt 
 #ifdef MPP_LAND
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
   use module_mpp_land, only: check_land, node_info, numprocs
@@ -45,6 +46,7 @@ module module_NoahMP_hrldas_driver
 
 #ifdef WRF_HYDRO
    REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain
+   REAL,    allocatable, DIMENSION(:,:)   :: infxsrt_tr, sfcheadrt_tr, soldrain_tr    ! water tracer vars
    !LRK - Remove HRLDAS_ini_typ for WRF-Hydro
    integer :: forc_typ, snow_assim, HRLDAS_ini_typ
    !integer :: forc_typ, snow_assim
@@ -294,6 +296,58 @@ module module_NoahMP_hrldas_driver
    &            its,ite, jts,jte, kts,kte      ! t -> tile
 
 !------------------------------------------------------------------------
+! Needed for Water tracer capability
+!------------------------------------------------------------------------
+
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QFX_TR       ! latent heat flux [kg s-1 m-2]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LH_TR        ! latent heat flux [W m-2]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SFCRUNOFF_TR ! accumulated surface runoff [m]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  UDRUNOFF_TR  ! accumulated sub-surface runoff [m]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SMOIS_TR     ! volumetric soil moisture [m3/m3]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SH2OXY_TR      ! volumetric liquid soil moisture [m3/m3]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWXY_TR      ! snow water equivalent [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWHXY_TR     ! physical snow depth [m]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  CANWAT_TR    ! total canopy water + ice [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACSNOM_TR    ! accumulated snow melt leaving pack
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ACSNOW_TR    ! accumulated snow on grid
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  CANICEXY_TR  ! canopy-intercepted ice (mm)
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  CANLIQXY_TR  ! canopy-intercepted liquid water (mm)
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QSNOWXY_TR   ! snowfall on the ground [mm/s]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  WSLAKEXY_TR  ! lake water storage [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  WAXY_TR      ! water in the "aquifer" [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  WTXY_TR      ! groundwater storage [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SMCWTDXY_TR  ! groundwater storage [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  DEEPRECHXY_TR! groundwater storage [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RECHXY_TR    ! groundwater storage [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  ZSNSOXY_TR   ! snow layer depth [m]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SNICEXY_TR   ! snow layer ice [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SNLIQXY_TR   ! snow layer liquid water [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RUNSFXY_TR   ! surface runoff [mm/s]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RUNSBXY_TR   ! subsurface runoff [mm/s]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ECANXY_TR    ! evaporation of intercepted water (mm/s)
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  EDIRXY_TR    ! soil surface evaporation rate (mm/s]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ETRANXY_TR   ! transpiration rate (mm/s)
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  FLUXXY_TR    ! tracer flux at soil bottom [m]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SMOIS_SUB    ! volumetric soil moisture in sublayers [m3/m3]
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SH2OXY_SUB     ! volumetric liquid soil moisture in sublayers [m3/m3]
+  !------namelist variables----------------
+  integer                                 :: water_tracer_option ! 0-water tracer off, 1-water tracer on
+  character(len=256)                      :: track_start   ! YYYY-MM-DD
+  character(len=256)                      :: track_end     ! YYYY-MM-DD
+  integer                                 :: partial_mixing_option ! partial mixing option (0-complete mixing, 1-partial mixing)
+  !-----variables read fro namelist--------
+  integer                                 :: OPT_WT       ! 0-water tracer off, 1-water tracer on
+  character(len=19)                       :: wvtstart     ! YYYY-MM-DD_hh:mm:ss
+  character(len=19)                       :: wvtend       ! YYYY-MM-DD_hh:mm:ss
+  integer                                 :: IOPT_PM      ! partial mixing option (0-complete mixing, 1-partial mixing)
+  integer                                 :: NTRACER      ! sum of NSUB
+  !------tracer flag and raio variables to "tag" water from precip------
+  INTEGER                                 :: wvtflag      ! 0->before track_start; 1->at track_start
+                                                          ! 2->during tracking period; 3->after track_end
+  REAL                                    :: wvt_ratio    ! ratio of tracer precip to total precip
+  INTEGER                                 :: K
+
+!------------------------------------------------------------------------
 ! Needed for NoahMP init
 !------------------------------------------------------------------------
 
@@ -444,6 +498,33 @@ module module_NoahMP_hrldas_driver
      use module_hrldas_HYDRO, only: open_print_mpp
      use state_module, only: state_type
      implicit  none
+
+!---------------------------------------------
+! Define interface for hrldas_drv_HYDRO_ini [Huancui Hu]
+!---------------------------------------------
+INTERFACE
+  SUBROUTINE hrldas_drv_HYDRO_ini(STC_io,SMC_io,SH2OX_io,infxsrt,sfcheadrt,soldrain,&
+                                  ii,jj,kk,kt,dt,olddate,zsoil   &
+                                 ,NTRACER,OPT_WT, SMOIS_TR, SH2OXY_TR,SMOIS_SUB,SH2OXY_SUB &    !wt vars
+                                 ,infxsrt_tr,sfcheadrt_tr,soldrain_tr)       !wt vars
+          implicit none
+          integer,            intent(in)                             :: ii,jj,kk, kt
+          character(len=*),   intent(in)                             :: olddate
+          real                                                       :: dt
+          real,               intent(inout),dimension(ii,kk,jj)      :: STC_io,SMC_io,SH2OX_io
+          real,               intent(inout),dimension(ii,jj)         :: infxsrt,sfcheadrt, soldrain
+          real,               intent(in),   dimension(kk)            :: zsoil
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+          integer,            intent(in)                             :: NTRACER
+          integer,optional,   intent(in)                             :: OPT_WT
+          real,   optional,   intent(inout),dimension(ii,NTRACER,jj) :: SMOIS_TR, SH2OXY_TR, SMOIS_SUB,SH2OXY_SUB
+          real,   optional,   intent(inout),dimension(ii,jj)         :: infxsrt_tr,sfcheadrt_tr, soldrain_tr
+  END SUBROUTINE hrldas_drv_HYDRO_ini
+END INTERFACE
+!---------------------------------------------
+
      integer, intent(out) :: NTIME_out
      integer, parameter :: did=1
      integer :: khour
@@ -485,6 +566,26 @@ module module_NoahMP_hrldas_driver
   IOPT_IMPERV = noah_lsm%imperv_option
 
   khour = noah_lsm%khour
+
+  !-----water tracer variables--------
+  OPT_WT   = water_tracer_option
+  NTRACER  = 1
+  if (OPT_WT .eq. 1) then 
+    nlst_rt(did)%PMOPT   = partial_mixing_option
+    if (partial_mixing_option .eq. 1 .or. partial_mixing_option .eq. 3) then
+      IOPT_PM  = 1
+    else
+      IOPT_PM  = 0
+    end if
+    NSUB     = tracer_sublayer
+    NTRACER  = sum(NSUB(1:nsoil))
+    nlst_rt(did)%NTRACER = NTRACER
+    allocate(nlst_rt(did)%NSUB(MAX_SOIL_LEVELS))
+    nlst_rt(did)%NSUB    = NSUB
+  end if
+  print *, "FLAG1"
+  print *, "OPT_WT,IOPT_PM:", OPT_WT, IOPT_PM
+  print *, "NTRACER", NTRACER 
 
   !!----------------------------------------------------------------------------
   !! channel_only
@@ -705,6 +806,16 @@ module module_NoahMP_hrldas_driver
   nsoil = noah_lsm%nsoil
   act_lev = noah_lsm%act_lev
   crocus_opt = noah_lsm%crocus_opt
+!-----water tracer tracking times-------
+  if (OPT_WT .eq. 1) then 
+    write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
+       track_start(1:4), track_start(5:6), track_start(7:8), track_start(9:10), track_start(11:12),0
+
+    write(wvtend,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
+       track_end(1:4), track_end(5:6), track_end(7:8), track_end(9:10), track_end(11:12),0
+  end if
+!---------------------------------------
+  
   ids = xstart
   ide = xend
   jds = ystart
@@ -918,6 +1029,43 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( TERRAIN   (XSTART:XEND,YSTART:YEND) )  ! terrain height
   ALLOCATE ( GVFMIN    (XSTART:XEND,YSTART:YEND) )  ! annual minimum in vegetation fraction
   ALLOCATE ( GVFMAX    (XSTART:XEND,YSTART:YEND) )  ! annual maximum in vegetation fraction
+
+!------------------------------------------------------------------------
+! Needed for Water tracer capability
+!------------------------------------------------------------------------
+if (OPT_WT .eq. 1) then 
+  ALLOCATE ( QFX_TR       (XSTART:XEND,YSTART:YEND) )  ! latent heat flux [kg s-1 m-2]
+  ALLOCATE ( LH_TR        (XSTART:XEND,YSTART:YEND) )  ! latent heat flux [W m-2]
+  ALLOCATE ( SFCRUNOFF_TR (XSTART:XEND,YSTART:YEND) )  ! accumulated surface runoff [m]
+  ALLOCATE ( UDRUNOFF_TR  (XSTART:XEND,YSTART:YEND) )  ! accumulated sub-surface runoff [m]
+  ALLOCATE ( SMOIS_TR     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric soil moisture [m3/m3]
+  ALLOCATE ( SH2OXY_TR    (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric liquid soil moisture [m3/m3]
+  ALLOCATE ( SNOWXY_TR    (XSTART:XEND,YSTART:YEND) )  ! snow water equivalent [mm]
+  ALLOCATE ( SNOWHXY_TR   (XSTART:XEND,YSTART:YEND) )  ! physical snow depth [m]
+  ALLOCATE ( CANWAT_TR    (XSTART:XEND,YSTART:YEND) )  ! total canopy water + ice [mm]
+  ALLOCATE ( ACSNOM_TR    (XSTART:XEND,YSTART:YEND) )  ! accumulated snow melt leaving pack
+  ALLOCATE ( ACSNOW_TR    (XSTART:XEND,YSTART:YEND) )  ! accumulated snow on grid
+  ALLOCATE ( CANICEXY_TR  (XSTART:XEND,YSTART:YEND) )  ! canopy-intercepted ice (mm)
+  ALLOCATE ( CANLIQXY_TR  (XSTART:XEND,YSTART:YEND) )  ! canopy-intercepted liquid water (mm)
+  ALLOCATE ( QSNOWXY_TR   (XSTART:XEND,YSTART:YEND) )  ! snowfall on the ground [mm/s]
+  ALLOCATE ( WSLAKEXY_TR  (XSTART:XEND,YSTART:YEND) )  ! lake water storage [mm]
+  ALLOCATE ( WAXY_TR      (XSTART:XEND,YSTART:YEND) )  ! water in the "aquifer" [mm]
+  ALLOCATE ( WTXY_TR      (XSTART:XEND,YSTART:YEND) )  ! groundwater storage [mm]
+  ALLOCATE ( SMCWTDXY_TR  (XSTART:XEND,YSTART:YEND) )  ! soil moisture below the bottom of the column (m3m-3)
+  ALLOCATE ( DEEPRECHXY_TR(XSTART:XEND,YSTART:YEND) )  ! recharge to the water table when deep (m)
+  ALLOCATE ( RECHXY_TR    (XSTART:XEND,YSTART:YEND) )  ! recharge to the water table (diagnostic) (m)
+  ALLOCATE ( ZSNSOXY_TR   (XSTART:XEND,-NSNOW+1:NTRACER,YSTART:YEND) )  ! snow layer depth [m]
+  ALLOCATE ( SNICEXY_TR   (XSTART:XEND,-NSNOW+1:0,    YSTART:YEND) )  ! snow layer ice [mm]
+  ALLOCATE ( SNLIQXY_TR   (XSTART:XEND,-NSNOW+1:0,    YSTART:YEND) )  ! snow layer liquid water [mm]
+  ALLOCATE ( RUNSFXY_TR   (XSTART:XEND,YSTART:YEND) )  ! surface runoff [mm/s]
+  ALLOCATE ( RUNSBXY_TR   (XSTART:XEND,YSTART:YEND) )  ! subsurface runoff [mm/s]
+  ALLOCATE ( ECANXY_TR    (XSTART:XEND,YSTART:YEND) )  ! evaporation of intercepted water (mm/s)
+  ALLOCATE ( EDIRXY_TR    (XSTART:XEND,YSTART:YEND) )  ! soil surface evaporation rate (mm/s]
+  ALLOCATE ( ETRANXY_TR   (XSTART:XEND,YSTART:YEND) )  ! transpiration rate (mm/s)
+  ALLOCATE ( FLUXXY_TR     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! tracer flux at soil bottom [m]
+  ALLOCATE ( SMOIS_SUB     (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric soil moisture in sublayers [m3/m3]
+  ALLOCATE ( SH2OXY_SUB    (XSTART:XEND,1:NTRACER,YSTART:YEND) )     ! volumetric liquid soil moisture in sublayers [m3/m3]
+end if
 
 !------------------------------------------------------------------------
 ! Needed for MMF_RUNOFF (IOPT_RUN = 5); not part of MP driver in WRF
@@ -1149,6 +1297,44 @@ module module_NoahMP_hrldas_driver
   XICE           = 0.0   ! fraction of grid that is seaice
   XICE_THRESHOLD = 0.5   ! fraction of grid determining seaice (from WRF)
 
+!------initialized water tracer variables---------
+if (OPT_WT .eq. 1) then 
+  QFX_TR        = undefined_real
+  LH_TR         = undefined_real
+  SFCRUNOFF_TR  = 0.0
+  UDRUNOFF_TR   = 0.0
+  SMOIS_TR      = undefined_real
+  SH2OXY_TR       = undefined_real
+  SNOWXY_TR       = undefined_real
+  SNOWHXY_TR      = undefined_real
+  CANWAT_TR     = undefined_real
+  ACSNOM_TR     = 0.0
+  ACSNOW_TR     = 0.0
+  CANICEXY_TR   = undefined_real
+  CANLIQXY_TR   = undefined_real
+  QSNOWXY_TR    = undefined_real
+  WSLAKEXY_TR   = undefined_real
+  WAXY_TR       = undefined_real
+  WTXY_TR       = undefined_real
+  SMCWTDXY_TR   = undefined_real
+  DEEPRECHXY_TR = 0.0
+  RECHXY_TR     = 0.0
+  ZSNSOXY_TR    = undefined_real
+  SNICEXY_TR    = undefined_real
+  SNLIQXY_TR    = undefined_real
+  RUNSFXY_TR    = undefined_real
+  RUNSBXY_TR    = undefined_real
+  ECANXY_TR     = undefined_real
+  EDIRXY_TR     = undefined_real
+  ETRANXY_TR    = undefined_real
+  FLUXXY_TR     = undefined_real
+  SMOIS_SUB      = undefined_real
+  SH2OXY_SUB     = undefined_real
+end if
+print *, "FLAG2"
+print *, "NTRACER", NTRACER
+!-------------------------------------------------
+
 !----------------------------------------------------------------------
 ! Read Landuse Type and Soil Texture and Other Information
 !----------------------------------------------------------------------
@@ -1351,6 +1537,30 @@ module module_NoahMP_hrldas_driver
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_SNOW",    FLOW_SNOW     )
         call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "FLOW_ICE",     FLOW_ICE      )
      end if ! crocus_opt /= 0
+!------------------------------------------------------------------------------------------
+! Needed for water tracer capabilit
+!------------------------------------------------------------------------------------------
+  if (OPT_WT .eq. 1) then
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC_TR"     , SMOIS_TR    )  !1
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O_TR"    , SH2OXY_TR   )  !2
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNICE_TR"   , SNICEXY_TR  )  !3
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNLIQ_TR"   , SNLIQXY_TR  )  !4
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSNOW_TR"   , QSNOWXY_TR  )  !5
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANLIQ_TR"  , CANLIQXY_TR )  !6
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "CANICE_TR"  , CANICEXY_TR )  !7
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNEQV_TR"   , SNOWXY_TR   )  !8
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOWH_TR"   , SNOWHXY_TR  )  !9
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WA_TR"      , WAXY_TR     )  !10
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "WT_TR"      , WTXY_TR     )  !11
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACMELT_TR"  , ACSNOM_TR   )  !12
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACSNOW_TR"  , ACSNOW_TR   )  !13
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF_TR",SFCRUNOFF_TR   ) !14
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF_TR" ,UDRUNOFF_TR    ) !15
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMC_SUB"     , SMOIS_SUB    )  !16
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SH2O_SUB"    , SH2OXY_SUB   )  !17
+  end if
+!------------------------------------------------------------------------------------------
+
 #ifdef WRF_HYDRO
      if(checkRstV("ACCPRCP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCPRCP"  ,ACCPRCP    )
      if(checkRstV("ACCECAN") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCECAN"  ,ACCECAN    )
@@ -1527,6 +1737,17 @@ module module_NoahMP_hrldas_driver
    allocate( soldrain  (ix,jx) )
    allocate( etpnd     (ix,jx) )
    allocate( prcp0     (ix,jx) )
+   
+   !-----water tracer vars-----
+   if (OPT_WT .eq. 1) then
+     allocate( infxsrt_tr   (ix,jx) )
+     allocate( sfcheadrt_tr (ix,jx) )
+     allocate( soldrain_tr  (ix,jx) )
+     infxsrt_tr  = 0.0
+     sfcheadrt_tr= 0.0
+     soldrain_tr = 0.0
+   end if
+   !-----water tracer end------   
 
    prcp0     = 0
    sfcheadrt = 0.0
@@ -1545,9 +1766,22 @@ module module_NoahMP_hrldas_driver
    print*, "zsoil/soil_thick_input = ", noah_lsm%soil_thick_input(1:NSOIL)
 #endif
 
+  !-------water tracer calc------
+  if (OPT_WT .eq. 1) then
+   call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
+         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NSOIL,real(noah_timestep),          &
+         olddate,zsoil(1:NSOIL)      &
+         , NTRACER, OPT_WT=OPT_WT                           &
+         , SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR           &
+         , SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB       &
+         , infxsrt_tr=infxsrt_tr                            &
+         , sfcheadrt_tr=sfcheadrt_tr                        &
+         , soldrain_tr =soldrain_tr)
+  else
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
          infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, SMOIS,real(noah_lsm%noah_timestep), &
-         olddate,zsoil(1:NSOIL))
+         olddate,zsoil(1:NSOIL), NTRACER)
+  end if
 
 call get_iocflag(1, io_config_outputs)
 
@@ -1647,14 +1881,15 @@ endif
 ! which is the LSM timestep, we declare it here
 ! since it does not exist at this point
   ITIME = 0
-  if(t0OutputFlag .eq. 1) call ldas_output(ITIME,state)
+  if(t0OutputFlag .eq. 1) call ldas_output(ITIME,state,wvtflag)
 !#else
 !  if (restart_filename_requested == " ") then
 !     if(t0OutputFlag .eq. 1) call ldas_output()
 !  endif
 !#endif
 #endif
-
+print *, "FLAG3"
+print *, "NTRACER", NTRACER
 end subroutine land_driver_ini
 
 !===============================================================================
@@ -1662,6 +1897,21 @@ end subroutine land_driver_ini
     use module_hydro_io, only: read_channel_only
     use state_module, only: state_type
     implicit  none
+     INTERFACE
+        subroutine hrldas_drv_HYDRO(STC_io,SMC_io,SH2OX_io,infxsrt,sfcheadrt,soldrain,ii,jj,kk, &
+                                   NTRACER, WVTFLAG, SMOIS_SUB, SH2OXY_SUB, &      !wt vars
+                                   SMOIS_TR, SH2OXY_TR,infxsrt_tr, sfcheadrt_tr,soldrain_tr )   !wt vars
+          implicit none
+          integer,                                intent(INOUT) :: ii,jj,kk
+          real,dimension(ii,kk,jj),               intent(INOUT) :: STC_io,SMC_io,SH2OX_io
+          real,dimension(ii,jj),                  intent(INOUT) :: infxsrt,sfcheadrt, soldrain
+         !-----water tracer vars------
+          integer,                                intent(INOUT) :: NTRACER
+          integer,                      optional, intent(INOUT) :: WVTFLAG
+          real,dimension(ii,NTRACER,jj),optional, intent(INOUT) :: SMOIS_SUB, SH2OXY_SUB, SMOIS_TR,SH2OXY_TR
+          real,dimension(ii,jj),        optional, intent(INOUT) :: infxsrt_tr,sfcheadrt_tr, soldrain_tr
+        end subroutine hrldas_drv_HYDRO
+     END INTERFACE
     type(state_type) :: state
     integer :: itime          ! timestep loop
 
@@ -1684,7 +1934,7 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
       if(forc_typ .eq. 8) then
           call read_forc_ldasout(olddate,hgrid, noah_lsm%indir, dtbl,ix,jx,infxsrt,soldrain)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NTRACER)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1699,7 +1949,7 @@ end subroutine land_driver_ini
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
           call read_channel_only(olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NTRACER)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1746,6 +1996,85 @@ end subroutine land_driver_ini
           T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),          &
 	    P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
 #endif
+!------water tracer variables initiation-------
+if (OPT_WT .eq. 1) then 
+  if (olddate < wvtstart) then
+    wvtflag = 0
+  else
+    if (olddate(1:15) == wvtstart(1:15)) then
+      wvtflag = 1
+    else
+      if (olddate < wvtend) then
+        wvtflag = 2
+      else
+        wvtflag = 3
+      end if
+    end if
+  end if
+!print *, "FLAG4, SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26)
+print *, "wvtflag", wvtflag
+print *, "NTRACER", NTRACER
+  ! call tell_wt_flag(olddate, wvtstart, wvtend, wvtflag)
+  if (wvtflag == 1) then
+        QFX_TR        = 0.0
+        LH_TR         = 0.0
+        SFCRUNOFF_TR  = 0.0
+        UDRUNOFF_TR   = 0.0
+        SMOIS_TR      = 0.0
+        SH2OXY_TR       = 0.0
+        SNOWXY_TR       = 0.0
+        SNOWHXY_TR      = 0.0
+        CANWAT_TR     = 0.0
+        ACSNOM_TR     = 0.0
+        ACSNOW_TR     = 0.0
+        CANICEXY_TR   = 0.0
+        CANLIQXY_TR   = 0.0
+        QSNOWXY_TR    = 0.0
+        WSLAKEXY_TR   = 0.0
+        WAXY_TR       = 0.0
+        WTXY_TR       = 0.0
+        ZSNSOXY_TR    = 0.0
+	K = 0
+        do I = 1, NSOIL
+           do J = 1,NSUB(I)
+              K = K + 1
+              ZSNSOXY_TR(:,K,:) = ZSNSOXY(:,I,:) + DZS(I)*(NSUB(I)-J)/NSUB(I)
+           end do
+        end do
+	smcwtdxy_TR   = 0.0
+        rechxy_TR     = 0.0
+        deeprechxy_TR = 0.0
+        SNICEXY_TR    = 0.0
+        SNLIQXY_TR    = 0.0
+        RUNSFXY_TR    = 0.0
+        RUNSBXY_TR    = 0.0
+        ECANXY_TR     = 0.0
+        EDIRXY_TR     = 0.0
+        ETRANXY_TR    = 0.0
+        SMOIS_SUB      = 0.0
+        SH2OXY_SUB       = 0.0
+        FLUXXY_TR      = 0.0
+        ! specicial care for SMOIS_SUB...
+        K = 0
+        DO I = 1, NSOIL
+              DO J =  NSUB(I), 1, -1
+                 K = K + 1
+                 SMOIS_SUB(:,K,:) = SMOIS(:,I,:)
+                 SH2OXY_SUB(:,K,:) = SH2O(:,I,:)
+              END DO
+         !     if (I .eq. 1) then
+         !        SMOIS_SUB(:,2:NSUB(1),:) = SH2O_SUB(:,2:NSUB(1),:)
+         !        SMOIS_SUB(:,1,:) = SMOIS(:,I,:)*NSUB(1)-SH2O(:,I,:)*(NSUB(1)-1)
+         !     end if
+        END DO
+	! call initialized_wt(xxx)
+	wvtflag = 2
+  end if
+  
+end if
+!print *, "FLAG5, SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
+print *, "NTRACER", NTRACER
+!----------------------------------------------
 
 991  continue
 
@@ -1819,7 +2148,75 @@ end subroutine land_driver_ini
    ! Timing information for SFLX:
 
     call system_clock(count=count_before_sflx, count_rate=clock_rate)
+    
+    if (OPT_WT .eq. 1) then
+      if (wvtflag == 2) then
+        wvt_ratio = 1.0
+      else
+        wvt_ratio = 0.0
+      end if
+    end if
 
+print *, "FLAG6"
+
+    if (wvtflag .le. 0) then
+print *, "FLAG7"
+print *, "NTRACER", NTRACER
+         CALL noahmplsm(ITIMESTEP,       YR, JULIAN_IN,   COSZEN, XLAT_URB2D, &
+	           DZ8W,     DTBL,      DZS,     NUM_SOIL_LAYERS,         DX, &
+		 IVGTYP,   ISLTYP,   VEGFRA,   GVFMAX,       TMN,             &
+		  XLAND,     XICE,     XICE_THRESHOLD,                        &
+                  IDVEG, IOPT_CRS, IOPT_BTR, IOPT_RUN,  IOPT_SFC,   IOPT_FRZ, &
+	       IOPT_INF, IOPT_RAD, IOPT_ALB, IOPT_SNF, IOPT_TBOT,   IOPT_STC, &
+	       IOPT_GLA, IOPT_RSF, IZ0TLND,                                   &
+		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, &
+		    P8W,   RAINBL,       SR,                                  &
+		    TSK,      HFX,      QFX,       LH,    GRDFLX,     SMSTAV, &
+		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
+		   SH2O,     TSLB,     SNOW,    SNOWH,    CANWAT,     ACSNOM, &
+		 ACSNOW,    EMISS,     QSFC,                                  &
+ 		     Z0,      ZNT,                                            & ! IN/OUT LSM eqv
+		ISNOWXY,     TVXY,     TGXY, CANICEXY,  CANLIQXY,      EAHXY, &
+		  TAHXY,     CMXY,     CHXY,   FWETXY,  SNEQVOXY,   ALBOLDXY, &
+		QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY,      WTXY,     TSNOXY, &
+		ZSNSOXY,  SNICEXY,  SNLIQXY, LFMASSXY,  RTMASSXY,   STMASSXY, &
+		 WOODXY, STBLCPXY, FASTCPXY,      LAI,    XSAIXY,    TAUSSXY, &
+	        SMOISEQ, SMCWTDXY,DEEPRECHXY,  RECHXY,                        & ! IN/OUT Noah MP only
+	         T2MVXY,   T2MBXY,   Q2MVXY,   Q2MBXY,                        &
+                 TRADXY,    NEEXY,    GPPXY,    NPPXY,    FVEGXY,    RUNSFXY, &
+	        RUNSBXY,   ECANXY,   EDIRXY,  ETRANXY,     FSAXY,     FIRAXY, &
+                 APARXY,    PSNXY,    SAVXY,    SAGXY,   RSSUNXY,    RSSHAXY, &
+               ALBSNDXY, ALBSNIXY,                                            & ! OUT Noah MP only
+                 BGAPXY,   WGAPXY,    TGVXY,    TGBXY,     CHVXY,      CHBXY, &
+		  SHGXY,    SHCXY,    SHBXY,    EVGXY,     EVBXY,      GHVXY, &
+		  GHBXY,    IRGXY,    IRCXY,    IRBXY,      TRXY,      EVCXY, &
+	       CHLEAFXY,   CHUCXY,   CHV2XY,   CHB2XY,                        &                          
+#ifdef SPATIAL_SOIL
+                 BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,             &
+		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
+		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
+		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+#endif
+#ifdef WRF_HYDRO
+                 sfcheadrt,INFXSRT,soldrain,                          &    !O
+#endif
+                ids,ide, jds,jde, kds,kde,                      &
+                ims,ime, jms,jme, kms,kme,                      &
+                its,ite, jts,jte, kts,kte,        &
+! variables below are optional
+                MP_RAINC =  RAINCV, MP_RAINNC =    RAINNCV, MP_SHCV = RAINSHV,&
+		MP_SNOW  = SNOWNCV, MP_GRAUP  = GRAUPELNCV, MP_HAIL = HAILNCV &
+#ifdef WRF_HYDRO
+                , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
+                , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
+#endif
+                , NTRACER=NTRACER)
+
+print *, "NTRACER", NTRACER
+!print *, "FLAG8,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
+    else
+!print *, "FLAG9,SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
+print *, "NTRACER", NTRACER
          CALL noahmplsm(ITIMESTEP,       YR, JULIAN_IN,   COSZEN, XLAT_URB2D, &
 	           DZ8W,     DTBL,      DZS,     NUM_SOIL_LAYERS,         DX, &
 		 IVGTYP,   ISLTYP,   VEGFRA,   GVFMAX,       TMN,             &
@@ -1878,7 +2275,24 @@ end subroutine land_driver_ini
                 , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
 #endif
+                , NTRACER=NTRACER, wvtflag=wvtflag, iopt_pm=iopt_pm, wvt_ratio=wvt_ratio, NSUB=NSUB           & ! IN WVT
+		, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB                                              & ! IN WVT
+                , QFX_TR=QFX_TR, LH_TR=LH_TR, SFCRUNOFF_TR=SFCRUNOFF_TR, UDRUNOFF_TR=UDRUNOFF_TR      & !IN/OUT WVT
+		, SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR, SNOWXY_TR=SNOWXY_TR, SNOWHXY_TR=SNOWHXY_TR, CANWAT_TR=CANWAT_TR &
+		, ACSNOM_TR=ACSNOM_TR, ACSNOW_TR=ACSNOW_TR, CANICEXY_TR=CANICEXY_TR, CANLIQXY_TR=CANLIQXY_TR  &
+		, QSNOWXY_TR=QSNOWXY_TR, WSLAKEXY_TR=WSLAKEXY_TR, WAXY_TR=WAXY_TR, WTXY_TR=WTXY_TR   &
+		, ZSNSOXY_TR=ZSNSOXY_TR, SNICEXY_TR=SNICEXY_TR, SNLIQXY_TR=SNLIQXY_TR                & ! IN/OUT WVT variables
+                , SMCWTDXY_TR=SMCWTDXY_TR, DEEPRECHXY_TR=DEEPRECHXY_TR, RECHXY_TR=RECHXY_TR          & ! INOUT
+                , RUNSFXY_TR=RUNSFXY_TR, RUNSBXY_TR=RUNSBXY_TR, ECANXY_TR=ECANXY_TR                  &
+		, EDIRXY_TR=EDIRXY_TR, ETRANXY_TR=ETRANXY_TR, FLUXXY_TR=FLUXXY_TR                    & ! IN WVT variables
+#ifdef WRF_HYDRO
+                , INFXSRT_TR=INFXSRT_TR, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr           &    !O water tracer
+#endif 
                 )
+!print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
+!print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
+
+    end if
 
 
           call system_clock(count=count_after_sflx, count_rate=clock_rate)
@@ -1908,10 +2322,19 @@ end subroutine land_driver_ini
 
  ENDIF   ! SKIP FIRST TIMESTEP
 
+!print *, "FLAG9-2,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+     if (OPT_WT .le. 0) then
+       call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NTRACER) 
+     else
+       call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, &
+            NTRACER, WVTFLAG=WVTFLAG, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB, &    ! water tracer vars      
+            SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR,              &    ! water tracer vars
+            infxsrt_tr=infxsrt_tr, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr)  ! water tracer vars
+!print *, "FLAG9-3, SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2OX(44,:,23),SH2OXY_SUB(44,:,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
+     end if
 #endif
 
 ! Output for history
@@ -1920,12 +2343,12 @@ end subroutine land_driver_ini
 
            ! convert RAINRATE back to mm/s for output
            RAINBL = RAINBL_tmp
-           call ldas_output(ITIME,state)
-
+           call ldas_output(ITIME,state,wvtflag)
 
         endif
      endif OUTPUT_FOR_HISTORY
 
+!print *, "FLAG9-4"
      if (IVGTYP(xstart,ystart)==ISWATER) then
        write(*,'(" ***DATE=", A19)', advance="NO") olddate
      else
@@ -1976,15 +2399,17 @@ end subroutine land_driver_ini
 
 
       ITIMESTEP = ITIMESTEP + 1
+!print *, "FLAG10,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
 
 end subroutine land_driver_exe
 
 !!===============================================================================
-subroutine  ldas_output(itime, state)
+subroutine  ldas_output(itime, state, wvtflag)
   use state_module, only: state_type
 
   type(state_type) :: state
   integer, intent(in)  :: itime ! time step of the LSM
+  integer, intent(in)  :: wvtflag ! -999-no tracer capability, 0-2-with tracer capability
 
 !#ifdef WRF_HYDRO
 !if ( (io_config_outputs .eq. 0) ) then
@@ -2243,6 +2668,30 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
    end if ! crocus_opt /= 0
+   
+   if (wvtflag .ge. 0) then
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LH_TR,IVGTYP,117)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ECANXY_TR,IVGTYP,118)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EDIRXY_TR,IVGTYP,119)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ETRANXY_TR,IVGTYP,120)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,UDRUNOFF_TR,IVGTYP,121)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SFCRUNOFF_TR,IVGTYP,122)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANLIQXY_TR,IVGTYP,123)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANICEXY_TR,IVGTYP,124)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WAXY_TR,IVGTYP,125)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WTXY_TR,IVGTYP,126)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNICEXY_TR,IVGTYP,127)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNLIQXY_TR,IVGTYP,128)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2OXY_TR,IVGTYP,129)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS_TR,IVGTYP,130)
+     !call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,FLUXXY_TR,IVGTYP,130)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWHXY_TR,IVGTYP,131)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWXY_TR,IVGTYP,132)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,133)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,134)
+     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,135)
+   end if
+   
 #endif /* WRF_HYDRO */
 
 !#ifdef WRF_HYDRO
@@ -2269,8 +2718,8 @@ subroutine lsm_restart(state)
                              nsoil,                 nsnow,     dx,        dy,        &
                              truelat1,              truelat2,  mapproj,   lat1,      &
                              lon1,                  cen_lon,   iswater,   ivgtyp,    &
-                             glacinfo,              glact,     act_lev,   VIS_ICEALB)
-
+                             glacinfo,              glact,     act_lev,   VIS_ICEALB,&
+                             NTRACER)
 
    write(tmpStr, '(A,"/RESTART.",A10,"_DOMAIN",I1)') trim(noah_lsm%outdir), olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13), igrid
 
@@ -2345,6 +2794,28 @@ subroutine lsm_restart(state)
      call add_to_restart(ncid, FLOW_ICE      , "FLOW_ICE"    )
      call add_to_restart(ncid, FLOW_SNOW     , "FLOW_SNOW"   )
   end if ! crocus_opt /= 0
+!-----------------------------------------------------------------
+! Needed for water tracer capability
+!-----------------------------------------------------------------
+  call add_to_restart(ncid,SMOIS_TR     , "SMC_TR"   , layers="TRAC")   !1
+  call add_to_restart(ncid,SH2OXY_TR    , "SH2O_TR"  , layers="TRAC")   !2
+  call add_to_restart(ncid,SNICEXY_TR   , "SNICE_TR" , layers="SNOW")   !3
+  call add_to_restart(ncid,SNLIQXY_TR   , "SNLIQ_TR" , layers="SNOW")   !4
+  call add_to_restart(ncid,QSNOWXY_TR   , "QSNOW_TR" )                  !5
+  call add_to_restart(ncid,CANLIQXY_TR  , "CANLIQ_TR")                  !6 
+  call add_to_restart(ncid,CANICEXY_TR  , "CANICE_TR")                  !7
+  call add_to_restart(ncid,SNOWXY_TR    , "SNEQV_TR" )                  !8
+  call add_to_restart(ncid,SNOWHXY_TR   , "SNOWH_TR" )                  !9
+  call add_to_restart(ncid,WAXY_TR      , "WA_TR"    )                  !10
+  call add_to_restart(ncid,WTXY_TR      , "WT_TR"    )                  !11
+  call add_to_restart(ncid,ACSNOM_TR    , "ACMELT_TR")                  !12
+  call add_to_restart(ncid,ACSNOW_TR    , "ACSNOW_TR")                  !13
+  call add_to_restart(ncid,SFCRUNOFF_TR , "SFCRUNOFF_TR")               !14
+  call add_to_restart(ncid,UDRUNOFF_TR  , "UDRUNOFF_TR" )               !15
+  call add_to_restart(ncid,SMOIS_SUB    , "SMC_SUB"  , layers="TRAC")   !16
+  call add_to_restart(ncid,SH2OXY_SUB   , "SH2O_SUB" , layers="TRAC")   !17
+!-----------------------------------------------------------------
+
 #ifdef WRF_HYDRO
   call add_to_restart(ncid,ACCPRCP   , "ACCPRCP" )
   call add_to_restart(ncid,ACCECAN   , "ACCECAN" )
@@ -2754,6 +3225,29 @@ subroutine define_rst_variables(ncid, state)
      call define_rst_var(ncid,FLOW_SNOW     , "FLOW_SNOW"   )
      call define_rst_var(ncid,FLOW_ICE      , "FLOW_ICE"    )
   end if ! crocus_opt /= 0
+!-----------------------------------------------
+! Neede for water tracer capaiblity
+!----------------------------------------------
+if (OPT_WT .eq. 1) then
+  call define_rst_var(ncid,SMOIS_TR     , "SMC_TR"   , layers="TRAC")    !1
+  call define_rst_var(ncid,SH2OXY_TR    , "SH2O_TR"  , layers="TRAC")    !2
+  call define_rst_var(ncid,SNICEXY_TR   , "SNICE_TR" , layers="SNOW")    !3
+  call define_rst_var(ncid,SNLIQXY_TR   , "SNLIQ_TR" , layers="SNOW")    !4
+  call define_rst_var(ncid,QSNOWXY_TR   , "QSNOW_TR" )                   !5
+  call define_rst_var(ncid,CANLIQXY_TR  , "CANLIQ_TR")                   !6
+  call define_rst_var(ncid,CANICEXY_TR  , "CANICE_TR")                   !7
+  call define_rst_var(ncid,SNOWXY_TR    , "SNEQV_TR" )                   !8
+  call define_rst_var(ncid,SNOWHXY_TR   , "SNOWH_TR" )                   !9
+  call define_rst_var(ncid,WAXY_TR      , "WA_TR"    )                   !10
+  call define_rst_var(ncid,WTXY_TR      , "WT_TR"    )                   !11
+  call define_rst_var(ncid,ACSNOM_TR    , "ACMELT_TR")                   !12
+  call define_rst_var(ncid,ACSNOW_TR    , "ACSNOW_TR")                   !13
+  call define_rst_var(ncid,SFCRUNOFF_TR , "SFCRUNOFF_TR")                !14
+  call define_rst_var(ncid,UDRUNOFF_TR  , "UDRUNOFF_TR" )                !15
+  call define_rst_var(ncid,SMOIS_SUB    , "SMC_SUB"   , layers="TRAC")   !16
+  call define_rst_var(ncid,SH2OXY_SUB   , "SH2O_SUB"  , layers="TRAC")   !17
+end if
+!-----------------------------------------------
 #ifdef WRF_HYDRO
   call define_rst_var(ncid,ACCPRCP   , "ACCPRCP" )
   call define_rst_var(ncid,ACCECAN   , "ACCECAN" )

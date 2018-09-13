@@ -54,7 +54,18 @@ contains
         LNLINKSL,                         &
         basns_area,                       &
         nhdBuckMask,   bucket_loss,       &
-        channelBucket_only )
+        channelBucket_only                &
+        ,wvtflag_pass                     & !wt var
+        ,runoff1x_in_tr, runoff2x_in_tr   & !wt var
+        ,z_gwsubbas_tmp_tr                & !wt var
+        ,qout_gwsubbas_tr_pass,qin_gwsubbas_tr_pass & !wt var
+        ,pmopt_pass                       & !pm gw var
+        ,z_gwsubbas_tmp_passive           & !pm gw var
+        ,z_gwsubbas_tmp_active            & !pm gw var
+        ,z_gwsubbas_tmp_passive_tr        & !pm gw var
+        ,z_gwsubbas_tmp_active_tr         & !pm gw var
+        ,cm_gwsubbas_tmp                  & !pm gw var
+        ) 
 
    use module_UDMAP, only: LNUMRSL, LUDRSL
 
@@ -83,6 +94,35 @@ contains
    integer, intent(in)                               :: channelBucket_only
    integer, intent(in)                               :: bucket_loss
 
+!-----water tracer vars--------
+   integer, optional, intent(in)                       :: wvtflag_pass
+   real,    optional, intent(in),   dimension(ix,jx)   :: runoff1x_in_tr, runoff2x_in_tr
+   real,    optional, intent(inout),dimension(numbasns):: z_gwsubbas_tmp_tr
+   real,    optional, intent(out),  dimension(numbasns):: qout_gwsubbas_tr_pass
+   real,    optional, intent(inout),dimension(numbasns):: qin_gwsubbas_tr_pass
+   !----local vars-----
+   real,                            dimension(numbasns):: net_perc_tr
+   real*8,                          dimension(numbasns):: z_gwsubbas_tr
+   real*8,                          dimension(LNLINKSL):: LQLateral_tr
+   real,                            dimension(ixrt,jxrt):: runoff1x_tr, runoff2x_tr
+   real                                                 :: PROPOR_TR
+!-----partial mixing for gw buckt------
+   integer, optional, intent(in)                       :: pmopt_pass
+   real,    optional, intent(inout),dimension(numbasns):: z_gwsubbas_tmp_passive
+   real,    optional, intent(inout),dimension(numbasns):: z_gwsubbas_tmp_active
+   real,    optional, intent(inout),dimension(numbasns):: z_gwsubbas_tmp_passive_tr
+   real,    optional, intent(inout),dimension(numbasns):: z_gwsubbas_tmp_active_tr
+   real,    optional, intent(in),   dimension(numbasns):: cm_gwsubbas_tmp
+   !-----local vars------
+   real,                            dimension(numbasns):: net_perc_in_tr, net_perc_out_tr
+   real,                            dimension(numbasns):: z_gwsubbas_passive, z_gwsubbas_active
+   real,                            dimension(numbasns):: z_gwsubbas_passive_tr, z_gwsubbas_active_tr
+   real,                            dimension(numbasns):: z_gwsubbas_decrease
+   real,                            dimension(numbasns):: z_gwsubbas_passive_new, z_gwsubbas_active_new
+   real,                            dimension(numbasns):: z_gwsubbas_passive_diff, z_gwsubbas_active_diff
+   real                                                :: PROPOR_qin, PROPOR_passive, PROPOR_active
+!------------------------------ 
+
    real, dimension(numbasns)                         :: net_perc
    integer, dimension(numbasns)                      :: nhdBuckMask
 
@@ -105,10 +145,23 @@ contains
    endif
    z_gwsubbas(1:numbasns) = z_gwsubbas_tmp(1:numbasns)
 
+   if (present(wvtflag_pass)) then
+     net_perc_tr = 0.
+     qout_gwsubbas_tr_pass = 0.
+     z_gwsubbas_tr(1:numbasns) = z_gwsubbas_tmp_tr(1:numbasns)
+   end if
+   if (present(pmopt_pass)) then
+     z_gwsubbas_passive(1:numbasns)    = z_gwsubbas_tmp_passive(1:numbasns)
+     z_gwsubbas_active(1:numbasns)     = z_gwsubbas_tmp_active(1:numbasns)
+     z_gwsubbas_passive_tr(1:numbasns) = z_gwsubbas_tmp_passive_tr(1:numbasns)
+     z_gwsubbas_active_tr(1:numbasns)  = z_gwsubbas_tmp_active_tr(1:numbasns)
+   end if
+
    if(channelBucket_only .eq. 0) then
 
       !! Initialize if not passed in
       qin_gwsubbas = 0.
+      if (present(wvtflag_pass)) qin_gwsubbas_tr_pass = 0.
 
 !Assign local value of runoff2 (drainage) for flux caluclation to buckets...
 
@@ -129,16 +182,26 @@ contains
 !DJG Implement subgrid weighting routine...
                if( (runoff1x_in(i,j) .lt. 0) .or. (runoff1x_in(i,j) .gt. 1000) ) then
                     runoff1x(IXXRT,JYYRT) = 0
+                    if (present(wvtflag_pass)) runoff1x_tr(IXXRT,JYYRT) = 0
                else
                     runoff1x(IXXRT,JYYRT)=runoff1x_in(i,j)*area_lsm(I,J)     &
                         *INFXSWGT(IXXRT,JYYRT)/cellArea(IXXRT,JYYRT)
+                    if (present(wvtflag_pass)) then
+                      call calculate_wt_ratio(runoff1x_in_tr(i,j),runoff1x_in(i,j),PROPOR_TR)
+                      runoff1x_tr(IXXRT,JYYRT) =  runoff1x(IXXRT,JYYRT)*PROPOR_TR
+                    end if
                endif
 
                if( (runoff2x_in(i,j) .lt. 0) .or. (runoff2x_in(i,j) .gt. 1000) ) then
                     runoff2x(IXXRT,JYYRT) = 0
+                    if (present(wvtflag_pass)) runoff2x_tr(IXXRT,JYYRT) = 0
                else
                   runoff2x(IXXRT,JYYRT)=runoff2x_in(i,j)*area_lsm(I,J)     &
                       *INFXSWGT(IXXRT,JYYRT)/cellArea(IXXRT,JYYRT)
+                  if (present(wvtflag_pass)) then
+                    call calculate_wt_ratio(runoff2x_in_tr(i,j),runoff2x_in(i,j),PROPOR_TR)
+                    runoff2x_tr(IXXRT,JYYRT)=runoff2x(IXXRT,JYYRT)*PROPOR_TR
+                  end if
                endif
              enddo
              enddo
@@ -147,6 +210,7 @@ contains
 
 
        LQLateral = 0
+       if (present(wvtflag_pass)) LQLateral_tr = 0
        do k = 1, LNUMRSL
               ! get from land grid runoff
                do m = 1, LUDRSL(k)%ncell
@@ -155,6 +219,10 @@ contains
                    if(ii .gt. 0 .and. jj .gt. 0) then
                            LQLateral(k) = LQLateral(k)+runoff2x(ii,jj)*LUDRSL(k)%cellWeight(m) * mm_to_m &
                                *cellArea(ii,jj)
+                           if (present(wvtflag_pass)) then
+                             LQLateral_tr(k) = LQLateral_tr(k) + runoff2x_tr(ii,jj)*LUDRSL(k)%cellWeight(m)/1000 &
+                               *cellArea(ii,jj)
+                           end if
                    endif
                end do
        end do
@@ -162,9 +230,11 @@ contains
 
 #ifdef MPP_LAND
        call updateLinkV(LQLateral, net_perc)      ! m^3
+       if (present(wvtflag_pass)) call updateLinkV(LQLateral_tr, net_perc_tr)   !wt var
 
 #else
        net_perc = LQLateral        ! m^3
+       if (present(wvtflag_pass)) net_perc_tr = LQLateral_tr     !wt var
 #endif
 
     endif !! if channelBucket_only .eq. 0 else
@@ -181,13 +251,44 @@ contains
          if(channelBucket_only .eq. 0) then
             !! If not using channelBucket_only, save qin_gwsubbas
             qin_gwsubbas(bas) = net_perc(bas)             !units (m^3)
+            if (present(wvtflag_pass)) qin_gwsubbas_tr_pass(bas) = net_perc_tr(bas)
          else
             !! If using channelBucket_only, get net_perc from the passed qin_gwsubbas
             net_perc(bas)     = qin_gwsubbas(bas)         !units (m^3)
+            if (present(wvtflag_pass)) net_perc_tr(bas) = qin_gwsubbas_tr_pass(bas)
          end if
 
          ! !Adjust level of GW depth...(conceptual GW bucket units (mm))
          z_gwsubbas(bas) = z_gwsubbas(bas) + net_perc(bas) / basns_area(bas)   ! m
+         if (present(wvtflag_pass)) then
+           z_gwsubbas_tr(bas) = z_gwsubbas_tr(bas) + net_perc_tr(bas) / basns_area(bas)   ! m
+           if (present(pmopt_pass)) then
+             z_gwsubbas_passive_new(bas)  = min(z_gwsubbas(bas), 0.1)  !was 0.1
+             z_gwsubbas_passive_diff(bas) = z_gwsubbas_passive_new(bas) - z_gwsubbas_passive(bas)
+             z_gwsubbas_active_new(bas)   = z_gwsubbas(bas) - z_gwsubbas_passive_new(bas)
+             z_gwsubbas_active_diff(bas)  = z_gwsubbas_active_new(bas) - z_gwsubbas_active(bas)
+             call calculate_wt_ratio(qin_gwsubbas_tr_pass(bas), qin_gwsubbas(bas), PROPOR_qin)
+             if (z_gwsubbas_passive_diff(bas) > 1.0E-10) then
+                z_gwsubbas_passive_tr(bas)  = z_gwsubbas_passive_tr(bas) + z_gwsubbas_passive_diff(bas)*PROPOR_qin
+                z_gwsubbas_active_tr(bas)   = z_gwsubbas_active_tr(bas)  + z_gwsubbas_active_diff(bas)*PROPOR_qin
+                call calculate_wt_ratio(z_gwsubbas_passive_tr(bas), z_gwsubbas_passive_new(bas), PROPOR_passive)
+                call calculate_wt_ratio(z_gwsubbas_active_tr(bas),  z_gwsubbas_active_new(bas),  PROPOR_active)
+             else
+                if (abs(z_gwsubbas_passive_diff(bas)) <= 1.0E-10) then
+                  call calculate_wt_ratio(z_gwsubbas_active_tr(bas)+z_gwsubbas_active_diff(bas)*PROPOR_qin,z_gwsubbas_active_new(bas), PROPOR_active)
+                  net_perc_in_tr(bas)  = net_perc(bas)*cm_gwsubbas_tmp(bas)*PROPOR_active
+                  call calculate_wt_ratio(z_gwsubbas_passive_tr(bas) + net_perc_in_tr(bas)/basns_area(bas),z_gwsubbas_passive_new(bas)+net_perc(bas)*cm_gwsubbas_tmp(bas)/basns_area(bas), PROPOR_passive)
+                  net_perc_out_tr(bas) = net_perc(bas)*cm_gwsubbas_tmp(bas)*PROPOR_passive*cm_gwsubbas_tmp(bas)
+                  z_gwsubbas_passive_tr(bas) = z_gwsubbas_passive_tr(bas) + (net_perc_in_tr(bas)-net_perc_out_tr(bas))/basns_area(bas)
+                  z_gwsubbas_active_tr(bas)  = z_gwsubbas_active_tr(bas) + z_gwsubbas_active_diff(bas)*PROPOR_qin - (net_perc_in_tr(bas)-net_perc_out_tr(bas))/basns_area(bas)
+                  call calculate_wt_ratio(z_gwsubbas_passive_tr(bas), z_gwsubbas_passive_new(bas), PROPOR_passive)
+                  call calculate_wt_ratio(z_gwsubbas_active_tr(bas), z_gwsubbas_active_new(bas), PROPOR_active)
+                end if
+             end if
+             z_gwsubbas_passive(bas)  = z_gwsubbas_passive_new(bas)
+             z_gwsubbas_active(bas)   = z_gwsubbas_active_new(bas)
+           end if
+         end if
 
          ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          !Calculate baseflow as a function of GW bucket depth...
@@ -197,6 +298,13 @@ contains
             !DJG...Estimation of bucket 'overflow' (qout_spill) if/when bucket gets filled...
             qout_spill = 0.
             z_gw_spill = 0.
+            if (present(wvtflag_pass)) then
+              if (z_gwsubbas(bas) .gt. 1.0E-10) then
+                PROPOR_TR = min(1.0, max(0.0, z_gwsubbas_tr(bas)/z_gwsubbas(bas)))
+              else
+                PROPOR_TR = 0.0
+              end if
+            end if
 
             !!DJG...convert z_mx to millimeters...for v2 and later...
             !yw  added by Wei Yu...If block is to accomodate old parameter file...
@@ -231,6 +339,10 @@ contains
 
 !DJG...Calculation of max bucket outlfow that is limited by total quantity in bucket...
                qout_gwsubbas(bas) = MIN(qout_max,qout_gwsubbas(bas))   ! Limit bucket discharge to max. bucket limit   (m^3/s)
+               !----water tracer calc----
+               if (present(wvtflag_pass)) then
+                 qout_gwsubbas_tr_pass(bas) = qout_gwsubbas(bas)*PROPOR_TR
+               end if
 
                if (bucket_loss .eq. 1) then
                     qloss_gwsubbas(bas) = qout_gwsubbas(bas)*loss_fraction(bas)
@@ -242,6 +354,7 @@ contains
 ! Assuming a steady-state (inflow=outflow) model...
 !DJG convert input and output units to cms...       qout_gwsubbas(bas) = qin_gwsubbas(bas)  !steady-state model...(m^3)
                qout_gwsubbas(bas) = qin_gwsubbas(bas)/DT  !steady-state model...(m^3/s)
+               if (present(wvtflag_pass)) qout_gwsubbas_tr_pass(bas) = qin_gwsubbas_tr_pass(bas)/DT  !wt var
 
           end if    ! End if for bucket model discharge type....
 
@@ -256,25 +369,76 @@ contains
              z_gwsubbas(bas) = z_gwsubbas(bas) - (qout_gwsubbas(bas))*DT/( basns_area(bas) )   ! units (meters)
           endif
 
+          z_gwsubbas(bas) = z_gwsubbas(bas) - qout_gwsubbas(bas)*DT/( &
+                       basns_area(bas) )   ! units (meters)	
+          
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !Combine calculated bucket discharge and amount spilled from bucket...
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
           qout_gwsubbas(bas) = qout_gwsubbas(bas) + qout_spill   ! units (m^3/s)
+          if (present(wvtflag_pass)) then
+            z_gwsubbas_tr(bas)         = z_gwsubbas(bas)*PROPOR_TR
+            qout_gwsubbas_tr_pass(bas) = qout_gwsubbas_tr_pass(bas) + qout_spill*PROPOR_TR
+            if (present(pmopt_pass)) then
+              z_gwsubbas_decrease(bas)   = qout_gwsubbas(bas)*DT/(basns_area(bas) )
+              if (z_gwsubbas_decrease(bas) > z_gwsubbas_active(bas)) then
+                qout_gwsubbas_tr_pass(bas) = (z_gwsubbas_active(bas)*PROPOR_active + (z_gwsubbas_decrease(bas)-z_gwsubbas_active(bas))*PROPOR_passive)*(basns_area(bas) )/DT
+                z_gwsubbas_passive_tr(bas) = z_gwsubbas_passive_tr(bas) - (z_gwsubbas_decrease(bas)-z_gwsubbas_active(bas))*PROPOR_passive
+                z_gwsubbas_active_tr(bas)  = 0.0
+                z_gwsubbas_passive(bas)    = z_gwsubbas_passive(bas) - (z_gwsubbas_decrease(bas)-z_gwsubbas_active(bas))
+                z_gwsubbas_active(bas)     = 0.0
+              else
+                qout_gwsubbas_tr_pass(bas) = (z_gwsubbas_decrease(bas)*PROPOR_active)*(basns_area(bas) )/DT
+                z_gwsubbas_active_tr(bas)  = z_gwsubbas_active_tr(bas) -z_gwsubbas_decrease(bas)*PROPOR_active
+                z_gwsubbas_active(bas)     = z_gwsubbas_active(bas) - z_gwsubbas_decrease(bas)
+              end if
+            end if
+          end if
       else
           qout_gwsubbas(bas) = 0.0
+          if (present(wvtflag_pass)) qout_gwsubbas_tr_pass(bas) = 0.0
       endif   ! the basns is masked
 
 
    END DO                 ! End loop for GW bucket calcs...
 
    z_gwsubbas_tmp(1:numbasns) = z_gwsubbas(1:numbasns)     ! units (meters)
-
+   if (present(wvtflag_pass)) then
+     z_gwsubbas_tmp_tr(1:numbasns)  = z_gwsubbas_tr(1:numbasns)
+     if (present(pmopt_pass)) then
+       z_gwsubbas_tmp_passive(1:numbasns)    = z_gwsubbas_passive(1:numbasns)
+       z_gwsubbas_tmp_active(1:numbasns)     = z_gwsubbas_active(1:numbasns)
+       z_gwsubbas_tmp_passive_tr(1:numbasns) = z_gwsubbas_passive_tr(1:numbasns)
+       z_gwsubbas_tmp_active_tr(1:numbasns)  = z_gwsubbas_active_tr(1:numbasns)
+     end if
+   end if
+    
    return
 
 !------------------------------------------------------------------------------
    End subroutine simp_gw_buck_nhd
 !------------------------------------------------------------------------------
+
+!-----------------------------------------
+! Huancui Hu: calculate_wt_ratio
+subroutine calculate_wt_ratio (a,b,c)
+
+  implicit none
+  real,    intent(in)     :: a
+  real,    intent(in)     :: b
+  real,    intent(inout)  :: c
+
+  if (b .gt. 1.0E-10) then
+    c = min(1.0,max(a/b, 0.0))
+  else
+    c = 0.0
+  end if
+
+end subroutine
+!-----------------------------------------
+
+
 !------------------------------------------------------------------------------
 !DJG   Simple GW Bucket Model
 !------------------------------------------------------------------------------

@@ -966,6 +966,11 @@ contains
     noah_lsm%noah_timestep           = -999
     noah_lsm%output_timestep         = -999
     noah_lsm%restart_frequency_hours = -999
+    noah_lsm%tracer_sublayer         = -999       ! water tracer sublayers
+    noah_lsm%wvtflag                 = -999       ! flag for water tracer
+    nlst_rt(did)%wvtflag    = -999
+    nlst_rt(did)%NTRACER    = -999
+    nlst_rt(did)%PMOPT      = -999
 
     write(*,*) 'Calling config noahlsm_offline'
 

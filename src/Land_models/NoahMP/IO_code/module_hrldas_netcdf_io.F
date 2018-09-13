@@ -66,6 +66,7 @@ module module_hrldas_netcdf_io
   integer, private :: dimid_snow_layers_remember
   integer, private :: dimid_glacier_layers_remember
   integer, private :: crocus_opt = 0
+  integer, private :: dimid_tracer_layers_remember       !wt
 
   interface define_rst_var
      module procedure define_3d_real,define_2d_real,define_2d_int
@@ -1789,7 +1790,7 @@ contains
 #endif
        endif
 
-       var(:,:,k) = (src(:,ktop,:)*fraction) + (src(:,kbottom,:)*(1.0-fraction))
+       var(:,k,:) = (src(:,ktop,:)*fraction) + (src(:,kbottom,:)*(1.0-fraction))
 
     enddo KLOOP
 
@@ -2989,8 +2990,7 @@ contains
            ixfull, jxfull, ixpar, jxpar, xstartpar, ystartpar,                                   &
            nsoil, nsnow, dx, dy, truelat1, truelat2, mapproj,                                    &
            lat1, lon1, cen_lon, iswater, vegtyp, glacinfo,                                       &
-           glact, act_level, vis_icealb)
-
+           glact, act_level, vis_icealb, NTRACER)
 
     implicit none
 
@@ -3015,6 +3015,7 @@ contains
     real,                                  intent(in) :: lat1, lon1, cen_lon
     integer,                               intent(in) :: iswater
     integer, dimension(ixpar,jxpar),       intent(in) :: vegtyp
+    integer,                               intent(in) :: NTRACER  !wt var
     integer, dimension(global_nx,global_ny) :: gvegtyp
     integer, dimension(ixpar,jxpar), optional, intent(in) :: glacinfo
     real,    dimension(ixpar,jxpar), optional, intent(in) :: glact
@@ -3025,7 +3026,7 @@ contains
       call prepare_restart_file_seq(outdir, version, igrid, llanduse, olddate, startdate,  &
        global_nx, global_ny, global_nx, global_ny, xstartpar, ystartpar,               &
        nsoil, nsnow, dx, dy, truelat1, truelat2, mapproj, lat1, lon1, cen_lon,         &
-       iswater, gvegtyp, act_level)
+       iswater, gvegtyp, act_level, NTRACER)
     endif
 
     call mpp_land_sync()
@@ -3036,7 +3037,7 @@ contains
   subroutine prepare_restart_file_seq(outdir, version, igrid, llanduse, olddate, startdate,  &
        ixfull, jxfull, ixpar, jxpar, xstartpar, ystartpar,                                    &
        nsoil, nsnow, dx, dy, truelat1, truelat2, mapproj, lat1, lon1, cen_lon,                       &
-       iswater, vegtyp, act_level)
+       iswater, vegtyp, act_level, NTRACER)
     use iso_fortran_env, only : compiler_version
     implicit none
 #include <netcdf.inc>
@@ -3062,6 +3063,7 @@ contains
     real,                                  intent(in) :: lat1, lon1, cen_lon
     integer,                               intent(in) :: iswater
     integer, dimension(ixpar,jxpar),       intent(in) :: vegtyp
+    integer,                               intent(in) :: NTRACER  !wt var
 
     character(len=1) :: hgrid
     integer :: ncid
@@ -3070,6 +3072,7 @@ contains
     integer :: varid
     integer :: dimid_times, dimid_datelen, dimid_ix, dimid_jx, dimid_dum, dimid_layers, dimid_snow_layers, dimid_sosn_layers
     integer :: dimid_glacier_layers
+    integer :: dimid_tracer_layers !wt var
     character(len=19) :: date19
     integer :: rank
 
@@ -3120,6 +3123,7 @@ contains
     ierr = nf90_def_dim(ncid, "sosn_layers", nsnow+nsoil, dimid_sosn_layers)
     if (crocus_opt /= 0) &
          ierr = nf90_def_dim(ncid, "glacier_levels", act_level, dimid_glacier_layers)
+    ierr = nf90_def_dim(ncid, "tracer_layers", NTRACER, dimid_tracer_layers)    !wt var
 
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "RESTART FILE FROM HRLDAS "//version)
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "compiler_version", compiler_version())
@@ -3940,6 +3944,12 @@ contains
        ierr = nf90_inq_dimid(ncid, "glacier_levels", dimid_kx)
        call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
                                 "Problem nf90_inq_dimid for 'glacier_levels'")
+    !-----Needed for water tracer capability-----
+    else if (output_layers == "TRAC") then
+       ierr = nf90_inq_dimid(ncid, "tracer_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'tracer_layers'")
+    !--------------------------------------------
     else
        stop "FATAL ERROR: In module_hrldas_netcdf_io.F add_to_restart_3d() - PANIC!"
     endif

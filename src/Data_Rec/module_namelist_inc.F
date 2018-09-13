@@ -77,6 +77,13 @@ module module_namelist_inc
 
           logical :: channel_bypass = .FALSE.
 
+!-----needed for water tracer capability-----
+          integer  :: wvtflag
+          integer  :: NTRACER
+          integer, allocatable,dimension(:) :: NSUB
+          integer  :: PMOPT
+!--------------------------------------------
+
 !#ifdef WRF_HYDRO_NUDGING
        character(len=256) :: nudgingParamFile
        character(len=256) :: netwkReExFile

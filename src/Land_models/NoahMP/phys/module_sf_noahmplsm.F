@@ -20,6 +20,7 @@
 
 MODULE MODULE_SF_NOAHMPLSM
 
+!  use module_sf_watertracer
   IMPLICIT NONE
 
   public  :: noahmp_options
@@ -80,6 +81,19 @@ MODULE MODULE_SF_NOAHMPLSM
 !  private ::       CH4FLUX
 
   private :: ERROR
+
+!-------water tracer subroutines
+  public  :: tag_precip
+  private :: calculate_dz
+  private :: calculate_lh_energy
+  private :: get_wt_ratio
+  private :: MELTING_SUB
+  private :: FREEZING_SUB
+  private :: TOPSOIL_SUB
+  private :: TOPSOIL_SAT
+  private :: SOIL_SAT
+  private :: SMT_TR
+  private :: COMBO_TR 
 
 ! =====================================options for different schemes================================
 ! **recommended
@@ -427,6 +441,16 @@ contains
 #ifdef WRF_HYDRO
                    ,SFCHEADRT                                                  & ! IN/OUT :
 #endif
+                   , NTRACER, WVTFLAG, IOPT_PM, WVT_RATIO, NSUB, SMC_SUB, SH2O_SUB & ! IN
+                   , SH2O_TR, SMC_TR, CANLIQ_TR, CANICE_TR, QSNOW_TR,ZSNSO_TR      & ! IN/OUT
+                   , SNOWH_TR, SNEQV_TR, SNICE_TR, SNLIQ_TR,WA_TR,WT_TR, WSLAKE_TR   & ! IN/OUT
+                   , SMCWTD_TR  ,DEEPRECH_TR , RECH_TR                              & ! INOUT
+                   , ECAN_TR, ETRAN_TR, EDIR_TR,  FCEV_TR, FCTR_TR, FGEV_TR        & ! OUT
+                   , RUNSRF_TR, RUNSUB_TR, QSNBOT_TR, PONDING_TR, PONDING1_TR         & ! OUT
+                   , PONDING2_TR, FLUX_TR                       & ! OUT
+#ifdef WRF_HYDRO
+                   , SFCHEADRT_TR_PASS                          & ! INOUT
+#endif
                    )
 
 ! --------------------------------------------------------------------------------------------------
@@ -479,10 +503,12 @@ contains
   REAL                           , INTENT(IN)    :: DZ8W   !thickness of lowest layer
   REAL                           , INTENT(IN)    :: DX
   REAL                           , INTENT(IN)    :: SHDMAX  !yearly max vegetation fraction
+  INTEGER                        , INTENT(IN)    :: NTRACER
 !jref:end
 
 #ifdef WRF_HYDRO
   REAL                           , INTENT(INOUT)    :: sfcheadrt
+  REAL, OPTIONAL                 , INTENT(INOUT)    :: sfcheadrt_tr_pass !wt var
 #endif
 
 ! input/output : need arbitary intial values
@@ -566,6 +592,61 @@ contains
   REAL              :: Q1
   REAL, INTENT(OUT) :: EMISSI
 !jref:end
+
+!----------------------------------------------------------------------
+! Needed for Water tracer capability (optional variables)
+!----------------------------------------------------------------------
+  INTEGER,                         OPTIONAL, INTENT(IN)    :: WVTFLAG
+  INTEGER,                         OPTIONAL, INTENT(IN)    :: IOPT_PM   !partial mixing option: 1-active
+  REAL,                            OPTIONAL, INTENT(IN)    :: WVT_RATIO !tracer ratio
+  INTEGER,  DIMENSION( 1:NSOIL)  , OPTIONAL, INTENT(IN)    :: NSUB
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SMC_SUB    !soil moisture (ice + liq.) [m3/m3]
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_SUB   !liquid soil moisture [m3/m3]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: QSNOW_TR  !snowfall [mm/s]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: CANLIQ_TR !intercepted liquid water (mm)
+  REAL                           , OPTIONAL, INTENT(INOUT) :: CANICE_TR !intercepted ice mass (mm)
+  REAL                           , OPTIONAL, INTENT(INOUT) :: SNEQV_TR  !snow water eqv. [mm]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT) :: SMC_TR    !soil moisture (ice + liq.) [m3/m3]
+  REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL, INTENT(INOUT) :: ZSNSO_TR  !layer-bottom depth from snow surf [m]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: SNOWH_TR  !snow height [m]
+  REAL, DIMENSION(-NSNOW+1:    0), OPTIONAL, INTENT(INOUT) :: SNICE_TR  !snow layer ice [mm]
+  REAL, DIMENSION(-NSNOW+1:    0), OPTIONAL, INTENT(INOUT) :: SNLIQ_TR  !snow layer liquid water [mm]
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_TR   !liquid soil moisture [m3/m3]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: WA_TR     !water storage in aquifer [mm]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: WT_TR     !water in aquifer&saturated soil [mm]
+  REAL                           , OPTIONAL, INTENT(INOUT) :: WSLAKE_TR !lake water storage (can be neg.) (mm)
+  REAL,                            OPTIONAL, INTENT(INOUT) :: SMCWTD_TR !soil water content between bottom of the soil and water table [m3/m3]
+  REAL,                            OPTIONAL, INTENT(INOUT) :: DEEPRECH_TR !recharge to or from the water table when deep [m]
+  REAL,                            OPTIONAL, INTENT(INOUT) :: RECH_TR !recharge to or from the water table when shallow [m] (diagnostic)
+  REAL                           , OPTIONAL, INTENT(OUT)   :: ECAN_TR   !evaporation of intercepted water (mm/s)
+  REAL                           , OPTIONAL, INTENT(OUT)   :: ETRAN_TR  !transpiration rate (mm/s)
+  REAL                           , OPTIONAL, INTENT(OUT)   :: EDIR_TR   !soil surface evaporation rate (mm/s]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: FCEV_TR   !canopy evap heat (w/m2) [+ to atm]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: FGEV_TR   !ground evap heat (w/m2) [+ to atm]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: FCTR_TR   !transpiration heat (w/m2) [+ to atm]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: RUNSRF_TR !surface runoff [mm/s]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: RUNSUB_TR !baseflow (saturation excess) [mm/s]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: QSNBOT_TR !snowmelt out bottom of pack [mm/s]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: PONDING_TR!surface ponding [mm]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: PONDING1_TR!surface ponding [mm]
+  REAL                           , OPTIONAL, INTENT(OUT)   :: PONDING2_TR!surface ponding [mm]
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL, INTENT(OUT)   :: FLUX_TR    ! tracer flux at bottom of soil layer [m]
+  !--------LOCAL VARIABLES---------------------------------------------
+  REAL                                                     :: CMC_TR    !intercepted water(CANICE+CANLIQ) (mm)
+  REAL, DIMENSION(-NSNOW+1:NTRACER)                        :: DZSNSO_TR !snow/soil layer thickness [m]
+  REAL                                                     :: QIN_TR    !groundwater recharge [mm/s]
+  REAL                                                     :: QDIS_TR   !groundwater discharge [mm/s]
+  REAL, DIMENSION(       1:NTRACER)                        :: SICE_TR   !soil ice content (m3/m3)
+  REAL, DIMENSION(       1:NTRACER)                        :: SICE_SUB   !soil ice content (m3/m3)
+  REAL                                                     :: QMELT_TR  !snowmelt [mm/s]
+  REAL                                                     :: RAIN_TR     !rain rate (mm/s)  ! MB/AN: v3.7
+  REAL                                                     :: SNOW_TR     !liquid equivalent snow rate (mm/s)  ! MB/AN: v3.7
+  REAL                                                     :: QRAIN_TR   !rain at ground srf (mm/s) [+]
+  REAL                                                     :: SNOWHIN_TR !snow depth increasing rate (m/s)
+  REAL                                                     :: PROPOR_TR
+  REAL                                                     :: QFX_TR
+  REAL                                                     :: wt_undefined_value = -1.E36
+!----------------------------------------------------------------------
 
 ! local
   INTEGER                                        :: IZ     !do-loop index
@@ -682,6 +763,7 @@ contains
   LOGICAL                             :: dveg_active ! flag to run dynamic vegetation
   LOGICAL                             :: crop_active ! flag to run crop model
 
+!print *, "FLAG0001"
   ! INTENT (OUT) variables need to be assigned a value.  These normally get assigned values
   ! only if DVEG == 2.
   nee = 0.0
@@ -701,6 +783,16 @@ contains
              EAIR    ,RHOAIR   ,QPRECC  ,QPRECL  ,SOLAD   ,SOLAI   , &
              SWDOWN  ,BDFALL   ,RAIN    ,SNOW    ,FP      ,FPICE   , PRCP )
 
+!-----tag precip as water tracer------
+!print *, "FLAG0003"
+   if (present(wvt_ratio)) then
+     call tag_precip(RAIN, wvt_ratio, RAIN_TR)
+     call tag_precip(SNOW, wvt_ratio, SNOW_TR)
+   end if
+
+!print *, "FLAG0004"
+!-------------------------------------
+
 ! snow/soil layer thickness (m)
 
      DO IZ = ISNOW+1, NSOIL
@@ -710,6 +802,10 @@ contains
            DZSNSO(IZ) = ZSNSO(IZ-1) - ZSNSO(IZ)
          END IF
      END DO
+     ! do similar thing for water tracers
+!print *, "FLAG0005"
+     if (present(wvtflag)) call calculate_dz(ISNOW, NTRACER, &
+                                 ZSNSO_TR(ISNOW+1:NTRACER), DZSNSO_TR(ISNOW+1:NTRACER))
 
 ! root-zone temperature
 
@@ -753,6 +849,23 @@ contains
      IF(parameters%urban_flag .OR. VEGTYP == parameters%ISBARREN) FVEG = 0.0
      IF(ELAI+ESAI == 0.0) FVEG = 0.0
 
+  if (present(wvtflag)) then
+!print *, "FLAG0006"
+    CALL PRECIP_HEAT(parameters,ILOC   ,JLOC   ,VEGTYP ,DT     ,UU     ,VV     , & !in
+                     ELAI   ,ESAI   ,FVEG   ,IST    ,                 & !in
+                     BDFALL ,RAIN   ,SNOW   ,FP     ,                 & !in
+                     CANLIQ ,CANICE ,TV     ,SFCTMP ,TG     ,         & !in
+                     QINTR  ,QDRIPR ,QTHROR ,QINTS  ,QDRIPS ,QTHROS , & !out
+                     PAHV   ,PAHG   ,PAHB   ,QRAIN  ,QSNOW  ,SNOWHIN, & !out
+	             FWET   ,CMC                                      &
+		     , WVTFLAG=WVTFLAG, WVT_RATIO=WVT_RATIO           & !wt in
+		     , CANLIQ_TR=CANLIQ_TR, CANICE_TR=CANICE_TR       & !wt inout
+		     , QRAIN_TR=QRAIN_TR, QSNOW_TR=QSNOW_TR           & !wt out
+		     , SNOWHIN_TR=SNOWHIN_TR, CMC_TR=CMC_TR           & !out
+		     )   !out
+!print *, "FLAG0007"  
+  else 
+!print *, "FLAG0008"
     CALL PRECIP_HEAT(parameters,ILOC   ,JLOC   ,VEGTYP ,DT     ,UU     ,VV     , & !in
                      ELAI   ,ESAI   ,FVEG   ,IST    ,                 & !in
                      BDFALL ,RAIN   ,SNOW   ,FP     ,                 & !in
@@ -760,9 +873,49 @@ contains
                      QINTR  ,QDRIPR ,QTHROR ,QINTS  ,QDRIPS ,QTHROS , & !out
                      PAHV   ,PAHG   ,PAHB   ,QRAIN  ,QSNOW  ,SNOWHIN, & !out
 	             FWET   ,CMC                                    )   !out
+!print *, "FLAG0009"
+  end if
 
 ! compute energy budget (momentum & energy fluxes and phase changes)
 
+  if (present(wvtflag)) then
+!print *, "FLAG0010"
+    CALL ENERGY (parameters,ICE    ,VEGTYP ,IST    ,NSNOW  ,NSOIL  , & !in
+                 ISNOW  ,DT     ,RHOAIR ,SFCPRS ,QAIR   , & !in
+                 SFCTMP ,THAIR  ,LWDN   ,UU     ,VV     ,ZLVL   , & !in
+                 CO2AIR ,O2AIR  ,SOLAD  ,SOLAI  ,COSZ   ,IGS    , & !in
+                 EAIR   ,TBOT   ,ZSNSO  ,ZSOIL  , & !in
+                 ELAI   ,ESAI   ,FWET   ,FOLN   ,         & !in
+                 FVEG   ,PAHV   ,PAHG   ,PAHB   ,                 & !in
+                 QSNOW  ,DZSNSO ,LAT    ,CANLIQ ,CANICE ,iloc, jloc , & !in
+		 Z0WRF  ,                                         &
+                 IMELT  ,SNICEV ,SNLIQV ,EPORE  ,T2M    ,FSNO   , & !out
+                 SAV    ,SAG    ,QMELT  ,FSA    ,FSR    ,TAUX   , & !out
+                 TAUY   ,FIRA   ,FSH    ,FCEV   ,FGEV   ,FCTR   , & !out
+                 TRAD   ,PSN    ,APAR   ,SSOIL  ,BTRANI ,BTRAN  , & !out
+                 PONDING,TS     ,LATHEAV , LATHEAG , frozen_canopy,frozen_ground,                         & !out
+                 TV     ,TG     ,STC    ,SNOWH  ,EAH    ,TAH    , & !inout
+                 SNEQVO ,SNEQV  ,SH2O   ,SMC    ,SNICE  ,SNLIQ  , & !inout
+                 ALBOLD ,CM     ,CH     ,DX     ,DZ8W   ,Q2     , & !inout
+                 TAUSS  ,                                         & !inout
+!jref:start
+                 QC     ,QSFC   ,PSFC   , & !in 
+                 T2MV   ,T2MB  ,FSRV   , &
+                 FSRG   ,RSSUN   ,RSSHA ,ALBSND  ,ALBSNI, BGAP   ,WGAP,TGV,TGB,&
+                 Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV   ,CHB     , & !out
+                 EMISSI ,PAH    ,                                 &
+		 SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 & !out
+		  , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB            & !wt in
+		  , SMC_SUB=SMC_SUB, SH2O_SUB=SH2O_SUB             & !wt in
+                  , SNOWH_TR=SNOWH_TR, SNEQV_TR=SNEQV_TR           & !wt inout
+		  , SH2O_TR=SH2O_TR, SMC_TR=SMC_TR                 & !wt inout
+		  , SNICE_TR=SNICE_TR,SNLIQ_TR=SNLIQ_TR            & !inout
+                  , QMELT_TR=QMELT_TR, PONDING_TR=PONDING_TR       & !inout   
+		 )                                            !out
+!jref:end
+!print *, "FLAG0011"
+  else
+!print *, "FLAG0012"
     CALL ENERGY (parameters,ICE    ,VEGTYP ,IST    ,NSNOW  ,NSOIL  , & !in
                  ISNOW  ,DT     ,RHOAIR ,SFCPRS ,QAIR   , & !in
                  SFCTMP ,THAIR  ,LWDN   ,UU     ,VV     ,ZLVL   , & !in
@@ -787,11 +940,30 @@ contains
                  FSRG   ,RSSUN   ,RSSHA ,ALBSND  ,ALBSNI, BGAP   ,WGAP,TGV,TGB,&
                  Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV   ,CHB     , & !out
                  EMISSI ,PAH    ,                                 &
-		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 )                                            !out
+		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,  &
+                     EVC,CHLEAF,CHUC,CHV2,CHB2, NTRACER)              !out
 !jref:end
+!print *, "FLAG0013"
+  end if
 
     SICE(:) = MAX(0.0, SMC(:) - SH2O(:))
     SNEQVO  = SNEQV
+    ! do similar thing to water tracers
+    if (present(WVTFLAG)) then
+      SICE_TR(:)  = MAX(0.0, SMC_TR(:)-SH2O_TR(:))
+      SICE_SUB(:) = MAX(0.0, SMC_SUB(:)-SH2O_SUB(:))
+      do IZ = 1, NSOIL
+        !----NOTE: NEED TO BE ADJUSTED IF USING MULTIPLE SUBLAYERS!!!!!-----
+        if (abs(SICE_SUB(IZ)-SICE(IZ)) .lt. 1.5E-7) then
+          SICE_SUB(IZ) = SICE(IZ)
+        else
+          print *, "ERROR around FLAG0013, ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
+        end if
+      end do
+if (ILOC .eq. 44 .and. JLOC .eq. 23) then
+!  print *, "FLAG0013, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
+end if
+    end if
 
     QVAP = MAX( FGEV/LATHEAG, 0.)       ! positive part of fgev; Barlage change to ground v3.6
     QDEW = ABS( MIN(FGEV/LATHEAG, 0.))  ! negative part of fgev
@@ -799,6 +971,8 @@ contains
 
 ! compute water budgets (water storages, ET components, and runoff)
 
+   if (present(wvtflag)) then
+!print *, "FLAG0014"
      CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
                  VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                  ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
@@ -815,7 +989,48 @@ contains
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
+                 , NTRACER, WVTFLAG=WVTFLAG,IOPT_PM=IOPT_PM, NSUB=NSUB         & !wt in
+		 , SMC_SUB=SMC_SUB, SH2O_SUB=SH2O_SUB, SICE_SUB=SICE_SUB       & !wt in
+                 ,PONDING_TR=PONDING_TR, RAIN_TR=RAIN_TR, SNOW_TR=SNOW_TR      & !wt in
+		 , QSNOW_TR=QSNOW_TR, QRAIN_TR=QRAIN_TR, SNOWHIN_TR=SNOWHIN_TR & !wt in
+                 , CANLIQ_TR=CANLIQ_TR, CANICE_TR=CANICE_TR, SNOWH_TR=SNOWH_TR & !wt inout
+		 , SNEQV_TR=SNEQV_TR, SNICE_TR=SNICE_TR,  SNLIQ_TR=SNLIQ_TR    & !wt inout
+		 , ZSNSO_TR=ZSNSO_TR,  SH2O_TR=SH2O_TR, SMC_TR=SMC_TR          & !wt INOUT
+                 , SICE_TR=SICE_TR, WA_TR=WA_TR, WT_TR=WT_TR                   & !wt inout
+		 , DZSNSO_TR=DZSNSO_TR, WSLAKE_TR=WSLAKE_TR                    & !wt inout
+		 , SMCWTD_TR=SMCWTD_TR, DEEPRECH_TR=DEEPRECH_TR                & !wt inout
+		 , RECH_TR=RECH_TR, CMC_TR=CMC_TR, ECAN_TR=ECAN_TR             & !wt inout
+		 , ETRAN_TR=ETRAN_TR, RUNSRF_TR=RUNSRF_TR, RUNSUB_TR=RUNSUB_TR & !OUT
+                 , QIN_TR=QIN_TR, QDIS_TR=QDIS_TR, PONDING1_TR=PONDING1_TR     & !wt out
+		 , PONDING2_TR=PONDING2_TR, QSNBOT_TR=QSNBOT_TR                & !wt out
+		 , EDIR_TR=EDIR_TR, FLUX_TR=FLUX_TR                            & !wt OUT
+#ifdef WRF_HYDRO
+                        ,sfcheadrt_tr_pass=sfcheadrt_tr_pass                    &
+#endif
+
                  )  !out
+!print *, "FLAG0015"   
+   else
+!print *, "FLAG0016"
+     CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
+                 VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
+                 ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
+                 FICEOLD,PONDING,TG     ,IST    ,FVEG   ,iloc,jloc , SMCEQ , & !in
+                 BDFALL ,FP     ,RAIN   ,SNOW   ,                 & !in  MB/AN: v3.7
+		 QSNOW  ,QRAIN  ,SNOWHIN,LATHEAV,LATHEAG,frozen_canopy,frozen_ground,  & !in  MB
+                 ISNOW  ,CANLIQ ,CANICE ,TV     ,SNOWH  ,SNEQV  , & !inout
+                 SNICE  ,SNLIQ  ,STC    ,ZSNSO  ,SH2O   ,SMC    , & !inout
+                 SICE   ,ZWT    ,WA     ,WT     ,DZSNSO ,WSLAKE , & !inout
+                 SMCWTD ,DEEPRECH,RECH                          , & !inout
+                 CMC    ,ECAN   ,ETRAN  ,FWET   ,RUNSRF ,RUNSUB , & !out
+                 QIN    ,QDIS   ,PONDING1       ,PONDING2,&
+                 QSNBOT                             &
+#ifdef WRF_HYDRO
+                        ,sfcheadrt                     &
+#endif
+                 ,NTRACER)  !out
+!print *, "FLAG0017"
+   end if
 
 !     write(*,'(a20,10F15.5)') 'SFLX:RUNOFF=',RUNSRF*DT,RUNSUB*DT,EDIR*DT
 
@@ -838,6 +1053,16 @@ contains
                  GPP    ,NPP    ,NEE    ,AUTORS ,HETERS ,TOTSC  , & !out
                  TOTLB  ,LAI    ,SAI    )                   !out
    END IF
+   
+!--------calculate energy fluxes due to tracers------------
+!because total fluxes are calculated in "ENERGY" but tracer
+!fluxes from surface requires going through "WATER"
+!thus now calculated seperately
+!print *, "FLAG0018"
+   if (present(wvtflag)) call calculate_lh_energy(FROZEN_CANOPY, FROZEN_GROUND, &
+                              ETRAN_TR, ECAN_TR, EDIR_TR,HVAP,HSUB, FCTR_TR, FCEV_TR, FGEV_TR)
+!print *, "FLAG0019"
+!----------------------------------------------------------
 
    IF (OPT_CROP == 1 .and. crop_active) THEN
     CALL CARBON_CROP (parameters,NSNOW  ,NSOIL  ,VEGTYP ,DT     ,ZSOIL  ,JULIAN , & !in
@@ -860,6 +1085,8 @@ contains
 
 ! urban - jref
     QFX = ETRAN + ECAN + EDIR
+    ! do similar for water tracers
+    if (present(ETRAN_TR)) QFX_TR=ETRAN_TR+ECAN_TR+EDIR_TR
     IF ( parameters%urban_flag ) THEN
        QSFC = QFX/(RHOAIR*CH) + QAIR
        Q2B = QSFC
@@ -868,6 +1095,9 @@ contains
     IF(SNOWH <= 1.E-6 .OR. SNEQV <= 1.E-3) THEN
      SNOWH = 0.0
      SNEQV = 0.0
+     ! do similar for water tracers
+     if (present(SNOWH_TR)) SNOWH_TR = 0.0
+     if (present(SNEQV_TR)) SNEQV_TR = 0.0
     END IF
 
     IF(SWDOWN.NE.0.) THEN
@@ -875,7 +1105,6 @@ contains
     ELSE
       ALBEDO = -999.9
     END IF
-
 
   END SUBROUTINE NOAHMP_SFLX
 
@@ -1145,7 +1374,11 @@ ENDIF   ! CROPTYPE == 0
                           CANLIQ ,CANICE ,TV     ,SFCTMP ,TG     ,         & !in
                           QINTR  ,QDRIPR ,QTHROR ,QINTS  ,QDRIPS ,QTHROS , & !out
 			  PAHV   ,PAHG   ,PAHB   ,QRAIN  ,QSNOW  ,SNOWHIN, & !out
-			  FWET   ,CMC                                    )   !out
+			  FWET   ,CMC                                      &
+			  , WVTFLAG, WVT_RATIO                             & !wt in
+			  , CANLIQ_TR, CANICE_TR                           & !wt inout
+                          , QRAIN_TR, QSNOW_TR, SNOWHIN_TR, CMC_TR         & !wt out
+			  )   !out
 
 ! ------------------------ code history ------------------------------
 ! Michael Barlage: Oct 2013 - split CANWATER to calculate precip movement for
@@ -1194,6 +1427,28 @@ ENDIF   ! CROPTYPE == 0
   REAL, INTENT(OUT)   :: CMC     !intercepted water (mm)
 ! --------------------------------------------------------------------
 
+!---------------------------------------------------------------------
+! Needed for Water tracer capability
+!---------------------------------------------------------------------
+  INTEGER, OPTIONAL, INTENT(IN) :: WVTFLAG
+  REAL,    OPTIONAL, INTENT(IN) :: WVT_RATIO
+  REAL, OPTIONAL, INTENT(INOUT) :: CANLIQ_TR  !intercepted liquid water (mm)
+  REAL, OPTIONAL, INTENT(INOUT) :: CANICE_TR  !intercepted ice mass (mm)
+  REAL, OPTIONAL, INTENT(OUT)   :: QRAIN_TR   !rain at ground srf (mm/s) [+]
+  REAL, OPTIONAL, INTENT(OUT)   :: QSNOW_TR   !snow at ground srf (mm/s) [+]
+  REAL, OPTIONAL, INTENT(OUT)   :: SNOWHIN_TR !snow depth increasing rate (m/s)
+  REAL, OPTIONAL, INTENT(OUT)   :: CMC_TR     !intercepted water (mm)
+  REAL                          :: QINTR_TR   !interception rate for rain (mm/s)
+  REAL                          :: QDRIPR_TR  !drip rate for rain (mm/s)
+  REAL                          :: QTHROR_TR  !throughfall for rain (mm/s)
+  REAL                          :: QINTS_TR   !interception (loading) rate for snowfall (mm/s)
+  REAL                          :: QDRIPS_TR  !drip (unloading) rate for intercepted snow (mm/s)
+  REAL                          :: QTHROS_TR  !throughfall of snowfall (mm/s)
+  REAL                          :: ICEDRIP_TR !canice unloading
+  REAL                          :: PROPOR_TR
+  REAL                          :: wt_undefined_value = -1.E36
+!---------------------------------------------------------------------
+
 ! ------------------------ local variables ---------------------------
   REAL                :: MAXSNO  !canopy capacity for snow interception (mm)
   REAL                :: MAXLIQ  !canopy capacity for rain interception (mm)
@@ -1223,6 +1478,20 @@ ENDIF   ! CROPTYPE == 0
       QSNOW   = 0.0
       SNOWHIN = 0.0
       ICEDRIP = 0.0
+      
+      !-----initiate tracer variables-------
+      if (present(wvtflag)) QINTR_TR   = 0.0
+      if (present(wvtflag)) QDRIPR_TR  = 0.0
+      if (present(wvtflag)) QTHROR_TR  = 0.0
+      if (present(wvtflag)) QINTS_TR   = 0.0
+      if (present(wvtflag)) QDRIPS_TR  = 0.0
+      if (present(wvtflag)) QTHROS_TR  = 0.0
+      if (present(wvtflag)) ICEDRIP_TR = 0.0
+      if (present(QRAIN_TR)) QRAIN_TR   = 0.0
+      if (present(QSNOW_TR)) QSNOW_TR   = 0.0
+      if (present(SNOWHIN_TR)) SNOWHIN_TR = 0.0
+      !-------------------------------------
+      
 !      print*, "precip_heat begin canopy balance:",canliq+canice+(rain+snow)*dt
 !      print*,  "precip_heat snow*3600.0:",snow*3600.0
 !      print*,  "precip_heat rain*3600.0:",rain*3600.0
@@ -1243,13 +1512,26 @@ ENDIF   ! CROPTYPE == 0
          QDRIPR = FVEG * RAIN - QINTR
          QTHROR = (1.-FVEG) * RAIN
          CANLIQ=MAX(0.,CANLIQ+QINTR*DT)
+	 ! do tracer calculation---------
+	 if (present(WVTFLAG)) call tag_precip(QINTR, WVT_RATIO, QINTR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QDRIPR, WVT_RATIO, QDRIPR_TR)
+	 if (present(WVTFLAG)) call tag_precip(QTHROR, WVT_RATIO, QTHROR_TR)
+	 if (present(WVTFLAG)) CANLIQ_TR = MAX(0.0, CANLIQ_TR+QINTR_TR*DT)
+	 !-------------------------------
       ELSE
          QINTR  = 0.
          QDRIPR = 0.
          QTHROR = RAIN
-	 IF(CANLIQ > 0.) THEN             ! FOR CASE OF CANOPY GETTING BURIED
+	 if (present(WVTFLAG)) QINTR_TR = 0.0     !wt calc
+	 if (present(WVTFLAG)) QDRIPR_TR = 0.0   !wt calc
+	 if (present(WVTFLAG)) QTHROR_TR = 0.0   !wt calc
+ 	 IF(CANLIQ > 0.) THEN             ! FOR CASE OF CANOPY GETTING BURIED
 	   QDRIPR = QDRIPR + CANLIQ/DT
 	   CANLIQ = 0.0
+	   if (present(WVTFLAG)) then   !wt calc
+	     QDRIPR_TR = QDRIPR_TR + CANLIQ_TR/DT
+	     CANLIQ_TR = 0.0
+	   end if
 	 END IF
       END IF
 
@@ -1268,6 +1550,8 @@ ENDIF   ! CROPTYPE == 0
       MAXSNO = 6.6*(0.27+46./BDFALL) * (ELAI+ ESAI)
 
       IF((ELAI+ ESAI).GT.0.) THEN
+         if (present(CANICE_TR)) call get_wt_ratio(CANICE_TR, CANICE, PROPOR_TR)  !wt calc
+      
          QINTS = FVEG * SNOW * FP
          QINTS = MIN(QINTS, (MAXSNO - CANICE)/DT * (1.-EXP(-SNOW*DT/MAXSNO)) )
          QINTS = MAX(QINTS, 0.)
@@ -1278,13 +1562,29 @@ ENDIF   ! CROPTYPE == 0
          QDRIPS = (FVEG * SNOW - QINTS) + ICEDRIP
          QTHROS = (1.0-FVEG) * SNOW
          CANICE= MAX(0.,CANICE + (QINTS - ICEDRIP)*DT)
+	 if (present(WVTFLAG)) then     !wt calc
+	   call tag_precip(QINTS, WVT_RATIO, QINTS_TR)
+	   ICEDRIP_TR = ICEDRIP*PROPOR_TR
+	   QDRIPS_TR  = FVEG*SNOW*WVT_RATIO - QINTS_TR + ICEDRIP_TR
+	   call tag_precip(QTHROS, WVT_RATIO, QTHROS_TR)
+	   CANICE_TR  = MAX(0.,CANICE_TR+(QINTS_TR-ICEDRIP_TR)*DT)
+	 end if
       ELSE
          QINTS  = 0.
          QDRIPS = 0.
          QTHROS = SNOW
+	 if (present(WVTFLAG)) then  !wt calc
+	   QINTS_TR = 0.0
+	   QDRIPS_TR = 0.0
+	   QTHROS_TR = QTHROS * WVT_RATIO
+	 end if
 	 IF(CANICE > 0.) THEN             ! FOR CASE OF CANOPY GETTING BURIED
 	   QDRIPS = QDRIPS + CANICE/DT
 	   CANICE = 0.0
+	   if (present(WVTFLAG)) then  ! wt calc
+	     QDRIPS_TR = QDRIPS_TR + CANICE_TR/DT
+	     CANICE_TR = 0.0
+           end if
 	 END IF
       ENDIF
 !      print*, "precip_heat canopy through:",3600.0*(FVEG * SNOW - QINTS)
@@ -1302,6 +1602,7 @@ ENDIF   ! CROPTYPE == 0
 ! total canopy water
 
       CMC = CANLIQ + CANICE
+      if (present(WVTFLAG)) CMC_TR = CANLIQ_TR+CANICE_TR    !wt calc
 
 ! heat transported by snow/ice
 
@@ -1351,10 +1652,20 @@ ENDIF   ! CROPTYPE == 0
       QRAIN   = QDRIPR + QTHROR
       QSNOW   = QDRIPS + QTHROS
       SNOWHIN = QSNOW/BDFALL
+      ! wt calc
+      if (present(WVTFLAG)) then
+        QRAIN_TR = QDRIPR_TR + QTHROR_TR
+	QSNOW_TR = QDRIPS_TR + QTHROS_TR
+	SNOWHIN_TR = QSNOW_TR/BDFALL
+      end if
 
       IF (IST == 2 .AND. TG > TFRZ) THEN
          QSNOW   = 0.
          SNOWHIN = 0.
+	 if (present(WVTFLAG)) then
+	   QSNOW_TR = 0.
+	   SNOWHIN_TR = 0.
+         end if
       END IF
 !      print*,  "precip_heat qsnow*3600.0:",qsnow*3600.0
 !      print*,  "precip_heat qrain*3600.0:",qrain*3600.0
@@ -1526,7 +1837,7 @@ ENDIF   ! CROPTYPE == 0
                      ELAI   ,ESAI   ,FWET   ,FOLN   ,         & !in
                      FVEG   ,PAHV   ,PAHG   ,PAHB   ,                 & !in
                      QSNOW  ,DZSNSO ,LAT    ,CANLIQ ,CANICE ,ILOC   , JLOC, & !in
-		     Z0WRF  ,                                         &
+                     Z0WRF  ,                                         &
                      IMELT  ,SNICEV ,SNLIQV ,EPORE  ,T2M    ,FSNO   , & !out
                      SAV    ,SAG    ,QMELT  ,FSA    ,FSR    ,TAUX   , & !out
                      TAUY   ,FIRA   ,FSH    ,FCEV   ,FGEV   ,FCTR   , & !out
@@ -1541,8 +1852,12 @@ ENDIF   ! CROPTYPE == 0
                      T2MV   ,T2MB   ,FSRV   , &
                      FSRG   ,RSSUN  ,RSSHA  ,ALBSND  ,ALBSNI,BGAP   ,WGAP,TGV,TGB,&
                      Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV  ,CHB, EMISSI,PAH  ,&
-		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 )   !out
-!jref:end
+                     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,CHUC,CHV2,CHB2 &
+                     , NTRACER, WVTFLAG, NSUB, SMC_SUB, SH2O_SUB               & !wt IN
+                     , SNOWH_TR, SNEQV_TR, SH2O_TR, SMC_TR, SNICE_TR,SNLIQ_TR  & !wt inout
+                     , QMELT_TR, PONDING_TR                                    & !wt OUT
+                     )   !out 
+!jref:end                            
 
 ! --------------------------------------------------------------------------------------------------
 ! we use different approaches to deal with subgrid features of radiation transfer and turbulent
@@ -1707,6 +2022,24 @@ ENDIF   ! CROPTYPE == 0
 !  REAL                                              :: Q2E
   REAL,                               INTENT(OUT)   :: EMISSI
   REAL,                               INTENT(OUT)   :: PAH    !precipitation advected heat - total (W/m2)
+
+!----------------------------------------------------------------------
+! Needed for Water tracer capability
+!----------------------------------------------------------------------
+  INTEGER,                            OPTIONAL, INTENT(IN)    :: WVTFLAG
+  INTEGER, DIMENSION(1:NSOIL)       , OPTIONAL, INTENT(IN)    :: NSUB
+  INTEGER                           ,           INTENT(IN)    :: NTRACER
+  REAL   , DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_SUB
+  REAL   , DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SMC_SUB
+  REAL                              , OPTIONAL, INTENT(OUT)   :: QMELT_TR  !snowmelt [mm/s]
+  REAL                              , OPTIONAL, INTENT(OUT)   :: PONDING_TR!pounding at ground [mm]
+  REAL                              , OPTIONAL, INTENT(INOUT) :: SNOWH_TR  !snow height [m]
+  REAL                              , OPTIONAL, INTENT(INOUT) :: SNEQV_TR  !snow mass (mm)
+  REAL   , DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_TR   !liquid soil moisture [m3/m3]
+  REAL   , DIMENSION(     1:NTRACER), OPTIONAL, INTENT(INOUT) :: SMC_TR    !soil moisture (ice + liq.) [m3/m3]
+  REAL   , DIMENSION(-NSNOW+1:    0), OPTIONAL, INTENT(INOUT) :: SNICE_TR  !snow ice mass (kg/m2)
+  REAL   , DIMENSION(-NSNOW+1:    0), OPTIONAL, INTENT(INOUT) :: SNLIQ_TR  !snow liq mass (kg/m2)
+!----------------------------------------------------------------------
 
 ! local
   INTEGER                                           :: IZ     !do-loop index
@@ -2140,14 +2473,27 @@ ENDIF   ! CROPTYPE == 0
      END IF
 
 ! Energy released or consumed by snow & frozen soil
-
+if (present(WVTFLAG)) then
  CALL PHASECHANGE (parameters,NSNOW   ,NSOIL   ,ISNOW   ,DT      ,FACT    , & !in
                    DZSNSO  ,HCPCT   ,IST     ,ILOC    ,JLOC    , & !in
                    STC     ,SNICE   ,SNLIQ   ,SNEQV   ,SNOWH   , & !inout
                    SMC     ,SH2O    ,                            & !inout
-                   QMELT   ,IMELT   ,PONDING )                     !out
+                   QMELT   ,IMELT   ,PONDING                     & !out
+		   , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB         & !wt in
+		   , SMC_SUB=SMC_SUB, SH2O_SUB=SH2O_SUB          & !wt IN
+                   , SNICE_TR=SNICE_TR, SNLIQ_TR=SNLIQ_TR        & !wt inout
+		   , SNEQV_TR=SNEQV_TR, SNOWH_TR=SNOWH_TR        & !wt inout
+                   , SMC_TR=SMC_TR, SH2O_TR=SH2O_TR              & !wt inout
+                   , QMELT_TR=QMELT_TR, PONDING_TR=PONDING_TR    & !wt out
+		   )                     !out
+else
+ CALL PHASECHANGE (parameters,NSNOW   ,NSOIL   ,ISNOW   ,DT      ,FACT    , & !in
+                   DZSNSO  ,HCPCT   ,IST     ,ILOC    ,JLOC    , & !in
+                   STC     ,SNICE   ,SNLIQ   ,SNEQV   ,SNOWH   , & !inout
+                   SMC     ,SH2O    ,                            & !inout
+                   QMELT   ,IMELT   ,PONDING, NTRACER )                     !out
 
-
+end if
   END SUBROUTINE ENERGY
 
 !== begin thermoprop ===============================================================================
@@ -5292,7 +5638,12 @@ ENDIF   ! CROPTYPE == 0
                           DZSNSO  ,HCPCT   ,IST     ,ILOC    ,JLOC    , & !in
                           STC     ,SNICE   ,SNLIQ   ,SNEQV   ,SNOWH   , & !inout
                           SMC     ,SH2O    ,                            & !inout
-                          QMELT   ,IMELT   ,PONDING )                     !out
+                          QMELT   ,IMELT   ,PONDING                     & !out
+			  , NTRACER, WVTFLAG, NSUB, SMC_SUB, SH2O_SUB   & !wt IN
+                          , SNICE_TR, SNLIQ_TR, SNEQV_TR, SNOWH_TR      & !wt inout
+                          , SMC_TR, SH2O_TR                             & !wt inout
+                          , QMELT_TR, PONDING_TR                        & !wt out
+			  )                     !out
 ! ----------------------------------------------------------------------
 ! melting/freezing of snow water and soil water
 ! ----------------------------------------------------------------------
@@ -5327,6 +5678,41 @@ ENDIF   ! CROPTYPE == 0
   REAL, DIMENSION(-NSNOW+1:0)    , INTENT(INOUT)  :: SNICE  !snow layer ice [mm]
   REAL, DIMENSION(-NSNOW+1:0)    , INTENT(INOUT)  :: SNLIQ  !snow layer liquid water [mm]
 
+!---------------------------------------------------------------------
+! Needed for Water tracer capability
+!---------------------------------------------------------------------
+  INTEGER,                           OPTIONAL, INTENT(IN)     :: WVTFLAG
+  INTEGER, DIMENSION(1:NSOIL),       OPTIONAL, INTENT(IN)     :: NSUB
+  INTEGER,                                     INTENT(IN)     :: NTRACER
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT)  :: SH2O_SUB   !soil liquid water[m3/m3]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT)  :: SMC_SUB    !total soil water [m3/m3]
+  REAL,                              OPTIONAL, INTENT(OUT)    :: QMELT_TR  !snowmelt rate [mm/s]
+  REAL,                              OPTIONAL, INTENT(OUT)    :: PONDING_TR!snowmelt when snow has no layer [mm]
+  REAL,                              OPTIONAL, INTENT(INOUT)  :: SNEQV_TR
+  REAL,                              OPTIONAL, INTENT(INOUT)  :: SNOWH_TR
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT)  :: SH2O_TR   !soil liquid water[m3/m3]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT)  :: SMC_TR    !total soil water [m3/m3]
+  REAL, DIMENSION(-NSNOW+1:0)      , OPTIONAL, INTENT(INOUT)  :: SNICE_TR  !snow layer ice [mm]
+  REAL, DIMENSION(-NSNOW+1:0)      , OPTIONAL, INTENT(INOUT)  :: SNLIQ_TR  !snow layer liquid water [mm]
+  !------local water tracer variables--------
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WMASS0_TR
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WICE0_TR
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WLIQ0_TR
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: MICE_TR      !soil/snow ice mass [mm]
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: MLIQ_TR      !soil/snow liquid water mass [mm]
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WMASS0_SUB
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WICE0_SUB
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: WLIQ0_SUB
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: MICE_SUB      !soil/snow ice mass [mm]
+  REAL, DIMENSION(-NSNOW+1:NTRACER) :: MLIQ_SUB      !soil/snow liquid water mass [mm]
+  REAL                              :: WMELTING_REST, WFREEZING_REST, SUPERCOOL_REST, WICE_REST
+  REAL                              :: TEMP1_TR     !temporary variables [kg/m2]
+  REAL                              :: PROPOR_TR
+  REAL                              :: PROPOR_TRL
+  REAL                              :: PROPOR_TRS
+  INTEGER                           :: K, ISUB
+!---------------------------------------------------------------------
+
 ! local
 
   INTEGER                         :: J         !do loop index
@@ -5350,7 +5736,19 @@ ENDIF   ! CROPTYPE == 0
     QMELT   = 0.
     PONDING = 0.
     XMF     = 0.
-
+    ! wt initialization
+    if (present(WVTFLAG)) then
+      QMELT_TR = 0.0
+      PONDING_TR = 0.0
+      PROPOR_TR  = 0.0
+      MICE  = 0.0
+      MLIQ  = 0.0
+      MICE_SUB = 0.0
+      MLIQ_SUB = 0.0
+      MICE_TR  = 0.0
+      MLIQ_TR  = 0.0
+    end if
+    
     DO J = -NSNOW+1, NSOIL
          SUPERCOOL(J) = 0.0
     END DO
@@ -5358,12 +5756,32 @@ ENDIF   ! CROPTYPE == 0
     DO J = ISNOW+1,0       ! all layers
          MICE(J) = SNICE(J)
          MLIQ(J) = SNLIQ(J)
+	 if (present(WVTFLAG)) then
+	   MICE_TR(J) = SNICE_TR(J)
+           MLIQ_TR(J) = SNLIQ_TR(J)
+           MICE_SUB(J) = SNICE(J)
+           MLIQ_SUB(J) = SNLIQ(J)
+	 end if
     END DO
 
     DO J = 1, NSOIL               ! soil
          MLIQ(J) =  SH2O(J)            * DZSNSO(J) * 1000.
          MICE(J) = (SMC(J) - SH2O(J))  * DZSNSO(J) * 1000.
     END DO
+    !------do wt calc-------
+    if (present(WVTFLAG)) then
+      ISUB = 0
+      DO J = 1, NSOIL
+        DO K = 1, NSUB(J)
+         ISUB = ISUB + 1
+         MLIQ_TR(ISUB)  =  SH2O_TR(ISUB)                * DZSNSO(J)/real(NSUB(J)) * 1000.
+         MICE_TR(ISUB)  = (SMC_TR(ISUB) - SH2O_TR(ISUB))* DZSNSO(J)/real(NSUB(J)) * 1000.
+         MLIQ_SUB(ISUB) = SH2O_SUB(ISUB)                * DZSNSO(J)/real(NSUB(J)) * 1000.
+         MICE_SUB(ISUB) = (SMC_SUB(ISUB)-SH2O_SUB(ISUB))* DZSNSO(J)/real(NSUB(J)) * 1000.
+       END DO
+      END DO
+    end if
+    !----wt calc end-------
 
     DO J = ISNOW+1,NSOIL       ! all layers
          IMELT(J)    = 0
@@ -5373,6 +5791,18 @@ ENDIF   ! CROPTYPE == 0
          WLIQ0(J)    = MLIQ(J)
          WMASS0(J)   = MICE(J) + MLIQ(J)
     ENDDO
+    !-------do wt calc--------
+    if (present(WVTFLAG)) then
+      DO J = ISNOW+1, NTRACER
+         WICE0_TR(J)    = MICE_TR(J)
+         WLIQ0_TR(J)    = MLIQ_TR(J)
+         WMASS0_TR(J)   = MICE_TR(J) + MLIQ_TR(J)
+         WICE0_SUB(J)   = MICE_SUB(J)
+         WLIQ0_SUB(J)   = MLIQ_SUB(J)
+         WMASS0_SUB(J)  = MICE_SUB(J) + MLIQ_SUB(J)
+       END DO
+    end if
+    !-------------------------
 
     if(ist == 1) then
       DO J = 1,NSOIL
@@ -5444,6 +5874,16 @@ ENDIF   ! CROPTYPE == 0
         QMELT   = MAX(0.,(TEMP1-SNEQV))/DT
         XMF     = HFUS*QMELT
         PONDING = TEMP1-SNEQV
+	!------do wt calc-------
+	if (present(WVTFLAG)) then
+	  TEMP1_TR   = SNEQV_TR
+	  call get_wt_ratio(TEMP1_TR, TEMP1, PROPOR_TR)
+          SNEQV_TR   = MAX(0.,TEMP1_TR-XM(1)*PROPOR_TR)
+          SNOWH_TR   = MAX(0.,SNOWH*PROPOR_TR)
+	  QMELT_TR   = MAX(0.,(TEMP1_TR-SNEQV_TR))/DT
+          PONDING_TR = TEMP1_TR-SNEQV_TR
+	end if
+	!-----------------------
     ENDIF
 
 ! The rate of melting and freezing for snow and soil
@@ -5455,21 +5895,83 @@ ENDIF   ! CROPTYPE == 0
          IF (XM(J) > 0.) THEN
             MICE(J) = MAX(0., WICE0(J)-XM(J))
             HEATR = HM(J) - HFUS*(WICE0(J)-MICE(J))/DT
+         !-----do wt calc------
+         if (present(WVTFLAG)) then
+              PROPOR_TRS = 0.0
+              if (J <= 0) then !snow layer
+                call get_wt_ratio(WICE0_TR(J), WICE0(J), PROPOR_TRS)
+                MICE_TR(J)  = MAX(0., WICE0_TR(J)-XM(J)*PROPOR_TRS)
+                MICE_SUB(J) = MAX(0., WICE0_TR(J)-XM(J))
+              else
+                WMELTING_REST = XM(J)
+                call MELTING_SUB(WMELTING_REST,XM(J), J, NSUB(J),       &
+                     WICE0_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+                     WICE0_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+                     MICE_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))),  &
+                     MICE_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))))
+              end if
+            end if
+            !---------------------
          ELSE IF (XM(J) < 0.) THEN
             IF (J <= 0) THEN                             ! snow
                MICE(J) = MIN(WMASS0(J), WICE0(J)-XM(J))
+               !-----do wt calc------
+               if (present(WVTFLAG)) then
+                 call get_wt_ratio(WLIQ0_TR(J), WLIQ0(J), PROPOR_TRL)
+                 MICE_TR(J)  = MIN(WMASS0_TR(J), WICE0_TR(J)-XM(J)*PROPOR_TRL)
+                 MICE_SUB(J) = MIN(WMASS0_SUB(J), WICE0_SUB(J)-XM(J))
+               end if
+               !---------------------
             ELSE                                         ! soil
                IF (WMASS0(J) < SUPERCOOL(J)) THEN
                   MICE(J) = 0.
+		  !-----do wt calc-----
+		  if (present(WVTFLAG)) then
+		    MICE_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))) = 0.
+		    MICE_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))) = 0.
+		  end if
+		  !--------------------
                ELSE
                   MICE(J) = MIN(WMASS0(J) - SUPERCOOL(J),WICE0(J)-XM(J))
                   MICE(J) = MAX(MICE(J),0.0)
+		  !-----do wt calc-----
+		  if (present(WVTFLAG)) then
+		    WFREEZING_REST = XM(J)
+		    SUPERCOOL_REST = SUPERCOOL(J)
+		    call FREEZING_SUB(WFREEZING_REST, SUPERCOOL_REST, &
+		                      XM(J), SUPERCOOL(J), J, NSUB(J), WLIQ0(J), MICE(J),&
+				      WICE0_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+				      WICE0_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+				      WLIQ0_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))),  &
+				      WLIQ0_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+				      WMASS0_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))), &
+				      WMASS0_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))),&
+				      MICE_TR(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J))),  &
+				      MICE_SUB(sum(NSUB(1:J))-NSUB(J)+1:sum(NSUB(1:J)))  &
+				      )
+		  end if
+		  !--------------------
                ENDIF
             ENDIF
             HEATR = HM(J) - HFUS*(WICE0(J)-MICE(J))/DT
          ENDIF
 
          MLIQ(J) = MAX(0.,WMASS0(J)-MICE(J))
+	 !------do wt calc------
+	 if (present(WVTFLAG)) then
+	   if (J <=0 ) then
+	     MLIQ_TR(J) = MAX(0.,WMASS0_TR(J)-MICE_TR(J))
+	     MLIQ_TR(J) = MIN(MLIQ_TR(J), MLIQ(J))
+	   else
+	     DO K =1, NSUB(J)
+               ISUB       = sum(NSUB(1:J)) - NSUB(J) + K
+               MLIQ_SUB(ISUB) = MAX(0., WMASS0_SUB(ISUB)-MICE_SUB(ISUB))
+               MLIQ_TR(ISUB) = MAX(0.,WMASS0_TR(ISUB)-MICE_TR(ISUB))
+               MLIQ_TR(ISUB) = MIN(MLIQ_TR(ISUB), MLIQ_SUB(ISUB))
+             END DO
+	   end if
+	 end if
+	 !----------------------
 
          IF (ABS(HEATR) > 0.) THEN
             STC(J) = STC(J) + FACT(J)*HEATR
@@ -5487,6 +5989,12 @@ ENDIF   ! CROPTYPE == 0
 
          IF (J < 1) THEN
             QMELT = QMELT + MAX(0.,(WICE0(J)-MICE(J)))/DT
+	    !-----do wt calc------
+	    if (present(WVTFLAG)) then
+	      QMELT_TR = QMELT_TR + MAX(0.,(WICE0_TR(J)-MICE_TR(J)))/DT
+	      QMELT_TR = MIN(QMELT_TR, QMELT)
+	    end if
+	    !---------------------
          ENDIF
       ENDIF
     ENDDO
@@ -5494,11 +6002,28 @@ ENDIF   ! CROPTYPE == 0
     DO J = ISNOW+1,0             ! snow
        SNLIQ(J) = MLIQ(J)
        SNICE(J) = MICE(J)
+       !-----do wt calc-----
+       if (present(WVTFLAG)) then
+         SNLIQ_TR(J) = MLIQ_TR(J)
+	 SNICE_TR(J) = MICE_TR(J)
+       end if
+       !--------------------
     END DO
 
     DO J = 1, NSOIL              ! soil
        SH2O(J) =  MLIQ(J)            / (1000. * DZSNSO(J))
        SMC(J)  = (MLIQ(J) + MICE(J)) / (1000. * DZSNSO(J))
+       !-----do wt calc------
+       if (present(WVTFLAG)) then
+         DO K =1, NSUB(J)
+           ISUB           = sum(NSUB(1:J)) - NSUB(J) + K
+           SH2O_TR(ISUB)  =  MLIQ_TR(ISUB)                  / (1000. * DZSNSO(J)/real(NSUB(J)))
+           SMC_TR(ISUB)   = (MLIQ_TR(ISUB) + MICE_TR(ISUB)) / (1000. * DZSNSO(J)/real(NSUB(J)))
+           SH2O_SUB(ISUB) = MLIQ_SUB(ISUB)                  / (1000. * DZSNSO(J)/real(NSUB(J)))
+           SMC_SUB(ISUB)  = (MLIQ_SUB(ISUB)+MICE_SUB(ISUB)) / (1000. * DZSNSO(J)/real(NSUB(J)))
+         END DO
+       end if
+       !---------------------
     END DO
 
   END SUBROUTINE PHASECHANGE
@@ -5661,6 +6186,18 @@ ENDIF   ! CROPTYPE == 0
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
+                    , NTRACER, WVTFLAG, IOPT_PM, NSUB, SMC_SUB, SH2O_SUB, SICE_SUB   & !IN
+                    , PONDING_TR,   RAIN_TR,  SNOW_TR, QSNOW_TR, QRAIN_TR, SNOWHIN_TR & !IN
+                    , CANLIQ_TR, CANICE_TR, SNOWH_TR, SNEQV_TR                        & !INOUT
+                    , SNICE_TR,  SNLIQ_TR, ZSNSO_TR,  SH2O_TR, SMC_TR                 & !INOUT
+                    , SICE_TR,     WA_TR,    WT_TR,DZSNSO_TR, WSLAKE_TR               & !INOUT
+                    , SMCWTD_TR,DEEPRECH_TR, RECH_TR                                  & !INOUT
+                    , CMC_TR,   ECAN_TR, ETRAN_TR, RUNSRF_TR, RUNSUB_TR               & !OUT
+                    , QIN_TR,   QDIS_TR, PONDING1_TR, PONDING2_TR                     & !OUT
+                    , QSNBOT_TR, EDIR_TR, FLUX_TR                                     & !OUT
+#ifdef WRF_HYDRO
+                        ,sfcheadrt_tr_pass                    &
+#endif
                     )  !out
 ! ----------------------------------------------------------------------
 ! Code history:
@@ -5746,6 +6283,63 @@ ENDIF   ! CROPTYPE == 0
   LOGICAL                           , INTENT(IN)   :: FROZEN_GROUND ! used to define latent heat pathway
   LOGICAL                           , INTENT(IN)   :: FROZEN_CANOPY ! used to define latent heat pathway
 
+!-----------------------------------------------------------------------
+! Needed for Water tracer capability
+!-----------------------------------------------------------------------
+  INTEGER,                         OPTIONAL,INTENT(IN)    :: WVTFLAG
+  INTEGER,                         OPTIONAL,INTENT(IN)    :: IOPT_PM     !partial mixing option: 1-active
+  INTEGER,     DIMENSION(1:NSOIL), OPTIONAL,INTENT(IN)    :: NSUB
+  INTEGER                        ,          INTENT(IN)    :: NTRACER
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL,INTENT(INOUT) :: SH2O_SUB    !soil liquid water content [m3/m3]
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL,INTENT(INOUT) :: SICE_SUB    !soil ice content [m3/m3]
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL,INTENT(INOUT) :: SMC_SUB     !total soil water content [m3/m3]
+  REAL                           , OPTIONAL,INTENT(IN)    :: RAIN_TR     !rainfall (mm/s) ! MB/AN: v3.7
+  REAL                           , OPTIONAL,INTENT(IN)    :: SNOW_TR     !snowfall (mm/s) ! MB/AN: v3.7
+  REAL                           , OPTIONAL,INTENT(IN)    :: QSNOW_TR   !snow at ground srf (mm/s) [+]
+  REAL                           , OPTIONAL,INTENT(IN)    :: QRAIN_TR   !rain at ground srf (mm) [+]
+  REAL                           , OPTIONAL,INTENT(IN)    :: SNOWHIN_TR !snow depth increasing rate (m/s)
+  REAL,                            OPTIONAL,INTENT(INOUT) :: CANLIQ_TR  !intercepted liquid water (mm)
+  REAL,                            OPTIONAL,INTENT(INOUT) :: CANICE_TR  !intercepted ice mass (mm)
+  REAL,                            OPTIONAL,INTENT(INOUT) :: SNOWH_TR   !snow height [m]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: SNEQV_TR   !snow water eqv. [mm]
+  REAL, DIMENSION(-NSNOW+1:    0), OPTIONAL,INTENT(INOUT) :: SNICE_TR   !snow layer ice [mm]
+  REAL, DIMENSION(-NSNOW+1:    0), OPTIONAL,INTENT(INOUT) :: SNLIQ_TR   !snow layer liquid water [mm]
+  REAL,DIMENSION(-NSNOW+1:NTRACER),OPTIONAL,INTENT(INOUT) :: ZSNSO_TR   !depth of snow/soil layer-bottom
+  REAL,DIMENSION(-NSNOW+1:NTRACER),OPTIONAL,INTENT(INOUT) :: DZSNSO_TR  !snow/soil layer thickness [m]
+  REAL,DIMENSION(       1:NTRACER),OPTIONAL,INTENT(INOUT) :: SH2O_TR    !soil liquid water content [m3/m3]
+  REAL,DIMENSION(       1:NTRACER),OPTIONAL,INTENT(INOUT) :: SICE_TR    !soil ice content [m3/m3]
+  REAL,DIMENSION(       1:NTRACER),OPTIONAL,INTENT(INOUT) :: SMC_TR     !total soil water content [m3/m3]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: WA_TR      !water storage in aquifer [mm]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: WT_TR      !water storage in aquifer
+                                                            !+ stuarated soil
+                                                            ![mm]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: WSLAKE_TR  !water storage in lake (can be -) (mm)
+  REAL                           , OPTIONAL,INTENT(INOUT) :: PONDING_TR ![mm]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: SMCWTD_TR !soil water content between bottom of the soil and water table [m3/m3]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: DEEPRECH_TR !recharge to or from the water table when deep [m]
+  REAL,                            OPTIONAL,INTENT(INOUT) :: RECH_TR !recharge to or from the water table when shallow [m] (diagnostic)
+  REAL,                            OPTIONAL,INTENT(OUT)   :: CMC_TR     !intercepted water per ground area (mm)
+  REAL,                            OPTIONAL,INTENT(OUT)   :: ECAN_TR    !evap of intercepted water (mm/s) [+]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: ETRAN_TR   !transpiration rate (mm/s) [+]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: RUNSRF_TR  !surface runoff [mm/s]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: RUNSUB_TR  !baseflow (sturation excess) [mm/s]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: QIN_TR     !groundwater recharge [mm/s]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: QDIS_TR
+  REAL,                            OPTIONAL,INTENT(OUT)   :: PONDING1_TR
+  REAL,                            OPTIONAL,INTENT(OUT)   :: PONDING2_TR
+  REAL,                            OPTIONAL,INTENT(OUT)   :: QSNBOT_TR  !melting water out of snow bottom [mm/s]
+  REAL,                            OPTIONAL,INTENT(OUT)   :: EDIR_TR    !mm/s
+  REAL, DIMENSION(     1:NTRACER), OPTIONAL,INTENT(OUT)   :: FLUX_TR    !m
+  !------------------local vars----------------------------------------
+  REAL                                                    :: QINSUR_TR  !water input on soil surface [m/s]
+  REAL                                                    :: QDRAIN_TR  !soil-bottom free drainage [mm/s]
+  REAL                                                    :: QSEVA_TR   !soil evaporation [m/s]
+  REAL                                                    :: SNOFLOW_TR !glacier flow [mm/s]
+  REAL                                                    :: PROPOR_TR
+  REAL                                                    :: SMMASS, MSICE_REST, MEVAP_REST !for frozen ground
+!  REAL,  DIMENSION(1:NSUB(1))                             :: MSICE_SUB, MSH2O_SUB, MSICE_TR, MSH2O_TR
+!-----------------------------------------------------------------------
+  
 
 ! local
   INTEGER                                        :: IZ
@@ -5764,6 +6358,7 @@ ENDIF   ! CROPTYPE == 0
 
 #ifdef WRF_HYDRO
   REAL                           , INTENT(INOUT)    :: sfcheadrt
+  REAL,            OPTIONAL      , INTENT(INOUT)    :: sfcheadrt_tr_pass
 #endif
 
 ! ----------------------------------------------------------------------
@@ -5773,9 +6368,31 @@ ENDIF   ! CROPTYPE == 0
    SNOFLOW         = 0.
    RUNSUB          = 0.
    QINSUR          = 0.
+   
+   if (present(WVTFLAG)) then
+     SNOFLOW_TR        = 0.
+     RUNSUB_TR         = 0.
+     QINSUR_TR         = 0.
+     EDIR_TR           = 0.
+   end if
 
 ! canopy-intercepted snowfall/rainfall, drips, and throughfall
 
+ if (present(WVTFLAG)) then
+   CALL CANWATER (parameters,VEGTYP ,DT     , & !in
+                  FCEV   ,FCTR   ,ELAI   , & !in
+                  ESAI   ,TG     ,FVEG   ,ILOC   , JLOC, & !in
+                  BDFALL ,FROZEN_CANOPY  , & !in     
+                  CANLIQ ,CANICE ,TV     ,                 & !inout
+                  CMC    ,ECAN   ,ETRAN  , & !out
+                  FWET                     &
+		  , WVTFLAG  =WVTFLAG        & !wt in
+		  , CANLIQ_TR=CANLIQ_TR    & !wt inout
+		  , CANICE_TR=CANICE_TR    & !wt inout
+		  , CMC_TR   =CMC_TR       & !wt out
+		  , ECAN_TR  =ECAN_TR)  
+		  
+ else
    CALL CANWATER (parameters,VEGTYP ,DT     , & !in
                   FCEV   ,FCTR   ,ELAI   , & !in
                   ESAI   ,TG     ,FVEG   ,ILOC   , JLOC, & !in
@@ -5783,6 +6400,8 @@ ENDIF   ! CROPTYPE == 0
                   CANLIQ ,CANICE ,TV     ,                 & !inout
                   CMC    ,ECAN   ,ETRAN  , & !out
                   FWET      )                           !out
+		  
+ end if
 
 ! sublimation, frost, evaporation, and dew
 
@@ -5798,14 +6417,52 @@ ENDIF   ! CROPTYPE == 0
      ENDIF
      QSDEW = QDEW - QSNFRO
 
+   if (present(WVTFLAG)) then
+if (ILOC .eq. 41 .and. JLOC .eq. 27) then
+!  print *, "FLAG WITHIN WATER000-1, SICE_SUB,SICE,SICE_TR:",SICE_SUB,SICE,SICE_TR
+end if
      CALL SNOWWATER (parameters,NSNOW  ,NSOIL  ,IMELT  ,DT     ,ZSOIL  , & !in
           &          SFCTMP ,SNOWHIN,QSNOW  ,QSNFRO ,QSNSUB , & !in
           &          QRAIN  ,FICEOLD,ILOC   ,JLOC   ,         & !in
           &          ISNOW  ,SNOWH  ,SNEQV  ,SNICE  ,SNLIQ  , & !inout
           &          SH2O   ,SICE   ,STC    ,ZSNSO  ,DZSNSO , & !inout
-          &          QSNBOT ,SNOFLOW,PONDING1       ,PONDING2)  !out
+          &          QSNBOT ,SNOFLOW,PONDING1       ,PONDING2 & !out
+	  &          , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB           & !wt in
+	             , SH2O_SUB=SH2O_SUB, SICE_SUB=SICE_SUB, SNOWHIN_TR=SNOWHIN_TR & !wt in
+		     , QSNOW_TR=QSNOW_TR, QRAIN_TR=QRAIN_TR          & !wt in
+                     , SNOWH_TR=SNOWH_TR, SNEQV_TR=SNEQV_TR          & !wt inout
+		     , SNICE_TR=SNICE_TR, SNLIQ_TR=SNLIQ_TR          & !wt INOUT
+                     , SH2O_TR=SH2O_TR, SICE_TR=SICE_TR, ZSNSO_TR=ZSNSO_TR & !wt inout
+		     , DZSNSO_TR=DZSNSO_TR,EDIR_TR=EDIR_TR           & !wt INOUT
+                     , QSNBOT_TR=QSNBOT_TR,SNOFLOW_TR=SNOFLOW_TR     & !wt INOUT
+		     , PONDING1_TR=PONDING1_TR, PONDING2_TR=PONDING2_TR)  !wt out
+if (ILOC .eq. 41 .and. JLOC .eq. 27) then
+!  print *, "FLAG WITHIN WATER000, SICE_SUB,SICE,SICE_TR:",SICE_SUB,SICE,SICE_TR
+end if
+   else
+     CALL SNOWWATER (parameters,NSNOW  ,NSOIL  ,IMELT  ,DT     ,ZSOIL  , & !in
+          &          SFCTMP ,SNOWHIN,QSNOW  ,QSNFRO ,QSNSUB , & !in
+          &          QRAIN  ,FICEOLD,ILOC   ,JLOC   ,         & !in
+          &          ISNOW  ,SNOWH  ,SNEQV  ,SNICE  ,SNLIQ  , & !inout
+          &          SH2O   ,SICE   ,STC    ,ZSNSO  ,DZSNSO , & !inout
+          &          QSNBOT ,SNOFLOW,PONDING1       ,PONDING2, NTRACER)  !out
+	  
+   end if
 
    IF(FROZEN_GROUND) THEN
+     ! -----wt calc-----
+     if (present(WVTFLAG))  then
+       if ((QSDEW-QSEVA) .lt. 0.0) then
+         call TOPSOIL_SUB (NSUB(1), DZSNSO_TR(1:NSUB(1)), DT, QSEVA-QSDEW,&
+                          SH2O_SUB(1:NSUB(1)), SICE_SUB(1:NSUB(1)), &
+                          SH2O_TR(1:NSUB(1)), SICE_TR(1:NSUB(1)), EDIR_TR)		  
+       else
+         SICE_TR(1) = SICE_TR(1) + (QSDEW-QSEVA)*0.0*DT/(DZSNSO_TR(1)*1000.0)
+          SICE_SUB(1) = SICE_SUB(1) + (QSDEW-QSEVA)*DT/(DZSNSO_TR(1)*1000.0)
+          EDIR_TR = EDIR_TR - (QSDEW-QSEVA)*0.0
+       end if
+     end if
+     !-----wt calc ends------
       SICE(1) =  SICE(1) + (QSDEW-QSEVA)*DT/(DZSNSO(1)*1000.)
       QSDEW = 0.0
       QSEVA = 0.0
@@ -5819,12 +6476,15 @@ ENDIF   ! CROPTYPE == 0
 
     !PONDING: melting water from snow when there is no layer
     QINSUR = (PONDING+PONDING1+PONDING2)/DT * 0.001
+    if (present(WVTFLAG)) QINSUR_TR = (PONDING_TR+PONDING1_TR+PONDING2_TR)/DT * 0.001 !wt calc
 !    QINSUR = PONDING/DT * 0.001
 
     IF(ISNOW == 0) THEN
        QINSUR = QINSUR+(QSNBOT + QSDEW + QRAIN) * 0.001
+       if (present(WVTFLAG)) QINSUR_TR = QINSUR_TR+(QSNBOT_TR + QSDEW*0.0 + QRAIN_TR) * 0.001 !wt calc
     ELSE
        QINSUR = QINSUR+(QSNBOT + QSDEW) * 0.001
+       if (present(WVTFLAG)) QINSUR_TR = QINSUR_TR+(QSNBOT_TR + QSDEW*0.0) * 0.001   !wt calc
     ENDIF
 
     QSEVA  = QSEVA * 0.001
@@ -5835,20 +6495,63 @@ ENDIF   ! CROPTYPE == 0
 
 #ifdef WRF_HYDRO
        QINSUR = QINSUR+sfcheadrt/DT*0.001  !sfcheadrt units (m)
+       if (present(WVTFLAG)) then
+         QINSUR_TR = QINSUR_TR+sfcheadrt_tr_pass/DT*0.001
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG WITHIN WATER001, QINSUR,QINSUR_TR,sfcheadrt,sfcheadrt_tr:",QINSUR,QINSUR_TR,sfcheadrt,sfcheadrt_tr_pass
+!  print *, "PONDING,PONDING1,PONDING2,PONDING_TR,PONDING1_TR,PONDING2_TR:",PONDING,PONDING1,PONDING2,PONDING_TR,PONDING1_TR,PONDING2_TR
+!  print *, "QSNBOT,QSDEW,QRAIN,QSNBOT_TR,QRAIN_TR:",QSNBOT,QSDEW,QRAIN,QSNBOT_TR,QRAIN_TR    
+!  print *, "FLAG WITHIN WATER001, SICE_SUB,SICE,SICE_TR:",SICE_SUB,SICE,SICE_TR
+end if
+       end if
 #endif
 
 ! lake/soil water balances
 
     IF (IST == 2) THEN                                        ! lake
        RUNSRF = 0.
+       if (present(WVTFLAG)) RUNSRF_TR = 0.                   !wt calc
        IF(WSLAKE >= WSLMAX) RUNSRF = QINSUR*1000.             !mm/s
+       !-----wt calc------
+       if (present(WVTFLAG)) then
+         if (WSLAKE >= WSLMAX) then
+	   RUNSRF_TR = QINSUR_TR*1000.
+	 end if
+	 call get_wt_ratio(WSLAKE_TR, WSLAKE, PROPOR_TR)
+	 WSLAKE_TR = WSLAKE_TR + (QINSUR_TR-QSEVA*PROPOR_TR)*1000.*DT -RUNSRF_TR*DT
+	 EDIR_TR   = EDIR_TR  + QSEVA*PROPOR_TR*1000.
+       end if
+       !------------------
        WSLAKE = WSLAKE + (QINSUR-QSEVA)*1000.*DT -RUNSRF*DT   !mm
     ELSE                                                      ! soil
+      if (present(WVTFLAG)) then
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG WITHIN WATER002,RUNSRF, RUNSRF_TR:",RUNSRF,RUNSRF_TR
+!  print *, "SH2O,SH2O_SUB,SH2O_TR:",SH2O,SH2O_SUB,SH2O_TR
+end if
+       CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+                            QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
+                            SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
+                            SMCWTD, DEEPRECH                      , & !inout
+                            RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX  & !out
+			    , NTRACER, WVTFLAG=WVTFLAG,IOPT_PM=IOPT_PM,NSUB=NSUB        & !wt in
+			    , SH2O_SUB=SH2O_SUB, SMC_SUB=SMC_SUB, DZSNSO_TR=DZSNSO_TR   & !wt IN
+                            , QINSUR_TR=QINSUR_TR, SH2O_TR=SH2O_TR, SMC_TR=SMC_TR       & !wt inout
+			    , SMCWTD_TR=SMCWTD_TR, DEEPRECH_TR=DEEPRECH_TR              & !wt inout
+                            , RUNSRF_TR=RUNSRF_TR, QDRAIN_TR=QDRAIN_TR                  & !wt out
+			    , RUNSUB_TR=RUNSUB_TR, ETRAN_TR=ETRAN_TR                    & !wt out
+			    , QSEVA_TR=QSEVA_TR,  FLUX_TR=FLUX_TR)                        !wt out
+			    
+                 EDIR_TR = EDIR_TR + QSEVA_TR*1000.    !unit: mm/s
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG WITHIN WATER003,SH2O,SH2O_SUB,SH2O_TR,RUNSRF, RUNSRF_TR:",SH2O,SH2O_SUB,SH2O_TR,RUNSRF, RUNSRF_TR
+end if
+      else 
        CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                             QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
                            SMCWTD, DEEPRECH                       , & !inout
-                            RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX )   !out
+                            RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX, NTRACER )   !out
 
        IF(OPT_RUN == 1) THEN
           CALL GROUNDWATER (parameters,NSNOW  ,NSOIL  ,DT     ,SICE   ,ZSOIL  , & !in
@@ -5860,12 +6563,21 @@ ENDIF   ! CROPTYPE == 0
 
        IF(OPT_RUN == 3 .or. OPT_RUN == 4 .or. OPT_RUN == 7) THEN
           RUNSUB       = RUNSUB + QDRAIN        !mm/s
+	  if (present(WVTFLAG)) RUNSUB_TR = RUNSUB_TR + QDRAIN_TR    ! wt calc
        END IF
 
        DO IZ = 1,NSOIL
            SMC(IZ) = SH2O(IZ) + SICE(IZ)
        ENDDO
-
+       !-----wt calc------
+       if (present(WVTFLAG)) then
+         DO IZ = 1, NTRACER
+           SMC_TR(IZ) = SH2O_TR(IZ) + SICE_TR(IZ)
+           SMC_SUB(IZ) = SH2O_SUB(IZ) + SICE_SUB(IZ)
+         END DO
+       end if
+       !------------------
+ 
        IF(OPT_RUN == 5) THEN
           CALL SHALLOWWATERTABLE (parameters,NSNOW  ,NSOIL, ZSOIL, DT       , & !in
                          DZSNSO ,SMCEQ   ,ILOC , JLOC        , & !in
@@ -5879,6 +6591,7 @@ ENDIF   ! CROPTYPE == 0
     ENDIF
 
     RUNSUB       = RUNSUB + SNOFLOW         !mm/s
+    if (present(WVTFLAG)) RUNSUB_TR = RUNSUB_TR + SNOFLOW_TR   !wt calc
 
   END SUBROUTINE WATER
 
@@ -5890,7 +6603,9 @@ ENDIF   ! CROPTYPE == 0
                        BDFALL ,FROZEN_CANOPY  ,  & !in
                        CANLIQ ,CANICE ,TV     ,                 & !inout
                        CMC    ,ECAN   ,ETRAN  , & !out
-                       FWET      )                           !out
+                       FWET                     & !out
+		       , WVTFLAG, CANLIQ_TR, CANICE_TR  & !wt inout
+		       , CMC_TR, ECAN_TR  )               !wt out
 
 ! ------------------------ code history ------------------------------
 ! canopy hydrology
@@ -5923,6 +6638,16 @@ ENDIF   ! CROPTYPE == 0
   REAL, INTENT(OUT)   :: ETRAN   !transpiration rate (mm/s) [+]
   REAL, INTENT(OUT)   :: FWET    !wetted or snowed fraction of the canopy (-)
 ! --------------------------------------------------------------------
+! Needed for Water tracer capability
+!---------------------------------------------------------------------
+  INTEGER, OPTIONAL, INTENT(IN)    :: WVTFLAG
+  REAL,    OPTIONAL, INTENT(INOUT) :: CANLIQ_TR  !intercepted liquid water (mm)
+  REAL,    OPTIONAL, INTENT(INOUT) :: CANICE_TR  !intercepted ice mass (mm)
+  REAL,    OPTIONAL, INTENT(OUT)   :: CMC_TR     !intercepted water (mm)
+  REAL,    OPTIONAL, INTENT(OUT)   :: ECAN_TR    !evaporation of intercepted water (mm/s) [+]
+  REAL                             :: PRO_LIQ    !ratio: liq_tracer/liq
+  REAL                             :: PRO_ICE    !ratio: ice_tracer/ice 
+!---------------------------------------------------------------------
 
 ! ------------------------ local variables ---------------------------
   REAL                :: MAXSNO  !canopy capacity for snow interception (mm)
@@ -5938,6 +6663,7 @@ ENDIF   ! CROPTYPE == 0
 ! initialization
 
       ECAN    = 0.0
+      if (present(WVTFLAG)) ECAN_TR = 0.0    !wt calc
 
 ! --------------------------- liquid water ------------------------------
 ! maximum canopy water
@@ -5960,12 +6686,20 @@ ENDIF   ! CROPTYPE == 0
         QFROC = ABS( MIN( FCEV/HSUB, 0. ) )
       ENDIF
 
+    !-----wt calc-----
+    if (present(WVTFLAG)) then
+      call get_wt_ratio(CANLIQ_TR, CANLIQ, PRO_LIQ)
+      call get_wt_ratio(CANICE_TR, CANICE, PRO_ICE)
+    end if
+
 ! canopy water balance. for convenience allow dew to bring CANLIQ above
 ! maxh2o or else would have to re-adjust drip
 
        QEVAC = MIN(CANLIQ/DT,QEVAC)
        CANLIQ=MAX(0.,CANLIQ+(QDEWC-QEVAC)*DT)
+       if (present(WVTFLAG)) CANLIQ_TR=MAX(0.,CANLIQ_TR+(QDEWC*0.0-QEVAC*PRO_LIQ)*DT) !wt calc
        IF(CANLIQ <= 1.E-06) CANLIQ = 0.0
+       if (present(WVTFLAG)) CANLIQ_TR=min(CANLIQ, CANLIQ_TR)   !wt calc
 
 ! --------------------------- canopy ice ------------------------------
 ! for canopy ice
@@ -5974,8 +6708,11 @@ ENDIF   ! CROPTYPE == 0
 
       QSUBC = MIN(CANICE/DT,QSUBC)
       CANICE= MAX(0.,CANICE + (QFROC-QSUBC)*DT)
+      if (present(WVTFLAG)) CANICE_TR= MAX(0.,CANICE_TR + (QFROC*0.0-QSUBC*PRO_ICE)*DT)  !wt calc
       IF(CANICE.LE.1.E-6) CANICE = 0.
 
+      if (present(WVTFLAG)) CANICE_TR = min(CANICE, CANICE_TR)   !wt calc
+     
 ! wetted fraction of canopy
 
       IF(CANICE.GT.0.) THEN
@@ -5995,6 +6732,12 @@ ENDIF   ! CROPTYPE == 0
          CANICE = MAX(0.,CANICE - QMELTC*DT)
          CANLIQ = MAX(0.,CANLIQ + QMELTC*DT)
          TV     = FWET*TFRZ + (1.-FWET)*TV
+	 !-----wt calc------
+	 if (present(WVTFLAG)) then
+	   CANICE_TR = MAX(0.,CANICE_TR - QMELTC*PRO_ICE*DT)
+           CANLIQ_TR = MAX(0.,CANLIQ_TR + QMELTC*PRO_ICE*DT)
+	 end if
+	 !------------------
       ENDIF
 
       IF(CANLIQ.GT.1.E-6.AND.TV.LT.TFRZ) THEN
@@ -6002,6 +6745,12 @@ ENDIF   ! CROPTYPE == 0
          CANLIQ = MAX(0.,CANLIQ - QFRZC*DT)
          CANICE = MAX(0.,CANICE + QFRZC*DT)
          TV     = FWET*TFRZ + (1.-FWET)*TV
+	 !-----wt calc------
+	 if (present(WVTFLAG)) then
+	   CANLIQ_TR = MAX(0.,CANLIQ_TR - QFRZC*PRO_LIQ*DT)
+           CANICE_TR = MAX(0.,CANICE_TR + QFRZC*PRO_LIQ*DT)
+	 end if
+	 !------------------
       ENDIF
 
 ! total canopy water
@@ -6011,6 +6760,12 @@ ENDIF   ! CROPTYPE == 0
 ! total canopy evaporation
 
       ECAN = QEVAC + QSUBC - QDEWC - QFROC
+      !-----wt calc------
+      if (present(WVTFLAG)) then
+        CMC_TR = CANLIQ_TR + CANICE_TR
+	ECAN_TR = QEVAC*PRO_LIQ + QSUBC*PRO_ICE - QDEWC*0.0 - QFROC*0.0
+      end if
+      !------------------
 
   END SUBROUTINE CANWATER
 
@@ -6021,7 +6776,12 @@ ENDIF   ! CROPTYPE == 0
                         QRAIN  ,FICEOLD,ILOC   ,JLOC   ,         & !in
                         ISNOW  ,SNOWH  ,SNEQV  ,SNICE  ,SNLIQ  , & !inout
                         SH2O   ,SICE   ,STC    ,ZSNSO  ,DZSNSO , & !inout
-                        QSNBOT ,SNOFLOW,PONDING1       ,PONDING2)  !out
+                        QSNBOT ,SNOFLOW,PONDING1       ,PONDING2 & !out
+			, NTRACER,  WVTFLAG, NSUB, SH2O_SUB, SICE_SUB & !wt in
+			, SNOWHIN_TR, QSNOW_TR, QRAIN_TR              & !wt IN
+                        , SNOWH_TR, SNEQV_TR, SNICE_TR, SNLIQ_TR      & !wt INOUT
+                        , SH2O_TR, SICE_TR, ZSNSO_TR, DZSNSO_TR,EDIR_TR  & !wt INOUT
+                        , QSNBOT_TR, SNOFLOW_TR, PONDING1_TR, PONDING2_TR) !wt out
 ! ----------------------------------------------------------------------
   IMPLICIT NONE
 ! ----------------------------------------------------------------------
@@ -6060,6 +6820,36 @@ ENDIF   ! CROPTYPE == 0
   REAL,                              INTENT(OUT) :: PONDING1
   REAL,                              INTENT(OUT) :: PONDING2
 
+!----------------------------------------------------------------------
+! Needed for Water tracer capability
+!----------------------------------------------------------------------
+  INTEGER,                           OPTIONAL,INTENT(IN)    :: WVTFLAG
+  INTEGER, DIMENSION(1:NSOIL),       OPTIONAL,INTENT(IN)    :: NSUB
+  INTEGER,                                    INTENT(IN)    :: NTRACER
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL,INTENT(INOUT) :: SH2O_SUB   !soil liquid moisture (m3/m3)
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL,INTENT(INOUT) :: SICE_SUB   !soil ice moisture (m3/m3)
+  REAL,                              OPTIONAL,INTENT(IN)    :: SNOWHIN_TR!snow depth increasing rate (m/s)
+  REAL,                              OPTIONAL,INTENT(IN)    :: QSNOW_TR  !snow at ground srf (mm/s) [+]
+  REAL,                              OPTIONAL,INTENT(IN)    :: QRAIN_TR  !snow surface rain rate[mm/s]
+  REAL,                              OPTIONAL,INTENT(INOUT) :: SNOWH_TR  !snow height [m]
+  REAL,                              OPTIONAL,INTENT(INOUT) :: SNEQV_TR  !snow water eqv. [mm]
+  REAL, DIMENSION(-NSNOW+1:      0), OPTIONAL,INTENT(INOUT) :: SNICE_TR  !snow layer ice [mm]
+  REAL, DIMENSION(-NSNOW+1:      0), OPTIONAL,INTENT(INOUT) :: SNLIQ_TR  !snow layer liquid water [mm]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL,INTENT(INOUT) :: SH2O_TR   !soil liquid moisture (m3/m3)
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL,INTENT(INOUT) :: SICE_TR   !soil ice moisture (m3/m3)
+  REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL,INTENT(INOUT) :: ZSNSO_TR  !depth of snow/soil layer-bottom
+  REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL,INTENT(INOUT) :: DZSNSO_TR !snow/soil layer thickness [m]
+  REAL,                              OPTIONAL,INTENT(INOUT) :: EDIR_TR   ! mm/s
+  REAL,                              OPTIONAL,INTENT(OUT)   :: QSNBOT_TR !melting water out of snow bottom [mm/s]
+  REAL,                              OPTIONAL,INTENT(OUT)   :: SNOFLOW_TR!glacier flow [mm]
+  REAL,                              OPTIONAL,INTENT(OUT)   :: PONDING1_TR
+  REAL,                              OPTIONAL,INTENT(OUT)   :: PONDING2_TR
+  !------------local vars---------------------------------------------
+  REAL                                                      :: undefined_value = -1.E36
+  REAL                                                      :: PROPOR_TR
+  INTEGER                                                   :: K, ISUB
+!----------------------------------------------------------------------
+
 ! local
   INTEGER :: IZ,i
   REAL    :: BDSNOW  !bulk density of snow (kg/m3)
@@ -6067,34 +6857,105 @@ ENDIF   ! CROPTYPE == 0
    SNOFLOW = 0.0
    PONDING1 = 0.0
    PONDING2 = 0.0
+   !-----wt calc------
+   if (present(WVTFLAG)) then
+     SNOFLOW_TR = 0.0
+     PONDING1_TR = 0.0
+     PONDING2_TR = 0.0
+   end if
+   !------------------
 
+ if (present(WVTFLAG)) then
    CALL SNOWFALL (parameters,NSOIL  ,NSNOW  ,DT     ,QSNOW  ,SNOWHIN, & !in
                   SFCTMP ,ILOC   ,JLOC   ,                 & !in
                   ISNOW  ,SNOWH  ,DZSNSO ,STC    ,SNICE  , & !inout
-                  SNLIQ  ,SNEQV  )                           !inout
+                  SNLIQ  ,SNEQV                            & !inout
+		  , NTRACER, WVTFLAG=WVTFLAG         & !wt in
+		  , QSNOW_TR=QSNOW_TR, SNOWHIN_TR=SNOWHIN_TR & !wt inout
+		  , SNOWH_TR=SNOWH_TR, DZSNSO_TR=DZSNSO_TR   & !wt inout
+		  , SNICE_TR=SNICE_TR, SNLIQ_TR=SNLIQ_TR, SNEQV_TR=SNEQV_TR)   !wt inout	  
+ else
+   CALL SNOWFALL (parameters,NSOIL  ,NSNOW  ,DT     ,QSNOW  ,SNOWHIN, & !in
+                  SFCTMP ,ILOC   ,JLOC   ,                 & !in
+                  ISNOW  ,SNOWH  ,DZSNSO ,STC    ,SNICE  , & !inout
+                  SNLIQ  ,SNEQV, NTRACER  )                           !inout	  
+  end if
 
 ! MB: do each if block separately
 
-   IF(ISNOW < 0) &        ! when multi-layer
+   IF(ISNOW < 0) then       ! when multi-layer
+   IF (present(WVTFLAG)) then
+    CALL  COMPACT (parameters,NSNOW  ,NSOIL  ,DT     ,STC    ,SNICE  , & !in
+                  SNLIQ  ,ZSOIL  ,IMELT  ,FICEOLD,ILOC   , JLOC ,& !in
+                  ISNOW  ,DZSNSO ,ZSNSO                          & !inout
+		  , NTRACER, WVTFLAG=WVTFLAG, DZSNSO_TR=DZSNSO_TR)  !wt inout
+   else
    CALL  COMPACT (parameters,NSNOW  ,NSOIL  ,DT     ,STC    ,SNICE  , & !in
                   SNLIQ  ,ZSOIL  ,IMELT  ,FICEOLD,ILOC   , JLOC ,& !in
-                  ISNOW  ,DZSNSO ,ZSNSO  )                   !inout
+                  ISNOW  ,DZSNSO ,ZSNSO, NTRACER  )                   !inout
+   end if
+   END IF
 
-   IF(ISNOW < 0) &        !when multi-layer
+   IF(ISNOW < 0) THEN        !when multi-layer
+   if (present(WVTFLAG)) then
+if (ILOC .eq. 44 .and. JLOC .eq. 23) then
+!  print *, "FLAG IN SNOWWATER001, SICE, SICE_SUB:",SICE, SICE_SUB
+end if
    CALL  COMBINE (parameters,NSNOW  ,NSOIL  ,ILOC   ,JLOC   ,         & !in
                   ISNOW  ,SH2O   ,STC    ,SNICE  ,SNLIQ  , & !inout
                   DZSNSO ,SICE   ,SNOWH  ,SNEQV  ,         & !inout
-                  PONDING1       ,PONDING2)                  !out
+                  PONDING1       ,PONDING2                 & !out
+		  , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB    & !wt in
+		  , SH2O_SUB=SH2O_SUB, SICE_SUB=SICE_SUB, DT=DT  & !wt in
+		  , SH2O_TR=SH2O_TR, SNICE_TR=SNICE_TR           & !wt inout
+		  , SNLIQ_TR=SNLIQ_TR, DZSNSO_TR=DZSNSO_TR       & !wt inout
+		  , SICE_TR=SICE_TR, SNOWH_TR=SNOWH_TR           & !wt inout
+		  , SNEQV_TR=SNEQV_TR, PONDING1_TR=PONDING1_TR   & !wt out
+		  , PONDING2_TR=PONDING2_TR)                       !wt out
+if (ILOC .eq. 44 .and. JLOC .eq. 23) then
+!  print *, "FLAG IN SNOWWATER002, SICE, SICE_SUB:",SICE, SICE_SUB
+end if
+   else
+   CALL  COMBINE (parameters,NSNOW  ,NSOIL  ,ILOC   ,JLOC   ,         & !in
+                  ISNOW  ,SH2O   ,STC    ,SNICE  ,SNLIQ  , & !inout
+                  DZSNSO ,SICE   ,SNOWH  ,SNEQV  ,         & !inout
+                  PONDING1       ,PONDING2, NTRACER)                  !out
+   end if
+   END IF
 
-   IF(ISNOW < 0) &        !when multi-layer
+   IF(ISNOW < 0) THEN        !when multi-layer
+   if (present(WVTFLAG)) then
    CALL   DIVIDE (parameters,NSNOW  ,NSOIL  ,                         & !in
-                  ISNOW  ,STC    ,SNICE  ,SNLIQ  ,DZSNSO )   !inout
+                  ISNOW  ,STC    ,SNICE  ,SNLIQ  ,DZSNSO              & !inout
+		  , NTRACER, WVTFLAG=WVTFLAG                          & !wt in
+		  , SNICE_TR=SNICE_TR, SNLIQ_TR=SNLIQ_TR, DZSNSO_TR=DZSNSO_TR) !wt inout
+   else
+   CALL   DIVIDE (parameters,NSNOW  ,NSOIL  ,                         & !in
+                  ISNOW  ,STC    ,SNICE  ,SNLIQ  ,DZSNSO, NTRACER )   !inout
+   end if
+   END IF
 
-   CALL  SNOWH2O (parameters,NSNOW  ,NSOIL  ,DT     ,QSNFRO ,QSNSUB , & !in
+   if (present(WVTFLAG)) then
+   CALL  SNOWH2O (parameters,NSNOW  ,NSOIL  ,DT     ,QSNFRO ,QSNSUB , & !in 
                   QRAIN  ,ILOC   ,JLOC   ,                 & !in
                   ISNOW  ,DZSNSO ,SNOWH  ,SNEQV  ,SNICE  , & !inout
                   SNLIQ  ,SH2O   ,SICE   ,STC    ,         & !inout
-                  QSNBOT ,PONDING1       ,PONDING2)           !out
+                  QSNBOT ,PONDING1       ,PONDING2         & !out
+		  , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB           & !wt in
+		  , SH2O_SUB=SH2O_SUB, SICE_SUB=SICE_SUB          & !wt in
+		  , QRAIN_TR=QRAIN_TR, DZSNSO_TR=DZSNSO_TR        & !wt in
+		  , SNOWH_TR=SNOWH_TR, SNEQV_TR= SNEQV_TR         & !wt inout
+                  , SNICE_TR=SNICE_TR, SNLIQ_TR=SNLIQ_TR          & !wt inout
+		  , SH2O_TR=SH2O_TR, SICE_TR=SICE_TR              & !wt inout
+		  , EDIR_TR=EDIR_TR, QSNBOT_TR=QSNBOT_TR          & !wt inout
+		  , PONDING1_TR=PONDING1_TR, PONDING2_TR=PONDING2_TR) !wt out
+   else
+   CALL  SNOWH2O (parameters,NSNOW  ,NSOIL  ,DT     ,QSNFRO ,QSNSUB , & !in 
+                  QRAIN  ,ILOC   ,JLOC   ,                 & !in
+                  ISNOW  ,DZSNSO ,SNOWH  ,SNEQV  ,SNICE  , & !inout
+                  SNLIQ  ,SH2O   ,SICE   ,STC    ,         & !inout
+                  QSNBOT ,PONDING1       ,PONDING2, NTRACER)           !out
+   end if
 
 !set empty snow layers to zero
 
@@ -6104,24 +6965,43 @@ ENDIF   ! CROPTYPE == 0
         stc(iz)   = 0.
         dzsnso(iz)= 0.
         zsnso(iz) = 0.
+	!-----wt calc------
+	if (present(WVTFLAG)) then
+	  snice_tr(iz) = 0.
+          snliq_tr(iz) = 0.
+          dzsnso_tr(iz)= 0.
+          zsnso_tr(iz) = 0.
+	end if
+	!------------------
    enddo
 
 !to obtain equilibrium state of snow in glacier region
 
    IF(SNEQV > parameters%SWE_LIMIT) THEN   ! 5000 mm -> maximum water depth
+      if (present(WVTFLAG)) call get_wt_ratio(SNEQV_TR, SNEQV, PROPOR_TR)  !wt calc
       BDSNOW      = SNICE(0) / DZSNSO(0)
       SNOFLOW     = (SNEQV - parameters%SWE_LIMIT)
+      if (present(WVTFLAG)) SNOFLOW_TR  = SNOFLOW*PROPOR_TR  !wt calc
       SNICE(0)    = SNICE(0)  - SNOFLOW
       DZSNSO(0)   = DZSNSO(0) - SNOFLOW/BDSNOW
       SNOFLOW     = SNOFLOW / DT
+      !-----wt calc------
+      if (present(WVTFLAG)) then
+        SNICE_TR(0)    = SNICE_TR(0)  - SNOFLOW_TR
+	DZSNSO_TR(0)   = DZSNSO_TR(0) - SNOFLOW_TR/BDSNOW
+        SNOFLOW_TR     = SNOFLOW_TR / DT
+      end if
+      !------------------
    END IF
 
 ! sum up snow mass for layered snow
 
    IF(ISNOW < 0) THEN  ! MB: only do for multi-layer
        SNEQV = 0.
+       if (present(WVTFLAG)) SNEQV_TR = 0.  !wt calc
        DO IZ = ISNOW+1,0
              SNEQV = SNEQV + SNICE(IZ) + SNLIQ(IZ)
+	     if (present(WVTFLAG)) SNEQV_TR = SNEQV_TR + SNICE_TR(IZ) + SNLIQ_TR(IZ)  !wt calc
        ENDDO
    END IF
 
@@ -6129,12 +7009,25 @@ ENDIF   ! CROPTYPE == 0
 
    DO IZ = ISNOW+1, 0
         DZSNSO(IZ) = -DZSNSO(IZ)
+	if (present(WVTFLAG)) DZSNSO_TR(IZ) = -DZSNSO_TR(IZ)   !wt calc
    END DO
 
    DZSNSO(1) = ZSOIL(1)
+   if (present(WVTFLAG)) DZSNSO_TR(1) = ZSOIL(1)/NSUB(1)   !wt calc
    DO IZ = 2,NSOIL
         DZSNSO(IZ) = (ZSOIL(IZ) - ZSOIL(IZ-1))
    END DO
+   !-----wt calc------
+   if (present(WVTFLAG)) then
+     ISUB = 0
+     DO IZ = 1, NSOIL
+       DO K = 1, NSUB(IZ)
+         ISUB = ISUB+1
+         DZSNSO_TR(ISUB) = DZSNSO(IZ)/NSUB(IZ)
+       END DO
+     END DO
+   end if
+   !------------------
 
    ZSNSO(ISNOW+1) = DZSNSO(ISNOW+1)
    DO IZ = ISNOW+2 ,NSOIL
@@ -6144,6 +7037,18 @@ ENDIF   ! CROPTYPE == 0
    DO IZ = ISNOW+1 ,NSOIL
        DZSNSO(IZ) = -DZSNSO(IZ)
    END DO
+   !-----wt calc------
+   if (present(WVTFLAG)) then
+     ZSNSO_TR(ISNOW+1) = DZSNSO_TR(ISNOW+1)
+     do IZ = ISNOW+2, NTRACER
+       ZSNSO_TR(IZ) = ZSNSO_TR(IZ-1) + DZSNSO_TR(IZ)
+     end do
+     
+     do iz = ISNOW+1, NTRACER
+       DZSNSO_TR(IZ) = -DZSNSO_TR(IZ)
+     end do
+   end if
+   !------------------
 
   END SUBROUTINE SNOWWATER
 
@@ -6152,7 +7057,10 @@ ENDIF   ! CROPTYPE == 0
   SUBROUTINE SNOWFALL (parameters,NSOIL  ,NSNOW  ,DT     ,QSNOW  ,SNOWHIN , & !in
                        SFCTMP ,ILOC   ,JLOC   ,                  & !in
                        ISNOW  ,SNOWH  ,DZSNSO ,STC    ,SNICE   , & !inout
-                       SNLIQ  ,SNEQV  )                            !inout
+                       SNLIQ  ,SNEQV                             & !inout
+		       , NTRACER, WVTFLAG                        & !wt in
+		       , QSNOW_TR, SNOWHIN_TR, SNOWH_TR          & !wt IN AND INOUT
+                       , DZSNSO_TR, SNICE_TR, SNLIQ_TR, SNEQV_TR)  !wt inout
 ! ----------------------------------------------------------------------
 ! snow depth and density to account for the new snowfall.
 ! new values of snow depth & density returned.
@@ -6181,6 +7089,20 @@ ENDIF   ! CROPTYPE == 0
   REAL, DIMENSION(-NSNOW+1:    0), INTENT(INOUT) :: SNICE  !snow layer ice [mm]
   REAL, DIMENSION(-NSNOW+1:    0), INTENT(INOUT) :: SNLIQ  !snow layer liquid water [mm]
 
+!-----------------------------------------------------------------------
+! Needed for Water tracer capability
+!-----------------------------------------------------------------------
+  INTEGER,                          OPTIONAL,   INTENT(IN) :: WVTFLAG
+  INTEGER,                                      INTENT(IN) :: NTRACER
+  REAL,                             OPTIONAL,   INTENT(IN) :: QSNOW_TR  !snow at ground srf (mm/s) [+]
+  REAL,                             OPTIONAL,   INTENT(IN) :: SNOWHIN_TR!snow depth increasing rate (m/s)
+  REAL,                             OPTIONAL,INTENT(INOUT) :: SNOWH_TR  !snow depth [m]
+  REAL,                             OPTIONAL,INTENT(INOUT) :: SNEQV_TR  !swow water equivalent [m]
+  REAL, DIMENSION(-NSNOW+1:NTRACER),OPTIONAL,INTENT(INOUT) :: DZSNSO_TR !thickness of snow/soil layers (m)
+  REAL, DIMENSION(-NSNOW+1:    0),  OPTIONAL,INTENT(INOUT) :: SNICE_TR  !snow layer ice [mm]
+  REAL, DIMENSION(-NSNOW+1:    0),  OPTIONAL,INTENT(INOUT) :: SNLIQ_TR  !snow layer liquid water [mm]
+!-----------------------------------------------------------------------
+
 ! local
 
   INTEGER :: NEWNODE            ! 0-no new layers, 1-creating new layers
@@ -6192,6 +7114,12 @@ ENDIF   ! CROPTYPE == 0
     IF(ISNOW == 0 .and. QSNOW > 0.)  THEN
       SNOWH = SNOWH + SNOWHIN * DT
       SNEQV = SNEQV + QSNOW * DT
+      !-----wt calc------
+      if (present(WVTFLAG)) then
+        SNOWH_TR = SNOWH_TR + SNOWHIN_TR * DT
+        SNEQV_TR = SNEQV_TR + QSNOW_TR * DT
+      end if
+      !------------------
     END IF
 
 ! creating a new layer
@@ -6205,6 +7133,14 @@ ENDIF   ! CROPTYPE == 0
       STC(0)   = MIN(273.16, SFCTMP)   ! temporary setup
       SNICE(0) = SNEQV
       SNLIQ(0) = 0.
+      !-----wt calc------
+      if (present(WVTFLAG)) then
+        DZSNSO_TR(0)= SNOWH_TR
+        SNOWH_TR    = 0.
+        SNICE_TR(0) = SNEQV_TR
+        SNLIQ_TR(0) = 0.
+      end if
+      !------------------
     END IF
 
 ! snow with layers
@@ -6212,6 +7148,12 @@ ENDIF   ! CROPTYPE == 0
     IF(ISNOW <  0 .AND. NEWNODE == 0 .AND. QSNOW > 0.) then
          SNICE(ISNOW+1)  = SNICE(ISNOW+1)   + QSNOW   * DT
          DZSNSO(ISNOW+1) = DZSNSO(ISNOW+1)  + SNOWHIN * DT
+	 !-----wt calc-----
+	 if (present(WVTFLAG)) then
+	   SNICE_TR(ISNOW+1)  = SNICE_TR(ISNOW+1)   + QSNOW_TR   * DT
+           DZSNSO_TR(ISNOW+1) = DZSNSO_TR(ISNOW+1)  + SNOWHIN_TR * DT
+	 end if
+	 !-----------------
     ENDIF
 
 ! ----------------------------------------------------------------------
@@ -6222,7 +7164,11 @@ ENDIF   ! CROPTYPE == 0
   SUBROUTINE COMBINE (parameters,NSNOW  ,NSOIL  ,ILOC   ,JLOC   ,         & !in
                       ISNOW  ,SH2O   ,STC    ,SNICE  ,SNLIQ  , & !inout
                       DZSNSO ,SICE   ,SNOWH  ,SNEQV  ,         & !inout
-                      PONDING1       ,PONDING2)                  !out
+                      PONDING1       ,PONDING2                 & !out
+		      , NTRACER, WVTFLAG, NSUB,  SH2O_SUB, SICE_SUB, DT & !wt in
+		      , SH2O_TR, SNICE_TR, SNLIQ_TR                     & !wt INOUT
+                      , DZSNSO_TR, SICE_TR, SNOWH_TR, SNEQV_TR          & !wt INOUT
+                      , PONDING1_TR, PONDING2_TR)                         !wt out
 ! ----------------------------------------------------------------------
     IMPLICIT NONE
 ! ----------------------------------------------------------------------
@@ -6248,6 +7194,36 @@ ENDIF   ! CROPTYPE == 0
     REAL,                            INTENT(OUT) :: PONDING1
     REAL,                            INTENT(OUT) :: PONDING2
 
+!----------------------------------------------------------------------
+! Needed for Water tracer capability
+!----------------------------------------------------------------------
+    INTEGER,                          OPTIONAL, INTENT(IN)    :: WVTFLAG
+    INTEGER,DIMENSION(       1:NSOIL),OPTIONAL, INTENT(IN)    :: NSUB
+    INTEGER,                                    INTENT(IN)    :: NTRACER
+    REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SH2O_SUB  !soil liquid moisture (m3/m3)
+    REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SICE_SUB  !soil ice moisture (m3/m3)
+    REAL,                             OPTIONAL, INTENT(IN)    :: DT
+    REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SH2O_TR  !soil liquid moisture (m3/m3)
+    REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SICE_TR  !soil ice moisture (m3/m3)
+    REAL, DIMENSION(-NSNOW+1:    0),  OPTIONAL, INTENT(INOUT) :: SNICE_TR !snow layer ice [mm]
+    REAL, DIMENSION(-NSNOW+1:    0),  OPTIONAL, INTENT(INOUT) :: SNLIQ_TR !snow layer liquid water [mm]
+    REAL, DIMENSION(-NSNOW+1:NTRACER),OPTIONAL, INTENT(INOUT) :: DZSNSO_TR!snow layer depth [m]
+    REAL,                             OPTIONAL, INTENT(INOUT) :: sneqv_TR !snow water equivalent [m]
+    REAL,                             OPTIONAL, INTENT(INOUT) :: snowh_TR !snow depth [m]
+    REAL,                             OPTIONAL, INTENT(OUT)   :: PONDING1_TR
+    REAL,                             OPTIONAL, INTENT(OUT)   :: PONDING2_TR
+    !-------local vars-------------------------------------------------
+    REAL    :: PONDING1_REST, PONDING1_TRTEMP
+    REAL    :: ZWICE_TR                 ! total ice mass in snow
+    REAL    :: ZWLIQ_TR                 ! total liquid water in snow
+!    REAL,   OPTIONAL  :: DZSNSO_TRJ               ! water tracer vars to pass to COMBO subroutine
+!    REAL,   OPTIONAL  :: SNLIQ_TRJ                ! water tracer vars to pass to COMBO subroutine
+!    REAL,   OPTIONAL  :: SNICE_TRJ                ! water tracer vars to pass to COMBO subroutine
+!    REAL,   OPTIONAL  :: DZSNSO_TRL               ! water tracer vars to pass to COMBO subroutine
+!    REAL,   OPTIONAL  :: SNLIQ_TRL                ! water tracer vars to pass to COMBO subroutine
+!    REAL,   OPTIONAL  :: SNICE_TRL                ! water tracer vars to pass to COMBO subroutine
+!----------------------------------------------------------------------
+
 ! local variables:
 
     INTEGER :: I,J,K,L               ! node indices
@@ -6270,28 +7246,69 @@ ENDIF   ! CROPTYPE == 0
                 SNLIQ(J+1) = SNLIQ(J+1) + SNLIQ(J)
                 SNICE(J+1) = SNICE(J+1) + SNICE(J)
                 DZSNSO(J+1) = DZSNSO(J+1) + DZSNSO(J)
+		!-----wt calc------
+		if (present(WVTFLAG)) then
+		  SNLIQ_TR(J+1) = SNLIQ_TR(J+1) + SNLIQ_TR(J)
+                  SNICE_TR(J+1) = SNICE_TR(J+1) + SNICE_TR(J)
+		end if
+		!-------------------
              ELSE
                IF (ISNOW_OLD < -1) THEN    ! MB/KM: change to ISNOW
                 SNLIQ(J-1) = SNLIQ(J-1) + SNLIQ(J)
                 SNICE(J-1) = SNICE(J-1) + SNICE(J)
                 DZSNSO(J-1) = DZSNSO(J-1) + DZSNSO(J)
+		!-----wt calc------
+		if (present(WVTFLAG)) then
+		  SNLIQ_TR(J-1) = SNLIQ_TR(J-1) + SNLIQ_TR(J)
+                  SNICE_TR(J-1) = SNICE_TR(J-1) + SNICE_TR(J)
+		end if
+		!------------------
                ELSE
 	         IF(SNICE(J) >= 0.) THEN
                   PONDING1 = SNLIQ(J)    ! ISNOW WILL GET SET TO ZERO BELOW; PONDING1 WILL GET
                   SNEQV = SNICE(J)       ! ADDED TO PONDING FROM PHASECHANGE PONDING SHOULD BE
                   SNOWH = DZSNSO(J)      ! ZERO HERE BECAUSE IT WAS CALCULATED FOR THIN SNOW
+		  !-----wt calc-----
+		  if (present(WVTFLAG)) then
+		    PONDING1_TR = SNLIQ_TR(J)
+		    SNEQV_TR = SNICE_TR(J)
+		    SNOWH_TR = DZSNSO_TR(J)
+		  end if
+		  !-----------------
 		 ELSE   ! SNICE OVER-SUBLIMATED EARLIER
 		  PONDING1 = SNLIQ(J) + SNICE(J)
+		  if (present(WVTFLAG)) PONDING1_TR = SNLIQ_TR(J) + SNICE_TR(J)  !wt calc
 		  IF(PONDING1 < 0.) THEN  ! IF SNICE AND SNLIQ SUBLIMATES REMOVE FROM SOIL
+		   !-----wt calc-----
+		   if (present(WVTFLAG)) then
+		     call TOPSOIL_SUB (NSUB(1),DZSNSO_TR(1:NSUB(1)),DT, (-1)*PONDING1/DT, &
+                                     SH2O_SUB(1:NSUB(1)), SICE_SUB(1:NSUB(1)), &
+                                     SH2O_TR(1:NSUB(1)),SICE_TR(1:NSUB(1)),PONDING1_TRTEMP )
+		     PONDING1_TR = MAX(PONDING1_TRTEMP*DT, 0.0)
+		   end if
+		   !-----------------
 		   SICE(1) = MAX(0.0,SICE(1)+PONDING1/(DZSNSO(1)*1000.))
                    PONDING1 = 0.0
 		  END IF
                   SNEQV = 0.0
                   SNOWH = 0.0
+		  !-----wt calc-----
+		  if (present(WVTFLAG)) then
+		    SNEQV_TR = 0.0
+                    SNOWH_TR = 0.0
+		  end if
+		  !-----------------
 		 END IF
                  SNLIQ(J) = 0.0
                  SNICE(J) = 0.0
                  DZSNSO(J) = 0.0
+		 !-----wt calc-----
+		 if (present(WVTFLAG)) then
+		   SNLIQ_TR(J) = 0.0
+                   SNICE_TR(J) = 0.0
+                   DZSNSO_TR(J) = 0.0
+		 end if
+		 !-----------------
                ENDIF
 !                SH2O(1) = SH2O(1)+SNLIQ(J)/(DZSNSO(1)*1000.)
 !                SICE(1) = SICE(1)+SNICE(J)/(DZSNSO(1)*1000.)
@@ -6304,6 +7321,13 @@ ENDIF   ! CROPTYPE == 0
                    SNLIQ(I) = SNLIQ(I-1)
                    SNICE(I) = SNICE(I-1)
                    DZSNSO(I)= DZSNSO(I-1)
+		   !-----wt calc-----
+		   if (present(WVTFLAG)) then
+		     SNLIQ_TR(I) = SNLIQ_TR(I-1)
+                     SNICE_TR(I) = SNICE_TR(I-1)
+                     DZSNSO_TR(I)= DZSNSO_TR(I-1)
+		   end if
+		   !-----------------
                 END DO
              END IF
              ISNOW = ISNOW + 1
@@ -6315,6 +7339,16 @@ ENDIF   ! CROPTYPE == 0
        IF(SICE(1) < 0.) THEN
           SH2O(1) = SH2O(1) + SICE(1)
           SICE(1) = 0.
+	  !-----wt calc-----
+	  if (present(WVTFLAG)) then
+	    do I = 1,NSUB(1)
+              SH2O_TR(I) = SH2O_TR(1) + SICE_TR(1)
+              SICE_TR(I) = 0.
+              SH2O_SUB(I) = SH2O_SUB(1) + SICE_SUB(1)
+              SICE_SUB(I) = 0.
+            end do
+	  end if
+	  !-----------------
        END IF
 
        IF(ISNOW ==0) RETURN   ! MB: get out if no longer multi-layer
@@ -6323,12 +7357,28 @@ ENDIF   ! CROPTYPE == 0
        SNOWH  = 0.
        ZWICE  = 0.
        ZWLIQ  = 0.
+       !-----wt calc-----
+       if (present(WVTFLAG)) then
+         SNEQV_TR  = 0.
+         SNOWH_TR  = 0.
+         ZWICE_TR  = 0.
+         ZWLIQ_TR  = 0.
+       end if
+       !-----------------
 
        DO J = ISNOW+1,0
              SNEQV = SNEQV + SNICE(J) + SNLIQ(J)
              SNOWH = SNOWH + DZSNSO(J)
              ZWICE = ZWICE + SNICE(J)
              ZWLIQ = ZWLIQ + SNLIQ(J)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       SNEQV_TR = SNEQV_TR + SNICE_TR(J) + SNLIQ_TR(J)
+               SNOWH_TR = SNOWH_TR + DZSNSO_TR(J)
+               ZWICE_TR = ZWICE_TR + SNICE_TR(J)
+               ZWLIQ_TR = ZWLIQ_TR + SNLIQ_TR(J)
+	     end if
+	     !-----------------
        END DO
 
 ! check the snow depth - all snow gone
@@ -6339,7 +7389,14 @@ ENDIF   ! CROPTYPE == 0
           ISNOW  = 0
           SNEQV = ZWICE
           PONDING2 = ZWLIQ           ! LIMIT OF ISNOW < 0 MEANS INPUT PONDING
+	  !-----wt calc-----
+	  if (present(WVTFLAG)) then
+	    SNEQV_TR = ZWICE_TR
+            PONDING2_TR = ZWLIQ_TR
+	  end if
+	  !-----------------
           IF(SNEQV <= 0.) SNOWH = 0. ! SHOULD BE ZERO; SEE ABOVE
+	  IF (present(WVTFLAG)) SNOWH_TR = min(SNOWH, SNOWH_TR)      !wt calc
        END IF
 
 !       IF (SNOWH < 0.05 ) THEN
@@ -6376,9 +7433,18 @@ ENDIF   ! CROPTYPE == 0
                    J = I
                    L = NEIBOR
                 END IF
-
+		
+		if (present(WVTFLAG)) then
+		CALL COMBO_TR (parameters,DZSNSO(J), SNLIQ(J), SNICE(J), &
+                   STC(J), DZSNSO(L), SNLIQ(L), SNICE(L), STC(L)      & 
+		   , WVTFLAG, DZSNSO_TR(J)                            & !wt in
+		   , SNLIQ_TR(J), SNICE_TR(J)                         & !wt inout
+		   , DZSNSO_TR(L), SNLIQ_TR(L)                        & !wt inout
+		   , SNICE_TR(L) )
+		else
                 CALL COMBO (parameters,DZSNSO(J), SNLIQ(J), SNICE(J), &
                    STC(J), DZSNSO(L), SNLIQ(L), SNICE(L), STC(L) )
+		end if
 
                 ! Now shift all elements above this down one.
                 IF (J-1 > ISNOW+1) THEN
@@ -6387,6 +7453,13 @@ ENDIF   ! CROPTYPE == 0
                       SNICE(K) = SNICE(K-1)
                       SNLIQ(K) = SNLIQ(K-1)
                       DZSNSO(K) = DZSNSO(K-1)
+		      !-----wt calc-----
+		      if (present(WVTFLAG)) then
+		        SNICE_TR(K) = SNICE_TR(K-1)
+                        SNLIQ_TR(K) = SNLIQ_TR(K-1)
+                        DZSNSO_TR(K) = DZSNSO_TR(K-1)
+		      end if
+		      !-----------------
                    END DO
                 END IF
 
@@ -6408,7 +7481,10 @@ ENDIF   ! CROPTYPE == 0
 !== begin divide ===================================================================================
 
   SUBROUTINE DIVIDE (parameters,NSNOW  ,NSOIL  ,                         & !in
-                     ISNOW  ,STC    ,SNICE  ,SNLIQ  ,DZSNSO  )  !inout
+                     ISNOW  ,STC    ,SNICE  ,SNLIQ  ,DZSNSO              & !inout
+		     , NTRACER,  WVTFLAG                                 & !wt in
+		     , SNICE_TR, SNLIQ_TR, DZSNSO_TR                     & !wt inout
+		     )  
 ! ----------------------------------------------------------------------
     IMPLICIT NONE
 ! ----------------------------------------------------------------------
@@ -6425,6 +7501,26 @@ ENDIF   ! CROPTYPE == 0
     REAL, DIMENSION(-NSNOW+1:    0), INTENT(INOUT) :: SNICE !snow layer ice [mm]
     REAL, DIMENSION(-NSNOW+1:    0), INTENT(INOUT) :: SNLIQ !snow layer liquid water [mm]
     REAL, DIMENSION(-NSNOW+1:NSOIL), INTENT(INOUT) :: DZSNSO!snow layer depth [m]
+
+!--------------------------------------------------------------------
+! Needed for Water tracer capability
+!--------------------------------------------------------------------
+    INTEGER,                           OPTIONAL,INTENT(IN)    :: WVTFLAG
+    INTEGER,                                    INTENT(IN)    :: NTRACER
+    REAL, DIMENSION(-NSNOW+1:      0), OPTIONAL,INTENT(INOUT) :: SNICE_TR !snow layer ice [mm]
+    REAL, DIMENSION(-NSNOW+1:      0), OPTIONAL,INTENT(INOUT) :: SNLIQ_TR !snow layer liquid water [mm]
+    REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL,INTENT(INOUT) :: DZSNSO_TR!snow layer depth [m]
+    !---------local vars---------------------------------------------
+    REAL                                           :: DRR_TR   !thickness of the combined [m]
+    REAL, DIMENSION(       1:NSNOW)                :: DZ_TR    !snow layer thickness [m]
+    REAL, DIMENSION(       1:NSNOW)                :: SWICE_TR !partial volume of ice [m3/m3]
+    REAL, DIMENSION(       1:NSNOW)                :: SWLIQ_TR !partial volume of liquid water [m3/m3]
+    REAL                                           :: ZWICE_TR !temporary
+    REAL                                           :: ZWLIQ_TR !temporary
+!    REAL                                           :: DZ_TR2    !water tracer var passed to COMBO subroutine
+!    REAL                                           :: SWLIQ_TR2 !water tracer var passed to COMBO subroutine
+!    REAL                                           :: SWICE_TR2 !water tracer var passed to COMBO subroutine
+!--------------------------------------------------------------------
 
 ! local variables:
 
@@ -6447,6 +7543,13 @@ ENDIF   ! CROPTYPE == 0
              SWICE(J) = SNICE(J+ISNOW)
              SWLIQ(J) = SNLIQ(J+ISNOW)
              TSNO(J)  = STC(J+ISNOW)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       DZ_TR(J)    = DZSNSO_TR(J+ISNOW)
+               SWICE_TR(J) = SNICE_TR(J+ISNOW)
+               SWLIQ_TR(J) = SNLIQ_TR(J+ISNOW)
+	     end if
+	     !-----------------
           END IF
     END DO
 
@@ -6463,6 +7566,16 @@ ENDIF   ! CROPTYPE == 0
              SWICE(2) = SWICE(1)
              SWLIQ(2) = SWLIQ(1)
              TSNO(2)  = TSNO(1)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       DZ_TR(1)    = DZ_TR(1)/2.
+               SWICE_TR(1) = SWICE_TR(1)/2.
+               SWLIQ_TR(1) = SWLIQ_TR(1)/2.
+               DZ_TR(2)    = DZ_TR(1)
+               SWICE_TR(2) = SWICE_TR(1)
+               SWLIQ_TR(2) = SWLIQ_TR(1)
+	     end if
+	     !-----------------
           END IF
        END IF
 
@@ -6472,13 +7585,35 @@ ENDIF   ! CROPTYPE == 0
              PROPOR   = DRR/DZ(1)
              ZWICE    = PROPOR*SWICE(1)
              ZWLIQ    = PROPOR*SWLIQ(1)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       ZWICE_TR    = PROPOR*SWICE_TR(1)
+               ZWLIQ_TR    = PROPOR*SWLIQ_TR(1)
+               DRR_TR      = DZ_TR(1)*PROPOR
+	     end if
+	     !-----------------
              PROPOR   = 0.05/DZ(1)
              SWICE(1) = PROPOR*SWICE(1)
              SWLIQ(1) = PROPOR*SWLIQ(1)
              DZ(1)    = 0.05
-
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       SWICE_TR(1) = PROPOR*SWICE_TR(1)
+               SWLIQ_TR(1) = PROPOR*SWLIQ_TR(1)
+               DZ_TR(1)    = PROPOR*DZ_TR(1)
+	     end if
+	     !-----------------
+	     
+             if (present(WVTFLAG)) then
+	     CALL COMBO_TR (parameters,DZ(2), SWLIQ(2), SWICE(2), TSNO(2), DRR, &
+                  ZWLIQ, ZWICE, TSNO(1)                                      &
+		  , WVTFLAG, DZ_TR(2), SWLIQ_TR(2)         & !wt in
+		  , SWICE_TR(2), DRR_TR                      & !wt inout
+		  , ZWLIQ_TR, ZWICE_TR)                       !wt inout
+	     else
              CALL COMBO (parameters,DZ(2), SWLIQ(2), SWICE(2), TSNO(2), DRR, &
                   ZWLIQ, ZWICE, TSNO(1))
+	     end if
 
              ! subdivide a new layer
              IF (MSNO <= 2 .AND. DZ(2) > 0.20) THEN  ! MB: change limit
@@ -6492,6 +7627,16 @@ ENDIF   ! CROPTYPE == 0
                 SWICE(3) = SWICE(2)
                 SWLIQ(3) = SWLIQ(2)
                 TSNO(3) = TSNO(2) - DTDZ*DZ(2)/2.
+		!-----wt calc-----
+		if (present(WVTFLAG)) then
+		  DZ_TR(2)    = DZ_TR(2)/2.
+                  SWICE_TR(2) = SWICE_TR(2)/2.
+                  SWLIQ_TR(2) = SWLIQ_TR(2)/2.
+                  DZ_TR(3)    = DZ_TR(2)
+                  SWICE_TR(3) = SWICE_TR(2)
+                  SWLIQ_TR(3) = SWLIQ_TR(2)
+		end if
+		!-----------------
                 IF (TSNO(3) >= TFRZ) THEN
                    TSNO(3)  = TSNO(2)
                 ELSE
@@ -6508,12 +7653,35 @@ ENDIF   ! CROPTYPE == 0
              PROPOR   = DRR/DZ(2)
              ZWICE    = PROPOR*SWICE(2)
              ZWLIQ    = PROPOR*SWLIQ(2)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       ZWICE_TR    = PROPOR*SWICE_TR(2)
+               ZWLIQ_TR    = PROPOR*SWLIQ_TR(2)
+               DRR_TR      = DZ_TR(2)*PROPOR
+	     end if
+	     !-----------------
              PROPOR   = 0.2/DZ(2)
              SWICE(2) = PROPOR*SWICE(2)
              SWLIQ(2) = PROPOR*SWLIQ(2)
              DZ(2)    = 0.2
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       SWICE_TR(2) = PROPOR*SWICE_TR(2)
+               SWLIQ_TR(2) = PROPOR*SWLIQ_TR(2)
+               DZ_TR(2)    = PROPOR*DZ_TR(2)
+	     end if
+	     !-----------------
+	     
+	     if (present(WVTFLAG)) then
+	     CALL COMBO_TR (parameters,DZ(3), SWLIQ(3), SWICE(3), TSNO(3), DRR, &
+                  ZWLIQ, ZWICE, TSNO(2)                                      &
+		  , WVTFLAG, DZ_TR(3), SWLIQ_TR(3)              & !wt in
+		  , SWICE_TR(3), DRR_TR                         & !wt inout
+		  , ZWLIQ_TR, ZWICE_TR)                           !wt inout
+             else
              CALL COMBO (parameters,DZ(3), SWLIQ(3), SWICE(3), TSNO(3), DRR, &
                   ZWLIQ, ZWICE, TSNO(2))
+	     end if
           END IF
        END IF
 
@@ -6524,6 +7692,13 @@ ENDIF   ! CROPTYPE == 0
              SNICE(J) = SWICE(J-ISNOW)
              SNLIQ(J) = SWLIQ(J-ISNOW)
              STC(J)   = TSNO(J-ISNOW)
+	     !-----wt calc-----
+	     if (present(WVTFLAG)) then
+	       DZSNSO_TR(J) = DZ_TR(J-ISNOW)
+               SNICE_TR(J)  = SWICE_TR(J-ISNOW)
+               SNLIQ_TR(J)  = SWLIQ_TR(J-ISNOW)
+	     end if
+	     !-----------------
     END DO
 
 
@@ -6535,7 +7710,8 @@ ENDIF   ! CROPTYPE == 0
 
 !== begin combo ====================================================================================
 
-  SUBROUTINE COMBO(parameters,DZ,  WLIQ,  WICE, T, DZ2, WLIQ2, WICE2, T2)
+  SUBROUTINE COMBO(parameters,DZ,  WLIQ,  WICE, T, DZ2, WLIQ2, WICE2, T2 &
+                  ) 
 ! ----------------------------------------------------------------------
     IMPLICIT NONE
 ! ----------------------------------------------------------------------
@@ -6552,6 +7728,8 @@ ENDIF   ! CROPTYPE == 0
     REAL, INTENT(INOUT) :: WLIQ  !liquid water of element 1
     REAL, INTENT(INOUT) :: WICE  !ice of element 1 [kg/m2]
     REAL, INTENT(INOUT) :: T     !node temperature of element 1 [k]
+    
+!---------------------------------------------------------------------
 
 ! local
 
@@ -6587,11 +7765,92 @@ ENDIF   ! CROPTYPE == 0
 
   END SUBROUTINE COMBO
 
+!== begin combo ====================================================================================
+
+  SUBROUTINE COMBO_TR(parameters,DZ,  WLIQ,  WICE, T, DZ2, WLIQ2, WICE2, T2 &
+                  , WVTFLAG, DZ_TR, WLIQ_TR, WICE_TR, DZ2_TR, WLIQ2_TR, WICE2_TR) !wt inout
+! ----------------------------------------------------------------------
+    IMPLICIT NONE
+! ----------------------------------------------------------------------
+
+! ----------------------------------------------------------------------s
+! input
+
+  type (noahmp_parameters), intent(in) :: parameters
+    REAL, INTENT(IN)    :: DZ2   !nodal thickness of 2 elements being combined [m]
+    REAL, INTENT(IN)    :: WLIQ2 !liquid water of element 2 [kg/m2]
+    REAL, INTENT(IN)    :: WICE2 !ice of element 2 [kg/m2]
+    REAL, INTENT(IN)    :: T2    !nodal temperature of element 2 [k]
+    REAL, INTENT(INOUT) :: DZ    !nodal thickness of 1 elements being combined [m]
+    REAL, INTENT(INOUT) :: WLIQ  !liquid water of element 1
+    REAL, INTENT(INOUT) :: WICE  !ice of element 1 [kg/m2]
+    REAL, INTENT(INOUT) :: T     !node temperature of element 1 [k]
+
+!---------------------------------------------------------------------
+! Needed for Water tracer capability
+!---------------------------------------------------------------------
+    INTEGER,  INTENT(IN)    :: WVTFLAG
+    REAL,     INTENT(IN)    :: DZ2_TR   !nodal thickness of 2 elements being combined [m]
+    REAL,     INTENT(IN)    :: WLIQ2_TR !liquid water of element 2 [kg/m2]
+    REAL,     INTENT(IN)    :: WICE2_TR !ice of element 2 [kg/m2]
+    REAL,     INTENT(INOUT) :: DZ_TR    !nodal thickness of 1 elements being combined [m]
+    REAL,     INTENT(INOUT) :: WLIQ_TR  !liquid water of element 1
+    REAL,     INTENT(INOUT) :: WICE_TR  !ice of element 1 [kg/m2]
+    !----------local vars---------------------------------------------
+    REAL                    :: WLIQC_TR !combined liquid water [kg/m2]
+    REAL                    :: WICEC_TR !combined ice [kg/m2]
+    REAL                    :: DZC_TR
+
+ ! local 
+
+    REAL                :: DZC   !total thickness of nodes 1 and 2 (DZC=DZ+DZ2).
+    REAL                :: WLIQC !combined liquid water [kg/m2]
+    REAL                :: WICEC !combined ice [kg/m2]
+    REAL                :: TC    !combined node temperature [k]
+    REAL                :: H     !enthalpy of element 1 [J/m2]
+    REAL                :: H2    !enthalpy of element 2 [J/m2]
+    REAL                :: HC    !temporary
+!-----------------------------------------------------------------------
+
+
+    DZC = DZ+DZ2
+    WICEC = (WICE+WICE2)
+    WLIQC = (WLIQ+WLIQ2)
+    H = (CICE*WICE+CWAT*WLIQ) * (T-TFRZ)+HFUS*WLIQ
+    H2= (CICE*WICE2+CWAT*WLIQ2) * (T2-TFRZ)+HFUS*WLIQ2
+    !-----wt calc-----
+      DZC_TR   = DZ_TR+DZ2_TR
+      WICEC_TR = (WICE_TR+WICE2_TR)
+      WLIQC_TR = (WLIQ_TR+WLIQ2_TR)
+    !-----------------
+
+    HC = H + H2
+    IF(HC < 0.)THEN
+       TC = TFRZ + HC/(CICE*WICEC + CWAT*WLIQC)
+    ELSE IF (HC.LE.HFUS*WLIQC) THEN
+       TC = TFRZ
+    ELSE
+       TC = TFRZ + (HC - HFUS*WLIQC) / (CICE*WICEC + CWAT*WLIQC)
+    END IF
+
+    DZ = DZC
+    WICE = WICEC
+    WLIQ = WLIQC
+    T = TC
+    !-----wt calc-----
+      DZ_TR = DZC_TR
+      WICE_TR = WICEC_TR
+      WLIQ_TR = WLIQC_TR
+    !-----------------
+
+  END SUBROUTINE COMBO_TR
+
 !== begin compact ==================================================================================
 
   SUBROUTINE COMPACT (parameters,NSNOW  ,NSOIL  ,DT     ,STC    ,SNICE  , & !in
                       SNLIQ  ,ZSOIL  ,IMELT  ,FICEOLD,ILOC   , JLOC , & !in
-                      ISNOW  ,DZSNSO ,ZSNSO )                    !inout
+                      ISNOW  ,DZSNSO ,ZSNSO                           & !inout
+		      ,NTRACER,  WVTFLAG, DZSNSO_TR)                    !wt inout
 ! ----------------------------------------------------------------------
   IMPLICIT NONE
 ! ----------------------------------------------------------------------
@@ -6613,6 +7872,14 @@ ENDIF   ! CROPTYPE == 0
    INTEGER,                         INTENT(INOUT) :: ISNOW  ! actual no. of snow layers
    REAL, DIMENSION(-NSNOW+1:NSOIL), INTENT(INOUT) :: DZSNSO ! snow layer thickness [m]
    REAL, DIMENSION(-NSNOW+1:NSOIL), INTENT(INOUT) :: ZSNSO  ! depth of snow/soil layer-bottom
+
+!-----------------------------------------------------------------------
+! Needed for Water tracer capability
+!-----------------------------------------------------------------------
+   INTEGER,                           OPTIONAL, INTENT(IN)    :: WVTFLAG
+   INTEGER,                                     INTENT(IN)    :: NTRACER
+   REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL, INTENT(INOUT) :: DZSNSO_TR ! snow layer thickness [m]
+!-----------------------------------------------------------------------
 
 ! local
    REAL, PARAMETER     :: C2 = 21.e-3   ![m3/kg] ! default 21.e-3
@@ -6683,6 +7950,7 @@ ENDIF   ! CROPTYPE == 0
 
            DZSNSO(J) = DZSNSO(J)*(1.+PDZDTC)
            DZSNSO(J) = max(DZSNSO(J),SNICE(J)/DENICE + SNLIQ(J)/DENH2O)
+	   if (present(WVTFLAG)) DZSNSO_TR(J) = DZSNSO_TR(J)*(1.+PDZDTC)   !wt calc
         END IF
 
         ! Pressure of overlying snow
@@ -6699,7 +7967,11 @@ ENDIF   ! CROPTYPE == 0
                       QRAIN  ,ILOC   ,JLOC   ,                 & !in
                       ISNOW  ,DZSNSO ,SNOWH  ,SNEQV  ,SNICE  , & !inout
                       SNLIQ  ,SH2O   ,SICE   ,STC    ,         & !inout
-                      QSNBOT ,PONDING1       ,PONDING2)          !out
+                      QSNBOT ,PONDING1       ,PONDING2         & 
+		      , NTRACER, WVTFLAG, NSUB, SH2O_SUB, SICE_SUB    & !wt in
+		      , QRAIN_TR, DZSNSO_TR, SNOWH_TR, SNEQV_TR       & !wt in and inout
+                      , SNICE_TR, SNLIQ_TR, SH2O_TR, SICE_TR, EDIR_TR & !wt inout
+                      , QSNBOT_TR, PONDING1_TR, PONDING2_TR)            !wt out
 ! ----------------------------------------------------------------------
 ! Renew the mass of ice lens (SNICE) and liquid (SNLIQ) of the
 ! surface snow layer resulting from sublimation (frost) / evaporation (dew)
@@ -6734,6 +8006,33 @@ ENDIF   ! CROPTYPE == 0
    REAL, DIMENSION(       1:NSOIL), INTENT(INOUT) :: SICE   !soil ice moisture (m3/m3)
    REAL, DIMENSION(-NSNOW+1:NSOIL), INTENT(INOUT) :: STC    !snow layer temperature [k]
 
+!-----------------------------------------------------------------------
+! Needed for Water tracer capability
+!-----------------------------------------------------------------------
+   INTEGER,                          OPTIONAL, INTENT(IN)    :: WVTFLAG
+   INTEGER, DIMENSION(1:NSOIL),      OPTIONAL, INTENT(IN)    :: NSUB
+   INTEGER,                                    INTENT(IN)    :: NTRACER
+   REAL, DIMENSION(     1:NTRACER),  OPTIONAL, INTENT(INOUT) :: SH2O_SUB
+   REAL, DIMENSION(     1:NTRACER),  OPTIONAL, INTENT(INOUT) :: SICE_SUB
+   REAL,                             OPTIONAL, INTENT(IN)    :: QRAIN_TR  !snow surface rain rate[mm/s]
+   REAL,                             OPTIONAL, INTENT(OUT)   :: QSNBOT_TR !melting water out of snow bottom [mm/s]
+   REAL, DIMENSION(-NSNOW+1:NTRACER),OPTIONAL, INTENT(INOUT) :: DZSNSO_TR ! snow layer depth [m]
+   REAL,                             OPTIONAL, INTENT(INOUT) :: SNOWH_TR  !snow height [m]
+   REAL,                             OPTIONAL, INTENT(INOUT) :: SNEQV_TR  !snow water eqv. [mm]
+   REAL, DIMENSION(-NSNOW+1:0),      OPTIONAL, INTENT(INOUT) :: SNICE_TR  !snow layer ice [mm]
+   REAL, DIMENSION(-NSNOW+1:0),      OPTIONAL, INTENT(INOUT) :: SNLIQ_TR  !snow layer liquid water [mm]
+   REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SH2O_TR   !soil liquid moisture (m3/m3)
+   REAL, DIMENSION(       1:NTRACER),OPTIONAL, INTENT(INOUT) :: SICE_TR   !soil ice moisture (m3/m3)
+   REAL,                             OPTIONAL, INTENT(INOUT) :: EDIR_TR   !mm/s
+   REAL,                             OPTIONAL, INTENT(OUT)   :: PONDING1_TR, PONDING2_TR
+   !-----------local vars-----------------------------------------------
+   REAL                             :: TEMP_TR
+   REAL                             :: QIN_TR       !water flow into the element (mm/s)
+   REAL                             :: QOUT_TR      !water flow out of the element (mm/s)
+   REAL                             :: WGDIF_TR     !ice mass after minus sublimation
+   REAL                             :: PROPOR_TR, SNE_TEMP
+!-----------------------------------------------------------------------
+
 ! local variables:
 
    INTEGER                     :: J         !do loop/array indices
@@ -6751,6 +8050,19 @@ ENDIF   ! CROPTYPE == 0
 !for the case when SNEQV becomes '0' after 'COMBINE'
 
    IF(SNEQV == 0.) THEN
+      !-----wt calc------
+      if (present(WVTFLAG)) then
+        if (QSNFRO-QSNSUB .lt. 0.0) then
+          call TOPSOIL_SUB(NSUB(1), DZSNSO_TR(1:NSUB(1)), DT, (QSNSUB-QSNFRO), &
+                          SH2O_SUB(1:NSUB(1)), SICE_SUB(1:NSUB(1)),            &
+                          SH2O_TR(1:NSUB(1)), SICE_TR(1:NSUB(1)), EDIR_TR)
+        else
+          SICE_TR(1)  = SICE_TR(1) + (QSNFRO-QSNSUB)*0.0*DT/(DZSNSO_TR(1)*1000.)
+          SICE_SUB(1) = SICE_SUB(1) + (QSNFRO-QSNSUB)*DT/(DZSNSO_TR(1)*1000.)
+          EDIR_TR     = (QSNSUB-QSNFRO)*0.0
+        end if
+      end if
+      !------------------
       SICE(1) =  SICE(1) + (QSNFRO-QSNSUB)*DT/(DZSNSO(1)*1000.)  ! Barlage: SH2O->SICE v3.6
       IF(SICE(1) < 0.) THEN
          SH2O(1) = SH2O(1) + SICE(1)
@@ -6765,12 +8077,34 @@ ENDIF   ! CROPTYPE == 0
 
    IF(ISNOW == 0 .and. SNEQV > 0.) THEN
       TEMP   = SNEQV
+      !-----wt calc-----
+      if (present(WVTFLAG)) then
+        TEMP_TR = SNEQV_TR
+	call get_wt_ratio(SNEQV_TR, SNEQV, PROPOR_TR)
+	EDIR_TR = QSNSUB*PROPOR_TR - QSNFRO*0.0
+      end if
+      !-----------------
       SNEQV  = SNEQV - QSNSUB*DT + QSNFRO*DT
       PROPOR = SNEQV/TEMP
       SNOWH  = MAX(0.,PROPOR * SNOWH)
       SNOWH  = MIN(MAX(SNOWH,SNEQV/500.0),SNEQV/50.0)  ! limit adjustment to a reasonable density
+      !-----wt calc-----
+      if (present(WVTFLAG)) then
+        SNEQV_TR  = SNEQV_TR - QSNSUB*DT*PROPOR_TR + QSNFRO*DT*0.0
+	call get_wt_ratio(SNEQV_TR, TEMP_TR, PROPOR_TR)
+	SNOWH_TR  = MAX(0.,PROPOR_TR * SNOWH_TR)
+      end if
+      !-----------------
 
       IF(SNEQV < 0.) THEN
+         !-----wt calc------
+	 if (present(WVTFLAG)) then
+	   SNE_TEMP = 0.0
+           call TOPSOIL_SUB(NSUB(1), DZSNSO_TR(1:NSUB(1)), DT, (-1)*SNEQV/DT, &
+                          SH2O_SUB(1:NSUB(1)), SICE_SUB(1:NSUB(1)), &
+                          SH2O_TR(1:NSUB(1)), SICE_TR(1:NSUB(1)), SNE_TEMP)
+	 end if
+	 !------------------
          SICE(1) = SICE(1) + SNEQV/(DZSNSO(1)*1000.)
          SNEQV   = 0.
          SNOWH   = 0.
@@ -6784,24 +8118,54 @@ ENDIF   ! CROPTYPE == 0
    IF(SNOWH <= 1.E-8 .OR. SNEQV <= 1.E-6) THEN
      SNOWH = 0.0
      SNEQV = 0.0
+     if (present(WVTFLAG)) SNOWH_TR=min(SNOWH, SNOWH_TR)  !wt calc
+     if (present(WVTFLAG)) SNEQV_TR=min(SNEQV, SNEQV_TR)  !wt calc
    END IF
 
 ! for deep snow
 
    IF ( ISNOW < 0 ) THEN !KWM added this IF statement to prevent out-of-bounds array references
 
+      if (present(WVTFLAG)) call get_wt_ratio(SNICE_TR(ISNOW+1), SNICE(ISNOW+1), PROPOR_TR)   !wt calc
       WGDIF = SNICE(ISNOW+1) - QSNSUB*DT + QSNFRO*DT
       SNICE(ISNOW+1) = WGDIF
+      !-----wt calc-----
+      if (present(WVTFLAG)) then
+        WGDIF_TR = SNICE_TR(ISNOW+1) - QSNSUB*DT*PROPOR_TR + QSNFRO*DT*0.0
+        SNICE_TR(ISNOW+1) = WGDIF_TR
+        EDIR_TR  = QSNSUB*PROPOR_TR - QSNFRO*0.0
+      end if
+      !-----------------
       IF (WGDIF < 1.e-6 .and. ISNOW <0) THEN
+        if (present(WVTFLAG)) then
+	 CALL  COMBINE (parameters,NSNOW  ,NSOIL  ,ILOC, JLOC   , & !in
+              ISNOW  ,SH2O   ,STC    ,SNICE  ,SNLIQ  , & !inout
+              DZSNSO ,SICE   ,SNOWH  ,SNEQV  ,         & !inout
+              PONDING1, PONDING2                       & !out
+	      , NTRACER, WVTFLAG=WVTFLAG, NSUB=NSUB          & !wt in
+	      , SH2O_SUB=SH2O_SUB, SICE_SUB=SICE_SUB, DT=DT  & !wt in
+	      , SH2O_TR=SH2O_TR, SNICE_TR=SNICE_TR           & !wt inout
+	      , SNLIQ_TR=SNLIQ_TR, DZSNSO_TR=DZSNSO_TR       & !wt inout
+	      , SICE_TR=SICE_TR, SNOWH_TR=SNOWH_TR           & !wt inout
+	      , SNEQV_TR=SNEQV_TR, PONDING1_TR=PONDING1_TR   & !wt out
+              , PONDING2_TR=PONDING2_TR)                       !wt out)   
+	else
          CALL  COMBINE (parameters,NSNOW  ,NSOIL  ,ILOC, JLOC   , & !in
               ISNOW  ,SH2O   ,STC    ,SNICE  ,SNLIQ  , & !inout
               DZSNSO ,SICE   ,SNOWH  ,SNEQV  ,         & !inout
-              PONDING1, PONDING2 )                       !out
+              PONDING1, PONDING2, NTRACER )                       !out
+	end if
       ENDIF
       !KWM:  Subroutine COMBINE can change ISNOW to make it 0 again?
       IF ( ISNOW < 0 ) THEN !KWM added this IF statement to prevent out-of-bounds array references
          SNLIQ(ISNOW+1) = SNLIQ(ISNOW+1) + QRAIN * DT
          SNLIQ(ISNOW+1) = MAX(0., SNLIQ(ISNOW+1))
+	 !-----wt calc-----
+	 if (present(WVTFLAG)) then
+	   SNLIQ_TR(ISNOW+1) = SNLIQ_TR(ISNOW+1) + QRAIN_TR * DT
+           SNLIQ_TR(ISNOW+1) = MAX(0., SNLIQ_TR(ISNOW+1))
+	 end if
+	 !-----------------
       ENDIF
 
    ENDIF !KWM  -- Can the ENDIF be moved toward the end of the subroutine (Just set QSNBOT=0)?
@@ -6815,15 +8179,30 @@ ENDIF   ! CROPTYPE == 0
 
    QIN = 0.
    QOUT = 0.
+   !-----wt calc-----
+   if (present(WVTFLAG)) then
+     QIN_TR = 0.
+     QOUT_TR = 0.
+   end if
+   !-----------------
 
    DO J = ISNOW+1, 0
      SNLIQ(J) = SNLIQ(J) + QIN
+     if (present(WVTFLAG)) SNLIQ_TR(J) = SNLIQ_TR(J) + QIN_TR   !wt calc
      VOL_LIQ(J) = SNLIQ(J)/(DZSNSO(J)*DENH2O)
      QOUT = MAX(0.,(VOL_LIQ(J)-parameters%SSI*EPORE(J))*DZSNSO(J))
      IF(J == 0) THEN
        QOUT = MAX((VOL_LIQ(J)- EPORE(J))*DZSNSO(J) , parameters%SNOW_RET_FAC*DT*QOUT)
      END IF
      QOUT = QOUT*DENH2O
+     !-----wt calc-----
+     if (present(WVTFLAG)) then
+       call get_wt_ratio(SNLIQ_TR(J), SNLIQ(J), PROPOR_TR)
+       QOUT_TR = QOUT*PROPOR_TR
+       SNLIQ_TR(J) = SNLIQ_TR(J) - QOUT_TR
+       QIN_TR = QOUT_TR
+     end if
+     !-----------------
      SNLIQ(J) = SNLIQ(J) - QOUT
      IF((SNLIQ(J)/(SNICE(J)+SNLIQ(J))) > max_liq_mass_fraction) THEN
        QOUT = QOUT + (SNLIQ(J) - max_liq_mass_fraction/(1.0 - max_liq_mass_fraction)*SNICE(J))
@@ -6839,6 +8218,7 @@ ENDIF   ! CROPTYPE == 0
 ! Liquid water from snow bottom to soil
 
    QSNBOT = QOUT / DT           ! mm/s
+   if (present(WVTFLAG)) QSNBOT_TR = QOUT_TR / DT   !wt calc
 
   END SUBROUTINE SNOWH2O
 
@@ -6848,7 +8228,10 @@ ENDIF   ! CROPTYPE == 0
                         QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC, & !in
                         SH2O   ,SMC    ,ZWT    ,VEGTYP ,& !inout
                         SMCWTD, DEEPRECH                       ,& !inout
-                        RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX )   !out
+                        RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX  &
+			, NTRACER, WVTFLAG, IOPT_PM, NSUB, SH2O_SUB, SMC_SUB, DZSNSO_TR & !wt in
+			, QINSUR_TR, SH2O_TR, SMC_TR, SMCWTD_TR, DEEPRECH_TR            & !wt IN INOUT
+                        , RUNSRF_TR, QDRAIN_TR, RUNSUB_TR, ETRAN_TR, QSEVA_TR, FLUX_TR)   !wt out
 
 ! ----------------------------------------------------------------------
 ! calculate surface runoff and soil moisture.
@@ -6885,6 +8268,43 @@ ENDIF   ! CROPTYPE == 0
   REAL, INTENT(OUT)                       :: RUNSUB !subsurface runoff [mm/s]
   REAL, INTENT(OUT)                       :: FCRMAX !maximum of FCR (-)
   REAL, DIMENSION(1:NSOIL), INTENT(OUT)   :: WCND   !hydraulic conductivity (m/s)
+  
+!---------------------------------------------------------------------
+! Needed for Water tracer capability
+!---------------------------------------------------------------------
+  INTEGER,                           OPTIONAL, INTENT(IN)    :: WVTFLAG
+  INTEGER,                           OPTIONAL, INTENT(IN)    :: IOPT_PM    ! partial mixing option: 0-not active, 1-active
+  INTEGER, DIMENSION(    1:NSOIL),   OPTIONAL, INTENT(IN)    :: NSUB
+  INTEGER,                                     INTENT(IN)    :: NTRACER
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_SUB   !soil liquid water content [m3/m3]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT) :: SMC_SUB
+  REAL, DIMENSION(-NSNOW+1:NTRACER), OPTIONAL, INTENT(IN)    :: DZSNSO_TR
+  REAL,                              OPTIONAL, INTENT(IN)    :: QINSUR_TR !water input on soil surface [mm/s]
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(INOUT) :: SH2O_TR   !soil liquid water content [m3/m3]
+  REAL, DIMENSION(       1:NSOIL),   OPTIONAL, INTENT(INOUT) :: SMC_TR    !total soil water content [m3/m3]
+  REAL,                              OPTIONAL, INTENT(INOUT) :: SMCWTD_TR !soil moisture between bottom of the soil and the water table [m3/m3]
+  REAL,                              OPTIONAL, INTENT(INOUT) :: DEEPRECH_TR
+  REAL,                              OPTIONAL, INTENT(OUT)   :: QDRAIN_TR !soil-bottom free drainage [mm/s]
+  REAL,                              OPTIONAL, INTENT(OUT)   :: RUNSRF_TR !surface runoff [mm0/s]
+  REAL,                              OPTIONAL, INTENT(OUT)   :: RUNSUB_TR !subsurface runoff [mm/s]
+  REAL,                              OPTIONAL, INTENT(OUT)   :: ETRAN_TR  ! transpirtation (m/s) to mm/s
+  REAL,                              OPTIONAL, INTENT(OUT)   :: QSEVA_TR  ! soil evaporation (m/s)
+  REAL, DIMENSION(       1:NTRACER), OPTIONAL, INTENT(OUT)   :: FLUX_TR   ! tracer flux at the bottom of each layer
+  !------------local vars---------------------------------------------
+  REAL                                    :: PDDUM_TR  !infiltration rate at surface (m/s)
+  REAL                                    :: WPLUS_TR  !saturation excess of the total soil [m]
+  REAL                                    :: RSAT_TR   !accumulation of WPLUS (saturation excess) [m]
+  REAL, DIMENSION(1:NTRACER)              :: MLIQ_TR   !
+  REAL, DIMENSION(1:NTRACER)              :: SH2O0
+  REAL                                    :: XS_TR     !
+  REAL                                    :: QDRAIN_SAVE_TR !
+  REAL                                    :: PROPOR_TR
+  REAL, DIMENSION(1:NTRACER)              :: MLIQ_SEUDO, MLIQ_OLD    !used for limiting MLIQ > watmin
+  REAL, DIMENSION(1:NTRACER)              :: DEF_ARRAY  !used for limiting MLIQ > watmin
+  REAL                                    :: XS_LOWER
+  INTEGER                                 :: IZ_TR1, BACK_N, ISUBA, ISUBB
+  LOGICAL                                 :: BACK_FLAG
+!---------------------------------------------------------------------
 
 ! local
   INTEGER                                 :: K,IZ   !do-loop index
@@ -6928,13 +8348,35 @@ ENDIF   ! CROPTYPE == 0
     RSAT   = 0.0
     SUBDEF = 0.0
     WMINUS = 0.0
+    !-----wt flag-----
+    if (present(WVTFLAG)) then
+      RUNSRF_TR = 0.0
+      PDDUM_TR  = 0.0
+      RSAT_TR   = 0.0
+      RUNSUB_TR = 0.0
+      QSEVA_TR  = 0.0
+    end if
+    !-----------------
 
 ! for the case when snowmelt water is too large
 
     DO K = 1,NSOIL
        EPORE   = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
        RSAT    = RSAT + MAX(0.,SH2O(K)-EPORE)*DZSNSO(K)
-       SH2O(K) = MIN(EPORE,SH2O(K))
+       !-----wt calc-----
+       if (present(WVTFLAG)) then
+         if (K .eq. 1) then
+	   CALL TOPSOIL_SAT(NSUB(1),DZSNSO_TR(1:NSUB(1)), RSAT, &
+                           SH2O_SUB(1:NSUB(1)), SH2O_TR(1:NSUB(1)), RSAT_TR)
+	 else
+	   ISUBA = SUM(NSUB(1:K))-NSUB(K)+1
+           ISUBB = SUM(NSUB(1:K))
+           CALL SOIL_SAT(NSUB(K),DZSNSO_TR(ISUBA),RSAT, &
+                         SH2O_SUB(ISUBA:ISUBB), SH2O_TR(ISUBA:ISUBB),RSAT_TR)
+	 end if
+       end if
+       !-----------------
+       SH2O(K) = MIN(EPORE,SH2O(K))             
     END DO
 
 !impermeable fraction due to frozen soil
@@ -7035,6 +8477,15 @@ ENDIF   ! CROPTYPE == 0
     IF (OPT_RUN == 7) THEN
       CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DT,FCR,NSOIL,SMC,ZSOIL,QINSUR,RUNSRF,PDDUM)
     END IF
+    !-----wt calc-----
+    if (present(WVTFLAG)) then
+      call get_wt_ratio(QINSUR_TR, QINSUR, PROPOR_TR)
+      RUNSRF_TR = RUNSRF * PROPOR_TR
+      PDDUM_TR  = PDDUM * PROPOR_TR
+      SH2O0 = SH2O    ! SAVE SH2O BEFRORE SSTEP
+    end if
+    !-----------------
+
 ! determine iteration times and finer time step
 
     NITER = 1
@@ -7053,11 +8504,11 @@ ENDIF   ! CROPTYPE == 0
     QDRAIN_SAVE = 0.0
     RUNSRF_SAVE = 0.0
     DO ITER = 1, NITER
-       IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
-          CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
-                      SICEMAX,QINSUR ,                         & !in
-                      PDDUM  ,RUNSRF )                           !out
-       END IF
+!       IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
+!          CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
+!                      SICEMAX,QINSUR ,                         & !in
+!                      PDDUM  ,RUNSRF )                           !out
+!       END IF
 
        IF (QINSUR > 0. .AND. OPT_RUN == 7) THEN
           CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DTFINE,FCR,NSOIL,SMC,ZSOIL,QINSUR,& ! in
@@ -7078,15 +8529,26 @@ ENDIF   ! CROPTYPE == 0
        RSAT =  RSAT + WPLUS
        SUBDEF = SUBDEF + WMINUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
-       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+!       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
-    RUNSRF = RUNSRF_SAVE/NITER
+!    RUNSRF = RUNSRF_SAVE/NITER
+    !-----wt calc-----
+    if (present(WVTFLAG)) then
+      call get_wt_ratio(QINSUR_TR, QINSUR, PROPOR_TR)
+      RUNSRF_TR = RUNSRF * PROPOR_TR
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG IN SOILWATER001-1, QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR:",QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR
+!  print *, "SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
+end if
+    end if
+    !-----------------
 
     RUNSRF = RUNSRF * 1000. + RSAT * 1000./DT  ! m/s -> mm/s
     QDRAIN = QDRAIN * 1000.
     RUNSUB = RUNSUB - SUBDEF * 1000./DT ! mm/s
+
 
 !WRF_HYDRO_DJG...
 !yw    INFXSRT = RUNSRF * DT   !mm/s -> mm
@@ -7138,6 +8600,27 @@ ENDIF   ! CROPTYPE == 0
         SH2O(IZ)     = MLIQ(IZ) / (DZSNSO(IZ)*1000.)
       END DO
    END IF
+   
+   !-----wt calc-----
+   if (present(WVTFLAG)) then
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG IN SOILWATER002,RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
+!  print *, "SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
+end if
+     call SMT_TR (ILOC,JLOC,IOPT_PM, NSUB, NTRACER, SH2O_SUB, DZSNSO_TR(1:NTRACER), &
+                  SH2O, SH2O0, ZSOIL, DT, NSOIL,                          & !IN
+                  PDDUM, QSEVA, ETRANI, QDRAIN, RSAT,                     & !IN
+                  SH2O_TR, PDDUM_TR, QSEVA_TR, ETRAN_TR,                  &
+                  QDRAIN_TR,RSAT_TR, FLUX_TR)
+if (ILOC .eq. 75 .and. JLOC .eq. 46) then
+!  print *, "FLAG IN SOILWATER003,RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
+end if
+     ! convert unit to mm/s
+     QDRAIN_TR = QDRAIN_TR*1000.0
+     RUNSRF_TR = RUNSRF_TR*1000.0 + RSAT_TR*1000.0/DT
+     ETRAN_TR  = ETRAN_TR*1000.0
+   end if
+   !-----------------
 
   END SUBROUTINE SOILWATER
 
@@ -9200,7 +10683,603 @@ END SUBROUTINE PSN_CROP
   opt_imperv = iopt_imperv
 
   end subroutine noahmp_options
+ 
+!==========================================================================
+!-=========================================================================
+! WATER TRACER SUBROUTINES (copied from module_sf_watertracer.F
+!--------------------------------------------------------------------------
+  SUBROUTINE tag_precip(ppin, ratio, ppout)
 
+    IMPLICIT NONE
+
+    REAL, INTENT(IN) :: ppin
+    REAL, INTENT(IN) :: ratio
+    REAL, INTENT(OUT):: ppout
+
+    ppout = ppin*ratio
+
+  END SUBROUTINE tag_precip
+
+!-----------------------------------------------------------
+  SUBROUTINE calculate_dz(layer1,layer2, zsnso, dzsnso)
+
+    IMPLICIT NONE
+
+    INTEGER,                        INTENT(IN)  :: layer1
+    INTEGER,                        INTENT(IN)  :: layer2
+    REAL, DIMENSION(layer1+1:layer2), INTENT(IN) :: zsnso
+    REAL, DIMENSION(layer1+1:layer2), INTENT(OUT):: dzsnso
+    integer :: iz
+
+    do iz = layer1+1, layer2
+      if (iz == layer1+1) then
+        dzsnso(iz) = -zsnso(iz)
+      else
+        dzsnso(iz) = zsnso(iz-1) - zsnso(iz)
+      end if
+    end do
+
+
+  END SUBROUTINE calculate_dz
+
+!------------------------------------------------------------
+  SUBROUTINE calculate_lh_energy(frozen_c, frozen_g, etran, ecan, edir,HVAP,HSUB, ftran, fcan, fdir)
+
+    IMPLICIT NONE
+
+    LOGICAL,   INTENT(IN)  :: frozen_c
+    LOGICAL,   INTENT(IN)  :: frozen_g
+    REAL,      INTENT(IN)  :: etran
+    REAL,      INTENT(IN)  :: ecan
+    REAL,      INTENT(IN)  :: edir
+    REAL,      INTENT(IN)  :: HVAP
+    REAL,      INTENT(IN)  :: HSUB
+    REAL,      INTENT(OUT) :: ftran
+    REAL,      INTENT(OUT) :: fcan
+    REAL,      INTENT(OUT) :: fdir
+
+    if (.not.frozen_c) then
+      ftran = etran*HVAP
+      fcan  = ecan *HVAP
+    else
+      ftran = etran*HSUB
+      fcan  = ecan *HSUB
+    end if
+
+    if (.not.frozen_g) then
+      fdir = edir*HVAP
+    else
+      fdir = edir*HSUB
+    end if
+
+  END SUBROUTINE calculate_lh_energy
+
+!------------------------------------------------------------
+  SUBROUTINE get_wt_ratio(store_tr, store_tt, ratio1)
+
+    IMPLICIT NONE
+    REAL,    INTENT(IN)  :: store_tr
+    REAL,    INTENT(IN)  :: store_tt
+    REAL,    INTENT(OUT) :: ratio1
+
+    if (store_tt .gt. 1.E-10) then
+      ratio1 = store_tr/store_tt     
+!      ratio1 = min(1.0,store_tr/store_tt)   !commented out because it helps to debug
+    else
+      ratio1 = 0.0
+    end if
+
+  END SUBROUTINE get_wt_ratio
+!------------------------------------------------------------
+  SUBROUTINE MELTING_SUB(wmelt_rest, xm1, j1, nlayer, wice_tr, wice_sub, mice_tr, mice_sub)
+
+    IMPLICIT NONE
+    REAL,                         INTENT(INOUT) :: wmelt_rest
+    REAL,                         INTENT(IN)    :: xm1
+    INTEGER,                      INTENT(IN)    :: j1
+    INTEGER,                      INTENT(IN)    :: nlayer
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wice_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wice_sub
+    REAL,    DIMENSION(1:nlayer), INTENT(INOUT) :: mice_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(INOUT) :: mice_sub
+    REAL    :: ratio1
+    INTEGER :: k
+
+    do k = nlayer, 1, -1
+      ratio1 = 0.0
+      call get_wt_ratio(wice_tr(k), wice_sub(k), ratio1)
+      if (j1 .ne. 1) then
+        mice_tr(k)  = max(0.0, wice_tr(k)-xm1/real(nlayer)*ratio1)
+        mice_sub(k) = max(0.0, wice_sub(k)-xm1/real(nlayer))
+      else          !special treatment for layer 1 frozen soil
+        mice_tr(k) = max(0.0, (wice_sub(k)-wmelt_rest)*ratio1)
+        mice_sub(k) = max(0.0, wice_sub(k)-wmelt_rest)
+        wmelt_rest = wmelt_rest - max(0.0, wice_sub(k)-mice_sub(k))
+      end if
+    end do
+
+  END SUBROUTINE MELTING_SUB
+!------------------------------------------------------------
+  SUBROUTINE FREEZING_SUB(wfreez_rest, superc_rest, xm1, superc1, j1, nlayer, wliq, mice, &
+                          wice_tr, wice_sub, wliq_tr, wliq_sub, wmass_tr, wmass_sub, &
+                          mice_tr, mice_sub )
+
+    IMPLICIT NONE
+    REAL,                         INTENT(INOUT) :: wfreez_rest
+    REAL,                         INTENT(INOUT) :: superc_rest
+    REAL,                         INTENT(IN)    :: xm1
+    REAL,                         INTENT(IN)    :: superc1
+    INTEGER,                      INTENT(IN)    :: j1
+    INTEGER,                      INTENT(IN)    :: nlayer
+    REAL,                         INTENT(IN)    :: wliq
+    REAL,                         INTENT(IN)    :: mice
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wice_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wice_sub
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wliq_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wliq_sub
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wmass_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(IN)    :: wmass_sub
+    REAL,    DIMENSION(1:nlayer), INTENT(INOUT) :: mice_tr
+    REAL,    DIMENSION(1:nlayer), INTENT(INOUT) :: mice_sub
+    REAL     :: ratiol
+    REAL     :: ratios
+    INTEGER  :: k
+    REAL     :: tracer_liq,   sub_liq
+    REAL     :: tracer_melting, sub_melting
+
+    do k = 1, nlayer, 1
+      ratios  = 0.0
+      ratiol  = 0.0
+      call get_wt_ratio(wice_tr(k), wice_sub(k), ratios)
+      call get_wt_ratio(wliq_tr(k), wliq_sub(k), ratiol)
+      if (j1 .ne. 1) then
+        tracer_liq = min(superc1, wliq)*ratiol/real(nlayer)
+        tracer_melting = max(superc1-wliq,0.0)*ratios/real(nlayer)
+        mice_tr(k) = min(wmass_tr(k)-tracer_liq-tracer_melting, wice_tr(k)-xm1*ratiol/real(nlayer))
+        mice_tr(k) = max(mice_tr(k), 0.0)
+        mice_tr(k) = min(mice_tr(k), mice/real(nlayer))
+
+        sub_liq    = min(superc1/real(nlayer),wliq_sub(k))
+        sub_melting = max(superc1/real(nlayer)-wliq,0.0)
+        mice_sub(k) = min(wmass_sub(k)-sub_liq-sub_melting, wice_sub(k)-xm1/real(nlayer))
+        mice_sub(k) = max(mice_sub(k),0.0)
+      else
+        sub_liq    = min(superc_rest,wliq_sub(k))
+        sub_melting = max(min(superc_rest, wmass_sub(k))-wliq_sub(k),0.0)
+        mice_sub(k) = min(wmass_sub(k)-sub_liq-sub_melting, wice_sub(k)-wfreez_rest)
+
+        tracer_liq = min(superc_rest, wliq_sub(k))*ratiol
+        tracer_melting = max(min(superc_rest,wmass_sub(k))-wliq_sub(k),0.0)*ratios
+        mice_tr(k) = min(wmass_tr(k)-tracer_liq-tracer_melting, wice_tr(k)-wfreez_rest*ratiol)
+        wfreez_rest = wfreez_rest + (mice_sub(k)-wice_sub(k))
+        superc_rest = max(superc_rest-(wmass_sub(k)-mice_sub(k)), 0.0)
+      end if
+    end do
+
+ END SUBROUTINE FREEZING_SUB
+!======================================================================
+  SUBROUTINE TOPSOIL_SUB (NLAYER, DZLAYER, DT,  FLUXOUT, & !IN
+                          SH2O1_SUB, SICE1_SUB, SH2O1_TR, SICE1_TR, FLUX_TR) !INOUT
+!-----------------------------------------------------------------------
+! HUANCUI HU: soil moisture removal from the top soil layer
+! is called in "FROZEN GROUND" in "WATER_TR", "COMBINE_TR", and "SNOWH2O_TR"
+!-----------------------------------------------------------------------
+   INTEGER,                    INTENT(IN)   :: NLAYER
+   REAL, DIMENSION(1:NLAYER),  INTENT(IN)   :: DZLAYER   ! unit:m
+   REAL,                       INTENT(IN)   :: DT
+   REAL,                       INTENT(IN)   :: FLUXOUT   ! + if outward,UNIT:mm/s
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_SUB  ! m3/m3
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SICE1_SUB
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_TR
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SICE1_TR
+   REAL,                       INTENT(INOUT):: FLUX_TR     ! unit:mm/s
+
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_SUB
+   REAL, DIMENSION(1:NLAYER)                :: SICE0_SUB
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_TR
+   REAL, DIMENSION(1:NLAYER)                :: SICE0_TR
+   REAL                                     :: LOSS_REST, PROPOR_TR
+   INTEGER                                  :: I
+
+!-----(1) check if ice lies on the top-----
+   DO I = 2, NLAYER
+      IF (SH2O1_SUB(I-1) .gt. 0.0) THEN
+         IF (SICE1_SUB(I) .gt. 0.0) THEN
+            PRINT *, "ERROR! ICE NOT PLACED ON TOP!"
+         END IF
+      END IF
+   END DO
+!-----(2) check if tracer moisture if less then total moisture
+   DO I = 1, NLAYER
+      IF (SH2O1_TR(I) .gt. SH2O1_SUB(I) .or. SICE1_TR(I) .gt. SICE1_SUB(I)) THEN
+         PRINT *, "ERROR! TRACER > TOTAL"
+      END IF
+   END DO
+!-----(3) update soil moisture ------
+   SH2O0_SUB = SH2O1_SUB
+   SICE0_SUB = SICE1_SUB
+   SH2O0_TR  = SH2O1_TR
+   SICE0_TR  = SICE1_TR
+   LOSS_REST = FLUXOUT
+   DO I = 1, NLAYER
+      IF (LOSS_REST .gt. 0.0) THEN
+         PROPOR_TR = 0.0
+         IF (SICE1_SUB(I) .gt. 1.0E-10) PROPOR_TR = SICE1_TR(I)/SICE1_SUB(I)
+         SICE1_SUB(I) = max(0.0, SICE1_SUB(I)-LOSS_REST*DT/(DZLAYER(I)*1000.0))
+         SICE1_TR(I)  = max(0.0, SICE1_TR(I)-(SICE0_SUB(I)-SICE1_SUB(I))*PROPOR_TR)
+         LOSS_REST = LOSS_REST - (SICE0_SUB(I)-SICE1_SUB(I))*DZLAYER(I)*1000.0/DT
+         FLUX_TR   = FLUX_TR + (SICE0_TR(I)-SICE1_TR(I))*DZLAYER(I)*1000.0/DT
+      END IF
+   END DO
+   IF (LOSS_REST .gt. 0.0) THEN
+      DO I = 1, NLAYER
+      IF (LOSS_REST .gt. 0.0) THEN
+         PROPOR_TR = 0.0
+         IF (SH2O1_SUB(I) .gt. 1.0E-10) PROPOR_TR = SH2O1_TR(I)/SH2O1_SUB(I)
+         SH2O1_SUB(I) = max(0.0, SH2O1_SUB(I)-LOSS_REST*DT/(DZLAYER(I)*1000.0))
+         SH2O1_TR(I)  = max(0.0, SH2O1_TR(I)-(SH2O0_SUB(I)-SH2O1_SUB(I))*PROPOR_TR)
+         LOSS_REST = LOSS_REST - (SH2O0_SUB(I)-SH2O1_SUB(I))*DZLAYER(I)*1000.0/DT
+         FLUX_TR   = FLUX_TR + (SH2O0_TR(I)-SH2O1_TR(I))*DZLAYER(I)*1000.0/DT
+      END IF
+      END DO
+   END IF
+
+  END SUBROUTINE TOPSOIL_SUB
+
+!======================================================================
+  SUBROUTINE TOPSOIL_SAT(NLAYER, DZLAYER,  FLUXOUT, & !IN
+                          SH2O1_SUB, SH2O1_TR, FLUX_TR)
+!INOUT
+!-----------------------------------------------------------------------
+! HUANCUI HU: soil moisture removal from the top soil layer due to saturation
+! excess, and also average soil liquid water between sublayers
+!-----------------------------------------------------------------------
+   INTEGER,                    INTENT(IN)   :: NLAYER
+   REAL, DIMENSION(1:NLAYER),  INTENT(IN)   :: DZLAYER   ! unit:m
+   REAL,                       INTENT(IN)   :: FLUXOUT   ! + if outward,UNIT:m
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_SUB  ! m3/m3
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_TR
+   REAL,                       INTENT(INOUT):: FLUX_TR     ! unit:mm/s
+
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_SUB
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_TR
+   REAL                                     :: LOSS_REST, PROPOR_TR, SH2O_AVE,DELTA_SUB
+   INTEGER                                  :: I
+
+  !-----(1) check if tracer moisture if less then total moisture
+   DO I = 1, NLAYER
+      IF (SH2O1_TR(I) .gt. SH2O1_SUB(I) ) THEN
+         PRINT *, "ERROR! TRACER > TOTAL"
+      END IF
+   END DO
+!-----(2) remove saturation excess------
+   SH2O0_SUB = SH2O1_SUB
+   SH2O0_TR  = SH2O1_TR
+   LOSS_REST = FLUXOUT
+   DO I = 1, NLAYER
+      IF (LOSS_REST .gt. 0.0) THEN
+         PROPOR_TR = 0.0
+         IF (SH2O1_SUB(I) .gt. 1.0E-10) PROPOR_TR = SH2O1_TR(I)/SH2O1_SUB(I)
+         SH2O1_SUB(I) = max(0.0, SH2O1_SUB(I)-LOSS_REST/DZLAYER(I))
+         SH2O1_TR(I)  = max(0.0, SH2O1_TR(I)-(SH2O0_SUB(I)-SH2O1_SUB(I))*PROPOR_TR)
+         LOSS_REST = LOSS_REST - (SH2O0_SUB(I)-SH2O1_SUB(I))*DZLAYER(I)
+         FLUX_TR   = FLUX_TR + (SH2O0_TR(I)-SH2O1_TR(I))*DZLAYER(I)
+      END IF
+   END DO
+!------(3) average SH2O_SUB and move SH2O_TR
+   SH2O_AVE = SUM(SH2O1_SUB(1:NLAYER))/REAL(NLAYER)
+   DO I = NLAYER, 2,-1
+      PROPOR_TR = 0.0
+      IF (SH2O1_SUB(I) .gt. 1.0E-10) PROPOR_TR = SH2O1_TR(I)/SH2O1_SUB(I)
+      DELTA_SUB = MAX(0.0, SH2O1_SUB(I)-SH2O_AVE)
+      SH2O1_SUB(I) = SH2O1_SUB(I) - DELTA_SUB
+      SH2O1_TR(I)  = SH2O1_TR(I) - DELTA_SUB*PROPOR_TR
+      SH2O1_SUB(I-1) = SH2O1_SUB(I-1) + DELTA_SUB
+      SH2O1_TR(I-1) = SH2O1_TR(I-1) + DELTA_SUB*PROPOR_TR
+   END DO
+
+   END SUBROUTINE TOPSOIL_SAT
+
+!======================================================================
+   SUBROUTINE SOIL_SAT(NLAYER, DZLAYER, FLUXOUT, SH2O1_SUB, SH2O1_TR, FLUX_TR)
+!-----------------------------------------------------------------------
+! HUANCUI HU: soil moisture removal from not-top soil layer due to saturation
+! excess
+!-----------------------------------------------------------------------
+   INTEGER,                    INTENT(IN)   :: NLAYER
+   REAL,                       INTENT(IN)   :: DZLAYER   ! unit:m
+   REAL,                       INTENT(IN)   :: FLUXOUT   ! + if outward,UNIT:m
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_SUB  ! m3/m3
+   REAL, DIMENSION(1:NLAYER),  INTENT(INOUT):: SH2O1_TR
+   REAL,                       INTENT(INOUT):: FLUX_TR     ! unit:mm/s
+
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_SUB
+   REAL, DIMENSION(1:NLAYER)                :: SH2O0_TR
+   REAL                                     :: LOSS_REST, PROPOR_TR, FLUX_AVE
+   INTEGER                                  :: I
+
+!-----(1) check if tracer moisture if less then total moisture
+   DO I = 1, NLAYER
+      IF (SH2O1_TR(I) .gt. SH2O1_SUB(I) ) THEN
+         PRINT *, "ERROR! TRACER > TOTAL"
+      END IF
+   END DO
+! ----(2) update soil moisture  ------------------------
+   FLUX_AVE = FLUXOUT/REAL(NLAYER)
+   SH2O0_TR = SH2O1_TR
+   DO I = 1, NLAYER
+      PROPOR_TR = 0.0
+      IF (SH2O1_SUB(I) .gt. 1.0E-10) PROPOR_TR = SH2O1_TR(I)/SH2O1_SUB(I)
+      SH2O1_SUB(I) = max(0.0, SH2O1_SUB(I)-FLUX_AVE/DZLAYER)
+      SH2O1_TR(I) = max(0.0, SH2O1_TR(I)-FLUX_AVE*PROPOR_TR/DZLAYER)
+      FLUX_TR = FLUX_TR + (SH2O0_TR(I)-SH2O1_TR(I))*DZLAYER
+   END DO
+
+   END SUBROUTINE SOIL_SAT
+
+!============================================================
+   SUBROUTINE SMT_TR (II,JJ,IOPT_PM, NSUB, NTRACER, SH2O_SUB, DZSNSO_SUB, &
+                     SH2O, SH2O0, ZSOIL, DT, NSOIL,                 & !IN
+                     PDDUM, QSEVA, ETRANI, QDRAIN, RSAT,            & !IN
+                     SH2O_TR, PDDUM_TR, QSEVA_TR, ETRAN_TR,         &
+                     QDRAIN_TR, RSAT_TR, FLUX_TR)                   !IN/OUT
+! ---------------------------------------------------------------------
+! Huancui Hu: calculate/updates soil moisture content due to tracer
+! ---------------------------------------------------------------------
+    INTEGER,                       INTENT(IN)   :: II,JJ,IOPT_PM
+    INTEGER, DIMENSION(1:NSOIL  ), INTENT(IN)   :: NSUB
+    INTEGER,                       INTENT(IN)   :: NTRACER
+    REAL,    DIMENSION(1:NTRACER), INTENT(INOUT):: SH2O_SUB
+    REAL,    DIMENSION(1:NTRACER), INTENT(IN)   :: DZSNSO_SUB
+    REAL,    DIMENSION(1:NSOIL  ), INTENT(IN)   :: SH2O     ! m3/m3
+    REAL,    DIMENSION(1:NSOIL  ), INTENT(IN)   :: SH2O0    ! m3/m3
+!    REAL,    DIMENSION(1:NSOIL ), INTENT(IN)   :: CI
+    REAL,    DIMENSION(1:NSOIL  ), INTENT(IN)   :: ZSOIL
+    REAL,                          INTENT(IN)   :: DT
+    INTEGER,                       INTENT(IN)   :: NSOIL
+    REAL,                          INTENT(IN)   :: PDDUM    ! m/s
+    REAL,                          INTENT(IN)   :: QSEVA    ! m/s
+    REAL,    DIMENSION(1:NSOIL  ), INTENT(IN)   :: ETRANI   ! m/s
+    REAL,                          INTENT(IN)   :: QDRAIN      ! mm/s
+    REAL,                          INTENT(IN)   :: RSAT        ! m
+    REAL,    DIMENSION(1:NTRACER), INTENT(INOUT):: SH2O_TR   ! m3/m3
+    REAL,                          INTENT(IN)   :: PDDUM_TR  ! m/s
+    REAL,                          INTENT(OUT)  :: QSEVA_TR   ! -> m/s
+    REAL,                          INTENT(OUT)  :: ETRAN_TR   ! -> m/s
+    REAL,                          INTENT(OUT)  :: QDRAIN_TR  ! -> m/s
+    REAL,                          INTENT(OUT)  :: RSAT_TR    ! -> m
+    REAL,    DIMENSION(1:NTRACER), INTENT(OUT)  :: FLUX_TR ! -> m: flux*dt
+
+! local variables
+    REAL, DIMENSION(1:NTRACER)           :: DEPTH
+    REAL, DIMENSION(1:NSOIL)             :: DEPTH_OLD
+    REAL, DIMENSION(1:NTRACER)           :: ETRAN_SUB
+    REAL, DIMENSION(1:NSOIL-1)           :: FLUX_BULK
+    REAL, DIMENSION(1:NTRACER+1)         :: FLUX
+    REAL, DIMENSION(1:NTRACER)           :: NOMEN    ! nominator
+    REAL, DIMENSION(1:NTRACER)           :: DENOM    ! denominator
+    REAL, DIMENSION(1:NTRACER)           :: RATIO    ! SHO2_TR/SHO2
+    REAL, DIMENSION(1:NTRACER)           :: CI_TR
+    INTEGER, DIMENSION(1:NTRACER)        :: SOLVE_ORDER   ! solve order: 1-first order, 2-second, 3-third, will change
+    INTEGER, DIMENSION(1:NTRACER)        :: FLUX_DIRE     ! flux directions:1-first order, 1-second, 2-third
+    INTEGER, DIMENSION(1:NTRACER)        :: SOLVED        ! layer solved or not
+    INTEGER                              :: K, N, ISUB
+    REAL     :: residual, residual_tr, DENOMI,NOMENI
+    REAL     :: flux_upper, flux_lower 
+    REAL     :: PROPOR_TR, PDDUM_TR_local, PDDUM_local ! PPDUM_local is after removing RSAT
+
+  ETRAN_TR    = 0.0
+  QSEVA_TR    = 0.0
+  QDRAIN_TR   = 0.0
+  RSAT_TR     = 0.0
+  residual_tr = 0.0
+  RATIO       = 0.0
+  NOMENI      = 0.0
+  DENOMI      = 0.0
+  SOLVE_ORDER = 0
+  FLUX_DIRE   = 0
+  SOLVED      = 0
+  PDDUM_TR_local = 0.0
+  PDDUM_local    = 0.0
+
+!--------STEP -1: subtract RSAT from PDDUM first--------
+  if (RSAT .gt. 1.0E-7) then
+    if (RSAT/DT .le. PDDUM) then
+      call get_wt_ratio(PDDUM_TR, PDDUM, PROPOR_TR)
+      RSAT_TR        = RSAT*PROPOR_TR
+      PDDUM_local    = PDDUM-RSAT/DT
+      PDDUM_TR_local = PDDUM_local*PROPOR_TR
+    else
+      print *, "ERROR in SMT_TR-1: RSAT/DT, PDDUM:", RSAT/DT, PDDUM
+    end if
+  else
+    PDDUM_local = PDDUM
+    PDDUM_TR_local = PDDUM_TR
+  end if
+
+!--------STEP 0: get the thickness of each soil layer-------------------
+  DO K = 1, NSOIL
+    IF ( K == 1) THEN
+      DEPTH_OLD(K) = - ZSOIL(K)
+    ELSE
+      DEPTH_OLD(K) = (ZSOIL(K-1) - ZSOIL(K))
+    END IF
+  END DO
+DEPTH = DZSNSO_SUB
+!--------STEP 1: calculate water fluxes between each soil layer---------
+! start from the bottom layer
+  DO K = NSOIL-1, 1, -1
+     IF (K == NSOIL-1) THEN
+        FLUX_BULK(K) = (SH2O(K+1)-SH2O0(K+1))*DEPTH_OLD(K+1) + (QDRAIN/1000.0 + ETRANI(K+1))*DT           ! unit: m
+     ELSE
+        FLUX_BULK(K) = (SH2O(K+1)-SH2O0(K+1))*DEPTH_OLD(K+1) + ETRANI(K+1)*DT + FLUX_BULK(K+1)
+     END IF
+  END DO
+  residual = (PDDUM-QSEVA-ETRANI(1))*DT - RSAT - FLUX_BULK(1) - (SH2O(1)-SH2O0(1))*DEPTH_OLD(1)
+if (II .eq. 75 .and. JJ .eq. 46) then
+!  print *, "FLAG in SMR_TR001, FLUX_BULK,QDRAIN,residual:", FLUX_BULK,QDRAIN,residual
+!  print *, "PDDUM, QSEVA, ETRANI, RSAT:",PDDUM, QSEVA, ETRANI, RSAT
+end if
+!--------STEP 1a: calculate sublayer fluxes-----------------------
+  ISUB = 0
+  Do K = 1, NSOIL
+     IF (K .eq. 1) THEN
+        flux_upper = (PDDUM_local-QSEVA)*DT
+        flux_lower = FLUX_BULK(K)
+     ELSE
+        IF (K .eq. NSOIL) THEN
+           flux_upper = FLUX_BULK(K-1)
+           flux_lower = QDRAIN/1000.0*DT
+        ELSE
+           flux_upper = FLUX_BULK(K-1)
+           flux_lower = FLUX_BULK(K)
+        END IF
+     END IF
+     DO N = 1,NSUB(K)
+        ISUB = ISUB+1
+        FLUX(ISUB) = ((NSUB(K)-N)*flux_upper+N*flux_lower)/NSUB(K)
+        ETRAN_SUB(ISUB) = ETRANI(K)/NSUB(K)
+! update SH2O_SUB in accordance with SH2O
+        SH2O_SUB(ISUB) = SH2O(K)
+if (II .eq. 75 .and. JJ .eq. 46) then
+!  print *, "FLAG in SMR_TR002, K,ISUB,FLUX(ISUB):",K,ISUB,FLUX(ISUB)
+end if
+     END DO
+  END DO
+!--------STEP 1b: get the solve order for different layers---------
+  DO K = 1, NTRACER
+     IF (K == 1) THEN
+        IF (FLUX(K) >= 0) THEN     ! FLUX is positive when downward
+           SOLVE_ORDER(K) = 1
+        ELSE
+           SOLVE_ORDER(K) = 2
+        ENDIF
+     ELSE IF (K == NTRACER) THEN
+        IF (FLUX(K-1) <=0) THEN
+           SOLVE_ORDER(K) = 1
+        ELSE
+           SOLVE_ORDER(K) = 2
+        END IF
+     ELSE
+        IF (FLUX(K-1) <=0 .and. FLUX(K) >=0) THEN
+           SOLVE_ORDER(K) = 1
+        ELSE IF (FLUX(K-1)*FLUX(K) > 0 ) THEN
+           SOLVE_ORDER(K) = 2
+        ELSE
+           SOLVE_ORDER(K) = 3
+        END IF
+     END IF
+  END DO
+FLUX_DIRE = SOLVE_ORDER
+!--------STEP 2: calculate the basic nominator and denominators--------
+  DO K =1, NTRACER
+    if (IOPT_PM == 1) then
+      DENOM(K) = (SH2O_SUB(K)*DEPTH(K) + ETRAN_SUB(K)*DT)*0.5
+    else
+      DENOM(K) = SH2O_SUB(K)*DEPTH(K) + ETRAN_SUB(K)*DT
+    end if
+    NOMEN(K) = SH2O_TR(K)*DEPTH(K)
+!    NOMEN(K) = (SH2O_TR(K)*DEPTH(K))*0.5
+    IF (K == 1) THEN
+      if (IOPT_PM == 1) then
+        DENOM(K) = DENOM(K) + (QSEVA*DT)*0.5
+      else
+        DENOM(K) = DENOM(K) + QSEVA*DT
+      end if
+      NOMEN(K) = NOMEN(K) + PDDUM_TR_local*DT
+    ELSE IF (K == NTRACER) THEN
+      DENOM(K) = DENOM(K) + max(QDRAIN,0.0)*DT/1000.0 ! + RSAT
+    END IF
+  END DO
+!--------STEP 3: calculate the water vapor tracer ratios to soil moisture
+  NLOOP: DO N = 1, NTRACER
+     DO K = 1,NTRACER
+        NOMENI = 0.0
+        DENOMI = 0.0
+        IF (SOLVE_ORDER(K) == 1 .and. SOLVED(K) == 0) THEN
+           IF (K == 1) THEN
+              NOMENI = NOMEN(K)-RATIO(K+1)*MIN(FLUX(K),0.)
+              DENOMI = MAX(DENOM(K),0.)+MAX(FLUX(K),0.)
+           ELSE IF (K == NTRACER) THEN
+              NOMENI = NOMEN(K)+RATIO(K-1)*MAX(FLUX(K-1),0.)
+              DENOMI = MAX(DENOM(K),0.)-MIN(FLUX(K-1),0.)
+           ELSE
+              NOMENI = NOMEN(K)+RATIO(K-1)*MAX(FLUX(K-1),0.)-RATIO(K+1)*MIN(FLUX(K),0.)
+              DENOMI = MAX(DENOM(K),0.)+MAX(FLUX(K),0.)-MIN(FLUX(K-1),0.)
+           END IF
+           RATIO(K) = NOMENI/DENOMI
+
+if (II .eq. 75 .and. JJ .eq. 46) then
+!  print *, "FLAG in SMR_TR003, N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K):",N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K)
+end if
+
+           SOLVED(K) = 1
+           IF ( abs(RATIO(K) < 1.0E-6)) THEN
+              RATIO(K) = 0.0
+           ENDIF
+           IF (K-1 > 0 .AND. SOLVED(K-1) == 0) THEN
+              IF (FLUX_DIRE(K-1) == 2) THEN
+                 SOLVE_ORDER(K-1) = 1
+              ELSE IF (SOLVED(K-2) == 1) THEN   ! to be here, K has to be >=3
+                 SOLVE_ORDER(K-1) = 1
+              END IF
+           END IF
+           IF (K+1 <= NTRACER .AND. SOLVED(K+1) == 0) THEN
+              IF (FLUX_DIRE(K+1) == 2) THEN
+                 SOLVE_ORDER(K+1) = 1
+              ELSE IF (SOLVED(K+2) == 1) THEN  !to be here, K has to be <NSOIL-2
+                 SOLVE_ORDER(K+1) = 1
+              END IF
+           END IF
+        END IF
+     END DO
+  ENDDO NLOOP
+
+  DO K = 1, NTRACER
+     IF (SOLVED(K) == 0) THEN
+!        print *, "ERROR!!! LAYER NOT SOLVED"
+     END IF
+!--------STEP 3.1: calculate the tracer fluxes at the bottom of each layer----
+     IF (K == NTRACER) THEN
+        FLUX_TR(K) = MAX(FLUX(K),0.)*RATIO(K) + MIN(FLUX(K),0.)*0.0
+     ELSE
+        FLUX_TR(K) = MAX(FLUX(K),0.)*RATIO(K) + MIN(FLUX(K),0.)*RATIO(K+1)
+     END IF
+  END DO
+!--------STEP 4: compute the new soil moisture due to tracer ----------
+  DO K = 1, NTRACER
+    residual_tr = residual_tr + (SH2O_SUB(K) * RATIO(K)-SH2O_TR (K))*DEPTH(K)
+    CI_TR(K) = (SH2O_SUB(K) * RATIO(K)-SH2O_TR (K))
+    if (RATIO(K) .ge. 1.0) then
+      print *, "ERROR2: RATIO EXCEEDING 1!"
+      print *, "II,JJ,K:",II,JJ,K,RATIO(K)
+    end if
+    if (IOPT_PM == 1) then
+      SH2O_TR (K) = SH2O_SUB(K) * RATIO(K) *0.5
+      ETRAN_TR = ETRAN_TR + ETRAN_SUB(K)*RATIO(K)*0.5
+    else
+      SH2O_TR (K) = SH2O_SUB(K) * RATIO(K)
+      ETRAN_TR = ETRAN_TR + ETRAN_SUB(K)*RATIO(K)
+    end if
+
+    IF (K == 1) THEN
+      if (IOPT_PM == 1) then
+        QSEVA_TR = QSEVA*RATIO(K)*0.5
+      else
+        QSEVA_TR = QSEVA*RATIO(K)
+      end if
+!      RSAT_TR  = RSAT*RATIO(K)
+      residual_tr =residual_tr - PDDUM_TR_local*DT + QSEVA*RATIO(K)*DT + ETRANI(K)*RATIO(K)*DT !+ RSAT*RATIO(K)
+    ELSE IF (K == NTRACER) THEN
+      QDRAIN_TR = max(QDRAIN,0.0)*RATIO(K)/1000.0
+      residual_tr =residual_tr + max(QDRAIN,0.0)*RATIO(K)*DT/1000.0
+    ENDIF
+  END DO
+
+
+   END SUBROUTINE SMT_TR
+!-------------------------------------------------------------------------
+!=========================================================================
 END MODULE MODULE_SF_NOAHMPLSM
 
 MODULE NOAHMP_TABLES
@@ -10195,3 +12274,4 @@ IMPERV_URBAN_TABLE   = IMPERV_URBAN
   end subroutine read_mp_optional_parameters
 
 END MODULE NOAHMP_TABLES
+
