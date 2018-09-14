@@ -34,6 +34,7 @@ def eprint(*args, **kwargs):
 
 def test_compile_candidate(candidate_sim, output_dir):
     print("\nQuestion: The candidate compiles?\n", end='')
+    print('\n')
 
     compile_dir = output_dir / 'compile_candidate'
 
@@ -49,6 +50,7 @@ def test_compile_candidate(candidate_sim, output_dir):
 
 def test_compile_reference(reference_sim, output_dir):
     print("\nQuestion: The reference compiles?\n", end='')
+    print('\n')
 
     compile_dir = output_dir / 'compile_reference'
 
@@ -64,6 +66,7 @@ def test_compile_reference(reference_sim, output_dir):
 
 def test_run_candidate(candidate_sim, output_dir, ncores):
     print("\nQuestion: The candidate runs successfully?\n", end='')
+    print('\n')
 
     # Set run directory and change working directory to run dir for simulation
     run_dir = output_dir / 'run_candidate'
@@ -98,6 +101,7 @@ def test_run_candidate(candidate_sim, output_dir, ncores):
 # Run questions
 def test_run_reference(reference_sim, output_dir, ncores):
     print("\nQuestion: The reference runs successfully?\n", end='')
+    print('\n')
 
     # Set run directory and change working directory to run dir for simulation
     run_dir = output_dir / 'run_reference'
@@ -133,6 +137,7 @@ def test_run_reference(reference_sim, output_dir, ncores):
 def test_ncores_candidate(output_dir,capsys):
     print("\nQuestion: The candidate outputs from a ncores run match outputs from"
           " ncores-1 run?\n", end='')
+    print('\n')
 
     candidate_sim_file = output_dir / 'run_candidate' / 'WrfHydroSim.pkl'
     candidate_collected_file = output_dir / 'run_candidate' / 'WrfHydroSim_collected.pkl'
@@ -192,10 +197,10 @@ def test_ncores_candidate(output_dir,capsys):
         eprint(diffs.diff_counts)
         for key, value in diffs.diff_counts.items():
             if value != 0:
-                diffs = getattr(diffs, key)
+                diff_set = getattr(diffs, key)
                 eprint('\n' + key + '\n')
-                for diff in diffs:
-                    eprint(diff)
+                for a_diff in diff_set:
+                    eprint(a_diff)
     assert has_diffs is False, \
         'Outputs for candidate run with ncores do not match outputs with ncores-1'
 
@@ -203,6 +208,7 @@ def test_ncores_candidate(output_dir,capsys):
 def test_perfrestart_candidate(output_dir):
     print("\nQuestion: The candidate outputs from a restart run match the outputs from standard "
           "run?\n", end='')
+    print('\n')
 
     candidate_sim_file = output_dir / 'run_candidate' / 'WrfHydroSim.pkl'
     candidate_collected_file = output_dir / 'run_candidate' / 'WrfHydroSim_collected.pkl'
@@ -222,7 +228,7 @@ def test_perfrestart_candidate(output_dir):
     # Get a new start time 1 hour later
     restart_job = candidate_sim_restart.jobs[0]
     restart_job.model_start_time = restart_job.model_start_time + \
-                                   dt.timedelta(hours=2)
+                                   dt.timedelta(hours=96)
 
     # Get restart files from previous run and symlink into restart sim dir
     # (Remember that we are in the run/sim dir)
@@ -279,9 +285,9 @@ def test_perfrestart_candidate(output_dir):
         eprint(diffs.diff_counts)
         for key, value in diffs.diff_counts.items():
             if value != 0:
-                diffs = getattr(diffs, key)
+                diff_set = getattr(diffs, key)
                 eprint('\n' + key + '\n')
-                for diff in diffs:
-                    eprint(diff)
+                for a_diff in diff_set:
+                    eprint(a_diff)
     assert has_diffs is False, \
         'Outputs for candidate run do not match outputs from candidate restart run'
