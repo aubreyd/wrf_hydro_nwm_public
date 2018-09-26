@@ -1719,11 +1719,11 @@ end subroutine HYDRO_ini
              do i = 1, RT_DOMAIN(did)%ix
                 !yw rt_domain(did)%lksat(i,j) = xdum1(soltyp(i,j) ) * 1000.0
                 rt_domain(did)%lksat(i,j) = xdum1(soltyp(i,j) ) 
-                IF(rt_domain(did)%VEGTYP(i,j) == rt_domain(did)%isurban ) THEN   ! urban
-                    rt_domain(did)%SMCMAX1(i,j) = 0.45
-                    rt_domain(did)%SMCREF1(i,j) = 0.42
-                    rt_domain(did)%SMCWLT1(i,j) = 0.40
-                else
+                !IF(rt_domain(did)%VEGTYP(i,j) == rt_domain(did)%isurban ) THEN   ! urban
+                !    rt_domain(did)%SMCMAX1(i,j) = 0.45
+                !    rt_domain(did)%SMCREF1(i,j) = 0.42
+                !    rt_domain(did)%SMCWLT1(i,j) = 0.40
+                !else
                     rt_domain(did)%SMCMAX1(i,j) = MAXSMC(soltyp(I,J))
                     rt_domain(did)%SMCREF1(i,j) = refsmc(soltyp(I,J))
                     rt_domain(did)%SMCWLT1(i,j) = wltsmc(soltyp(I,J))
@@ -1733,7 +1733,7 @@ end subroutine HYDRO_ini
                     rt_domain(did)%SMCMAX1(i,j) = min(rt_domain(did)%SMCMAX1(i,j), 1.0)
                     rt_domain(did)%SMCREF1(i,j) = max(min(rt_domain(did)%SMCREF1(i,j), rt_domain(did)%SMCMAX1(i,j) - 0.01), 0.0)
                     rt_domain(did)%SMCWLT1(i,j) = max(min(rt_domain(did)%SMCWLT1(i,j), rt_domain(did)%SMCREF1(i,j) - 0.01), 0.0)
-                ENDIF
+                !ENDIF
                 IF(rt_domain(did)%VEGTYP(i,j) > 0 ) THEN   ! created 2d ov_rough
                     rt_domain(did)%OV_ROUGH2d(i,j) = RT_DOMAIN(did)%OV_ROUGH(rt_domain(did)%VEGTYP(I,J))
                 endif
