@@ -128,6 +128,7 @@ type ldasMeta
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
    integer :: numSpectrumBands = 2
+   integer :: numLakeLayers = 10
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -429,6 +430,7 @@ type lsmMeta
    integer :: numSnowLayers = 3
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
+   integer :: numLakeLayers = 10
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
