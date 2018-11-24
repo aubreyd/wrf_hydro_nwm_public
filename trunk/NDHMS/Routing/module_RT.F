@@ -148,7 +148,9 @@ CONTAINS
      !
 
      allocate( rt_domain(did)%RETDEPRTFAC    (IXRT,JXRT) )
-     !
+     
+     allocate( rt_domain(did)%NEXP2DRT   (IXRT,JXRT) )
+     rt_domain(did)%NEXP2DRT = 1.0
 
      !allocate( rt_domain(did)%overland%control%surface_water_head_routing(IXRT,JXRT) )
      !rt_domain(did)%overland%control%surface_water_head_routing= 0.0                
@@ -246,7 +248,10 @@ CONTAINS
             rt_domain(did)%VEGTYP    = 0            
 
   allocate( rt_domain(did)%OV_ROUGH2d   (IX,JX) )
-            
+           
+  allocate( rt_domain(did)%NEXP2D   (IX,JX) )
+            rt_domain(did)%NEXP2D = 1.0
+ 
   allocate( rt_domain(did)%SOILTYP   (IX,JX) )
 
   allocate( rt_domain(did)%GWSUBBASMSK   (IX,JX) )

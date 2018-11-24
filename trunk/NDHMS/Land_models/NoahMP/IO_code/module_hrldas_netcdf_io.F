@@ -812,7 +812,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       bexp_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -826,7 +826,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcdry_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -840,7 +840,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcwlt_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -854,7 +854,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcref_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -868,7 +868,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcmax_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -882,7 +882,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       dksat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -896,7 +896,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       dwsat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -910,7 +910,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       psisat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -924,7 +924,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
     
-    do isoil = 1,4
+    do isoil = 1,nsoil
       quartz_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -1554,7 +1554,7 @@ contains
 #endif
        endif
 
-       var(:,:,k) = (src(:,ktop,:)*fraction) + (src(:,kbottom,:)*(1.0-fraction))
+       var(:,k,:) = (src(:,ktop,:)*fraction) + (src(:,kbottom,:)*(1.0-fraction))
 
     enddo KLOOP
      
