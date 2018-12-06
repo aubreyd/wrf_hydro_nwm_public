@@ -165,13 +165,6 @@ module module_HYDRO_drv
    rtflag = -99
    iniflag = -99
 
-   print *, "HYDRO_out: Start "
-   print *, "  olddate ", nlst_rt(did)%olddate(1:19)
-   print *, "  startdate ", nlst_rt(did)%startdate(1:19)
-   print *, "  his_out_counts, out_counts", rt_domain(did)%his_out_counts, rt_domain(did)%out_counts
-   print *, "  rstflag, outflag, rtflag, iniflag ", rstflag, outflag, rtflag, iniflag
-   print *, "  rtout_factor ", rtout_factor
-
 #ifdef MPP_LAND
    if(IO_id .eq. my_id) then
 #endif
@@ -211,13 +204,6 @@ module module_HYDRO_drv
      call mpp_land_bcast_int1(outflag)
 #endif
 
-   print *, "HYDRO_out: After date checks "  
-   print *, "  olddate ", nlst_rt(did)%olddate(1:19)
-   print *, "  startdate ", nlst_rt(did)%startdate(1:19)
-   print *, "  his_out_counts, out_counts", rt_domain(did)%his_out_counts, rt_domain(did)%out_counts
-   print *, "  rstflag, outflag, rtflag, iniflag ", rstflag, outflag, rtflag, iniflag
-   print *, "  rtout_factor ", rtout_factor 
-
      if (rstflag .eq. 1 .and. iniflag .eq. 1) rtout_factor = 1
      if (rstflag .eq. 1) call HYDRO_rst_out(did) 
 
@@ -234,32 +220,13 @@ module module_HYDRO_drv
      endif
 
 ! jump the ouput for the initial time when it has restart file from routing.
-!!AD   rtflag = -99
-!!AD   iniflag = -99
-!!AD#ifdef MPP_LAND
-!!AD   if(IO_id .eq. my_id) then
-!!AD#endif
 !       if ( (trim(nlst_rt(did)%restart_file) /= "") .and. ( nlst_rt(did)%startdate(1:19) == nlst_rt(did)%olddate(1:19) ) ) then
 !#ifndef NCEP_WCOSS
 !             print*, "yyyywww restart_file = ", trim(nlst_rt(did)%restart_file) 
 !#else
 !             write(78,*) "yyyywww restart_file = ", trim(nlst_rt(did)%restart_file) 
 !#endif
-!!AD          if ( nlst_rt(did)%startdate(1:19) == nlst_rt(did)%olddate(1:19) ) iniflag = 1
-!!AD          if ( (trim(nlst_rt(did)%restart_file) /= "") .and. ( nlst_rt(did)%startdate(1:19) == nlst_rt(did)%olddate(1:19) ) ) rtflag = 1
 !       endif
-!!AD#ifdef MPP_LAND
-!!AD   endif  
-!!AD   call mpp_land_bcast_int1(rtflag)
-!!AD   call mpp_land_bcast_int1(iniflag)
-!!AD#endif
-
-   print *, "HYDRO_out: After restart checks "
-   print *, "  olddate ", nlst_rt(did)%olddate(1:19)
-   print *, "  startdate ", nlst_rt(did)%startdate(1:19)
-   print *, "  his_out_counts, out_counts", rt_domain(did)%his_out_counts, rt_domain(did)%out_counts
-   print *, "  rstflag, outflag, rtflag, iniflag ", rstflag, outflag, rtflag, iniflag
-   print *, "  rtout_factor ", rtout_factor
 
 !yw keep the initial time otuput for debug
       if(rtflag == 1) then 
@@ -284,13 +251,6 @@ module module_HYDRO_drv
          endif
       end if
    
-   print *, "HYDRO_out: After LSM out "
-   print *, "  olddate ", nlst_rt(did)%olddate(1:19)
-   print *, "  startdate ", nlst_rt(did)%startdate(1:19)
-   print *, "  his_out_counts, out_counts", rt_domain(did)%his_out_counts, rt_domain(did)%out_counts
-   print *, "  rstflag, outflag, rtflag, iniflag ", rstflag, outflag, rtflag, iniflag
-   print *, "  rtout_factor ", rtout_factor
- 
 if(nlst_rt(did)%SUBRTSWCRT         .gt. 0 .or. &
    nlst_rt(did)%OVRTSWCRT          .gt. 0 .or. &
    nlst_rt(did)%GWBASESWCRT        .gt. 0 .or. &
@@ -301,7 +261,7 @@ if(nlst_rt(did)%SUBRTSWCRT         .gt. 0 .or. &
    if(nlst_rt(did)%RTOUT_DOMAIN       .eq. 1 .and. &
       nlst_rt(did)%channel_only       .eq. 0 .and. &
       nlst_rt(did)%channelBucket_only .eq. 0       ) then 
-              if( (mod(rtout_factor,3) .eq. 0) .or. nlst_rt(did)%io_config_outputs .ne. 5 ) then
+              if(mod(rtout_factor,3) .eq. 0 .or. nlst_rt(did)%io_config_outputs .ne. 5) then
                  ! Output gridded routing variables on National Water Model
                  ! high-res routing grid 
                  if(nlst_rt(did)%io_form_outputs .ne. 0) then
@@ -329,13 +289,6 @@ if(nlst_rt(did)%SUBRTSWCRT         .gt. 0 .or. &
               endif ! End check for rtout_factor
            rtout_factor = rtout_factor + 1
    endif
-
-   print *, "HYDRO_out: After RTOUT out "
-   print *, "  olddate ", nlst_rt(did)%olddate(1:19)
-   print *, "  startdate ", nlst_rt(did)%startdate(1:19)
-   print *, "  his_out_counts, out_counts", rt_domain(did)%his_out_counts, rt_domain(did)%out_counts
-   print *, "  rstflag, outflag, rtflag, iniflag ", rstflag, outflag, rtflag, iniflag
-   print *, "  rtout_factor ", rtout_factor
 
    !! JLM disable GW output for NWM. Bring this line back when runtime output options avail.
    !! JLM This seems like a more logical place?
