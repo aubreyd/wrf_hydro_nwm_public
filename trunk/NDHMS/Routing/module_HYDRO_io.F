@@ -661,6 +661,57 @@ end subroutine get_albedo12m_netcdf
 
   end subroutine get_2d_netcdf
 
+  subroutine get_2d_netcdf_int(name, ncid, array, units, idim, jdim, &
+       fatal_if_error, ierr)
+
+    implicit none
+
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: ncid
+    integer, intent(in) :: idim, jdim
+    integer, dimension(idim,jdim), intent(out) :: array
+    character(len=256), intent(out) :: units
+    ! fatal_IF_ERROR:  an input code value:
+    !      .TRUE. if an error in reading the data should stop the program.
+    !      Otherwise the, IERR error flag is set, but the program continues.
+    logical, intent(in) :: fatal_if_error
+    integer, intent(out) :: ierr
+
+    integer :: iret, varid
+    real    :: scale_factor,   add_offset
+
+    units = ""
+
+    iret = nf90_inq_varid(ncid,  name,  varid)
+    if (iret /= 0) then
+       if (fatal_IF_ERROR) then
+          print*, 'name = "', trim(name)//'"'
+          call hydro_stop("In get_2d_netcdf() - nf90_inq_varid problem")
+       else
+          ierr = iret
+          return
+       endif
+    endif
+
+    iret = nf90_get_var(ncid, varid, array)
+    if (iret /= 0) then
+       if (fatal_IF_ERROR) then
+          print*, 'name = "', trim(name)//'"'
+          call hydro_stop("In get_2d_netcdf() - nf90_get_var_real problem")
+       else
+          ierr = iret
+          return
+       endif
+    endif
+
+    iret = nf90_get_att(ncid, varid, 'scale_factor', scale_factor)
+    if(iret .eq. 0) array = array * scale_factor
+    iret = nf90_get_att(ncid, varid, 'add_offset', add_offset)
+    if(iret .eq. 0) array = array + add_offset
+
+    ierr = 0;
+
+  end subroutine get_2d_netcdf_int
 
       subroutine get_2d_netcdf_cows(var_name,ncid,var, &
             ix,jx,tlevel,fatal_if_error,ierr)
@@ -10976,8 +11027,9 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"NEXP",rt_domain(did)%NEXP2D)
-   call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"BEDROCK",rt_domain(did)%BEDROCK)
+   call read2dlsm_int(did,trim(nlst_rt(did)%hydrotbl_f),"BEDROCK",rt_domain(did)%BEDROCK)
 end subroutine hdtbl_in_nc
+
 subroutine read2dlsm(did,file,varName,varOut)
   implicit none
   integer :: did, ncid ,ierr,iret
@@ -11002,10 +11054,35 @@ subroutine read2dlsm(did,file,varName,varOut)
      call get_2d_netcdf(trim(varName), ncid, varOut, units, rt_domain(did)%ix, rt_domain(did)%jx, &
           .false., ierr)
      iret = nf_close(ncid)
-#endif
-  
+#endif  
 end subroutine read2dlsm
 
+subroutine read2dlsm_int(did,file,varName,varOut)
+  implicit none
+  integer :: did, ncid ,ierr,iret
+  character(len=*) :: file,varName
+  integer,dimension(:,:) :: varOut
+  character(len=256) :: units
+#ifdef MPP_LAND
+  integer,allocatable,dimension(:,:) :: tmpArr
+  if(my_id .eq. io_id) then
+     allocate(tmpArr(global_nx,global_ny))
+     iret = nf_open(trim(file), NF_NOWRITE, ncid)
+     call get_2d_netcdf_int(trim(varName), ncid, tmpArr, units, global_nx, global_ny, &
+          .false., ierr)
+     iret = nf_close(ncid)
+  else
+     allocate(tmpArr(1,1))
+  endif
+  call decompose_data_int(tmpArr,varOut)
+  deallocate(tmpArr)
+#else
+     iret = nf_open(trim(file), NF_NOWRITE, ncid)
+     call get_2d_netcdf_int(trim(varName), ncid, varOut, units, rt_domain(did)%ix, rt_domain(did)%jx, &
+          .false., ierr)
+     iret = nf_close(ncid)
+#endif  
+end subroutine read2dlsm_int
 
 subroutine read_channel_only (olddateIn, hgrid, indir, dtbl)
 !use module_HYDRO_io, only: read_rst_crt_reach_nc

@@ -45,7 +45,8 @@
   REAL :: QSUBBDRYTRT
   !REAL,    allocatable, DIMENSION(:,:)      :: ELRT,SOXRT,SOYRT,OVROUGHRT,RETDEPRT  
   REAL,    allocatable, DIMENSION(:,:)      :: ELRT
-  REAL,    allocatable, DIMENSION(:,:)      :: NEXP2DRT,BEDROCKRT
+  REAL,    allocatable, DIMENSION(:,:)      :: NEXP2DRT
+  INTEGER, allocatable, DIMENSION(:,:)      :: BEDROCKRT
   !REAL,    allocatable, DIMENSION(:,:,:)    :: SO8RT
   INTEGER,    allocatable, DIMENSION(:,:,:) ::  SO8LD_D ! SO8RT_D moved to overland properties module
   REAL,    allocatable, DIMENSION(:,:)      :: SO8LD_Vmax
@@ -224,7 +225,8 @@
       REAL,    allocatable, DIMENSION(:,:)   :: SMCMAX1,SMCWLT1,SMCREF1
       INTEGER, allocatable, DIMENSION(:,:)   :: VEGTYP 
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
-      REAL, allocatable, DIMENSION(:,:)      :: NEXP2D,BEDROCK
+      REAL, allocatable, DIMENSION(:,:)      :: NEXP2D
+      INTEGER, allocatable, DIMENSION(:,:)   :: BEDROCK
       REAL,    allocatable, DIMENSION(:)   :: SLDPTH
 
 !!! define constant/parameter
