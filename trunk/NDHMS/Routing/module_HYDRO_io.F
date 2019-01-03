@@ -10962,6 +10962,8 @@ subroutine hdtbl_out(did)
       call hdtbl_out_nc(did,ncid, count,count_flag,"SMCWLT1",rt_domain(did)%SMCWLT1,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"LKSAT",rt_domain(did)%LKSAT,"",ixd,jxd)
+      !call hdtbl_out_nc(did,ncid, count,count_flag,"NEXP",1.0,"",ixd,jxd)
+      !call hdtbl_out_nc(did,ncid, count,count_flag,"BEDROCK",-9999,"",ixd,jxd)
    end do
 
 end subroutine hdtbl_out
@@ -10974,6 +10976,7 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"NEXP",rt_domain(did)%NEXP2D)
+   call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"BEDROCK",rt_domain(did)%BEDROCK)
 end subroutine hdtbl_in_nc
 subroutine read2dlsm(did,file,varName,varOut)
   implicit none

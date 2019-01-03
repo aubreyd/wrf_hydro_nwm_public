@@ -115,7 +115,7 @@
           SOYRT,LATKSATRT,SOLDEPRT,QSUBBDRYRT,QSUBBDRYTRT,      &    
           NSOIL,SMCRT,INFXSUBRT,SMCMAXRT,SMCREFRT,ZSOIL,IXRT,JXRT,DT,    &
           SMCWLTRT,SO8RT,SO8RT_D, rt_option,SLDPTH,junk4,CWATAVAIL, &
-          SATLYRCHK, NEXP2DRT)
+          SATLYRCHK, NEXP2DRT, BEDROCKRT)
 
 !       use module_mpp_land, only: write_restart_rt_3, write_restart_rt_2, &
 !            my_id
@@ -146,7 +146,7 @@
 	REAL, INTENT(IN)                          :: DT
 	REAL, INTENT(IN), DIMENSION(NSOIL)        :: ZSOIL
 	REAL, INTENT(IN), DIMENSION(NSOIL) 	  :: SLDPTH
-        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: NEXP2DRT
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: NEXP2DRT, BEDROCKRT
 
 	REAL, INTENT(INOUT)                       :: QSUBBDRYTRT
 	REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: INFXSUBRT
@@ -277,7 +277,7 @@
 !     if(rt_option .eq. 1) then
         CALL ROUTE_SUBSURFACE1(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,  &   
                LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT, &   
-               SO8RT,SO8RT_D,CWATAVAIL,SUBDT,NEXP2DRT)
+               SO8RT,SO8RT_D,CWATAVAIL,SUBDT,NEXP2DRT,BEDROCKRT)
 !     else 
 !        CALL ROUTE_SUBSURFACE2(dist,ZWATTABLRT,QSUBRT,SOXRT,SOYRT,      &
 !               LATKSATRT,SOLDEPRT,IXRT,JXRT,QSUBBDRYRT,QSUBBDRYTRT,     &
@@ -1255,7 +1255,7 @@
           SUBROUTINE ROUTE_SUBSURFACE1(                                 &
                 dist,z,qsub,sox,soy,                                   &
                 latksat,soldep,XX,YY,QSUBDRY,QSUBDRYT,SO8RT,SO8RT_D,    &
-                CWATAVAIL,SUBDT, NEXP2DRT)
+                CWATAVAIL,SUBDT, NEXP2DRT, BEDROCKRT)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -1298,7 +1298,7 @@
         REAL*8, DIMENSION(XX,YY) :: qsub_tmp,QSUBDRY_tmp
 !yw        INTEGER, INTENT(OUT) :: flag
         REAL, INTENT(IN) :: dist(xx,yy,9),SUBDT
-        REAL, INTENT(IN), DIMENSION(XX,YY) :: NEXP2DRT
+        REAL, INTENT(IN), DIMENSION(XX,YY) :: NEXP2DRT, BEDROCKRT
 
 !!! Declare Local Variables
 
@@ -1312,6 +1312,7 @@
 !!! Initialize variables
 
         REAL :: nexp     ! local power law exponent
+        real :: bedht  ! bedrock layer height
         integer IXX0,JYY0,index,i,j
         real tmp_gsize
 
@@ -2446,7 +2447,8 @@
              rt_domain(did)%overland%properties%roughness, rt_domain(did)%overland%streams_and_lakes%lake_mask, &
              RT_DOMAIN(did)%LKSATRT, RT_DOMAIN(did)%OV_ROUGH2d, RT_DOMAIN(did)%SLDPTH, &
 	     RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, rt_domain(did)%ELRT, &
-             RT_DOMAIN(did)%iswater, RT_DOMAIN(did)%NEXP2D, RT_DOMAIN(did)%NEXP2DRT)
+             RT_DOMAIN(did)%iswater, RT_DOMAIN(did)%NEXP2D, RT_DOMAIN(did)%NEXP2DRT, &
+             RT_DOMAIN(did)%BEDROCK, RT_DOMAIN(did)%BEDROCKRT)
 
       end subroutine disaggregateDomain_drv
 
@@ -2456,7 +2458,7 @@
                LKSATFAC, CH_NETRT,SH2OWGT,SMCREFRT, INFXSUBRT,SMCMAXRT, &
                SMCWLTRT,SMCRT, OVROUGHRT, LAKE_MSKRT, LKSATRT, OV_ROUGH2d,  &
                SLDPTH, soiltypRT, soiltyp, elrt, iswater,                        &
-               NEXP2D, NEXP2DRT)
+               NEXP2D, NEXP2DRT, BEDROCK, BEDROCKRT)
 #ifdef MPP_LAND
         use module_mpp_land, only: left_id,down_id,right_id, &
               up_id,mpp_land_com_real, my_id, io_id, numprocs, &
@@ -2479,13 +2481,13 @@
         real,INTENT(OUT),DIMENSION(IXRT,JXRT,NSOIL)::SMCREFRT, SMCMAXRT, &
                SMCWLTRT,SMCRT
         real,INTENT(OUT),DIMENSION(IXRT,JXRT)::INFXSUBRT
-        real,INTENT(INOUT),DIMENSION(IXRT,JXRT)::OVROUGHRT, LKSATRT, NEXP2DRT
+        real,INTENT(INOUT),DIMENSION(IXRT,JXRT)::OVROUGHRT, LKSATRT, NEXP2DRT, BEDROCKRT
         integer,INTENT(INOUT), DIMENSION(IXRT,JXRT)  ::LAKE_MSKRT
                   
 
         real,INTENT(IN), DIMENSION(NSOIL)      :: SLDPTH
         REAL,dimension(ix,jx) ::    OV_ROUGH2d
-        REAL,INTENT(IN), dimension(ix,jx) ::    NEXP2D
+        REAL,INTENT(IN), dimension(ix,jx) ::    NEXP2D, BEDROCK
 
 
         integer :: i, j, AGGFACYRT, AGGFACXRT, IXXRT, JYYRT,KRT, KF
@@ -2676,6 +2678,7 @@
             END IF
 
     NEXP2DRT(IXXRT,JYYRT) = NEXP2D(i,j)
+    BEDROCKRT(IXXRT,JYYRT) = BEDROCK(i,j)
 
 !DJG 6.12.08 Map lateral hydraulic conductivity and apply distributed scaling
 ! ---        factor that will be read in from hires terrain file
@@ -2793,7 +2796,8 @@
                      rt_domain(did)%overland%control%infiltration_excess,RT_DOMAIN(did)%QSUBBDRYTRT, RT_DOMAIN(did)%QSUBBDRYRT,&
                      RT_DOMAIN(did)%QSUBRT ,nlst_rt(did)%rt_option, rt_domain(did)%overland%properties%distance_to_neighbor, &
                      RT_DOMAIN(did)%sub_resid,rt_domain(did)%overland%properties%max_water_surface_slope_index, &
-                     rt_domain(did)%overland%properties%water_surface_slope, RT_DOMAIN(did)%NEXP2DRT)
+                     rt_domain(did)%overland%properties%water_surface_slope, &
+                     RT_DOMAIN(did)%NEXP2DRT, RT_DOMAIN(did)%BEDROCKRT)
              endif
 
          end subroutine SubsurfaceRouting_drv
@@ -2804,7 +2808,7 @@
                   DT,ZWATTABLRT,SOXRT,SOYRT,LKSATRT,&
                   SOLDEPRT,INFXSUBRT,QSUBBDRYTRT, QSUBBDRYRT,&
                   QSUBRT ,rt_option, dist,sub_resid,SO8RT_D, SO8RT, &
-                  NEXP2DRT)
+                  NEXP2DRT, BEDROCKRT)
 #ifdef MPP_LAND
         use module_mpp_land, only:  mpp_land_com_real, mpp_land_com_integer
 #endif
@@ -2817,7 +2821,7 @@
          real,INTENT(INOUT) :: QSUBBDRYTRT
          REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBBDRYRT, QSUBRT
          REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT,NSOIL) :: SMCRT, SMCWLTRT, SMCMAXRT,SMCREFRT
-         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)   :: NEXP2DRT
+         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)   :: NEXP2DRT, BEDROCKRT
 
          INTEGER :: SO8RT_D(IXRT,JXRT,3)
          REAL :: SO8RT(IXRT,JXRT,8)
