@@ -1353,9 +1353,17 @@
 
           tmp_gsize = 1.0/dist(i,j,index)
 
-       
-          dzdx= (z(i,j) - z(IXX0,JYY0) )* tmp_gsize
-          beta=so8RT(i,j,index) + dzdx 
+          !AD: z is the depth from the surface to the top of the saturated layer (e.g., 0=full saturation, 2=no saturation).
+          !If beta is total head gradient, it should be ((elev - z) - (elev_neigh - z_neigh))/dist, which means beta should
+          !be so8RT MINUS dzdx.
+          dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
+          beta = so8RT(i,j,index) - dzdx
+
+          if (i.eq.66 .and. j.eq.204) then
+             print *, "ADCHECK_SUB: IXX0 JYY0 index", IXX0, JYY0, index
+             print *, "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
+             print *, "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+          endif
 
           if(beta .lt. 1E-20 ) then   !if-then for direction...
             call GETSUB8(IXX0,JYY0,I,J,Z,so8rt,dist(i,j,:),beta,XX,YY)
@@ -1371,8 +1379,8 @@
 ! do the rest if the lowest grid can be found.
 
               nexp = NEXP2DRT(i,j)
-              hh=(1-(z(i,j)/soldep(i,j)))**nexp
-              ksat=latksat(i,j)
+              hh = (1-(z(i,j)/soldep(i,j)))**nexp
+              ksat = latksat(i,j)
 
               if (hh .lt. 0.) then
                  print *, "hsub<0 at gridcell...", i,j,hh,z(i+1,j),z(i,j), &
@@ -1469,64 +1477,64 @@
 !DJG------------------------------------------------------------
 
 
-      SUBROUTINE GETSUB8(IXX0,JYY0,I,J,Z,sox,tmp_gsize,max,XX,YY)
+      SUBROUTINE GETSUB8(IXX0,JYY0,I,J,Z,sox,dist,max_slp,XX,YY)
           implicit none
           INTEGER:: IXX0,JYY0,IXX8,JYY8, XX, YY
           INTEGER, INTENT(IN) :: I,J
 
-          REAL,INTENT(IN) :: Z(XX,YY),sox(XX,YY,8),tmp_gsize(9)
-          REAL  max
-          max = -1
+          REAL,INTENT(IN) :: Z(XX,YY),sox(XX,YY,8),dist(9)
+          REAL  max_slp
+          max_slp = -1
 
           IXX8 = I
           JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,1),IXX0,JYY0,max,tmp_gsize(1),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,1),IXX0,JYY0,max_slp,dist(1),XX,YY)
 
           IXX8 = I+1
           JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,2),IXX0,JYY0,max,tmp_gsize(2),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,2),IXX0,JYY0,max_slp,dist(2),XX,YY)
 
           IXX8 = I+1
           JYY8 = J
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,3),IXX0,JYY0,max,tmp_gsize(3),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,3),IXX0,JYY0,max_slp,dist(3),XX,YY)
 
           IXX8 = I+1
           JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,4),IXX0,JYY0,max,tmp_gsize(4),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,4),IXX0,JYY0,max_slp,dist(4),XX,YY)
 
           IXX8 = I
           JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,5),IXX0,JYY0,max,tmp_gsize(5),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,5),IXX0,JYY0,max_slp,dist(5),XX,YY)
 
           IXX8 = I-1
           JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,6),IXX0,JYY0,max,tmp_gsize(6),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,6),IXX0,JYY0,max_slp,dist(6),XX,YY)
 
           IXX8 = I-1
           JYY8 = J
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,7),IXX0,JYY0,max,tmp_gsize(7),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,7),IXX0,JYY0,max_slp,dist(7),XX,YY)
 
           IXX8 = I-1
           JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,8),IXX0,JYY0,max,tmp_gsize(8),XX,YY)
+          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,8),IXX0,JYY0,max_slp,dist(8),XX,YY)
         RETURN
         END SUBROUTINE GETSUB8
 
-        SUBROUTINE GETSUB8DIR(IXX8,JYY8,I,J,Z,sox,IXX0,JYY0,max,tmp_gsize,XX,YY)
+        SUBROUTINE GETSUB8DIR(IXX8,JYY8,I,J,Z,sox,IXX0,JYY0,max_slp,dist,XX,YY)
         implicit none
         integer,INTENT(INOUT) ::IXX0,JYY0
         INTEGER, INTENT(IN) :: I,J,IXX8,JYY8,XX,YY
         REAL,INTENT(IN) :: Z(XX,YY),sox(XX,YY)
-        REAL, INTENT(INOUT) ::max
-        real, INTENT(IN) :: tmp_gsize
+        REAL, INTENT(INOUT) ::max_slp
+        real, INTENT(IN) :: dist
         real :: beta , dzdx
 
-          dzdx= (z(i,j) - z(IXX0,JYY0) )/tmp_gsize
-          beta=sox(i,j) + dzdx 
-          if(max < beta ) then
+          dzdx = ( z(i,j) - z(IXX0,JYY0) )/dist
+          beta = sox(i,j) - dzdx 
+          if(max_slp < beta ) then
                    IXX0 = IXX8
                    JYY0 = JYY8
-                   max = beta 
+                   max_slp = beta 
           end if
 
         END SUBROUTINE GETSUB8DIR
@@ -2450,7 +2458,8 @@
              RT_DOMAIN(did)%LKSATRT, RT_DOMAIN(did)%OV_ROUGH2d, RT_DOMAIN(did)%SLDPTH, &
 	     RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, rt_domain(did)%ELRT, &
              RT_DOMAIN(did)%iswater, RT_DOMAIN(did)%NEXP2D, RT_DOMAIN(did)%NEXP2DRT, &
-             RT_DOMAIN(did)%BEDROCK, RT_DOMAIN(did)%BEDROCKRT)
+             RT_DOMAIN(did)%BEDROCK, RT_DOMAIN(did)%BEDROCKRT,  &
+             RT_DOMAIN(did)%ZSOIL, RT_DOMAIN(did)%SOLDEPRT)
 
       end subroutine disaggregateDomain_drv
 
@@ -2460,7 +2469,7 @@
                LKSATFAC, CH_NETRT,SH2OWGT,SMCREFRT, INFXSUBRT,SMCMAXRT, &
                SMCWLTRT,SMCRT, OVROUGHRT, LAKE_MSKRT, LKSATRT, OV_ROUGH2d,  &
                SLDPTH, soiltypRT, soiltyp, elrt, iswater,                        &
-               NEXP2D, NEXP2DRT, BEDROCK, BEDROCKRT)
+               NEXP2D, NEXP2DRT, BEDROCK, BEDROCKRT, ZSOIL, SOLDEPRT)
 #ifdef MPP_LAND
         use module_mpp_land, only: left_id,down_id,right_id, &
               up_id,mpp_land_com_real, my_id, io_id, numprocs, &
@@ -2486,13 +2495,12 @@
         REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: OVROUGHRT, LKSATRT, NEXP2DRT
         INTEGER, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: BEDROCKRT
         integer, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
-                  
+        REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: SOLDEPRT
 
-        real,INTENT(IN), DIMENSION(NSOIL)      :: SLDPTH
+        real,INTENT(IN), DIMENSION(NSOIL)      :: SLDPTH, ZSOIL
         REAL,dimension(ix,jx) ::    OV_ROUGH2d
         REAL, INTENT(IN), DIMENSION(ix,jx) ::    NEXP2D
         INTEGER, INTENT(IN), DIMENSION(ix,jx) :: BEDROCK
-
 
         integer :: i, j, AGGFACYRT, AGGFACXRT, IXXRT, JYYRT,KRT, KF
         REAL  ::  LSMVOL,SMCEXCS, WATHOLDCAP
@@ -2683,6 +2691,11 @@
 
     NEXP2DRT(IXXRT,JYYRT) = NEXP2D(i,j)
     BEDROCKRT(IXXRT,JYYRT) = BEDROCK(i,j)
+    ! Update soil depth var based on bedrock layer input var
+    do KRT = 1, NSOIL
+       where(BEDROCKRT .eq. KRT) SOLDEPRT = -1.0*ZSOIL(KRT)
+    enddo
+
 
 !DJG 6.12.08 Map lateral hydraulic conductivity and apply distributed scaling
 ! ---        factor that will be read in from hires terrain file

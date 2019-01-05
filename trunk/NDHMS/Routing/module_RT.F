@@ -152,7 +152,7 @@ CONTAINS
      allocate( rt_domain(did)%NEXP2DRT   (IXRT,JXRT) )
      rt_domain(did)%NEXP2DRT = 1.0
      allocate( rt_domain(did)%BEDROCKRT   (IXRT,JXRT) )
-     rt_domain(did)%BEDROCKRT = -9999
+     rt_domain(did)%BEDROCKRT = nsoil
 
      !allocate( rt_domain(did)%overland%control%surface_water_head_routing(IXRT,JXRT) )
      !rt_domain(did)%overland%control%surface_water_head_routing= 0.0                
@@ -254,7 +254,7 @@ CONTAINS
   allocate( rt_domain(did)%NEXP2D   (IX,JX) )
             rt_domain(did)%NEXP2D = 1.0
   allocate( rt_domain(did)%BEDROCK   (IX,JX) )
-            rt_domain(did)%BEDROCK = -9999
+            rt_domain(did)%BEDROCK = nsoil
 
   allocate( rt_domain(did)%SOILTYP   (IX,JX) )
 
@@ -1051,7 +1051,12 @@ if(nlst_rt(did)%channel_only       .eq. 0 .and. &
             end if
          end if
          
-         
+          if (i.eq.66 .and. j.eq.204) then
+             print *, "ADCHECK_SUB: ELRT ELRT_N ", rt_domain(did)%ELRT(i,j), rt_domain(did)%ELRT(i,j+1)
+             print *, "     ELRT_NE ELRT_E ELRT_SE", rt_domain(did)%ELRT(i+1,j+1), rt_domain(did)%ELRT(i+1,j), rt_domain(did)%ELRT(i+1,j-1)
+             print *, "     ELRT_S ELRT_SW ELRT_W", rt_domain(did)%ELRT(i,j-1), rt_domain(did)%ELRT(i-1,j-1), rt_domain(did)%ELRT(i-1,j)
+          endif
+ 
       end do
    end do
    

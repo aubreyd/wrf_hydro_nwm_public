@@ -1760,7 +1760,6 @@ end subroutine HYDRO_ini
        
        if(allocated(soltyp)) deallocate(soltyp)
 
-
       end subroutine lsm_input
 
 
