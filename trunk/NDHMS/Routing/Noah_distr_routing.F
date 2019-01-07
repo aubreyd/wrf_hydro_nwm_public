@@ -1337,6 +1337,7 @@
 
 
         if(i.ge.2.AND.i.le.XX-1.AND.j.ge.2.AND.j.le.YY-1) then !if grdcl chk
+
 ! check for boundary grid point?
           IXX0 = SO8RT_D(i,j,1)
           JYY0 = SO8RT_D(i,j,2)
@@ -1344,7 +1345,7 @@
           index = SO8RT_D(i,j,3)
 
             if(dist(i,j,index) .le. 0) then
-               write(6,*) "FATAL ERROR: dist(i,j,index) is <= zero "   
+               write(6,*) "FATAL ERROR: dist(i,j,index) is <= zero "
                call hydro_stop("In ROUTE_SUBSURFACE1() - dist(i,j,index) is <= zero ")
             endif
             if(soldep(i,j) .eq. 0) then
@@ -1355,7 +1356,7 @@
 
           !AD: z is the depth from the surface to the top of the saturated layer (e.g., 0=full saturation, 2=no saturation).
           !If beta is total head gradient, it should be ((elev - z) - (elev_neigh - z_neigh))/dist, which means beta should
-          !be so8RT MINUS dzdx.
+          !be so8RT MINUS dzdx. This has been corrected in GETSUB8 as well.
           dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
           beta = so8RT(i,j,index) - dzdx
 
@@ -1366,7 +1367,8 @@
           endif
 
           if(beta .lt. 1E-20 ) then   !if-then for direction...
-            call GETSUB8(IXX0,JYY0,I,J,Z,so8rt,dist(i,j,:),beta,XX,YY)
+            call GETSUB8(I, J, XX, YY, Z, so8rt, dist(i,j,:), &                         
+                   IXX0, JYY0, index, beta)     
           end if
           if(beta .gt. 0) then            !if-then for flux calc 
               if(beta .lt. 1E-20 ) then
@@ -1477,67 +1479,84 @@
 !DJG------------------------------------------------------------
 
 
-      SUBROUTINE GETSUB8(IXX0,JYY0,I,J,Z,sox,dist,max_slp,XX,YY)
-          implicit none
-          INTEGER:: IXX0,JYY0,IXX8,JYY8, XX, YY
-          INTEGER, INTENT(IN) :: I,J
+SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, & 
+                   maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
+   implicit none
+   integer, intent(in)   :: I, J ! i, j indices for cell of interest 
+   integer, intent(in)    :: XX, YY ! rt domain dimensions
+   real, intent(in)       :: wattbl(XX, YY) ! water table depth domain array (m)
+   real, intent(in)       :: elevslpNeighbors(XX, YY, 8)
+                             ! ground elev slope domain array for all 8 neighbors (m/m)
+   real, intent(in)       :: distNeighbors(9)
+                             ! lateral distance array for all 8 neighbors of I,J cell (m)
+   integer, intent(inout) :: maxslpNeighI, maxslpNeighJ ! i, j for max elev+head slope neighbor
+   integer, intent(inout) :: maxslpNeighIndx
+                             ! neighbor cell direction index for max elev+head slope neighbor
+   real, intent(inout)    :: maxslpNeighSlp ! elev+head slope for max slope neighbor (m/m)
 
-          REAL,INTENT(IN) :: Z(XX,YY),sox(XX,YY,8),dist(9)
-          REAL  max_slp
-          max_slp = -1
+   ! Local variables
+   integer                :: neighIndx ! local neighbor direction index (1-8)
+   integer                :: neighI(8), neighJ(8) ! arrays of neighbor i, j indices
 
-          IXX8 = I
-          JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,1),IXX0,JYY0,max_slp,dist(1),XX,YY)
+   ! Initialize maxslp vars to negative in case max cannot be found
+   maxslpNeighI = -1
+   maxslpNeighJ = -1
+   maxslpNeighIndx = -1
+   maxslpNeighSlp = -1
 
-          IXX8 = I+1
-          JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,2),IXX0,JYY0,max_slp,dist(2),XX,YY)
+   ! Setup i, j arrays for neighbors, starting north and rotating clockwise
+   neighI = (/ I,   I+1, I+1, I+1, I,   I-1, I-1, I-1 /) 
+   neighJ = (/ J+1, J+1, J,   J-1, J-1, J-1, J,   J+1 /)
 
-          IXX8 = I+1
-          JYY8 = J
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,3),IXX0,JYY0,max_slp,dist(3),XX,YY)
+   ! Loop through all neighbors to update max elev+head slope neighbor
+   do neighIndx = 1, 8
+      call GETSUB8DIR(I, J, wattbl(I, J), & 
+                      neighI(neighIndx), neighJ(neighIndx), neighIndx, wattbl(neighI, neighJ), &
+                      elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), & 
+                      maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
+   enddo
+   RETURN
+END SUBROUTINE GETSUB8
 
-          IXX8 = I+1
-          JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,4),IXX0,JYY0,max_slp,dist(4),XX,YY)
+SUBROUTINE GETSUB8DIR(I, J, wattblSelf, &
+                      neighI, neighJ, neighIndx, wattblNeighbor, &
+                      elevslpNeighbor, distNeighbor, &
+                      maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
+   implicit none
+   integer, intent(in)    :: I, J ! i, j indices for cell of interest
+   real, intent(in)       :: wattblSelf ! water table depth for cell of interest (m)
+   integer, intent(in)    :: neighI, neighJ ! neighbor cell i, j indices
+   integer, intent(in)    :: neighIndx ! neighbor cell direction index (1-8)
+   real, intent(in)       :: wattblNeighbor ! water table depth for speified neighbor index (m)
+   real, intent(in)       :: elevslpNeighbor
+                             ! ground elev slope domain array for speified neighbor index (m/m)
+   real, intent(in)       :: distNeighbor
+                             ! lateral distance array for specified neighbor index (m)
+   integer, intent(inout) :: maxslpNeighI, maxslpNeighJ ! i, j for max elev+head slope neighbor
+   integer, intent(inout) :: maxslpNeighIndx
+                             ! neighbor cell direction index for max elev+head slope neighbor
+   real, intent(inout)    :: maxslpNeighSlp ! elev+head slope for max slope neighbor (m/m)
 
-          IXX8 = I
-          JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,5),IXX0,JYY0,max_slp,dist(5),XX,YY)
+   ! Local variables
+   real                   :: dzdx ! subsurface head slope (m/m)
+   real                   :: beta ! total elevation+head slope (m/m)
 
-          IXX8 = I-1
-          JYY8 = J-1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,6),IXX0,JYY0,max_slp,dist(6),XX,YY)
+   ! Calculate total head slope
+   ! NOTE: wattbl is depth of water table from surface (e.g., 0m if saturated column, 
+   ! 2m if no water table present). So total head slope should be:
+   !    beta = ( (elev - wattbl) - (elev_neigh - wattbl_neigh) ) / distance
+   !         = elevslpNeighbor - dzdx
+   dzdx = ( wattblSelf - wattblNeighbor ) / distNeighbor
+   beta = elevslpNeighbor - dzdx
+   ! Check if this is max and update tracking variables
+   if ( maxslpNeighSlp < beta ) then
+      maxslpNeighI = neighI
+      maxslpNeighJ = neighJ
+      maxslpNeighSlp = beta
+      maxslpNeighIndx = neighIndx 
+   end if
+END SUBROUTINE GETSUB8DIR
 
-          IXX8 = I-1
-          JYY8 = J
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,7),IXX0,JYY0,max_slp,dist(7),XX,YY)
-
-          IXX8 = I-1
-          JYY8 = J+1
-          call GETSUB8DIR(IXX8,JYY8,I,J,Z,sox(:,:,8),IXX0,JYY0,max_slp,dist(8),XX,YY)
-        RETURN
-        END SUBROUTINE GETSUB8
-
-        SUBROUTINE GETSUB8DIR(IXX8,JYY8,I,J,Z,sox,IXX0,JYY0,max_slp,dist,XX,YY)
-        implicit none
-        integer,INTENT(INOUT) ::IXX0,JYY0
-        INTEGER, INTENT(IN) :: I,J,IXX8,JYY8,XX,YY
-        REAL,INTENT(IN) :: Z(XX,YY),sox(XX,YY)
-        REAL, INTENT(INOUT) ::max_slp
-        real, INTENT(IN) :: dist
-        real :: beta , dzdx
-
-          dzdx = ( z(i,j) - z(IXX0,JYY0) )/dist
-          beta = sox(i,j) - dzdx 
-          if(max_slp < beta ) then
-                   IXX0 = IXX8
-                   JYY0 = JYY8
-                   max_slp = beta 
-          end if
-
-        END SUBROUTINE GETSUB8DIR
 !DJG ----------------------------------------------------------------------
 
 !DJG     SUBROUTINE ROUTE_OVERLAND2
