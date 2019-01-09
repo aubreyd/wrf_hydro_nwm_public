@@ -41,7 +41,7 @@ module overland_routing_properties
       ! minimum amount of surface water required before water is routed as overland flow (mm)
       real, allocatable, dimension(:,:) :: retention_depth     
       
-      ! replaced with water_surface_slope
+      ! replaced with surface_slope
       !real, allocatable, dimension(:,:,:) :: so8rt
       ! water surface slope in 8 ordinal directions (m/m)                                                                  !
       ! TODO verify this correct, check with Wei? 
@@ -56,12 +56,12 @@ module overland_routing_properties
       !                      |  
       !                      5
       !
-      real, allocatable, dimension(:,:,:) :: water_surface_slope 
+      real, allocatable, dimension(:,:,:) :: surface_slope 
       
-      ! replaced with max_water_surface_slope_index
+      ! replaced with max_surface_slope_index
       !integer, allocatable, dimension(:,:,:) :: so8rt_d
-      ! index of neighboring cell in the direction of steepest water surface slope, used with water_surface_slope
-      integer, allocatable, dimension(:,:,:) :: max_water_surface_slope_index                                   
+      ! index of neighboring cell in the direction of steepest water surface slope, used with surface_slope
+      integer, allocatable, dimension(:,:,:) :: max_surface_slope_index                                   
 
       ! replaced with distance_to_neighbor
       !real, allocatable, dimension(:,:,:) :: dist
@@ -115,17 +115,17 @@ subroutine overland_properties_init(this,ix,jx)
     end if
 
     ! allocate 8 directional slope
-    if ( .not. allocated(this%water_surface_slope) ) then
-        allocate( this%water_surface_slope(ix,jx,8) )
-        this%water_surface_slope = -999
+    if ( .not. allocated(this%surface_slope) ) then
+        allocate( this%surface_slope(ix,jx,8) )
+        this%surface_slope = -999
     else
         allocation_error = .true.
     end if
 
     ! allocate slope index
-    if ( .not. allocated(this%max_water_surface_slope_index) ) then
-        allocate( this%max_water_surface_slope_index(ix,jx,3) )
-        this%max_water_surface_slope_index = 0.0
+    if ( .not. allocated(this%max_surface_slope_index) ) then
+        allocate( this%max_surface_slope_index(ix,jx,3) )
+        this%max_surface_slope_index = 0.0
     else
         allocation_error = .true.
     end if
@@ -183,15 +183,15 @@ subroutine overland_properties_destory(this)
     end if
 
     ! allocate water surface slope
-    if ( allocated(this%water_surface_slope) ) then
-        deallocate( this%water_surface_slope )
+    if ( allocated(this%surface_slope) ) then
+        deallocate( this%surface_slope )
     else
         allocation_error = .true.
     end if
 
     ! allocate slope index
-    if ( allocated(this%max_water_surface_slope_index) ) then
-        deallocate( this%max_water_surface_slope_index )
+    if ( allocated(this%max_surface_slope_index) ) then
+        deallocate( this%max_surface_slope_index )
     else
         allocation_error = .true.
     end if

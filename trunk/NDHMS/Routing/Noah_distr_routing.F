@@ -964,8 +964,8 @@
                   IXRT, JXRT, &
                   ovrt_data%control%boundary_flux, &
                   ovrt_data%control%boundary_flux_total,    & 
-                  ovrt_data%properties%water_surface_slope, &
-                  ovrt_data%properties%max_water_surface_slope_index, &
+                  ovrt_data%properties%surface_slope, &
+                  ovrt_data%properties%max_surface_slope_index, &
                   q_sfcflx_x, q_sfcflx_y)
             else
               CALL ROUTE_OVERLAND2(DTRT_TER, &
@@ -2835,8 +2835,8 @@ END SUBROUTINE GETSUB8DIR
                      rt_domain(did)%overland%properties%surface_slope_y,RT_DOMAIN(did)%LKSATRT, RT_DOMAIN(did)%SOLDEPRT, &
                      rt_domain(did)%overland%control%infiltration_excess,RT_DOMAIN(did)%QSUBBDRYTRT, RT_DOMAIN(did)%QSUBBDRYRT,&
                      RT_DOMAIN(did)%QSUBRT ,nlst_rt(did)%rt_option, rt_domain(did)%overland%properties%distance_to_neighbor, &
-                     RT_DOMAIN(did)%sub_resid,rt_domain(did)%overland%properties%max_water_surface_slope_index, &
-                     rt_domain(did)%overland%properties%water_surface_slope, &
+                     RT_DOMAIN(did)%sub_resid,rt_domain(did)%overland%properties%max_surface_slope_index, &
+                     rt_domain(did)%overland%properties%surface_slope, &
                      RT_DOMAIN(did)%NEXP2DRT, RT_DOMAIN(did)%BEDROCKRT)
              endif
 
@@ -2925,7 +2925,7 @@ END SUBROUTINE GETSUB8DIR
                  !         rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake,rt_domain(did)%overland%control%boundary_flux, &
                  !         rt_domain(did)%overland%streams_and_lakes%accumulated_surface_water_to_channel,rt_domain(did)%overland%control%boundary_flux_total, rt_domain(did)%overland%streams_and_lakes%accumulated_surface_water_to_lake,&
                  !         rt_domain(did)%q_sfcflx_x,rt_domain(did)%q_sfcflx_y, &
-                 !         rt_domain(did)%overland%properties%distance_to_neighbor, rt_domain(did)%overland%properties%water_surface_slope, rt_domain(did)%overland%properties%max_water_surface_slope_index , &
+                 !         rt_domain(did)%overland%properties%distance_to_neighbor, rt_domain(did)%overland%properties%surface_slope, rt_domain(did)%overland%properties%max_surface_slope_index , &
                  !         rt_domain(did)%overland%mass_balance%post_soil_moisture_content,rt_domain(did)%overland%mass_balance%pre_infiltration_excess,rt_domain(did)%overland%mass_balance%post_infiltration_excess, &
                  !         rt_domain(did)%overland%mass_balance%pre_soil_moisture_content,rt_domain(did)%overland%mass_balance%accumulated_change_in_soil_moisture )
                  call OverlandRouting( &
