@@ -1355,8 +1355,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
             ! which means beta should be so8RT MINUS dzdx.
             ! This has been corrected in GETSUB8 as well.
             dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
-            !ADTEST beta = so8RT(i,j,index) - dzdx
-            beta = so8RT(i,j,index) + dzdx
+            beta = so8RT(i,j,index) - dzdx
 
             !if (i.eq.66 .and. j.eq.204) then
             if (i.eq.3 .and. j.eq.7) then
@@ -1506,8 +1505,7 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, &
    do neighIndx = 1, 8
       call GETSUB8DIR(I, J, wattbl(I, J), & 
                       neighI(neighIndx), neighJ(neighIndx), neighIndx, &
-                      !ADTEST wattbl(neighI(neighIndx), neighJ(neighIndx)), &
-                      wattbl(maxslpNeighI, maxslpNeighJ), & 
+                      wattbl(neighI(neighIndx), neighJ(neighIndx)), &
                       elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), & 
                       maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
       if (i.eq.3 .and. j.eq.7) then
@@ -1550,14 +1548,13 @@ SUBROUTINE GETSUB8DIR(I, J, wattblSelf, &
    !    beta = ( (elev - wattbl) - (elev_neigh - wattbl_neigh) ) / distance
    !         = elevslpNeighbor - dzdx
    dzdx = ( wattblSelf - wattblNeighbor ) / distNeighbor
-   !ADTEST beta = elevslpNeighbor - dzdx
-   beta = elevslpNeighbor + dzdx
+   beta = elevslpNeighbor - dzdx
    ! Check if this is max and update tracking variables
    if ( maxslpNeighSlp < beta ) then
       maxslpNeighI = neighI
       maxslpNeighJ = neighJ
       maxslpNeighSlp = beta
-      !ADTEST maxslpNeighIndx = neighIndx 
+      maxslpNeighIndx = neighIndx 
    end if
 END SUBROUTINE GETSUB8DIR
 
