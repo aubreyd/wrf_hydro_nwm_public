@@ -1051,13 +1051,12 @@ if(nlst_rt(did)%channel_only       .eq. 0 .and. &
             end if
          end if
 
-#ifdef HYDRO_D 
-          if (i.eq.66 .and. j.eq.204) then
-             print *, "ADCHECK_SUB: ELRT ELRT_N ", rt_domain(did)%ELRT(i,j), rt_domain(did)%ELRT(i,j+1)
-             print *, "     ELRT_NE ELRT_E ELRT_SE", rt_domain(did)%ELRT(i+1,j+1), rt_domain(did)%ELRT(i+1,j), rt_domain(did)%ELRT(i+1,j-1)
-             print *, "     ELRT_S ELRT_SW ELRT_W", rt_domain(did)%ELRT(i,j-1), rt_domain(did)%ELRT(i-1,j-1), rt_domain(did)%ELRT(i-1,j)
-          endif
-#endif
+         !if (i.eq.66 .and. j.eq.204) then
+         if (i.eq.3 .and. j.eq.7) then
+            print *,  "ADCHECK_SUB: ELRT ELRT_N ", rt_domain(did)%ELRT(i,j), rt_domain(did)%ELRT(i,j+1)
+            print *,  "     ELRT_NE ELRT_E ELRT_SE", rt_domain(did)%ELRT(i+1,j+1), rt_domain(did)%ELRT(i+1,j), rt_domain(did)%ELRT(i+1,j-1)
+            print *,  "     ELRT_S ELRT_SW ELRT_W", rt_domain(did)%ELRT(i,j-1), rt_domain(did)%ELRT(i-1,j-1), rt_domain(did)%ELRT(i-1,j)
+         endif
  
       end do
    end do

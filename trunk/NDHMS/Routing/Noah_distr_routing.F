@@ -1357,18 +1357,24 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
             dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
             beta = so8RT(i,j,index) - dzdx
 
-#ifdef HYDRO_D
-            if (i.eq.66 .and. j.eq.204) then
-               print *, "ADCHECK_SUB: IXX0 JYY0 index", IXX0, JYY0, index
-               print *, "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
-               print *, "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+            !if (i.eq.66 .and. j.eq.204) then
+            if (i.eq.3 .and. j.eq.7) then
+               print *,  "ADCHECK_SUB: IXX0 JYY0 index", IXX0, JYY0, index
+               print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
+               print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
             endif
-#endif
 
             if (beta .lt. 1E-20 ) then   !if-then for direction...
                call GETSUB8(i, j, XX, YY, Z, so8rt, dist(i,j,:), & 
                             IXX0, JYY0, index, beta)
             endif
+
+            if (i.eq.3 .and. j.eq.7) then
+               print *,  "ADCHECK_AFTER_GETSUB8: IXX0 JYY0 index", IXX0, JYY0, index
+               print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
+               print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+            endif
+   
             if (beta .gt. 0) then            !if-then for flux calc 
                if (beta .lt. 1E-20 ) then
 #ifdef HYDRO_D
@@ -1501,9 +1507,17 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, &
    ! Loop through all neighbors to update max elev+head slope neighbor
    do neighIndx = 1, 8
       call GETSUB8DIR(I, J, wattbl(I, J), & 
-                      neighI(neighIndx), neighJ(neighIndx), neighIndx, wattbl(neighI, neighJ), &
+                      neighI(neighIndx), neighJ(neighIndx), neighIndx, &
+                      wattbl(neighI(neighIndx), neighJ(neighIndx)), &
                       elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), & 
                       maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
+      if (i.eq.3 .and. j.eq.7) then
+         print *,  "ADCHECK_IN_GETSUB8: neighIndx, wattblSelf", neighIndx,  wattbl(I, J)
+         print *,  "     neighI neighJ neighIndx", neighI(neighIndx), neighJ(neighIndx), neighIndx
+         print *,  "     wattblNeigh", wattbl(neighI(neighIndx), neighJ(neighIndx))
+         print *,  "     elevSlp dist", elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx)
+         print *,  "     maxI maxJ maxIndx maxSlp", maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp
+      endif
    enddo
    RETURN
 END SUBROUTINE GETSUB8
