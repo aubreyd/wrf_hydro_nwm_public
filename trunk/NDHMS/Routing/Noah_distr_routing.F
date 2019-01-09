@@ -1355,7 +1355,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
             ! which means beta should be so8RT MINUS dzdx.
             ! This has been corrected in GETSUB8 as well.
             dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
-            beta = so8RT(i,j,index) - dzdx
+            !ADTEST beta = so8RT(i,j,index) - dzdx
+            beta = so8RT(i,j,index) + dzdx
 
             !if (i.eq.66 .and. j.eq.204) then
             if (i.eq.3 .and. j.eq.7) then
@@ -1495,9 +1496,6 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, &
    integer                :: neighI(8), neighJ(8) ! arrays of neighbor i, j indices
 
    ! Initialize maxslp vars to negative in case max cannot be found
-   maxslpNeighI = -1
-   maxslpNeighJ = -1
-   maxslpNeighIndx = -1
    maxslpNeighSlp = -1
 
    ! Setup i, j arrays for neighbors, starting north and rotating clockwise
@@ -1508,7 +1506,8 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, &
    do neighIndx = 1, 8
       call GETSUB8DIR(I, J, wattbl(I, J), & 
                       neighI(neighIndx), neighJ(neighIndx), neighIndx, &
-                      wattbl(neighI(neighIndx), neighJ(neighIndx)), &
+                      !ADTEST wattbl(neighI(neighIndx), neighJ(neighIndx)), &
+                      wattbl(maxslpNeighI, maxslpNeighJ), & 
                       elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), & 
                       maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
       if (i.eq.3 .and. j.eq.7) then
@@ -1551,13 +1550,14 @@ SUBROUTINE GETSUB8DIR(I, J, wattblSelf, &
    !    beta = ( (elev - wattbl) - (elev_neigh - wattbl_neigh) ) / distance
    !         = elevslpNeighbor - dzdx
    dzdx = ( wattblSelf - wattblNeighbor ) / distNeighbor
-   beta = elevslpNeighbor - dzdx
+   !ADTEST beta = elevslpNeighbor - dzdx
+   beta = elevslpNeighbor + dzdx
    ! Check if this is max and update tracking variables
    if ( maxslpNeighSlp < beta ) then
       maxslpNeighI = neighI
       maxslpNeighJ = neighJ
       maxslpNeighSlp = beta
-      maxslpNeighIndx = neighIndx 
+      !ADTEST maxslpNeighIndx = neighIndx 
    end if
 END SUBROUTINE GETSUB8DIR
 
