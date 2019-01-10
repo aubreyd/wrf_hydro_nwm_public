@@ -276,8 +276,8 @@
 ! allow users to still have option to use 2d overland (both are controlled by same
 ! rt_option flag). Remove this hard-coded option when rt_option=2 is fixed for subsurface.
 !     if(rt_option .eq. 1) then
-        CALL ROUTE_SUBSURFACE1(dist, ZWATTABLRT, SOXRT, SOYRT, &
-               LATKSATRT, SOLDEPRT, IXRT, JXRT, SO8RT, SO8RT_D, &
+        CALL ROUTE_SUBSURFACE1(dist, ZWATTABLRT, LATKSATRT, SOLDEPRT, &
+               IXRT, JXRT, SO8RT, SO8RT_D, &
                CWATAVAIL, SUBDT, NEXP2DRT, BEDROCKRT, &
                QSUBBDRYRT, QSUBBDRYTRT, QSUBRT)
 !     else 
@@ -1272,8 +1272,8 @@
 !  - Adapted from Wigmosta, 1994
 !  - Returns qsub=DQSUB which in turn becomes SUBFLO in head calc.
 !===================================================================================================
-SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
-                             latksat, soldep, XX, YY, SO8RT, SO8RT_D, &
+SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
+                             XX, YY, SO8RT, SO8RT_D, &
                              CWATAVAIL, SUBDT, NEXP2DRT, BEDROCKRT, &
                              QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
@@ -1288,8 +1288,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
    ! Declare passed arrays
    real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m)
    real, intent(in), dimension(XX,YY)      :: z ! depth to water table (m)
-   real, intent(in), dimension(XX,YY)      :: sox ! elevation slope in x direction (m/m)
-   real, intent(in), dimension(XX,YY)      :: soy ! elevation slope in y direction (m/m) !!NOT USED!!
    real, intent(in), dimension(XX,YY)      :: latksat
                                               ! lateral saturated hydraulic conductivity (m/s)
    real, intent(in), dimension(XX,YY)      :: soldep ! soil depth (m)
@@ -1308,7 +1306,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
    ! Declare local variables
    integer :: i, j ! indices for local loops
    integer :: IXX0, JYY0, index ! i, j, and direction index for steepest slope neighbor
-   real    :: tmp_gsize ! 1/distance for neighbor cell (1/m)
    real    :: dzdx, dzdy ! slope in x, y directions (m/m)
    real    :: beta ! total head slope (m/m)
    real    :: hh ! interim variable for subsurface solution per DHSVM (dimensionless)
@@ -1335,9 +1332,26 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
 
          if (i.ge.2.AND.i.le.XX-1.AND.j.ge.2.AND.j.le.YY-1) then !if grdcl chk
          ! check for boundary grid point?
-            IXX0 = SO8RT_D(i,j,1)
-            JYY0 = SO8RT_D(i,j,2)
-            index = SO8RT_D(i,j,3)
+
+            ! Set initial dummy values for steepest slope neighbor
+            IXX0 = -1
+            JYY0 = -1
+            index = -1
+            dzdx = -1.0
+            beta = -1.0
+
+            !if (i.eq.66 .and. j.eq.204) then
+            if (i.eq.3 .and. j.eq.7) then
+               print *,  "ADCHECK_SUB_INI: IXX0 JYY0 index", IXX0, JYY0, index
+               print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
+               print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+            endif
+
+            ! ADCHANGE: Always call routine to check for steepest elev+head slope
+            ! Updates IXX0, JYY0, index, and beta for steepest slope neighbor.
+            ! Note that beta will be -1 if steepest slope cannot be found.
+            call GETSUB8(i, j, XX, YY, Z, so8rt, dist(i,j,:), &
+                         IXX0, JYY0, index, beta)
 
             if (dist(i,j,index) .le. 0) then
                 write(6,*) "FATAL ERROR: dist(i,j,index) is <= zero "
@@ -1345,28 +1359,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, sox, soy, &
             endif
             if (soldep(i,j) .eq. 0) then
                 call hydro_stop("In ROUTE_SUBSURFACE1() - soldep is = zero")
-            endif
-
-            tmp_gsize = 1.0/dist(i,j,index)
-
-            ! AD_NOTE: z is the depth from the surface to the top of the saturated layer (e.g., 
-            ! 0=full saturation, 2=no saturation). If beta is total head gradient, it should be:
-            !      beta = ((elev - z) - (elev_neigh - z_neigh)) / dist
-            ! which means beta should be so8RT MINUS dzdx.
-            ! This has been corrected in GETSUB8 as well.
-            dzdx = ( z(i,j) - z(IXX0,JYY0) ) * tmp_gsize
-            beta = so8RT(i,j,index) - dzdx
-
-            !if (i.eq.66 .and. j.eq.204) then
-            if (i.eq.3 .and. j.eq.7) then
-               print *,  "ADCHECK_SUB: IXX0 JYY0 index", IXX0, JYY0, index
-               print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
-               print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
-            endif
-
-            if (beta .lt. 1E-20 ) then   !if-then for direction...
-               call GETSUB8(i, j, XX, YY, Z, so8rt, dist(i,j,:), & 
-                            IXX0, JYY0, index, beta)
             endif
 
             if (i.eq.3 .and. j.eq.7) then
