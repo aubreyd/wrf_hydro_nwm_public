@@ -481,7 +481,7 @@
 !DJG ------------------------------------------------------------------------
          SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                              SMCWLTRT,ZSOIL,SATLYRCHK,ZWATTABLRT,CWATAVAIL,&
-                             SLDPTH)
+                             SLDPTH, BEDROCKRT)
 
 	IMPLICIT NONE
 
@@ -497,6 +497,7 @@
 	REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: ZWATTABLRT
 	REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: CWATAVAIL
         INTEGER, INTENT(OUT), DIMENSION(IXRT,JXRT) :: SATLYRCHK
+        integer, intent(in), dimension(IXRT, JXRT) :: BEDROCKRT
        
 !DJG Local Variables
         INTEGER :: KK,i,j
@@ -513,7 +514,7 @@
           DO I=1,IXRT
 
 ! Loop through soil layers from bottom to top
-              DO KK=NSOIL,1,-1
+              DO KK=BEDROCKRT(i,j),1,-1
 
 ! Check for saturated layers
 ! Add additional logical check to ensure water is 'available' for routing,
@@ -523,7 +524,7 @@
                 IF ( (SMCRT(I,J,KK).GE.SMCREFRT(I,J,KK)).AND.(SMCREFRT(I,J,KK) &
                   .GT.SMCWLTRT(I,J,KK)) ) THEN
 ! Add additional check to ensure saturation from bottom up only...8/8/05
-                  IF((SATLYRCHK(I,J).EQ.KK+1) .OR. (KK.EQ.NSOIL) ) SATLYRCHK(I,J) = KK
+                  IF((SATLYRCHK(I,J).EQ.KK+1) .OR. (KK.EQ.BEDROCKRT(i,j)) ) SATLYRCHK(I,J) = KK
                 END IF
 
               END DO
@@ -552,13 +553,13 @@
 !DJG 2/16/2016 fix                  END DO
                 END IF
 !DJG 2/16/2016 fix accumulation of CWATAVAIL...
-                  DO KK=SATLYRCHK(I,J),NSOIL
+                  DO KK=SATLYRCHK(I,J),BEDROCKRT(i,j)
                     CWATAVAIL(I,J) = CWATAVAIL(I,J)+(SMCRT(I,J,KK)- &
                                      SMCREFRT(I,J,KK))*SLDPTH(KK)
                   END DO
               ELSE  ! no saturated layers...
-                ZWATTABLRT(I,J) = -ZSOIL(NSOIL)
-                SATLYRCHK(I,J) = NSOIL + 1
+                ZWATTABLRT(I,J) = -ZSOIL(BEDROCKRT(i,j))
+                SATLYRCHK(I,J) = BEDROCKRT(i,j) + 1
               END IF
 
 
@@ -1340,12 +1341,17 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
             dzdx = -1.0
             beta = -1.0
 
+#ifdef HYDRO_D
             !if (i.eq.66 .and. j.eq.204) then
-            if (i.eq.3 .and. j.eq.7) then
-               print *,  "ADCHECK_SUB_INI: IXX0 JYY0 index", IXX0, JYY0, index
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then
+               print *,  "ADCHECK_SUB_INI: I J", I, J
+               print *,  "     IXX0 JYY0 index", IXX0, JYY0, index
                print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
                print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+               print *,  "     soldep soldep_neigh", soldep(i,j), soldep(IXX0, JYY0)
+               print *,  "     qsub_tmp qsub_tmp_neigh", qsub_tmp(i,j), qsub_tmp(ixx0,jyy0)                                           
             endif
+#endif
 
             ! ADCHANGE: Always call routine to check for steepest elev+head slope
             ! Updates IXX0, JYY0, index, and beta for steepest slope neighbor.
@@ -1361,12 +1367,17 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                 call hydro_stop("In ROUTE_SUBSURFACE1() - soldep is = zero")
             endif
 
-            if (i.eq.3 .and. j.eq.7) then
-               print *,  "ADCHECK_AFTER_GETSUB8: IXX0 JYY0 index", IXX0, JYY0, index
+#ifdef HYDRO_D
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then 
+               print *,  "ADCHECK_AFTER_GETSUB8: I J", I, J
+               print *,  "     IXX0 JYY0 index", IXX0, JYY0, index
                print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
                print *,  "     so8RT dzdx beta", so8RT(i,j,index), dzdx, beta
+               print *,  "     soldep soldep_neigh", soldep(i,j), soldep(IXX0, JYY0)
+               print *,  "     qsub_tmp qsub_tmp_neigh", qsub_tmp(i,j), qsub_tmp(ixx0,jyy0)
             endif
-   
+#endif
+
             if (beta .gt. 0) then            !if-then for flux calc 
                if (beta .lt. 1E-20 ) then
 #ifdef HYDRO_D
@@ -1381,6 +1392,14 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                hh = ( 1 - ( z(i,j) / soldep(i,j) ) ) ** nexp
                ksat = latksat(i,j)
 
+#ifdef HYDRO_D
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_AFTER_HH: I J", I, J                                            
+               print *,  "     nexp soldep ksat", nexp, soldep(i, j), ksat                          
+               print *,  "     hh", hh                                  
+            endif      
+#endif
+
                if (hh .lt. 0.) then
                   print *, "hsub<0 at gridcell...", i,j,hh,z(i+1,j),z(i,j), &
                        soldep(i,j)
@@ -1391,6 +1410,15 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                ! AD_NOTE: gamma and qqsub are negative when flow is out of cell
                gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp ) * beta
                qqsub = gamma * hh
+
+#ifdef HYDRO_D
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_AFTER_QSUB: I J", I, J                                         
+               print *,  "     nexp soldep ksat", nexp, soldep(i, j), ksat             
+               print *,  "     hh gamma qqsub", hh, gamma, qqsub   
+               print *,  "     qsub_tmp qsub_tmp_neigh", qsub_tmp(i,j), qsub_tmp(ixx0,jyy0)
+            endif     
+#endif
 
                ! AD_NOTE: Moved this water available constraint from outside qsub calc loop
                ! to inside to better account for adjustments to adjacent cells.
@@ -1405,6 +1433,14 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                qsub(i,j) = qsub(i,j) + qqsub
                ! Add to neighbor cell qsub to track net fluxes over full i, j loop
                qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) - qqsub
+
+#ifdef HYDRO_D
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_AFTER_ADJUST: I J", I, J                                            
+               print *,  "     qqsub qsub", qqsub, qsub(i,j)                         
+               print *,  "     qsub_tmp_neigh", qsub_tmp(ixx0,jyy0)                                   
+            endif   
+#endif
 
                !DJG Error Checks...
                if (qqsub .gt. 0) then
@@ -1455,6 +1491,15 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
    qsub = qsub + qsub_tmp
    QSUBDRY = QSUBDRY + QSUBDRY_tmp 
 
+#ifdef HYDRO_D
+!print *,  "ADCHECK_AFTER_LOOP: qsub(3,7)", qsub(3,7)
+!print *,  "ADCHECK_AFTER_LOOP: qsub(3,6)", qsub(3,6) 
+!print *,  "ADCHECK_AFTER_LOOP: qsub_tmp(3,7)", qsub_tmp(3,7)                                                
+!print *,  "ADCHECK_AFTER_LOOP: qsub_tmp(3,6)", qsub_tmp(3,6)     
+print *,  "ADCHECK_AFTER_LOOP: qsub", qsub
+print *,  "ADCHECK_AFTER_LOOP: qsub_tmp", qsub_tmp
+#endif
+
 #ifdef MPP_LAND
    call MPP_LAND_COM_REAL(qsub,XX,YY,99)
    call MPP_LAND_COM_REAL(QSUBDRY,XX,YY,99)
@@ -1500,13 +1545,13 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, elevslpNeighbors, distNeighbors, &
                       wattbl(neighI(neighIndx), neighJ(neighIndx)), &
                       elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), & 
                       maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp)
-      if (i.eq.3 .and. j.eq.7) then
-         print *,  "ADCHECK_IN_GETSUB8: neighIndx, wattblSelf", neighIndx,  wattbl(I, J)
-         print *,  "     neighI neighJ neighIndx", neighI(neighIndx), neighJ(neighIndx), neighIndx
-         print *,  "     wattblNeigh", wattbl(neighI(neighIndx), neighJ(neighIndx))
-         print *,  "     elevSlp dist", elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx)
-         print *,  "     maxI maxJ maxIndx maxSlp", maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp
-      endif
+      !if (i.eq.3 .and. j.eq.7) then
+      !   print *,  "ADCHECK_IN_GETSUB8: neighIndx, wattblSelf", neighIndx,  wattbl(I, J)
+      !   print *,  "     neighI neighJ neighIndx", neighI(neighIndx), neighJ(neighIndx), neighIndx
+      !   print *,  "     wattblNeigh", wattbl(neighI(neighIndx), neighJ(neighIndx))
+      !   print *,  "     elevSlp dist", elevslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx)
+      !   print *,  "     maxI maxJ maxIndx maxSlp", maxslpNeighI, maxslpNeighJ, maxslpNeighIndx, maxslpNeighSlp
+      !endif
    enddo
    RETURN
 END SUBROUTINE GETSUB8
@@ -2703,11 +2748,6 @@ END SUBROUTINE GETSUB8DIR
 
     NEXP2DRT(IXXRT,JYYRT) = NEXP2D(i,j)
     BEDROCKRT(IXXRT,JYYRT) = BEDROCK(i,j)
-    ! Update soil depth var based on bedrock layer input var
-    do KRT = 1, NSOIL
-       where(BEDROCKRT .eq. KRT) SOLDEPRT = -1.0*ZSOIL(KRT)
-    enddo
-
 
 !DJG 6.12.08 Map lateral hydraulic conductivity and apply distributed scaling
 ! ---        factor that will be read in from hires terrain file
@@ -2722,8 +2762,8 @@ END SUBROUTINE GETSUB8DIR
 !New model corrected to scale from 0 at SMCREF to full LKSAT*LKSATFAC at SMCMAX:
 		LKSATRT(IXXRT,JYYRT) = LKSAT(I,J) * LKSATFAC(IXXRT,JYYRT) * &
 				min (1., &     !just in case, make sure scale factor doesn't go over 1
-					( max(0.,(SMCRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT,NSOIL))) / &     !becomes 0 if less than SMCREF
-				(SMCMAXRT(IXXRT,JYYRT,NSOIL)-SMCREFRT(IXXRT,JYYRT,NSOIL)) ) )
+					( max(0.,(SMCRT(IXXRT,JYYRT,1) - SMCREFRT(IXXRT,JYYRT,1))) / &     !becomes 0 if less than SMCREF
+				(SMCMAXRT(IXXRT,JYYRT,1)-SMCREFRT(IXXRT,JYYRT,1)) ) )
 
 !DJG set up lake mask...
 !--- modify to make lake mask large here, but not one of the routed lakes!!!
@@ -2744,6 +2784,11 @@ END SUBROUTINE GETSUB8DIR
 
           end do
         end do
+
+    ! Update soil depth var based on bedrock layer input var                                        
+    do KRT = 1, NSOIL                                                                               
+       where(BEDROCKRT .eq. KRT) SOLDEPRT = -1.0*ZSOIL(KRT)                                         
+    enddo 
 
 ! ADCHANGE: Add new zeroing out of -9999 elevation cells which are ocean
      where (ELRT .lt. -9998)
@@ -2867,7 +2912,7 @@ END SUBROUTINE GETSUB8DIR
          CWATAVAIL = 0.
          CALL FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                              SMCWLTRT,ZSOIL,SATLYRCHK,ZWATTABLRT, &
-                             CWATAVAIL,SLDPTH)
+                             CWATAVAIL,SLDPTH,BEDROCKRT)
 #ifdef MPP_LAND
         call MPP_LAND_COM_REAL(ZWATTABLRT,IXRT,JXRT,99)
         call MPP_LAND_COM_REAL(CWATAVAIL,IXRT,JXRT,99)
