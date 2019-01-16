@@ -1731,8 +1731,8 @@ end subroutine HYDRO_ini
                     !The min diffs were pulled from the existing HYDRO.TBL defaults.
                     !Currently water is 0, so enforcing 0 as the absolute min.
                     rt_domain(did)%SMCMAX1(i,j) = min(rt_domain(did)%SMCMAX1(i,j), 1.0)
-                    rt_domain(did)%SMCREF1(i,j) = max(min(rt_domain(did)%SMCREF1(i,j), rt_domain(did)%SMCMAX1(i,j) - 0.01), 0.0)
-                    rt_domain(did)%SMCWLT1(i,j) = max(min(rt_domain(did)%SMCWLT1(i,j), rt_domain(did)%SMCREF1(i,j) - 0.01), 0.0)
+                    rt_domain(did)%SMCREF1(i,j) = max(min(rt_domain(did)%SMCREF1(i,j), rt_domain(did)%SMCMAX1(i,j) - 0.00), 0.0)
+                    rt_domain(did)%SMCWLT1(i,j) = max(min(rt_domain(did)%SMCWLT1(i,j), rt_domain(did)%SMCREF1(i,j) - 0.00), 0.0)
                 ENDIF
                 IF(rt_domain(did)%VEGTYP(i,j) > 0 ) THEN   ! created 2d ov_rough
                     rt_domain(did)%OV_ROUGH2d(i,j) = RT_DOMAIN(did)%OV_ROUGH(rt_domain(did)%VEGTYP(I,J))
@@ -1752,8 +1752,8 @@ end subroutine HYDRO_ini
           rt_domain(did)%SMCWLT1 = 0.40
        endwhere
        where (rt_domain(did)%SMCMAX1 .gt. 1.0) rt_domain(did)%SMCMAX1 = 1.0
-       rt_domain(did)%SMCREF1 = max(min(rt_domain(did)%SMCREF1, rt_domain(did)%SMCMAX1 - 0.01), 0.0)
-       rt_domain(did)%SMCWLT1 = max(min(rt_domain(did)%SMCWLT1, rt_domain(did)%SMCREF1 - 0.01), 0.0)
+       rt_domain(did)%SMCREF1 = max(min(rt_domain(did)%SMCREF1, rt_domain(did)%SMCMAX1 - 0.00), 0.0)
+       rt_domain(did)%SMCWLT1 = max(min(rt_domain(did)%SMCWLT1, rt_domain(did)%SMCREF1 - 0.00), 0.0)
     endif
 
        rt_domain(did)%soiltyp = soltyp

@@ -2082,7 +2082,7 @@ subroutine output_rt_NWM(domainId,iGrid)
 
       ! Specify the number of vertical levels we are dealing with
       if(iTmp2 .eq. 5) then
-         numLev = 4
+         numLev = nlst_rt(1)%nsoil
       else
          numLev = 1
       endif

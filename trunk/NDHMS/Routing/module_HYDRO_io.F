@@ -11122,7 +11122,8 @@ end subroutine hdtbl_in_nc
 
 subroutine read2dlsm(did,file,varName,varOut)
   implicit none
-  integer :: did, ncid ,ierr,iret
+  integer :: did, ncid ,iret
+  integer :: ierr = -99
   character(len=*) :: file,varName
   real,dimension(:,:) :: varOut
   character(len=256) :: units
@@ -11137,7 +11138,7 @@ subroutine read2dlsm(did,file,varName,varOut)
   else
      allocate(tmpArr(1,1))
   endif
-  call decompose_data_real (tmpArr,varOut)
+  if (ierr .eq. 0) call decompose_data_real (tmpArr,varOut)
   deallocate(tmpArr)
 #else
      iret = nf_open(trim(file), NF_NOWRITE, ncid)
@@ -11149,7 +11150,8 @@ end subroutine read2dlsm
 
 subroutine read2dlsm_int(did,file,varName,varOut)
   implicit none
-  integer :: did, ncid ,ierr,iret
+  integer :: did, ncid , iret
+  integer :: ierr = -99
   character(len=*) :: file,varName
   integer,dimension(:,:) :: varOut
   character(len=256) :: units
@@ -11164,7 +11166,7 @@ subroutine read2dlsm_int(did,file,varName,varOut)
   else
      allocate(tmpArr(1,1))
   endif
-  call decompose_data_int(tmpArr,varOut)
+  if (ierr .eq. 0) call decompose_data_int(tmpArr,varOut)
   deallocate(tmpArr)
 #else
      iret = nf_open(trim(file), NF_NOWRITE, ncid)

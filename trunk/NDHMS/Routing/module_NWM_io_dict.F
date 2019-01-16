@@ -12,6 +12,7 @@
 module module_NWM_io_dict
 
 use module_version, only: get_model_version
+use module_namelist, only: nlst_rt
 
 implicit none
 
@@ -25,6 +26,8 @@ integer, parameter :: numLsmVars = 14
 integer, parameter :: numChObsVars = 1
 integer, parameter :: numGwVars = 3
 integer :: i
+!integer :: nsoil = nlst_rt(1)%nsoil 
+integer, parameter :: nsoil = 4
 
 ! Declare public types that will hold metadata
 public :: chrtMeta ! Public CHRTOUT metadata for NWM output.
@@ -113,7 +116,7 @@ type ldasMeta
    character (len=64), dimension(numLdasVars) :: varNames
    integer :: numVars = numLdasVars
    integer :: numSnowLayers = 3
-   integer :: numSoilLayers = 4
+   integer :: numSoilLayers = nsoil
    integer :: numSpectrumBands = 2
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
@@ -187,7 +190,7 @@ type rtDomainMeta
    ! Variable names
    character (len=64), dimension(numRtDomainVars) :: varNames
    integer :: numVars = numRtDomainVars
-   integer :: numSoilLayers = 4
+   integer :: numSoilLayers = nsoil
    character (len=512) :: modelOutputType = "terrain_rt"
    character (len=64) :: modelConfigType
 
@@ -401,7 +404,7 @@ type lsmMeta
    character (len=64), dimension(numLsmVars) :: varNames
    integer :: numVars = numLsmVars
    integer :: numSnowLayers = 3
-   integer :: numSoilLayers = 4
+   integer :: numSoilLayers = nsoil
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 

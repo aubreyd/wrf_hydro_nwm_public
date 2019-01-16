@@ -310,6 +310,15 @@
 
            WATAVAIL=0.  !Initialize to 0. for every cell...
 
+#ifdef HYDRO_D                                                                                      
+            !if (i.eq.66 .and. j.eq.204) then                                                       
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_SMADJ_INI: I J", I, J                                               
+               print *,  "     QSUBRT SUBFLO", QSUBRT(I,J), SUBFLO  
+               print *,  "     SMCRT", SMCRT(I,J,:) 
+               print *,  "     SMCMAXRT", SMCMAXRT(I,J,:)              
+            endif                                                                                   
+#endif  
 
 !!DJG Begin loop through soil profile to adjust soil water content
 !!DJG based on subsfc flow (SUBFLO)...
@@ -317,7 +326,7 @@
             IF (SUBFLO.GT.0) THEN ! Increase soil moist for +SUBFLO (Inflow)
 
 ! Loop through soil layers from bottom to top
-              DO KK=NSOIL,1,-1
+              DO KK=BEDROCKRT(I,J),1,-1
 
 
 ! Check for saturated layers
@@ -338,16 +347,37 @@
                     SMCRT(I,J,KK) = SMCMAXRT(I,J,KK)
                   END IF
                 END IF
-
+#ifdef HYDRO_D                                                                                      
+            !if (i.eq.66 .and. j.eq.204) then                                                       
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_SMADJ_POS_INLYRS: I J KK", I, J, KK                                 
+               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                               
+               print *,  "     SMCRT SMCMAXRT", SMCRT(I,J,KK), SMCMAXRT(I,J,KK)                                                 
+            endif                                                                                   
+#endif 
                  IF (SUBFLO.EQ.0.) EXIT
 !                IF (SUBFLO.EQ.0.) goto 669
 
               END DO      ! END DO FOR SOIL LAYERS
 
+#ifdef HYDRO_D                                                                                      
+            !if (i.eq.66 .and. j.eq.204) then                                                       
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                                  
+               print *,  "ADCHECK_SMADJ_POS_AFTERLYRS: I J", I, J                                                 
+               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL
+               print *,  "     SMCRT", SMCRT(I,J,:)                                      
+            endif                                                                                       
+#endif  
+
 669           continue
 
 ! If all layers sat. add remaining subflo to infilt. excess...                  
               IF (KK.eq.0.AND.SUBFLO.gt.0.) then
+#ifdef HYDRO_D                                                                                          
+               print *,  "ADCHECK_SMADJ_OVERFLOW: I J KK", I, J, KK                               
+               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
+               print *,  "     INFXSUBRT", INFXSUBRT(I,J)                     
+#endif           
                  INFXSUBRT(I,J) = INFXSUBRT(I,J) + SUBFLO*1000.    !Units = mm
                  SUBFLO=0.
               END IF
@@ -369,7 +399,7 @@
 !    now set to SMCREF, 8/24/07
 !DJG and then using unsat cond as opposed to Ksat...
 
-	      DO KK=SATLYRCHK(I,J),NSOIL
+	      DO KK=SATLYRCHK(I,J),BEDROCKRT(I,J)
                  WATAVAIL = (SMCRT(I,J,KK)-SMCREFRT(I,J,KK))*SLDPTH(KK)
                  IF (WATAVAIL.GE.ABS(SUBFLO)) THEN
 !?yw mod                 IF (WATAVAIL.GE.(ABS(SUBFLO)+0.000001) ) THEN
@@ -379,10 +409,26 @@
                    SMCRT(I,J,KK)=SMCREFRT(I,J,KK)
                    SUBFLO=SUBFLO+WATAVAIL
                  END IF
+#ifdef HYDRO_D                                                                                          
+            !if (i.eq.66 .and. j.eq.204) then                                                       
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_SMADJ_NEG_INLYRS: I J KK", I, J, KK                               
+               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
+               print *,  "     SMCRT SMCMAXRT", SMCRT(I,J,KK), SMCMAXRT(I,J,KK)                     
+            endif                                                                                   
+#endif  
                  IF (SUBFLO.EQ.0.) EXIT
 !                IF (SUBFLO.EQ.0.) goto 668
 
               END DO  ! END DO FOR SOIL LAYERS
+#ifdef HYDRO_D                                                                                      
+            !if (i.eq.66 .and. j.eq.204) then                                                       
+            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+               print *,  "ADCHECK_SMADJ_NEG_AFTERLYRS: I J", I, J                                   
+               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
+               print *,  "     SMCRT", SMCRT(I,J,:)                                                 
+            endif                                                                                   
+#endif     
 668        continue
 
 
@@ -415,6 +461,13 @@
         call MPP_LAND_COM_REAL(SMCRT(:,:,i),IXRT,JXRT,99)
      end DO
 #endif
+
+#ifdef HYDRO_D                                                                                      
+print *,  "ADCHECK_SMADJ_END: SMCRT1", SMCRT(:,:,1)
+print *,  "ADCHECK_SMADJ_END: SMCRT2", SMCRT(:,:,2)
+print *,  "ADCHECK_SMADJ_END: SMCRT3", SMCRT(:,:,3)
+print *,  "ADCHECK_SMADJ_END: SMCRT4", SMCRT(:,:,4)             
+#endif     
 
 #ifdef HYDRO_D
 ! ADCHANGE: START Final water balance variables
@@ -2652,7 +2705,13 @@ END SUBROUTINE GETSUB8DIR
                INFXSUBRT(IXXRT,JYYRT)=LSMVOL*     &
                    INFXSWGT(IXXRT,JYYRT)/dist(IXXRT,JYYRT,9)
   
-
+#ifdef HYDRO_D                                                                                      
+            if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               print *,  "ADCHECK_DISAG_INI: I J", IXXRT,JYYRT                                 
+               print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                         
+               print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                   
+            endif                                                                                   
+#endif  
             do KRT=1,NSOIL  !Do for soil profile loop
                IF(SICE(I,J,KRT).gt.0) then  !...adjust for soil ice
 !DJG Adjust SMCMAX for SICE when subsfc routing...make 3d variable
@@ -2709,7 +2768,13 @@ END SUBROUTINE GETSUB8DIR
 
              end do !End do for soil profile loop
 
-
+#ifdef HYDRO_D                                                                                      
+            if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then                              
+               print *,  "ADCHECK_DISAG_AFTERADJ: I J", IXXRT,JYYRT                                            
+               print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                                 
+               print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                           
+            endif                                                                                   
+#endif 
 
              do KRT=1,NSOIL  !debug loop
                IF (SMCRT(IXXRT,JYYRT,KRT).GT.SMCMAXRT(IXXRT,JYYRT,KRT)) THEN
@@ -2735,7 +2800,13 @@ END SUBROUTINE GETSUB8DIR
                END IF
              end do !debug loop
 
-
+#ifdef HYDRO_D                                                                                      
+            if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               print *,  "ADCHECK_DISAG_AFTERDEBUG: I J", IXXRT,JYYRT                                 
+               print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                         
+               print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                   
+            endif                                                                                   
+#endif  
 
 !DJG map ov roughness as function of land use provided in VEGPARM.TBL...
 ! --- added extra check for VEGTYP for 'masked-out' locations...
