@@ -632,7 +632,7 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
    ! Local variables
    integer :: ftnMeta,iret
    integer :: projVarId
- 
+   
    chrtOutDict%modelNdv = -9.E15
    ! CHRTOUT FILES
 
