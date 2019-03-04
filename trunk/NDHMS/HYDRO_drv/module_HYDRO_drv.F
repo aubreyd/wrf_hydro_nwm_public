@@ -1087,7 +1087,7 @@ endif
                                       + rt_domain(did)%overland%control%surface_water_head_routing(IXXRT,JYYRT) &
                                       * rt_domain(did)%overland%properties%distance_to_neighbor(IXXRT,JYYRT,9)
 
-                do KRT=1,nlst_rt(did)%NSOIL
+                do KRT=1,rt_domain(did)%BEDROCK(I,J)
 !DJG               SMCAGGRT(KRT)=SMCAGGRT(KRT)+SMCRT(IXXRT,JYYRT,KRT)
                    RT_DOMAIN(did)%SH2OAGGRT(KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                                  + RT_DOMAIN(did)%SMCRT(IXXRT,JYYRT,KRT)
@@ -1101,7 +1101,7 @@ endif
             rt_domain(did)%overland%control%surface_water_head_lsm(I,J) = RT_DOMAIN(did)%SFCHEADAGGRT &
                                           / (nlst_rt(did)%AGGFACTRT**2)
 
-            do KRT=1,nlst_rt(did)%NSOIL
+            do KRT=1,rt_domain(did)%BEDROCK(I,J)
 !DJG              SMC(I,J,KRT)=SMCAGGRT(KRT)/(AGGFACTRT**2)
                RT_DOMAIN(did)%SH2OX(I,J,KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                              / (nlst_rt(did)%AGGFACTRT**2)
@@ -1133,7 +1133,7 @@ endif
                                           = 1./FLOAT(nlst_rt(did)%AGGFACTRT**2)
                   end if
 
-                  do KRT=1,nlst_rt(did)%NSOIL
+                  do KRT=1,rt_domain(did)%BEDROCK(I,J)
 
 !!!yw added for debug
                    if(RT_DOMAIN(did)%SMCRT(IXXRT,JYYRT,KRT) .lt. 0) then

@@ -312,7 +312,8 @@
 
 #ifdef HYDRO_D                                                                                      
             !if (i.eq.66 .and. j.eq.204) then                                                       
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_SMADJ_INI: I J", I, J                                               
                print *,  "     QSUBRT SUBFLO", QSUBRT(I,J), SUBFLO  
                print *,  "     SMCRT", SMCRT(I,J,:) 
@@ -349,7 +350,8 @@
                 END IF
 #ifdef HYDRO_D                                                                                      
             !if (i.eq.66 .and. j.eq.204) then                                                       
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_SMADJ_POS_INLYRS: I J KK", I, J, KK                                 
                print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                               
                print *,  "     SMCRT SMCMAXRT", SMCRT(I,J,KK), SMCMAXRT(I,J,KK)                                                 
@@ -362,7 +364,8 @@
 
 #ifdef HYDRO_D                                                                                      
             !if (i.eq.66 .and. j.eq.204) then                                                       
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                                  
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                                  
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_SMADJ_POS_AFTERLYRS: I J", I, J                                                 
                print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL
                print *,  "     SMCRT", SMCRT(I,J,:)                                      
@@ -374,9 +377,9 @@
 ! If all layers sat. add remaining subflo to infilt. excess...                  
               IF (KK.eq.0.AND.SUBFLO.gt.0.) then
 #ifdef HYDRO_D                                                                                          
-               print *,  "ADCHECK_SMADJ_OVERFLOW: I J KK", I, J, KK                               
-               print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
-               print *,  "     INFXSUBRT", INFXSUBRT(I,J)                     
+               !print *,  "ADCHECK_SMADJ_OVERFLOW: I J KK", I, J, KK                               
+               !print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
+               !print *,  "     INFXSUBRT", INFXSUBRT(I,J)                     
 #endif           
                  INFXSUBRT(I,J) = INFXSUBRT(I,J) + SUBFLO*1000.    !Units = mm
                  SUBFLO=0.
@@ -411,7 +414,8 @@
                  END IF
 #ifdef HYDRO_D                                                                                          
             !if (i.eq.66 .and. j.eq.204) then                                                       
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_SMADJ_NEG_INLYRS: I J KK", I, J, KK                               
                print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
                print *,  "     SMCRT SMCMAXRT", SMCRT(I,J,KK), SMCMAXRT(I,J,KK)                     
@@ -423,7 +427,8 @@
               END DO  ! END DO FOR SOIL LAYERS
 #ifdef HYDRO_D                                                                                      
             !if (i.eq.66 .and. j.eq.204) then                                                       
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then    
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then                          
                print *,  "ADCHECK_SMADJ_NEG_AFTERLYRS: I J", I, J                                   
                print *,  "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL                                   
                print *,  "     SMCRT", SMCRT(I,J,:)                                                 
@@ -463,10 +468,10 @@
 #endif
 
 #ifdef HYDRO_D                                                                                      
-print *,  "ADCHECK_SMADJ_END: SMCRT1", SMCRT(:,:,1)
-print *,  "ADCHECK_SMADJ_END: SMCRT2", SMCRT(:,:,2)
-print *,  "ADCHECK_SMADJ_END: SMCRT3", SMCRT(:,:,3)
-print *,  "ADCHECK_SMADJ_END: SMCRT4", SMCRT(:,:,4)             
+!print *,  "ADCHECK_SMADJ_END: SMCRT1", SMCRT(:,:,1)
+!print *,  "ADCHECK_SMADJ_END: SMCRT2", SMCRT(:,:,2)
+!print *,  "ADCHECK_SMADJ_END: SMCRT3", SMCRT(:,:,3)
+!print *,  "ADCHECK_SMADJ_END: SMCRT4", SMCRT(:,:,4)             
 #endif     
 
 #ifdef HYDRO_D
@@ -1396,7 +1401,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
 
 #ifdef HYDRO_D
             !if (i.eq.66 .and. j.eq.204) then
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_SUB_INI: I J", I, J
                print *,  "     IXX0 JYY0 index", IXX0, JYY0, index
                print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
@@ -1421,7 +1427,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
             endif
 
 #ifdef HYDRO_D
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then 
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then 
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_AFTER_GETSUB8: I J", I, J
                print *,  "     IXX0 JYY0 index", IXX0, JYY0, index
                print *,  "     z zneigh dist", z(i, j), z(IXX0, JYY0), dist(i,j,index)
@@ -1446,7 +1453,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                ksat = latksat(i,j)
 
 #ifdef HYDRO_D
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_AFTER_HH: I J", I, J                                            
                print *,  "     nexp soldep ksat", nexp, soldep(i, j), ksat                          
                print *,  "     hh", hh                                  
@@ -1465,7 +1473,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                qqsub = gamma * hh
 
 #ifdef HYDRO_D
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_AFTER_QSUB: I J", I, J                                         
                print *,  "     nexp soldep ksat", nexp, soldep(i, j), ksat             
                print *,  "     hh gamma qqsub", hh, gamma, qqsub   
@@ -1488,7 +1497,8 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) - qqsub
 
 #ifdef HYDRO_D
-            if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            !if ((i.eq.3 .and. j.eq.7) .or. (i.eq.3 .and. j.eq.6)) then                              
+            if ((i.eq.11 .and. j.eq.23) .or. (i.eq.11 .and. j.eq.26)) then
                print *,  "ADCHECK_AFTER_ADJUST: I J", I, J                                            
                print *,  "     qqsub qsub", qqsub, qsub(i,j)                         
                print *,  "     qsub_tmp_neigh", qsub_tmp(ixx0,jyy0)                                   
@@ -2751,13 +2761,16 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                INFXSUBRT(IXXRT,JYYRT) = LSMVOL *     &
                                         INFXSWGT(IXXRT,JYYRT) / dist(IXXRT,JYYRT,9)
 #ifdef HYDRO_D                                                                                      
-               if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               !if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               if ((ixxrt.eq.11 .and. jyyrt.eq.23) .or. (ixxrt.eq.11 .and. jyyrt.eq.26)) then
                   print *,  "ADCHECK_DISAG_INI: I J", IXXRT,JYYRT                                 
                   print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                         
                   print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                   
                endif                                                                                   
 #endif  
                do KRT=1,NSOIL ! Soil layer loop
+
+                  IF (KRT .le. BEDROCK(I,J)) then
 
                   ! Adjustments for soil ice
                   IF (SICE(I,J,KRT) .gt. 0) then
@@ -2817,17 +2830,25 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                      END IF
                   END IF  !End if for soil moisture saturation excess
 
+                  else ! below bedrock, we keep everything static, even ice
+                     SMCRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
+                     SMCREFRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
+                     SMCWLTRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
+                  end if ! end if above bedrock layer
+
                end do !End do for soil profile loop
 
 #ifdef HYDRO_D                                                                                      
-               if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then                              
+               !if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then                              
+               if ((ixxrt.eq.11 .and. jyyrt.eq.23) .or. (ixxrt.eq.11 .and. jyyrt.eq.26)) then
                   print *,  "ADCHECK_DISAG_AFTERADJ: I J", IXXRT,JYYRT                                            
                   print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                                 
                   print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                           
                endif                                                                                   
 #endif 
                ! Debug loop
-               do KRT=1,NSOIL
+               do KRT=1,BEDROCK(I,J)
                   IF (SMCRT(IXXRT,JYYRT,KRT) .GT. SMCMAXRT(IXXRT,JYYRT,KRT)) THEN
                      print *, "FATAL ERROR: SMCMAX exceeded upon disaggregation3...", &
                               ixxrt, jyyrt, krt, &
@@ -2855,7 +2876,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                end do !debug loop
 
 #ifdef HYDRO_D                                                                                      
-               if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               !if ((ixxrt.eq.3 .and. jyyrt.eq.7) .or. (ixxrt.eq.3 .and. jyyrt.eq.6)) then              
+               if ((ixxrt.eq.11 .and. jyyrt.eq.23) .or. (ixxrt.eq.11 .and. jyyrt.eq.26)) then
                   print *,  "ADCHECK_DISAG_AFTERDEBUG: I J", IXXRT,JYYRT                                 
                   print *,  "     SMCRT", SMCRT(IXXRT,JYYRT,:)                                         
                   print *,  "     SMCMAXRT", SMCMAXRT(IXXRT,JYYRT,:)                                   
