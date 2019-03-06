@@ -665,6 +665,9 @@ CONTAINS
        parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
        parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
 
+       !ADCHANGE: Limit nroot to bedrock layer.
+       parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
+
 ! Initialized local
 
        FICEOLD = 0.0

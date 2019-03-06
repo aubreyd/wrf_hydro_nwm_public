@@ -323,7 +323,7 @@ contains
 
   SUBROUTINE NOAHMP_SFLX (parameters, &
                    ILOC    , JLOC    , LAT     , YEARLEN , JULIAN  , COSZ    , & ! IN : Time/Space-related
-                   DT      , DX      , DZ8W    , NSOIL   , ZSOIL   , NSNOW   , & ! IN : Model configuration 
+                   DT      , DX      , DZ8W, NSOIL, BEDROCKLYR, ZSOIL, NSNOW,  & ! IN : Model configuration 
                    SHDFAC  , SHDMAX  , VEGTYP  , ICE     , IST     ,           & ! IN : Vegetation/Soil characteristics
                    SMCEQ   ,                                                   & ! IN : Vegetation/Soil characteristics
                    SFCTMP  , SFCPRS  , PSFC    , UU      , VV      , Q2      , & ! IN : Forcing
@@ -367,6 +367,7 @@ contains
   INTEGER                        , INTENT(IN)    :: VEGTYP !vegetation type 
   INTEGER                        , INTENT(IN)    :: NSNOW  !maximum no. of snow layers        
   INTEGER                        , INTENT(IN)    :: NSOIL  !no. of soil layers        
+  INTEGER                        , INTENT(IN)    :: BEDROCKLYR !lowest hydrologically relevant soil layer
   INTEGER                        , INTENT(IN)    :: ILOC   !grid index
   INTEGER                        , INTENT(IN)    :: JLOC   !grid index
   REAL                           , INTENT(IN)    :: DT     !time step [sec]
@@ -712,7 +713,7 @@ contains
 
 ! compute water budgets (water storages, ET components, and runoff)
 
-     CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
+     CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL, BEDROCKLYR, IMELT  ,DT     ,UU     , & !in
                  VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                  ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
                  FICEOLD,PONDING,TG     ,IST    ,FVEG   ,iloc,jloc , SMCEQ , & !in
@@ -5512,7 +5513,7 @@ contains
 
 !== begin water ====================================================================================
 
-  SUBROUTINE WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
+  SUBROUTINE WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  , BEDROCKLYR, IMELT  ,DT     ,UU     , & !in
                     VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                     ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
                     FICEOLD,PONDING,TG     ,IST    ,FVEG   ,ILOC   ,JLOC ,SMCEQ , & !in
@@ -5543,6 +5544,7 @@ contains
   INTEGER,                         INTENT(IN)    :: NSNOW   !maximum no. of snow layers
   INTEGER                        , INTENT(IN)    :: IST     !surface type 1-soil; 2-lake
   INTEGER,                         INTENT(IN)    :: NSOIL   !no. of soil layers
+  INTEGER,                         INTENT(IN)    :: BEDROCKLYR   !lowest hydrologically active soil layer
   INTEGER, DIMENSION(-NSNOW+1:0) , INTENT(IN)    :: IMELT   !melting state index [1-melt; 2-freeze]
   REAL,                            INTENT(IN)    :: DT      !main time step (s)
   REAL,                            INTENT(IN)    :: UU      !u-direction wind speed [m/s]
@@ -5711,7 +5713,7 @@ contains
        IF(WSLAKE >= WSLMAX) RUNSRF = QINSUR*1000.             !mm/s
        WSLAKE = WSLAKE + (QINSUR-QSEVA)*1000.*DT -RUNSRF*DT   !mm
     ELSE                                                      ! soil
-       CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+       CALL      SOILWATER (parameters,NSOIL  ,BEDROCKLYR, NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                             QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
                            SMCWTD, DEEPRECH                       , & !inout
@@ -6695,7 +6697,7 @@ contains
 
 !== begin soilwater ================================================================================
 
-  SUBROUTINE SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+  SUBROUTINE SOILWATER (parameters,NSOIL  , BEDROCKLYR, NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                         QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC, & !in
                         SH2O   ,SMC    ,ZWT    ,VEGTYP ,& !inout
                         SMCWTD, DEEPRECH                       ,& !inout
@@ -6712,6 +6714,7 @@ contains
   INTEGER,                     INTENT(IN) :: ILOC   !grid index
   INTEGER,                     INTENT(IN) :: JLOC   !grid index
   INTEGER,                     INTENT(IN) :: NSOIL  !no. of soil layers
+  INTEGER,                     INTENT(IN) :: BEDROCKLYR !lowest hydrologically active soil layer
   INTEGER,                     INTENT(IN) :: NSNOW  !maximum no. of snow layers
   REAL,                        INTENT(IN) :: DT     !time step (sec)
   REAL, INTENT(IN)                        :: QINSUR !water input on soil surface [mm/s]
@@ -6740,6 +6743,7 @@ contains
 ! local
   INTEGER                                 :: K,IZ   !do-loop index
   INTEGER                                 :: ITER   !iteration index
+  INTEGER                                 :: NSOIL_HYDRO !nsoil to use for hydro loops
   REAl                                    :: DTFINE !fine time step (s)
   REAL, DIMENSION(1:NSOIL)                :: RHSTT  !right-hand side term of the matrix
   REAL, DIMENSION(1:NSOIL)                :: AI     !left-hand side term
@@ -6769,13 +6773,19 @@ contains
   REAL                                    :: DZTOT  !2-m soil depth (m)
   REAL, PARAMETER :: A = 4.0
 ! ----------------------------------------------------------------------
+
+!ADCHANGE: At this point only activating bedrock layer for OPT_RUN=3
+!Setting that here for now.
+    NSOIL_HYDRO = NSOIL
+    if (OPT_RUN == 3) NSOIL_HYDRO = BEDROCKLYR
+
     RUNSRF = 0.0
     PDDUM  = 0.0
     RSAT   = 0.0
 
 ! for the case when snowmelt water is too large
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        EPORE   = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
        RSAT    = RSAT + MAX(0.,SH2O(K)-EPORE)*DZSNSO(K)  
        SH2O(K) = MIN(EPORE,SH2O(K))             
@@ -6783,7 +6793,7 @@ contains
 
 !impermeable fraction due to frozen soil
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        FICE    = MIN(1.0,SICE(K)/parameters%SMCMAX(K))
        FCR(K)  = MAX(0.0,EXP(-A*(1.-FICE))- EXP(-A)) /  &
                         (1.0              - EXP(-A))
@@ -6794,7 +6804,7 @@ contains
     SICEMAX = 0.0
     FCRMAX  = 0.0
     SH2OMIN = parameters%SMCMAX(1)
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        IF (SICE(K) > SICEMAX) SICEMAX = SICE(K)
        IF (FCR(K)  > FCRMAX)  FCRMAX  = FCR(K)
        IF (SH2O(K) < SH2OMIN) SH2OMIN = SH2O(K)
@@ -6842,7 +6852,7 @@ contains
     END IF
 
     IF(OPT_RUN == 3) THEN
-       CALL INFIL (parameters,NSOIL  ,DT     ,ZSOIL  ,SH2O   ,SICE   , & !in
+       CALL INFIL (parameters, NSOIL, NSOIL_HYDRO, DT, ZSOIL, SH2O, SICE, & !in
                    SICEMAX,QINSUR ,                         & !in
                    PDDUM  ,RUNSRF )                           !out
     END IF
