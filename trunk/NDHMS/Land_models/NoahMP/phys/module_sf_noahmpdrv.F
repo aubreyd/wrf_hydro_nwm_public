@@ -665,6 +665,9 @@ CONTAINS
        parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
        parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
 
+       !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.
+       if (IOPT_RUN .ne. 3) parameters%bedrocklyr = NSOIL
+
        !ADCHANGE: Limit nroot to bedrock layer.
        parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
 
