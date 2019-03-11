@@ -712,7 +712,7 @@ contains
 
 ! compute water budgets (water storages, ET components, and runoff)
 
-     CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL,  IMELT  ,DT     ,UU     , & !in
+     CALL WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
                  VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                  ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
                  FICEOLD,PONDING,TG     ,IST    ,FVEG   ,iloc,jloc , SMCEQ , & !in
@@ -5512,7 +5512,7 @@ contains
 
 !== begin water ====================================================================================
 
-  SUBROUTINE WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  , IMELT  ,DT     ,UU     , & !in
+  SUBROUTINE WATER (parameters,VEGTYP ,NSNOW  ,NSOIL  ,IMELT  ,DT     ,UU     , & !in
                     VV     ,FCEV   ,FCTR   ,QPRECC ,QPRECL ,ELAI   , & !in
                     ESAI   ,SFCTMP ,QVAP   ,QDEW   ,ZSOIL  ,BTRANI , & !in
                     FICEOLD,PONDING,TG     ,IST    ,FVEG   ,ILOC   ,JLOC ,SMCEQ , & !in
@@ -5711,7 +5711,7 @@ contains
        IF(WSLAKE >= WSLMAX) RUNSRF = QINSUR*1000.             !mm/s
        WSLAKE = WSLAKE + (QINSUR-QSEVA)*1000.*DT -RUNSRF*DT   !mm
     ELSE                                                      ! soil
-       CALL      SOILWATER (parameters,NSOIL  , NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+       CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                             QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
                            SMCWTD, DEEPRECH                       , & !inout
@@ -6695,7 +6695,7 @@ contains
 
 !== begin soilwater ================================================================================
 
-  SUBROUTINE SOILWATER (parameters,NSOIL  ,  NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
+  SUBROUTINE SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                         QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC, & !in
                         SH2O   ,SMC    ,ZWT    ,VEGTYP ,& !inout
                         SMCWTD, DEEPRECH                       ,& !inout
@@ -6771,8 +6771,6 @@ contains
   REAL, PARAMETER :: A = 4.0
 ! ----------------------------------------------------------------------
 
-!ADCHANGE: At this point only activating bedrock layer for OPT_RUN=3
-!For other options NSOIL_HYDRO = NSOIL
     NSOIL_HYDRO = parameters%BEDROCKLYR
 
     RUNSRF = 0.0
@@ -6848,7 +6846,7 @@ contains
     END IF
 
     IF(OPT_RUN == 3) THEN
-       CALL INFIL (parameters, NSOIL, DT, ZSOIL, SH2O, SICE, & !in
+       CALL INFIL (parameters,NSOIL  ,DT     ,ZSOIL  ,SH2O   ,SICE   , & !in
                    SICEMAX,QINSUR ,                         & !in
                    PDDUM  ,RUNSRF )                           !out
     END IF
@@ -7316,6 +7314,9 @@ contains
     REAL                                    :: EPORE
     REAL                                    :: WMINUS
 ! ----------------------------------------------------------------------
+
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
     WPLUS = 0.0
 
     DO K = 1,NSOIL_HYDRO
