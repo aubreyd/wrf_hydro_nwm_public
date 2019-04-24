@@ -150,6 +150,7 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  mfsno_2D   ! Snow cover m parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfexp_2D! exponent in the shape parameter for soil resistance option 1
   INTEGER, ALLOCATABLE, DIMENSION(:,:)    ::  bedrocklyr_2D ! lowest hydrologically active layer (below which is bedrock) 
+  INTEGER                                 ::  kloop ! counter for nsoil loop 
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1181,6 +1182,24 @@ module module_NoahMP_hrldas_driver
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
 		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,&
                       BEDROCKLYR_2D)
+    print *, "ADCHECK_hrldas_pre: SMCMAX_3D SMC", SMCMAX_3D(3,:,3), SMOIS(3,:,3)
+    !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.               
+    if (IOPT_RUN .eq. 3) then
+       !ADCHANGE: Hard-code soil params below bedrock to be effectively null                        
+       do kloop = 1, NSOIL                                                                                
+         where (BEDROCKLYR_2D .lt. kloop) 
+           SMCMAX_3D(:,kloop,:) = 1.e-9
+           SMCREF_3D(:,kloop,:) = 1.e-9
+           SMCWLT_3D(:,kloop,:) = 1.e-9
+           SMCDRY_3D(:,kloop,:) = 1.e-9
+           DKSAT_3D(:,kloop,:) = 1.e-9 
+           DWSAT_3D(:,kloop,:) = 1.e-9                                       
+         end where
+       enddo
+    else
+       print *, "OPT_RUN is not 3 so setting all layers as hydrologically active."
+       BEDROCKLYR_2D = NSOIL 
+    endif
 #endif
   
 !------------------------------------------------------------------------
@@ -1319,6 +1338,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL                                                                                 
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D                                    &              
+#endif      
                      )
   else  ! for none restart
 
@@ -1417,13 +1439,17 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D                                     &
+#endif
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
 
+     print *, "ADCHECK_hrldas_post: SMCMAX_3D SMC", SMOIS(3,:,3)                     
 
   endif  ! end of restart if block
-  
+
   NTIME=(KHOUR)*3600./nint(dtbl)
 
 #ifdef HYDRO_D

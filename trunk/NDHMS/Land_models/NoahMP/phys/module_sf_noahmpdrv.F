@@ -656,20 +656,30 @@ CONTAINS
        else
          parameters%hvb = 0.0
        endif
-       
+      
        !ADCHANGE: Add some sanity checks in case calibration knocks the order of these out of sequence.
        !The min diffs were pulled from the existing SOILPARM.TBL defaults.
        !Currently water is 0, so enforcing 0 as the absolute min.
-       parameters%smcmax = min(parameters%smcmax, 1.0)
-       parameters%smcref = max(min(parameters%smcref, parameters%smcmax - 0.01), 0.0)
-       parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
-       parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
+       !parameters%smcmax = min(parameters%smcmax, 1.0)
+       !parameters%smcref = max(min(parameters%smcref, parameters%smcmax - 0.01), 0.0)
+       !parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
+       !parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
 
-       !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.
-       if (IOPT_RUN .ne. 3) parameters%bedrocklyr = NSOIL
-
+       if (IOPT_RUN .eq. 3) then
        !ADCHANGE: Limit nroot to bedrock layer.
        parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
+       !ADCHANGE: Hard-code soil params below bedrock to be effectively null
+       parameters%smcmax((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       else
+          parameters%bedrocklyr = NSOIL
+       endif
 
 ! Initialized local
 
@@ -1134,6 +1144,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
     parameters%RSURF_EXP  =   RSURF_EXP_TABLE
     parameters%BEDROCKLYR = BEDROCKLYR_TABLE
+
 #endif
 
 ! ----------------------------------------------------------------------
@@ -1180,7 +1191,11 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
        its,ite, jts,jte, kts,kte,                &
        smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy, dx, dy, msftx, msfty,&     ! Optional groundwater
        wtddt    ,stepwtd  ,dt       ,qrfsxy     ,qspringsxy  , qslatxy    ,  &      ! Optional groundwater
-       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy            )    ! Optional groundwater
+       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy          &      ! Optional groundwater
+#ifdef SPATIAL_SOIL
+       , SMCMAX_3D, BEXP_3D, PSISAT_3D           &
+#endif
+       )
 
   USE NOAHMP_TABLES
 
@@ -1271,6 +1286,10 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
     INTEGER,  INTENT(OUT) , OPTIONAL :: STEPWTD
     REAL, INTENT(IN) , OPTIONAL :: DT, WTDDT
 
+#ifdef SPATIAL_SOIL
+    REAL, DIMENSION(ims:ime, NSOIL, jms:jme), INTENT(INOUT) :: SMCMAX_3D, BEXP_3D, PSISAT_3D                                               
+#endif
+
 !jref:start
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: t2mvxy        !2m temperature vegetation part (k)
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: t2mbxy        !2m temperature bare ground part (k)
@@ -1281,7 +1300,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
     REAL, DIMENSION(1:NSOIL)  :: ZSOIL      ! Depth of the soil layer bottom (m) from 
     !                                                   the surface (negative)
 
-    REAL                      :: BEXP, SMCMAX, PSISAT
+    REAL, DIMENSION(1:NSOIL)  :: BEXP, SMCMAX, PSISAT
     REAL                      :: FK, masslai,masssai
 
     REAL, PARAMETER           :: BLIM  = 5.5
@@ -1360,29 +1379,30 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,parameter
                 SNOWH(I,J)=SNOW(I,J)*0.01               ! SNOW in mm and SNOWH in m
 	    ELSE
 	      
+#ifdef SPATIAL_SOIL
+              BEXP   = BEXP_3D(I,:,J)
+              SMCMAX = SMCMAX_3D(I,:,J)
+              PSISAT = PSISAT_3D(I,:,J)
+#else
               BEXP   =   BEXP_TABLE(ISLTYP(I,J))
               SMCMAX = SMCMAX_TABLE(ISLTYP(I,J))
               PSISAT = PSISAT_TABLE(ISLTYP(I,J))
-
+#endif
               DO NS=1, NSOIL
-	        IF ( SMOIS(I,NS,J) > SMCMAX )  SMOIS(I,NS,J) = SMCMAX
-              END DO
-              IF ( ( BEXP > 0.0 ) .AND. ( SMCMAX > 0.0 ) .AND. ( PSISAT > 0.0 ) ) THEN
-                DO NS=1, NSOIL
+	        IF ( SMOIS(I,NS,J) > SMCMAX(NS) )  SMOIS(I,NS,J) = SMCMAX(NS)
+                IF ( ( BEXP(NS) > 0.0 ) .AND. ( SMCMAX(NS) > 0.0 ) .AND. ( PSISAT(NS) > 0.0 ) ) THEN
                    IF ( TSLB(I,NS,J) < 273.149 ) THEN    ! Use explicit as initial soil ice
-                      FK=(( (HLICE/(GRAV*(-PSISAT))) *                              &
-                           ((TSLB(I,NS,J)-T0)/TSLB(I,NS,J)) )**(-1/BEXP) )*SMCMAX
+                      FK=(( (HLICE/(GRAV*(-PSISAT(NS)))) *                              &
+                           ((TSLB(I,NS,J)-T0)/TSLB(I,NS,J)) )**(-1/BEXP(NS)) )*SMCMAX(NS)
                       FK = MAX(FK, 0.02)
                       SH2O(I,NS,J) = MIN( FK, SMOIS(I,NS,J) )
                    ELSE
                       SH2O(I,NS,J)=SMOIS(I,NS,J)
                    ENDIF
-                END DO
-              ELSE
-                DO NS=1, NSOIL
+                ELSE
                    SH2O(I,NS,J)=SMOIS(I,NS,J)
-                END DO
-              ENDIF
+                ENDIF
+              ENDDO
             ENDIF
           ENDDO
        ENDDO
