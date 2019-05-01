@@ -141,8 +141,8 @@ contains
                    jj =  LUDRSL(k)%cell_j(m)
                    if(ii .gt. 0 .and. jj .gt. 0) then
                       if(OVRTSWCRT.ne.1) then
-                           LQLateral(k) = LQLateral(k)+runoff1x(ii,jj)*LUDRSL(k)%cellWeight(m)/1000 &
-                               *cellArea(ii,jj)
+                          ! LQLateral(k) = LQLateral(k)+runoff1x(ii,jj)*LUDRSL(k)%cellWeight(m)/1000 &
+                          !     *cellArea(ii,jj)
                       endif
                            LQLateral(k) = LQLateral(k)+runoff2x(ii,jj)*LUDRSL(k)%cellWeight(m)/1000 &
                                *cellArea(ii,jj)
@@ -179,6 +179,9 @@ contains
 
          ! !Adjust level of GW depth...(conceptual GW bucket units (mm))
          z_gwsubbas(bas) = z_gwsubbas(bas) + net_perc(bas) / basns_area(bas)   ! m
+
+         print *, "ADCHECK: bas basns_area", bas, basns_area(bas)
+         print *, "         z_gwsubbas net_perc", z_gwsubbas(bas), net_perc(bas)
 
          ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          !Calculate baseflow as a function of GW bucket depth...
@@ -243,6 +246,7 @@ contains
           qout_gwsubbas(bas) = 0.0
       endif   ! the basns is masked
 
+   print *, "         qout z_gwsubbas",  qout_gwsubbas(bas), z_gwsubbas(bas)
 
    END DO                 ! End loop for GW bucket calcs...
 

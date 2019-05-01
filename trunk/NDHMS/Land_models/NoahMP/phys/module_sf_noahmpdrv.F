@@ -666,19 +666,19 @@ CONTAINS
        !parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
 
        if (IOPT_RUN .eq. 3) then
-       !ADCHANGE: Limit nroot to bedrock layer.
-       parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
-       !ADCHANGE: Hard-code soil params below bedrock to be effectively null
-       parameters%smcmax((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         !ADCHANGE: Limit nroot to bedrock layer.
+         parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
+         !ADCHANGE: Hard-code soil params below bedrock to be effectively null
+         parameters%smcmax((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
        else
-          parameters%bedrocklyr = NSOIL
+         parameters%bedrocklyr = NSOIL
        endif
 
 ! Initialized local
