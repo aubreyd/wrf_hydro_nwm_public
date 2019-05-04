@@ -41,6 +41,7 @@
   REAL,    allocatable, DIMENSION(:,:)      :: LATVAL,LONVAL !-- lat lon
   REAL,    allocatable, DIMENSION(:,:)      :: TERRAIN
   REAL,    allocatable, DIMENSION(:,:)      :: landRunOff   ! used for NHDPLUS only
+  REAL,    allocatable, DIMENSION(:,:)      :: landRunOff_acc   ! used for NHDPLUS only
   REAL, allocatable,    DIMENSION(:)        :: CHLAT,CHLON   !  channel lat and lon
   ! INTEGER, allocatable, DIMENSION(:,:)    :: LAKE_MSKRT, BASIN_MSK,LAK_1K
   INTEGER, allocatable, DIMENSION(:,:)      :: LAK_1K
