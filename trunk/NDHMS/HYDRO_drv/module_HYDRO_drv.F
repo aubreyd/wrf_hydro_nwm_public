@@ -654,8 +654,15 @@ if (nlst_rt(did)%GWBASESWCRT        .ne. 0 .or. &
       if(nlst_rt(did)%OVRTSWCRT .ne. 0) then
          call OverlandRouting_drv(did)
       else
-         rt_domain(did)%overland%control%surface_water_head_routing = rt_domain(did)%overland%control%infiltration_excess
+         !rt_domain(did)%overland%control%surface_water_head_routing = rt_domain(did)%overland%control%infiltration_excess
+         !rt_domain(did)%overland%control%infiltration_excess = 0.
+         ! ADCHANGE: Updating landRunoff instead of surface_water_head_routing. This now allows 
+         !           landRunoff to include both infxsrt from the LSM and exfiltration (if subsfc 
+         !           is active) and prevents surface_water_head_routing from inadvertently being 
+         !           passed back to the LSM.
+         rt_domain(did)%landRunOff = rt_domain(did)%overland%control%infiltration_excess
          rt_domain(did)%overland%control%infiltration_excess = 0.
+         rt_domain(did)%overland%control%surface_water_head_routing = 0.
       endif
 #ifdef HYDRO_D
       call system_clock(count=clock_count_2, count_rate=clock_rate)
