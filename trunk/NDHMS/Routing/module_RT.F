@@ -125,6 +125,7 @@ CONTAINS
      if(nlst_rt(did)%UDMP_OPT .eq. 1) then
         allocate ( RT_DOMAIN(did)%landRunOff (ixrt,jxrt) )
         allocate ( RT_DOMAIN(did)%landRunOff_acc (ixrt,jxrt) )
+        RT_DOMAIN(did)%landRunOff = 0.0
         RT_DOMAIN(did)%landRunOff_acc = 0.0
      endif
 
