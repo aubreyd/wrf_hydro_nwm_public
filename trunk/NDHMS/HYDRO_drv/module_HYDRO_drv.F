@@ -663,9 +663,9 @@ if (nlst_rt(did)%GWBASESWCRT        .ne. 0 .or. &
            if (nlst_rt(did)%SUBRTSWCRT .ne. 0) then
              rt_domain(did)%landRunOff = rt_domain(did)%overland%control%infiltration_excess
            endif
-             rt_domain(did)%landRunOff_acc = rt_domain(did)%landRunOff_acc + rt_domain(did)%landRunOff
-             rt_domain(did)%overland%control%infiltration_excess = 0.
-             rt_domain(did)%overland%control%surface_water_head_routing = 0.
+           rt_domain(did)%landRunOff_acc = rt_domain(did)%landRunOff_acc + rt_domain(did)%landRunOff
+           rt_domain(did)%overland%control%infiltration_excess = 0.
+           rt_domain(did)%overland%control%surface_water_head_routing = 0.
          else
            rt_domain(did)%overland%control%surface_water_head_routing = rt_domain(did)%overland%control%infiltration_excess
            rt_domain(did)%overland%control%infiltration_excess = 0.
