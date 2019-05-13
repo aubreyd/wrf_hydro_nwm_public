@@ -669,7 +669,8 @@ if (nlst_rt(did)%GWBASESWCRT        .ne. 0 .or. &
          else
            rt_domain(did)%overland%control%surface_water_head_routing = rt_domain(did)%overland%control%infiltration_excess
            rt_domain(did)%overland%control%infiltration_excess = 0.
-      endif
+         endif
+     endif
 #ifdef HYDRO_D
       call system_clock(count=clock_count_2, count_rate=clock_rate)
       timeOr = timeOr     + float(clock_count_2-clock_count_1)/float(clock_rate)
