@@ -340,20 +340,21 @@ MODULE MODULE_SF_NOAHMPLSM
 !------------------------------------------------------------------------------------------!
 ! From the SOILPARM.TBL tables, as functions of soil category.
 !------------------------------------------------------------------------------------------!
-     REAL :: BEXP(NSOIL)   !B parameter
-     REAL :: SMCDRY(NSOIL) !dry soil moisture threshold where direct evap from top
-                           !layer ends (volumetric) (not used MB: 20140718)
-     REAL :: SMCWLT(NSOIL) !wilting point soil moisture (volumetric)
-     REAL :: SMCREF(NSOIL) !reference soil moisture (field capacity) (volumetric)
-     REAL :: SMCMAX(NSOIL) !porosity, saturated value of soil moisture (volumetric)
-     REAL :: PSISAT(NSOIL) !saturated soil matric potential
-     REAL :: DKSAT(NSOIL)  !saturated soil hydraulic conductivity
-     REAL :: DWSAT(NSOIL)  !saturated soil hydraulic diffusivity
-     REAL :: QUARTZ(NSOIL) !soil quartz content
-     REAL :: F1            !soil thermal diffusivity/conductivity coef (not used MB: 20140718)
-     REAL :: AXAJ          !Xinanjiang: Tension water distribution inflection parameter [-]
-     REAL :: BXAJ          !Xinanjiang: Tension water distribution shape parameter [-]
-     REAL :: XXAJ          !Xinanjiang: Free water distribution shape parameter [-]
+     REAL,ALLOCATABLE :: BEXP(:)   !B parameter
+     REAL,ALLOCATABLE :: SMCDRY(:) !dry soil moisture threshold where direct evap from top
+                                   !layer ends (volumetric) (not used MB: 20140718)
+     REAL,ALLOCATABLE :: SMCWLT(:) !wilting point soil moisture (volumetric)
+     REAL,ALLOCATABLE :: SMCREF(:) !reference soil moisture (field capacity) (volumetric)
+     REAL,ALLOCATABLE :: SMCMAX(:) !porosity, saturated value of soil moisture (volumetric)
+     REAL,ALLOCATABLE :: PSISAT(:) !saturated soil matric potential
+     REAL,ALLOCATABLE :: DKSAT(:)  !saturated soil hydraulic conductivity
+     REAL,ALLOCATABLE :: DWSAT(:)  !saturated soil hydraulic diffusivity
+     REAL,ALLOCATABLE :: QUARTZ(:) !soil quartz content
+     REAL :: F1                    !soil thermal diffusivity/conductivity coef (not used MB: 20140718)
+     REAL :: AXAJ                  !Xinanjiang: Tension water distribution inflection parameter [-]
+     REAL :: BXAJ                  !Xinanjiang: Tension water distribution shape parameter [-]
+     REAL :: XXAJ                  !Xinanjiang: Free water distribution shape parameter [-]
+
 !------------------------------------------------------------------------------------------!
 ! From the GENPARM.TBL file
 !------------------------------------------------------------------------------------------!
