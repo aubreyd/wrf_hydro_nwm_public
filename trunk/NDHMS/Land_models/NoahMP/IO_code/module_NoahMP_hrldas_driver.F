@@ -155,6 +155,8 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  hvt_2D     ! Canopy Height
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  mfsno_2D   ! Snow cover m parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfexp_2D! exponent in the shape parameter for soil resistance option 1
+  INTEGER, ALLOCATABLE, DIMENSION(:,:)    ::  bedrocklyr_2D ! lowest hydrologically active layer (below which is bedrock)
+  INTEGER                                 ::  kloop ! counter for nsoil loop
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -738,6 +740,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( hvt_2D     (XSTART:XEND,YSTART:YEND) )            ! Canopy Height
   ALLOCATE ( mfsno_2D   (XSTART:XEND,YSTART:YEND) )            ! Snow cover m parameter
   ALLOCATE ( rsurfexp_2D(XSTART:XEND,YSTART:YEND) )            ! exponent in the shape parameter for soil resistance option 1
+  ALLOCATE ( bedrocklyr_2D(XSTART:XEND,YSTART:YEND) )          ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1082,7 +1085,25 @@ module module_NoahMP_hrldas_driver
     CALL READ_3D_SOIL(noah_lsm%SPATIAL_FILENAME, XSTART, XEND, YSTART, YEND, &
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
-		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D)
+		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D, &
+                      BEDROCKLYR_2D)
+    !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.               
+    if (IOPT_RUN .eq. 3) then
+       !ADCHANGE: Hard-code soil params below bedrock to be effectively null                        
+       do kloop = 1, NSOIL                                                                                
+         where (BEDROCKLYR_2D .lt. kloop) 
+           SMCMAX_3D(:,kloop,:) = 1.e-9
+           SMCREF_3D(:,kloop,:) = 1.e-9
+           SMCWLT_3D(:,kloop,:) = 1.e-9
+           SMCDRY_3D(:,kloop,:) = 1.e-9
+           DKSAT_3D(:,kloop,:) = 1.e-9 
+           DWSAT_3D(:,kloop,:) = 1.e-9                                       
+         end where
+       enddo
+    else
+       print *, "OPT_RUN is not 3 so setting all layers as hydrologically active."
+       BEDROCKLYR_2D = NSOIL 
+    endif
 #endif
 
 !------------------------------------------------------------------------
@@ -1221,6 +1242,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
   else  ! for none restart
 
@@ -1319,6 +1343,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
@@ -1654,6 +1681,7 @@ end subroutine land_driver_ini
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+                 BEDROCKLYR_2D,                                               &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
