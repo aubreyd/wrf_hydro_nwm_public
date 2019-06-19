@@ -611,6 +611,18 @@ CONTAINS
 
 ! ----------------------------------------------------------------------
 
+! Allocate parameters data structures that vary with depth
+
+    allocate(parameters%BEXP(NSOIL))
+    allocate(parameters%SMCDRY(NSOIL))
+    allocate(parameters%SMCWLT(NSOIL))
+    allocate(parameters%SMCREF(NSOIL))
+    allocate(parameters%SMCMAX(NSOIL))
+    allocate(parameters%PSISAT(NSOIL))
+    allocate(parameters%DKSAT(NSOIL))
+    allocate(parameters%DWSAT(NSOIL))
+    allocate(parameters%QUARTZ(NSOIL))
+
     CALL NOAHMP_OPTIONS(IDVEG  ,IOPT_CRS  ,IOPT_BTR  ,IOPT_RUN  ,IOPT_SFC  ,IOPT_FRZ , &
                      IOPT_INF  ,IOPT_RAD  ,IOPT_ALB  ,IOPT_SNF  ,IOPT_TBOT, IOPT_STC , &
 		     IOPT_RSF  ,IOPT_SOIL ,IOPT_PEDO ,IOPT_CROP, IOPT_IMPERV )
@@ -1510,6 +1522,18 @@ CONTAINS
           ENDIF                                                         ! endif of land-sea test
       ENDDO ILOOP                                                       ! of I loop
    ENDDO JLOOP                                                          ! of J loop
+
+! Deallocate parameters data structures that vary with depth
+
+    deallocate(parameters%BEXP)
+    deallocate(parameters%SMCDRY)
+    deallocate(parameters%SMCWLT)
+    deallocate(parameters%SMCREF)
+    deallocate(parameters%SMCMAX)
+    deallocate(parameters%PSISAT)
+    deallocate(parameters%DKSAT)
+    deallocate(parameters%DWSAT)
+    deallocate(parameters%QUARTZ)
 
 !------------------------------------------------------
   END SUBROUTINE noahmplsm
