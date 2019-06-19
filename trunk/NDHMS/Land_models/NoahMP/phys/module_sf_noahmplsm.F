@@ -6983,9 +6983,9 @@ ENDIF   ! CROPTYPE == 0
                       PDDUM  ,RUNSRF )                           !out
        END IF
  
-       IF (OPT_TDRN ==1 .AND. OPT_RUN == 3) THEN
-          CALL TILE_DRAIN (parameters,NSOIL,SH2O,SMC,SICE,ZSOIL,QTLDRN)
-       END IF
+       !IF (OPT_TDRN ==1 .AND. OPT_RUN == 3) THEN ! Call Tile Drainage - Prasanth Valayamkunnath-6/16/2019
+       !   CALL TILE_DRAIN (parameters,NSOIL,SH2O,SMC,SICE,ZSOIL,QTLDRN)
+       !END IF
        
        CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM  ,ETRANI , & !in
                    QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
@@ -7001,16 +7001,20 @@ ENDIF   ! CROPTYPE == 0
        RSAT =  RSAT + WPLUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
        RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
-       QTLDRN_SAVE = QTLDRN_SAVE + QTLDRN
+       !QTLDRN_SAVE = QTLDRN_SAVE + QTLDRN
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
     RUNSRF = RUNSRF_SAVE/NITER
-    QTLDRN = QTLDRN_SAVE/NITER !(mm)
+    !QTLDRN = QTLDRN_SAVE/NITER !(mm)
     
     RUNSRF = RUNSRF * 1000. + RSAT * 1000./DT  ! m/s -> mm/s
     QDRAIN = QDRAIN * 1000.
 
+    IF (OPT_TDRN ==1 .AND. OPT_RUN == 3) THEN ! Call Tile Drainage - Prasanth Valayamkunnath-6/19/2019
+        CALL TILE_DRAIN (parameters,NSOIL,SH2O,SMC,SICE,ZSOIL,QTLDRN)
+    END IF
+    
 !WRF_HYDRO_DJG...
 !yw    INFXSRT = RUNSRF * DT   !mm/s -> mm
 
