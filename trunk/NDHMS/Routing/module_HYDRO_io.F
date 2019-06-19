@@ -5717,7 +5717,6 @@ end subroutine mpp_output_chrt
 
           if (nlst_rt(did)%TDRAINRT .eq. 1) then
             iret = nf90_def_var(ncid, "qtiledrain", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
-            call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
           end if
           
           iret = nf90_enddef(ncid)
@@ -5734,7 +5733,9 @@ end subroutine mpp_output_chrt
         call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT,"infxsrt"  )
         call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm,"sfcheadrt" )
 
-
+        if (nlst_rt(did)%TDRAINRT .eq. 1) then
+           call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
+         end if
 #ifdef MPP_LAND
      if(IO_id.eq.my_id) then
 #endif
@@ -5940,7 +5941,6 @@ end subroutine mpp_output_chrt
 
     if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
         iret = nf90_def_var(ncid, "qtiledrain", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
-        call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
     end if
 
    !         put global attribute
@@ -5974,6 +5974,10 @@ if( nlst_rt(did)%channel_only       .eq. 0 .and. &
    call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm,"sfcheadrt"  ) 
 
 end if ! neither channel_only nor channelBucket_only
+
+if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
+    call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
+end if
 
 if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
    nlst_rt(did)%OVRTSWCRT   .eq. 1 .or. &
