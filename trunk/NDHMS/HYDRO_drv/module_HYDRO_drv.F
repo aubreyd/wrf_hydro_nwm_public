@@ -622,12 +622,18 @@ if (nlst_rt(did)%GWBASESWCRT        .ne. 0 .or. &
                  RT_DOMAIN(did)%INFXSWGT, nlst_rt(did)%AGGFACTRT, RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx)
          endif
       endif
-
+ 
 #ifdef HYDRO_D
       call system_clock(count=clock_count_1, count_rate=clock_rate)
 #endif
    endif !! channel_only & channelBucket_only == 0
-
+   
+    if(nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage by Prasanth Valayamkunnath 06/17/2019
+       call RunOffDisag(RT_DOMAIN(did)%QTILEDRAIN, RT_DOMAIN(did)%tiledrainRunOff,        &
+            rt_domain(did)%dist_lsm(:,:,9),rt_domain(did)%overland%properties%distance_to_neighbor(:,:,9), &
+            RT_DOMAIN(did)%INFXSWGT, nlst_rt(did)%AGGFACTRT, RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx)
+            !print*, "QTILEDRAIN=",RT_DOMAIN(did)%QTILEDRAIN
+    end if ! Tile Drainage end
 
    ! step 2)
    if(nlst_rt(did)%channel_only .eq. 0 .and. nlst_rt(did)%channelBucket_only .eq. 0) then
@@ -924,7 +930,7 @@ if (nlst_rt(did)%CHANRTSWCRT.eq.1 .or. nlst_rt(did)%CHANRTSWCRT.eq.2) then
        , RT_DOMAIN(did)%LNLINKSL   &
        , RT_DOMAIN(did)%gtoNode, RT_DOMAIN(did)%toNodeInd, RT_DOMAIN(did)%nToInd      &
 #endif
-       , RT_DOMAIN(did)%CH_LNKRT_SL, RT_DOMAIN(did)%landRunOff   &
+       , RT_DOMAIN(did)%CH_LNKRT_SL, RT_DOMAIN(did)%landRunOff, RT_DOMAIN(did)%tiledrainRunOff   &
 #ifdef WRF_HYDRO_NUDGING
        , RT_DOMAIN(did)%nudge &
 #endif
@@ -934,6 +940,7 @@ if (nlst_rt(did)%CHANRTSWCRT.eq.1 .or. nlst_rt(did)%CHANRTSWCRT.eq.2) then
        ,                                     RT_DOMAIN(did)%HLINK    &
        , rt_domain(did)%nlinksize,            nlst_rt(did)%OVRTSWCRT &
        ,                                     nlst_rt(did)%SUBRTSWCRT &
+       ,                                     nlst_rt(did)%TDRAINRT   &
        , nlst_rt(did)%channel_only , nlst_rt(did)%channelBucket_only &
        )
 

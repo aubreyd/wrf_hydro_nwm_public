@@ -40,7 +40,7 @@
   INTEGER, allocatable, DIMENSION(:,:)      :: CH_NETLNK, GCH_NETLNK !-- assigns a unique value to each channel gridpoint, called links
   REAL,    allocatable, DIMENSION(:,:)      :: LATVAL,LONVAL !-- lat lon
   REAL,    allocatable, DIMENSION(:,:)      :: TERRAIN
-  REAL,    allocatable, DIMENSION(:,:)      :: landRunOff   ! used for NHDPLUS only
+  REAL,    allocatable, DIMENSION(:,:)      :: landRunOff, tiledrainRunOff   ! used for NHDPLUS only
   REAL, allocatable,    DIMENSION(:)        :: CHLAT,CHLON   !  channel lat and lon
   ! INTEGER, allocatable, DIMENSION(:,:)    :: LAKE_MSKRT, BASIN_MSK,LAK_1K
   INTEGER, allocatable, DIMENSION(:,:)      :: LAK_1K
@@ -54,7 +54,7 @@
   REAL,    allocatable, DIMENSION(:,:)      :: SO8LD_Vmax
   REAL   Vmax
   !REAL,    allocatable, DIMENSION(:,:)      :: SFCHEADRT,INFXSRT,LKSAT,LKSATRT  ! SFCHEAD moved to overland control module
-  REAL,    allocatable, DIMENSION(:,:)      :: INFXSRT,LKSAT,LKSATRT
+  REAL,    allocatable, DIMENSION(:,:)      :: INFXSRT,LKSAT,LKSATRT,QTILEDRAIN
   !REAL,    allocatable, DIMENSION(:,:)      :: SFCHEADSUBRT,INFXSUBRT,LKSATFAC  ! SFCHEADSUBRT, INFXSUBRT moved to overland control module
   REAL,    allocatable, DIMENSION(:,:)      :: LKSATFAC
   REAL,    allocatable, DIMENSION(:,:)      :: QSUBRT,ZWATTABLRT,QSUBBDRYRT,SOLDEPRT

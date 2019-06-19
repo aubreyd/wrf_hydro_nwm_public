@@ -5715,6 +5715,11 @@ end subroutine mpp_output_chrt
           iret = nf90_def_var(ncid, "infxsrt", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           iret = nf90_def_var(ncid, "sfcheadrt", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
 
+          if (nlst_rt(did)%TDRAINRT .eq. 1) then
+            iret = nf90_def_var(ncid, "qtiledrain", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+            call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
+          end if
+          
           iret = nf90_enddef(ncid)
 
 #ifdef MPP_LAND
@@ -5726,7 +5731,7 @@ end subroutine mpp_output_chrt
         !call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%SMCMAX1,"smcmax1") 
         !call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%SMCREF1,"smcref1" )
         !call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%SMCWLT1,"smcwlt1"  ) 
-        call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT,"infxsrt"  ) 
+        call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%INFXSRT,"infxsrt"  )
         call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%overland%control%surface_water_head_lsm,"sfcheadrt" )
 
 
@@ -5845,7 +5850,6 @@ end subroutine mpp_output_chrt
           iret = nf90_def_var(ncid, "infxsrt", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           iret = nf90_def_var(ncid, "soldrain", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           iret = nf90_def_var(ncid, "sfcheadrt", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
-
        end if  ! neither channel_only nor channelBucket_only
 
    if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
@@ -5933,7 +5937,12 @@ end subroutine mpp_output_chrt
    end if  !  end if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
 !                    nlst_rt(did)%OVRTSWCRT   .eq. 1 .or. &
 !                    nlst_rt(did)%GWBASESWCRT .ne. 0       ) 
-	      
+
+    if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
+        iret = nf90_def_var(ncid, "qtiledrain", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+        call w_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain"  )
+    end if
+
    !         put global attribute
    iret = nf90_put_att(ncid, NF90_GLOBAL, "his_out_counts", rt_domain(did)%his_out_counts)
    iret = nf90_put_att(ncid, NF90_GLOBAL, "Restart_Time", nlst_rt(did)%olddate(1:19))
@@ -6187,6 +6196,10 @@ end if  ! end if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
           write(iunit,ERR=101) rt_domain(did)%INFXSRT
           write(iunit,ERR=101) rt_domain(did)%soldrain
           write(iunit,ERR=101) rt_domain(did)%overland%control%surface_water_head_lsm
+          
+          if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
+            write(iunit,ERR=101) rt_domain(did)%QTILEDRAIN
+          end if
 
           if(nlst_rt(did)%SUBRTSWCRT.EQ.1.OR.nlst_rt(did)%OVRTSWCRT.EQ.1 .or. nlst_rt(did)%GWBASESWCRT .ne. 0) then
                 if(nlst_rt(did)%CHANRTSWCRT.EQ.1) then
@@ -6213,6 +6226,7 @@ end if  ! end if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
                 endif
           end if  
 
+          
         close(iunit)
     endif
     call mpp_land_sync()
@@ -6280,6 +6294,11 @@ end if  ! end if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
           read(iunit,ERR=101) rt_domain(did)%INFXSRT
           read(iunit,ERR=101) rt_domain(did)%soldrain
           read(iunit,ERR=101) rt_domain(did)%overland%control%surface_water_head_lsm
+          
+          if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
+            read(iunit,ERR=101) rt_domain(did)%QTILEDRAIN
+          end if
+          
           if(nlst_rt(did)%SUBRTSWCRT.EQ.0.and.nlst_rt(did)%OVRTSWCRT.EQ.0) rt_domain(did)%overland%control%surface_water_head_lsm = 0
 
           if(nlst_rt(did)%SUBRTSWCRT.EQ.1.OR.nlst_rt(did)%OVRTSWCRT.EQ.1 .or. nlst_rt(did)%GWBASESWCRT .ne. 0) then
@@ -6751,6 +6770,10 @@ if( nlst_rt(did)%channel_only       .eq. 0 .and. &
    !call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%SMCWLT1,"smcwlt1")
 
 endif ! neither channel_only nor channelBucket_only
+
+if (nlst_rt(did)%TDRAINRT .eq. 1) then ! Tile Drainage- Prasanth Valayamkunnath
+    call read_rst_nc2(ncid,rt_domain(did)%ix,rt_domain(did)%jx,rt_domain(did)%QTILEDRAIN,"qtiledrain")
+end if
 
 if(nlst_rt(did)%SUBRTSWCRT  .eq. 1 .or. &
    nlst_rt(did)%OVRTSWCRT   .eq. 1 .or. &

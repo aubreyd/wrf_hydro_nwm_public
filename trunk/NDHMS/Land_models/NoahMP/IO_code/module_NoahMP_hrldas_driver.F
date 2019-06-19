@@ -40,7 +40,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-   REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain
+   REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain, qtiledrain
    !LRK - Remove HRLDAS_ini_typ for WRF-Hydro
    integer :: forc_typ, snow_assim, HRLDAS_ini_typ
    !integer :: forc_typ, snow_assim
@@ -112,6 +112,7 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  IOPT_RSF  ! surface resistance option (1->Zeng; 2->simple)
   INTEGER                                 ::  IZ0TLND   ! option of Chen adjustment of Czil (not used)
   INTEGER                                 ::  IOPT_CROP ! crop model option (0->none; 1->Liu et al.; 2->Gecros)
+  INTEGER                                 ::  IOPT_TDRN ! drainage option (0->none; 1->on) !Prasanth
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  T_PHY     ! 3D atmospheric temperature valid at mid-levels [K]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  QV_CURR   ! 3D water vapor mixing ratio [kg/kg_dry]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  U_PHY     ! 3D U wind component [m/s]
@@ -263,6 +264,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  CHB2XY    ! bare 2m exchange coefficient
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  Z0        ! roughness length output to WRF
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  ZNT       ! roughness length output to WRF
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QTDRAIN   ! tile drain discharge (mm) !Prasanth
   INTEGER   ::  ids,ide, jds,jde, kds,kde,  &  ! d -> domain
    &            ims,ime, jms,jme, kms,kme,  &  ! m -> memory
    &            its,ite, jts,jte, kts,kte      ! t -> tile
@@ -413,6 +415,7 @@ module module_NoahMP_hrldas_driver
   integer            :: surface_resistance_option
 
   integer            :: crop_option = 0
+  integer            :: drainage_option=0 !Prasanth
 
   integer            :: split_output_count = 1
   integer            :: khour
@@ -451,7 +454,7 @@ module module_NoahMP_hrldas_driver
        frozen_soil_option, radiative_transfer_option, snow_albedo_option, &
        pcp_partition_option, tbot_option, temp_time_scheme_option, &
        glacier_option, surface_resistance_option, &
-
+       crop_option,drainage_option,& !Prasanth
        split_output_count, &
        khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
        spatial_filename, &
@@ -555,7 +558,7 @@ module module_NoahMP_hrldas_driver
   IOPT_GLA = glacier_option
   IOPT_RSF = surface_resistance_option
   IOPT_CROP = crop_option
-
+  IOPT_TDRN = drainage_option   !Prasanth
 
   !!----------------------------------------------------------------------------
   !! channel_only
@@ -952,7 +955,8 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( CHB2XY    (XSTART:XEND,YSTART:YEND) )  ! bare 2m exchange coefficient
   ALLOCATE ( Z0        (XSTART:XEND,YSTART:YEND) )  ! roughness length output to WRF
   ALLOCATE ( ZNT       (XSTART:XEND,YSTART:YEND) )  ! roughness length output to WRF
-
+  ALLOCATE ( QTDRAIN   (XSTART:XEND,YSTART:YEND) )  ! tile drainage (mm) !Prasanth
+  
   ALLOCATE ( XLONIN    (XSTART:XEND,YSTART:YEND) )  ! longitude
   ALLOCATE ( TERRAIN   (XSTART:XEND,YSTART:YEND) )  ! terrain height
   ALLOCATE ( GVFMIN    (XSTART:XEND,YSTART:YEND) )  ! annual minimum in vegetation fraction
@@ -1152,6 +1156,7 @@ module module_NoahMP_hrldas_driver
   CHSTARXY   = undefined_real
   Z0         = undefined_real
   ZNT        = undefined_real
+  QTDRAIN    = undefined_real !Prasanth
 
 #ifdef WRF_HYDRO
   SOILSAT_TOP = undefined_real
@@ -1269,6 +1274,7 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QSFC"    , QSFC     )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCRUNOFF",SFCRUNOFF   )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UDRUNOFF" ,UDRUNOFF    )
+     call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "QTDRAIN"  ,QTDRAIN  )
 #ifdef WRF_HYDRO
      if(checkRstV("ACCPRCP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCPRCP"  ,ACCPRCP    )
      if(checkRstV("ACCECAN") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCECAN"  ,ACCECAN    )
@@ -1317,7 +1323,7 @@ module module_NoahMP_hrldas_driver
                   ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
                   ims,ime, jms,jme, kms,kme,                &  ! memory
                   its,ite, jts,jte, kts,kte                 &  ! tile
-                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
+                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy ,qtdrain ,areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
                      )
@@ -1415,7 +1421,7 @@ module module_NoahMP_hrldas_driver
                   ids,ide+1, jds,jde+1, kds,kde,                &  ! domain
                   ims,ime, jms,jme, kms,kme,                &  ! memory
                   its,ite, jts,jte, kts,kte                 &  ! tile
-                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
+                     ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy ,qtdrain  ,areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
                      )
@@ -1443,13 +1449,14 @@ module module_NoahMP_hrldas_driver
    allocate( soldrain  (ix,jx) )
    allocate( etpnd     (ix,jx) )
    allocate( prcp0     (ix,jx) )
-
+   allocate( qtiledrain(ix,jx) )
    prcp0     = 0
    sfcheadrt = 0.0
    infxsrt   = 0.0
    etpnd     = 0.0
    soldrain  = 0.0
-
+   qtiledrain= 0.0
+   
    allocate(zsoil (NSOIL))
    zsoil = 0
 
@@ -1462,7 +1469,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
-         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, SMOIS,real(noah_timestep),          &
+         infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL, SMOIS,real(noah_timestep),          &
          olddate,zsoil(1:NSOIL))
 
 call get_iocflag(1, io_config_outputs)
@@ -1580,8 +1587,8 @@ end subroutine land_driver_ini
 
 #ifdef WRF_HYDRO
       if(forc_typ .eq. 8) then
-          call read_forc_ldasout(olddate,hgrid, indir, dtbl,ix,jx,infxsrt,soldrain)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call read_forc_ldasout(olddate,hgrid, indir, dtbl,ix,jx,infxsrt,soldrain,qtiledrain)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1596,7 +1603,7 @@ end subroutine land_driver_ini
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
           call read_channel_only(olddate, hgrid_hydro, indir, forcing_timestep)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1723,14 +1730,14 @@ end subroutine land_driver_ini
 		  XLAND,     XICE,     XICE_THRESHOLD,                        &
                   IDVEG, IOPT_CRS, IOPT_BTR, IOPT_RUN,  IOPT_SFC,   IOPT_FRZ, &
 	       IOPT_INF, IOPT_RAD, IOPT_ALB, IOPT_SNF, IOPT_TBOT,   IOPT_STC, &
-	       IOPT_GLA, IOPT_RSF,IOPT_CROP, IZ0TLND,                         &
+	       IOPT_GLA, IOPT_RSF,IOPT_CROP,IOPT_TDRN, IZ0TLND,                         &
 		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, &
 		    P8W,   RAINBL,       SR,                                  &
 		    TSK,      HFX,      QFX,       LH,    GRDFLX,     SMSTAV, &
 		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
 		   SH2O,     TSLB,     SNOW,    SNOWH,    CANWAT,     ACSNOM, &
 		 ACSNOW,    EMISS,     QSFC,                                  &
- 		     Z0,      ZNT,                                            & ! IN/OUT LSM eqv
+ 		     Z0,      ZNT, QTDRAIN,                                   & ! IN/OUT LSM eqv
 		ISNOWXY,     TVXY,     TGXY, CANICEXY,  CANLIQXY,      EAHXY, &
 		  TAHXY,     CMXY,     CHXY,   FWETXY,  SNEQVOXY,   ALBOLDXY, &
 		QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY,      WTXY,     TSNOXY, &
@@ -1753,7 +1760,7 @@ end subroutine land_driver_ini
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
 #endif
 #ifdef WRF_HYDRO
-                 sfcheadrt,INFXSRT,soldrain,                          &    !O
+                 sfcheadrt,INFXSRT,soldrain,qtiledrain,                &    !O
 #endif
                 ids,ide, jds,jde, kds,kde,                      &
                 ims,ime, jms,jme, kms,kme,                      &
@@ -1797,7 +1804,7 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL)
+     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
 #endif
 
 ! Output for history
@@ -2104,6 +2111,7 @@ integer, intent(in)  :: itime ! time step of the LSM
    call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(SNOWT_AVG),IVGTYP,95)
    call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNDXY,IVGTYP,96)
    call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNIXY,IVGTYP,97)
+   call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QTDRAIN,IVGTYP,98)
 #endif /* WRF_HYDRO */
 
 !#ifdef WRF_HYDRO
@@ -2182,6 +2190,7 @@ subroutine lsm_restart()
   call add_to_restart(ncid,QSFC      , "QSFC"  )
   call add_to_restart(ncid,SFCRUNOFF , "SFCRUNOFF")
   call add_to_restart(ncid,UDRUNOFF  , "UDRUNOFF" )
+  call add_to_restart(ncid,QTDRAIN   , "QTDRAIN")
 #ifdef WRF_HYDRO
   call add_to_restart(ncid,ACCPRCP   , "ACCPRCP" )
   call add_to_restart(ncid,ACCECAN   , "ACCECAN" )
@@ -2298,6 +2307,7 @@ subroutine lsm_rst_bi_out()
   write(iunit,ERR=101) QSFC
   write(iunit,ERR=101) SFCRUNOFF
   write(iunit,ERR=101) UDRUNOFF
+  write(iunit,ERR=101) QTDRAIN
 ! #ifndef REALTIME
 ! #ifdef WRF_HYDRO
 !   write(iunit,ERR=101) ACCPRCP
@@ -2426,6 +2436,7 @@ subroutine lsm_rst_bi_in()
   read(iunit,ERR=101) QSFC
   read(iunit,ERR=101) SFCRUNOFF
   read(iunit,ERR=101) UDRUNOFF
+  read(iunit,ERR=101) QTDRAIN
 ! #ifndef REALTIME
 ! #ifdef WRF_HYDRO
 !   read(iunit,ERR=101) ACCPRCP
@@ -2529,6 +2540,7 @@ end subroutine lsm_rst_bi_in
   call define_rst_var(ncid,QSFC      , "QSFC"  )
   call define_rst_var(ncid,SFCRUNOFF , "SFCRUNOFF")
   call define_rst_var(ncid,UDRUNOFF  , "UDRUNOFF" )
+  call define_rst_var(ncid,QTDRAIN   , "QTDRAIN" )
 #ifdef WRF_HYDRO
   call define_rst_var(ncid,ACCPRCP   , "ACCPRCP" )
   call define_rst_var(ncid,ACCECAN   , "ACCECAN" )

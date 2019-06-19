@@ -35,14 +35,14 @@ CONTAINS
 		 XLAND,     XICE,XICE_THRES,                                & ! IN : Vegetation/Soil characteristics
                  IDVEG, IOPT_CRS,  IOPT_BTR, IOPT_RUN, IOPT_SFC, IOPT_FRZ,  & ! IN : User options
               IOPT_INF, IOPT_RAD,  IOPT_ALB, IOPT_SNF,IOPT_TBOT, IOPT_STC,  & ! IN : User options
-              IOPT_GLA, IOPT_RSF, IOPT_CROP,  IZ0TLND,                      & ! IN : User options
+              IOPT_GLA, IOPT_RSF, IOPT_CROP,IOPT_TDRN,  IZ0TLND,                      & ! IN : User options
                    T3D,     QV3D,     U_PHY,    V_PHY,   SWDOWN,      GLW,  & ! IN : Forcing
 		 P8W3D,PRECIP_IN,        SR,                                & ! IN : Forcing
                    TSK,      HFX,      QFX,        LH,   GRDFLX,    SMSTAV, & ! IN/OUT LSM eqv
                 SMSTOT,SFCRUNOFF, UDRUNOFF,    ALBEDO,    SNOWC,     SMOIS, & ! IN/OUT LSM eqv
 		  SH2O,     TSLB,     SNOW,     SNOWH,   CANWAT,    ACSNOM, & ! IN/OUT LSM eqv
 		ACSNOW,    EMISS,     QSFC,                                 & ! IN/OUT LSM eqv
- 		    Z0,      ZNT,                                           & ! IN/OUT LSM eqv
+ 		    Z0,      ZNT, QTDRAIN,                                  & ! IN/OUT LSM eqv
                ISNOWXY,     TVXY,     TGXY,  CANICEXY, CANLIQXY,     EAHXY, & ! IN/OUT Noah MP only
 	         TAHXY,     CMXY,     CHXY,    FWETXY, SNEQVOXY,  ALBOLDXY, & ! IN/OUT Noah MP only
                QSNOWXY, WSLAKEXY,    ZWTXY,      WAXY,     WTXY,    TSNOXY, & ! IN/OUT Noah MP only
@@ -65,7 +65,7 @@ CONTAINS
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
 #endif
 #ifdef WRF_HYDRO
-               sfcheadrt,INFXSRT,soldrain,                                  &
+               sfcheadrt,INFXSRT,soldrain,qtiledrain,                 &
 #endif
                ids,ide,  jds,jde,  kds,kde,                    &
                ims,ime,  jms,jme,  kms,kme,                    &
@@ -119,6 +119,7 @@ CONTAINS
     INTEGER,                                         INTENT(IN   ) ::  IOPT_GLA  ! glacier option (1->phase change; 2->simple)
     INTEGER,                                         INTENT(IN   ) ::  IOPT_RSF  ! surface resistance (1->Sakaguchi/Zeng; 2->Seller; 3->mod Sellers; 4->1+snow)
     INTEGER,                                         INTENT(IN   ) ::  IOPT_CROP ! crop model option (0->none; 1->Liu et al.; 2->Gecros)
+    INTEGER,                                         INTENT(IN   ) ::  IOPT_TDRN ! tile drainage !Prasanth
     INTEGER,                                         INTENT(IN   ) ::  IZ0TLND   ! option of Chen adjustment of Czil (not used)
     REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) ::  T3D       ! 3D atmospheric temperature valid at mid-levels [K]
     REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) ::  QV3D      ! 3D water vapor mixing ratio [kg/kg_dry]
@@ -137,8 +138,11 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_SNOW   ! snow precipitation entering land model [mm]       ! MB/AN : v3.7
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_GRAUP  ! graupel precipitation entering land model [mm]    ! MB/AN : v3.7
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_HAIL   ! hail precipitation entering land model [mm]       ! MB/AN : v3.7
+    
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  QTDRAIN   ! Prasanth
+    
 #ifdef WRF_HYDRO
-    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  sfcheadrt,INFXSRT,soldrain   ! for WRF-Hydro
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  sfcheadrt,INFXSRT,soldrain, qtiledrain   ! for WRF-Hydro
 #endif
 #ifdef SPATIAL_SOIL
     REAL,    DIMENSION( ims:ime, 1:nsoil, jms:jme ), INTENT(IN) ::  BEXP_3D   ! C-H B exponent
@@ -369,6 +373,7 @@ CONTAINS
     REAL                                :: PLAI         ! leaf area index
     REAL                                :: PSAI         ! stem area index
     REAL                                :: TAUSS        ! non-dimensional snow age
+    REAL                                :: QTLDRN       ! tile drainage (mm)    
 
 ! OUT (with no Noah LSM equivalent)
 
@@ -469,7 +474,7 @@ CONTAINS
 
     CALL NOAHMP_OPTIONS(IDVEG  ,IOPT_CRS  ,IOPT_BTR  ,IOPT_RUN  ,IOPT_SFC  ,IOPT_FRZ , &
                      IOPT_INF  ,IOPT_RAD  ,IOPT_ALB  ,IOPT_SNF  ,IOPT_TBOT, IOPT_STC , &
-		     IOPT_RSF  ,IOPT_CROP )
+		             IOPT_RSF  ,IOPT_CROP ,IOPT_TDRN)
 
     IPRINT    =  .false.                     ! debug printout
 
@@ -622,6 +627,7 @@ CONTAINS
        SMCWTD                = SMCWTDXY(I,J)
        RECH                  = 0.
        DEEPRECH              = 0.
+       QTLDRN                = 0. !QTDRAIN (I,J)                ! tile drainage (mm)
 
        SLOPETYP     = 1                               ! set underground runoff slope term
        IST          = 1                               ! MP surface type: 1 = land; 2 = lake
@@ -728,6 +734,7 @@ CONTAINS
          RTMASS = undefined_value 
          STMASS = undefined_value 
          WOOD   = undefined_value 
+         QTLDRN = undefined_value 
          STBLCP = undefined_value 
          FASTCP = undefined_value 
          PLAI   = undefined_value 
@@ -791,7 +798,7 @@ CONTAINS
             STMASS  , WOOD    , STBLCP  , FASTCP  , PLAI    , PSAI    , & ! IN/OUT : 
             CM      , CH      , TAUSS   ,                               & ! IN/OUT : 
             GRAIN   , GDD     , PGS     ,                               & ! IN/OUT 
-            SMCWTD  ,DEEPRECH , RECH    ,                               & ! IN/OUT :
+            SMCWTD  ,DEEPRECH , RECH    , QTLDRN  ,                     & ! IN/OUT :
             Z0WRF   ,                                                   &
             FSA     , FSR     , FIRA    , FSH     , SSOIL   , FCEV    , & ! OUT : 
             FGEV    , FCTR    , ECAN    , ETRAN   , ESOIL   , TRAD    , & ! OUT : 
@@ -840,7 +847,7 @@ CONTAINS
 
             soldrain(i,j) = max(RUNSB*dt, 0.)        !mm , underground runoff
             INFXSRT(i,j) = RUNSF*dt        !mm , surface runoff
-
+            qtiledrain (i,j) = QTLDRN
 #endif
 
 
@@ -849,7 +856,7 @@ CONTAINS
              TSK      (I,J)                = TRAD
              HFX      (I,J)                = FSH
              GRDFLX   (I,J)                = SSOIL
-	     SMSTAV   (I,J)                = 0.0  ! [maintained as Noah consistency]
+	         SMSTAV   (I,J)                = 0.0  ! [maintained as Noah consistency]
              SMSTOT   (I,J)                = 0.0  ! [maintained as Noah consistency]
              SFCRUNOFF(I,J)                = SFCRUNOFF(I,J) + RUNSF * DT
              UDRUNOFF (I,J)                = UDRUNOFF(I,J)  + RUNSB * DT
@@ -919,7 +926,7 @@ CONTAINS
              XLAIXY   (I,J)                = PLAI
              XSAIXY   (I,J)                = PSAI
              TAUSSXY  (I,J)                = TAUSS
-
+             QTDRAIN  (I,J)                = QTDRAIN (I,J)+ QTLDRN
 ! OUTPUT
 
              Z0       (I,J)                = Z0WRF
@@ -1227,7 +1234,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
        ids,ide, jds,jde, kds,kde,                &
        ims,ime, jms,jme, kms,kme,                &
        its,ite, jts,jte, kts,kte,                &
-       smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy, dx, dy, msftx, msfty,&     ! Optional groundwater
+       smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy ,qtdrain ,areaxy, dx, dy, msftx, msfty,&     ! Optional groundwater
        wtddt    ,stepwtd  ,dt       ,qrfsxy     ,qspringsxy  , qslatxy    ,  &      ! Optional groundwater
        fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy            )    ! Optional groundwater
 
@@ -1299,6 +1306,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: fastcpxy    !short-lived carbon, shallow soil [g/m2]
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: xsaixy      !stem area index
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: lai         !leaf area index
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: qtdrain     !tile drainage (mm)
 
 ! IOPT_RUN = 5 option
 
@@ -1441,6 +1449,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
 
        DO J = jts,jtf
           DO I = its,itf
+             qtdrain    (I,J) = 0.
              tvxy       (I,J) = TSK(I,J)
 	       if(snow(i,j) > 0.0 .and. tsk(i,j) > 273.15) tvxy(I,J) = 273.15
              tgxy       (I,J) = TSK(I,J)

@@ -1551,7 +1551,7 @@ end subroutine drive_CHANNEL
         LNLINKSL, &
         gtoNode,toNodeInd,nToNodeInd,   &
 #endif
-         CH_LNKRT_SL, landRunOff  &
+         CH_LNKRT_SL, landRunOff, tiledrainRunOff  &
 #ifdef WRF_HYDRO_NUDGING
        , nudge &
 #endif
@@ -1559,7 +1559,7 @@ end subroutine drive_CHANNEL
        , qSfcLatRunoff,     qBucket                  &
        , QLateral, velocity                          &
        , HLINK                                       &
-       , nsize , OVRTSWCRT, SUBRTSWCRT, channel_only, channelBucket_only)
+        , nsize , OVRTSWCRT, SUBRTSWCRT, TDRAINRT, channel_only, channelBucket_only)
 
        use module_UDMAP, only: LNUMRSL, LUDRSL
        use module_namelist, only:  nlst_rt
@@ -1577,13 +1577,13 @@ end subroutine drive_CHANNEL
 
 ! -------- DECLARATIONS ------------------------
 
-       integer, intent(IN) :: did, IXRT,JXRT,channel_option, OVRTSWCRT, SUBRTSWCRT
+       integer, intent(IN) :: did, IXRT,JXRT,channel_option, OVRTSWCRT, SUBRTSWCRT, TDRAINRT
        integer, intent(IN) :: NLAKES, NLINKSL, nlinks
        integer, intent(INOUT) :: KT   ! flag of cold start (1) or continue run.
        real, intent(IN), dimension(IXRT,JXRT)    :: QSTRMVOLRT
        real, intent(IN), dimension(IXRT,JXRT)    :: LAKEINFLORT
        real, intent(IN), dimension(IXRT,JXRT)    :: QINFLOWBASE
-       real, dimension(ixrt,jxrt) :: landRunOff
+       real, dimension(ixrt,jxrt) :: landRunOff,tiledrainRunOff
 
        integer, intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT
        integer, intent(IN), dimension(IXRT,JXRT) :: CH_LNKRT_SL
@@ -1736,6 +1736,7 @@ else
 
    tmpQLateral = 0  !! WHY DOES THIS tmp variable EXIST?? Only for accumulations??
    tmpLQLateral = 0
+   
 
    ! NHDPLUS maping
    if(OVRTSWCRT .eq. 0)      then
@@ -1766,7 +1767,36 @@ else
       !! JLM: But then the next accumulation is added to the amt before zeroing? result
       !! JLM: should be identical to LQLateral.... I'm totally mystified.
    endif
+   
+   !-------Tile Drainage routing- Prasanth Valayamkunnath 6/17/2019-----
+    if(TDRAINRT .eq. 1) then
+      do k = 1, LNUMRSL
+         ! get from land grid runoff
+         do m = 1, LUDRSL(k)%ncell
+            ii =  LUDRSL(k)%cell_i(m)
+            jj =  LUDRSL(k)%cell_j(m)
+            LQLateral(k) = LQLateral(k)+tiledrainRunOff(ii,jj)*LUDRSL(k)%cellweight(m)/1000 &
+                *LUDRSL(k)%cellArea(m)/DT
+            tmpLQLateral(k) = tmpLQLateral(k)+tiledrainRunOff(ii,jj)*LUDRSL(k)%cellweight(m)/1000 &
+                *LUDRSL(k)%cellArea(m)/DT
+         end do
+      end do
 
+#ifdef MPP_LAND
+      call updateLinkV(tmpLQLateral, tmpQLateral)
+#endif
+      if(NLINKSL .gt. 0) then
+         if (nlst_rt(1)%output_channelBucket_influx .eq. 1 .or. &
+             nlst_rt(1)%output_channelBucket_influx .eq. 2      ) &
+               qSfcLatRunoff(1:NLINKSL) = tmpQLateral(1:NLINKSL)
+         if (nlst_rt(1)%output_channelBucket_influx .eq. 3) &
+              accSfcLatRunoff(1:NLINKSL) = accSfcLatRunoff(1:NLINKSL) + tmpQLateral(1:NLINKSL) * DT
+      endif
+      tmpLQLateral = 0
+      tmpQLateral = 0
+   endif
+   !----------------- END Tile Drainage----------------------------
+   
    !! JLM:: if ovrtswcrt=0 and subrtswcrt=1, then this accumulation is calculated twice for LQLateral???
    !! This impiles that if overland routing is off and subsurface routing is on, that
    !! qstrmvolrt represents only the subsurface contribution to the channel.

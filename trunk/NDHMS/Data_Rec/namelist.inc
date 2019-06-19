@@ -31,7 +31,7 @@
        integer :: output_channelBucket_influx ! used for FORCE_TYPE 9 and 10
 
           integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
-                  SUBRTSWCRT, OVRTSWCRT, AGGFACTRT, &
+                  SUBRTSWCRT, OVRTSWCRT,TDRAINRT, AGGFACTRT, &
                   GWBASESWCRT, GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                   sys_cpl, gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
                   gwsoilcpl, UDMP_OPT, bucket_loss

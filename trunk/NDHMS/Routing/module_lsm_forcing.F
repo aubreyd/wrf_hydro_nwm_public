@@ -3112,7 +3112,7 @@ end subroutine read_hydro_forcing_mpp1
 
   end subroutine READSNOW_FORC_mpp
 
-  subroutine read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+  subroutine read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain, qtiledrain)
 
       implicit none
       logical :: fexist
@@ -3121,7 +3121,7 @@ end subroutine read_hydro_forcing_mpp1
       character(len=19) :: outdate
       character(len=256) :: inflnm, inflnm2
       real :: dt
-      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2
+      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2, qtiledrain,qtiledrain2
       integer :: ncid, ierr
       character(len=256) :: units
 #ifdef MPP_LAND
@@ -3177,12 +3177,17 @@ end subroutine read_hydro_forcing_mpp1
         endif
         call decompose_data_real (gArr,soldrain)
         if(my_id .eq. io_id) then
+           call get_2d_netcdf("QTDRAIN",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
+        endif
+        call decompose_data_real (gArr,qtiledrain)
+        if(my_id .eq. io_id) then
             ierr = nf_close(ncid)
         endif
 #else
         ierr = nf_open(trim(inflnm), NF_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("QTDRAIN",     ncid, qtiledrain, units,  ix, jx, .TRUE., ierr)
         ierr = nf_close(ncid)
 #endif
 !       read file2
@@ -3197,23 +3202,28 @@ end subroutine read_hydro_forcing_mpp1
         endif
         call decompose_data_real (gArr,soldrain2)
         if(my_id .eq. io_id) then
+           call get_2d_netcdf("QTDRAIN",    ncid, gArr, units, global_nx, global_ny, .TRUE., ierr)
+        endif
+        call decompose_data_real (gArr,qtiledrain2)
+        if(my_id .eq. io_id) then
            ierr = nf_close(ncid)
         endif
 #else
         ierr = nf_open(trim(inflnm2), NF_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt2, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain2, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("QTDRAIN",    ncid, qtiledrain2, units,  ix, jx, .TRUE., ierr)
         ierr = nf_close(ncid)
 #endif
 
         infxsrt = infxsrt2 - infxsrt
         soldrain = soldrain2 - soldrain
-
+        qtiledrain  = qtiledrain2  - qtiledrain
    end subroutine read_ldasout
 
 !temporary for Noah model
 
-  subroutine read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+  subroutine read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain,qtiledrain)
       implicit none
       logical :: fexist
       integer :: ix,jx
@@ -3221,7 +3231,7 @@ end subroutine read_hydro_forcing_mpp1
       character(len=19) :: outdate
       character(len=256) :: inflnm, inflnm2
       real :: dt
-      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2
+      real, dimension(ix,jx):: infxsrt,infxsrt2,soldrain,soldrain2,qtiledrain,qtiledrain2
       integer :: ncid, ierr
       character(len=256) :: units
 
@@ -3266,37 +3276,40 @@ end subroutine read_hydro_forcing_mpp1
         ierr = nf_open(trim(inflnm), NF_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("QTDRAIN",     ncid, qtiledrain, units,  ix, jx, .TRUE., ierr)
         ierr = nf_close(ncid)
 !       read file2
         ierr = nf_open(trim(inflnm2), NF_NOWRITE, ncid)
         call get_2d_netcdf("SFCRNOFF",    ncid, infxsrt2, units,  ix, jx, .TRUE., ierr)
         call get_2d_netcdf("UGDRNOFF",    ncid, soldrain2, units,  ix, jx, .TRUE., ierr)
+        call get_2d_netcdf("QTDRAIN",     ncid, qtiledrain2, units,  ix, jx, .TRUE., ierr)
         ierr = nf_close(ncid)
 
         infxsrt = infxsrt2 - infxsrt
         soldrain = soldrain2 - soldrain
+        qtiledrain  = qtiledrain2 - qtiledrain
 
    end subroutine read_ldasout_seq
 end module module_lsm_forcing
 
-     subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+     subroutine read_forc_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain, qtiledrain)
       use module_lsm_forcing, only: read_ldasout
       implicit none
       integer :: ix,jx
       character(len=*) :: olddate,hgrid,indir
       real :: dt
-      real, dimension(ix,jx):: infxsrt,soldrain
-      call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+      real, dimension(ix,jx):: infxsrt,soldrain, qtiledrain
+      call read_ldasout(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain, qtiledrain)
     end subroutine read_forc_ldasout
     
-    subroutine read_forc_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+    subroutine read_forc_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain, qtiledrain)
 ! temporary for Noah model
       use module_lsm_forcing, only: read_ldasout_seq
       implicit none
       integer :: ix,jx
       character(len=*) :: olddate,hgrid,indir
       real :: dt
-      real, dimension(ix,jx):: infxsrt,soldrain
-      call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
+      real, dimension(ix,jx):: infxsrt,soldrain, qtiledrain
+      call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain, qtiledrain)
     end subroutine read_forc_ldasout_seq
 

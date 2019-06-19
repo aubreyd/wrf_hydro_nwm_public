@@ -125,7 +125,9 @@ CONTAINS
      if(nlst_rt(did)%UDMP_OPT .eq. 1) then
         allocate ( RT_DOMAIN(did)%landRunOff (ixrt,jxrt) )
      endif
-
+     if(nlst_rt(did)%TDRAINRT .eq. 1) then
+        allocate ( RT_DOMAIN(did)%tiledrainRunOff (ixrt,jxrt) )
+     endif
      allocate( rt_domain(did)%SMCRT   	(IXRT,JXRT,NSOIL) )
      rt_domain(did)%SMCRT   	= 0.0
      allocate( rt_domain(did)%soiltypRT   	(IXRT,JXRT) )
@@ -269,7 +271,8 @@ CONTAINS
             rt_domain(did)%LKSAT    = 0.0
   allocate( rt_domain(did)%SOLDRAIN   (IX,JX) )
             rt_domain(did)%SOLDRAIN    = 0.0
-
+  allocate( rt_domain(did)%QTILEDRAIN   (IX,JX) )
+            rt_domain(did)%QTILEDRAIN    = 0.0
   end if ! neither channel_only nor channelBucket_only
 
 

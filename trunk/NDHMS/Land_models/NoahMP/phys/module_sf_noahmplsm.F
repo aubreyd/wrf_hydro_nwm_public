@@ -160,6 +160,9 @@ MODULE MODULE_SF_NOAHMPLSM
                       ! **0 -> No crop model, will run default dynamic vegetation
                       !   1 -> Liu, et al. 2016
 
+  INTEGER :: OPT_TDRN ! options for crop model
+                      ! **0 -> No tile drainage
+                      !   1 -> on
 !------------------------------------------------------------------------------------------!
 ! Physical Constants:                                                                      !
 !------------------------------------------------------------------------------------------!
@@ -387,7 +390,7 @@ contains
                    STMASS  , WOOD    , STBLCP  , FASTCP  , LAI     , SAI     , & ! IN/OUT : 
                    CM      , CH      , TAUSS   ,                               & ! IN/OUT : 
                    GRAIN   , GDD     , PGS     ,                               & ! IN/OUT 
-                   SMCWTD  ,DEEPRECH , RECH    ,                               & ! IN/OUT :
+                   SMCWTD  ,DEEPRECH , RECH    , QTLDRN  ,                     & ! IN/OUT :
 		   Z0WRF   , &
                    FSA     , FSR     , FIRA    , FSH     , SSOIL   , FCEV    , & ! OUT : 
                    FGEV    , FCTR    , ECAN    , ETRAN   , EDIR    , TRAD    , & ! OUT :
@@ -492,8 +495,9 @@ contains
   REAL                           , INTENT(INOUT) :: WSLAKE !lake water storage (can be neg.) (mm)
   REAL,                            INTENT(INOUT) :: SMCWTD !soil water content between bottom of the soil and water table [m3/m3]
   REAL,                            INTENT(INOUT) :: DEEPRECH !recharge to or from the water table when deep [m]
-  REAL,                            INTENT(INOUT) :: RECH !recharge to or from the water table when shallow [m] (diagnostic)
+  REAL,                            INTENT(INOUT) :: RECH   !recharge to or from the water table when shallow [m] (diagnostic)
 
+  
 ! output
   REAL                           , INTENT(OUT)   :: Z0WRF  !combined z0 sent to coupled model
   REAL                           , INTENT(OUT)   :: FSA    !total absorbed solar radiation (w/m2)
@@ -626,7 +630,8 @@ contains
   REAL                        , INTENT(INOUT)    :: GRAIN  !grain mass [g/m2]
   REAL                        , INTENT(INOUT)    :: GDD    !growing degree days
   INTEGER                     , INTENT(INOUT)    :: PGS    !plant growing stage [-]
-
+  REAL                        , INTENT(INOUT)    :: QTLDRN !tile drainage (mm)
+  
 ! outputs
   REAL                          , INTENT(OUT)    :: NEE    !net ecosys exchange (g/m2/s CO2)
   REAL                          , INTENT(OUT)    :: GPP    !net instantaneous assimilation [g/m2/s C]
@@ -784,7 +789,7 @@ contains
                  SMCWTD ,DEEPRECH,RECH                          , & !inout
                  CMC    ,ECAN   ,ETRAN  ,FWET   ,RUNSRF ,RUNSUB , & !out
                  QIN    ,QDIS   ,PONDING1       ,PONDING2,&
-                 QSNBOT                             &
+                 QSNBOT ,QTLDRN                             &
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
@@ -5609,7 +5614,7 @@ ENDIF   ! CROPTYPE == 0
                     SMCWTD ,DEEPRECH,RECH                          , & !inout
                     CMC    ,ECAN   ,ETRAN  ,FWET   ,RUNSRF ,RUNSUB , & !out
                     QIN    ,QDIS   ,PONDING1       ,PONDING2,        &
-                    QSNBOT                                           &
+                    QSNBOT ,QTLDRN                                   &
 #ifdef WRF_HYDRO
                         ,sfcheadrt                     &
 #endif
@@ -5679,8 +5684,9 @@ ENDIF   ! CROPTYPE == 0
   REAL                           , INTENT(INOUT) :: PONDING ![mm]
   REAL,                            INTENT(INOUT) :: SMCWTD !soil water content between bottom of the soil and water table [m3/m3]
   REAL,                            INTENT(INOUT) :: DEEPRECH !recharge to or from the water table when deep [m]
-  REAL,                            INTENT(INOUT) :: RECH !recharge to or from the water table when shallow [m] (diagnostic)
-
+  REAL,                            INTENT(INOUT) :: RECH   !recharge to or from the water table when shallow [m] (diagnostic)
+  REAL,                            INTENT(INOUT) :: QTLDRN !tile drainage (mm)
+  
 ! output
   REAL,                            INTENT(OUT)   :: CMC     !intercepted water per ground area (mm)
   REAL,                            INTENT(OUT)   :: ECAN    !evap of intercepted water (mm/s) [+]
@@ -5800,7 +5806,7 @@ ENDIF   ! CROPTYPE == 0
                             QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
                            SMCWTD, DEEPRECH                       , & !inout
-                            RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX )   !out
+                            RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX ,QTLDRN)   !out
  
        IF(OPT_RUN == 1) THEN 
           CALL GROUNDWATER (parameters,NSNOW  ,NSOIL  ,DT     ,SICE   ,ZSOIL  , & !in
@@ -6784,7 +6790,7 @@ ENDIF   ! CROPTYPE == 0
                         QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC, & !in
                         SH2O   ,SMC    ,ZWT    ,VEGTYP ,& !inout
                         SMCWTD, DEEPRECH                       ,& !inout
-                        RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX )   !out
+                        RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX, QTLDRN )   !out
 
 ! ----------------------------------------------------------------------
 ! calculate surface runoff and soil moisture.
@@ -6814,6 +6820,7 @@ ENDIF   ! CROPTYPE == 0
   REAL, INTENT(INOUT)                     :: ZWT    !water table depth [m]
   REAL,                     INTENT(INOUT) :: SMCWTD !soil moisture between bottom of the soil and the water table [m3/m3]
   REAL                    , INTENT(INOUT) :: DEEPRECH
+  REAL                    , INTENT(INOUT) :: QTLDRN ! tile drainage
 
 ! output
   REAL, INTENT(OUT)                       :: QDRAIN !soil-bottom free drainage [mm/s] 
@@ -6847,6 +6854,7 @@ ENDIF   ! CROPTYPE == 0
   REAL                                    :: WATMIN !
   REAL                                    :: QDRAIN_SAVE !
   REAL                                    :: RUNSRF_SAVE !
+  REAL                                    :: QTLDRN_SAVE
   REAL                                    :: EPORE  !effective porosity [m3/m3]
   REAL, DIMENSION(1:NSOIL)                :: FCR    !impermeable fraction due to frozen soil
   INTEGER                                 :: NITER  !iteration times soil moisture (-)
@@ -6960,19 +6968,25 @@ ENDIF   ! CROPTYPE == 0
        END IF
 !    END IF                 
 
-    DTFINE  = DT / NITER
 
+
+    DTFINE  = DT / NITER
 ! solve soil moisture
 
     QDRAIN_SAVE = 0.0
     RUNSRF_SAVE = 0.0
+    QTLDRN_SAVE = 0.0
     DO ITER = 1, NITER
        IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
           CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
                       SICEMAX,QINSUR ,                         & !in
                       PDDUM  ,RUNSRF )                           !out
        END IF
-
+ 
+       IF (OPT_TDRN ==1 .AND. OPT_RUN == 3) THEN
+          CALL TILE_DRAIN (parameters,NSOIL,SH2O,SMC,SICE,ZSOIL,QTLDRN)
+       END IF
+       
        CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM  ,ETRANI , & !in
                    QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
                    SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD ,         & !in
@@ -6987,11 +7001,13 @@ ENDIF   ! CROPTYPE == 0
        RSAT =  RSAT + WPLUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
        RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+       QTLDRN_SAVE = QTLDRN_SAVE + QTLDRN
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
     RUNSRF = RUNSRF_SAVE/NITER
-
+    QTLDRN = QTLDRN_SAVE/NITER !(mm)
+    
     RUNSRF = RUNSRF * 1000. + RSAT * 1000./DT  ! m/s -> mm/s
     QDRAIN = QDRAIN * 1000.
 
@@ -7463,7 +7479,56 @@ ENDIF   ! CROPTYPE == 0
     SMC = SH2O + SICE
 
   END SUBROUTINE SSTEP
+  
+!== begin tile_drain ===============================================================================
 
+  SUBROUTINE TILE_DRAIN (parameters,NSOIL,SH2O,SMC,SICE,ZSOIL,QTLDRN)
+! ----------------------------------------------------------------------
+! calculate tile drainage discharge (mm) per NITER of SOILWATER soubroutine
+! Prasanth Valayamkunnath - 06/13/2019
+! ----------------------------------------------------------------------
+    IMPLICIT NONE
+! ----------------------------------------------------------------------
+! inout
+    type (noahmp_parameters), intent(in) :: parameters
+    INTEGER,INTENT(IN)                          :: NSOIL
+    REAL, DIMENSION(1:NSOIL), INTENT(INOUT)     :: SH2O
+    REAL, DIMENSION(1:NSOIL), INTENT(INOUT)     :: SMC
+    REAL,INTENT(INOUT)                          :: QTLDRN
+
+! input
+    REAL, DIMENSION(1:NSOIL), INTENT(IN)        :: SICE
+    REAL, DIMENSION(1:NSOIL), INTENT(IN)        :: ZSOIL
+
+! local 
+    INTEGER                                     :: K
+    REAL                                        :: TDRVOL  ! temp variable for drainage volume (mm)
+    REAL,DIMENSION(1:NSOIL)                     :: OVRFC   ! temp variable for volume of water above field capacity
+    
+! ----------------------------------------------------------------------
+
+    TDRVOL = 0.
+    OVRFC  = 0.
+    QTLDRN = 0.
+    DO K = 1, NSOIL
+      IF (K == 4) THEN ! draining water from 4th layer for now
+        OVRFC(K) = (SH2O(K) - parameters%SMCREF(K)) * ZSOIL(K) * 1000. ! mm 
+        IF (OVRFC(K) > 0.) THEN
+          TDRVOL = TDRVOL + OVRFC(K)
+          SH2O(K)= parameters%SMCREF(K)
+        END IF
+      END IF
+    END DO
+    
+    QTLDRN = TDRVOL
+ 
+! update soil moisture after tile drainage
+    DO K = 1, NSOIL
+      SMC(K)  = SH2O (K) + SICE (K)
+    END DO
+    
+  END SUBROUTINE TILE_DRAIN
+  
 !== begin wdfcnd1 ==================================================================================
 
   SUBROUTINE WDFCND1 (parameters,WDF,WCND,SMC,FCR,ISOIL)
@@ -8940,8 +9005,8 @@ END SUBROUTINE PSN_CROP
 !== begin noahmp_options ===========================================================================
 
   subroutine noahmp_options(idveg     ,iopt_crs  ,iopt_btr  ,iopt_run  ,iopt_sfc  ,iopt_frz , & 
-                             iopt_inf  ,iopt_rad  ,iopt_alb  ,iopt_snf  ,iopt_tbot, iopt_stc, &
-			     iopt_rsf, iopt_crop )
+                            iopt_inf  ,iopt_rad  ,iopt_alb  ,iopt_snf  ,iopt_tbot ,iopt_stc, &
+                            iopt_rsf  ,iopt_crop ,iopt_tdrn)
 
   implicit none
 
@@ -8961,7 +9026,7 @@ END SUBROUTINE PSN_CROP
                                     ! 1 -> semi-implicit; 2 -> full implicit (original Noah)
   INTEGER,  INTENT(IN) :: iopt_rsf  !surface resistance (1->Sakaguchi/Zeng; 2->Seller; 3->mod Sellers; 4->1+snow)
   INTEGER,  INTENT(IN) :: iopt_crop !crop model option (0->none; 1->Liu et al.; 2->Gecros)
-
+  INTEGER,  INTENT(IN) :: iopt_tdrn !tile drainage
 ! -------------------------------------------------------------------------------------------------
 
   dveg = idveg
@@ -8979,7 +9044,7 @@ END SUBROUTINE PSN_CROP
   opt_stc  = iopt_stc
   opt_rsf  = iopt_rsf
   opt_crop = iopt_crop
-  
+  opt_tdrn = iopt_tdrn  
   end subroutine noahmp_options
  
 END MODULE MODULE_SF_NOAHMPLSM
@@ -9296,7 +9361,7 @@ CONTAINS
       ISWATER_TABLE       = ISWATER
      ISBARREN_TABLE       = ISBARREN
         ISICE_TABLE       = ISICE
-                       ISCROP_TABLE   = ISCROP
+           ISCROP_TABLE   = ISCROP
     EBLFOREST_TABLE       = EBLFOREST
 
      CH2OP_TABLE(1:NVEG)  = CH2OP(1:NVEG)

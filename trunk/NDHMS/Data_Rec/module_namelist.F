@@ -40,7 +40,7 @@ CONTAINS
 
           integer ierr
           integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
-                    SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, &
+                    SUBRTSWCRT,OVRTSWCRT,TDRAINRT, AGGFACTRT, &
                     GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                     sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
                     gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
@@ -112,7 +112,7 @@ CONTAINS
             out_dt, rst_dt, &
             DEEPGWSPIN, SOLVEG_INITSWC, &
             RT_OPTION, CHANRTSWCRT, channel_option, &
-                    SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
+                    SUBRTSWCRT,OVRTSWCRT,TDRAINRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
                     GwSpinCycles, GwPreCycles, GwSpinUp, GwPreDiag, GwPreDiagInterval, gwIhShift, &
                     GWBASESWCRT, gwChanCondSw, gwChanCondConstIn, gwChanCondConstOut , &
                     route_topo_f,route_chan_f,route_link_f, compound_channel, route_lake_f, &
@@ -150,6 +150,7 @@ CONTAINS
    reservoir_data_ingest = 0 ! STUB FOR USE OF REALTIME RESERVOIR DISCHARGE DATA. CURRENTLY NOT IN USE.
    compound_channel = .FALSE.
    bucket_loss = 0
+   TDRAINRT = 0
    
 #ifdef WRF_HYDRO_NUDGING
    ! Default values for NUDGING_nlist
@@ -275,6 +276,7 @@ CONTAINS
   call mpp_land_bcast_int1(channel_option)
   call mpp_land_bcast_int1(SUBRTSWCRT)
   call mpp_land_bcast_int1(OVRTSWCRT)
+  call mpp_land_bcast_int1(TDRAINRT)
   call mpp_land_bcast_int1(AGGFACTRT)
   call mpp_land_bcast_real1(DTRT_TER)
   call mpp_land_bcast_real1(DTRT_CH)
@@ -333,6 +335,7 @@ CONTAINS
        CHANRTSWCRT = 0
        OVRTSWCRT = 0
        SUBRTSWCRT = 0
+       TDRAINRT   = 0
     endif
 
     nlst%CHRTOUT_DOMAIN = CHRTOUT_DOMAIN
@@ -379,6 +382,7 @@ CONTAINS
 
     nlst%SUBRTSWCRT = SUBRTSWCRT
     nlst%OVRTSWCRT = OVRTSWCRT
+    nlst%TDRAINRT  = TDRAINRT
     nlst%dxrt0 = dxrt
     nlst%AGGFACTRT = AGGFACTRT
     nlst%GWBASESWCRT = GWBASESWCRT
@@ -448,6 +452,7 @@ CONTAINS
     write(6,*) " nlst%DTRT_CH   ", DTRT_CH
     write(6,*) " nlst%SUBRTSWCRT ", SUBRTSWCRT
     write(6,*) " nlst%OVRTSWCRT ", OVRTSWCRT
+    write(6,*) " nlst%TDRAINRT ", TDRAINRT
     write(6,*) " nlst%dxrt0 ", dxrt
     write(6,*) " nlst%AGGFACTRT ", AGGFACTRT
     write(6,*) " nlst%GWBASESWCRT ", GWBASESWCRT
@@ -649,8 +654,8 @@ subroutine rt_nlst_check(nlst)
    if( (nlst%SUBRTSWCRT .lt. 0 ) .or. (nlst%SUBRTSWCRT .gt. 1) ) then
       call hydro_stop('hydro.namelist ERROR: Invalid SUBRTSWCRT specified')
    endif
-   if( (nlst%OVRTSWCRT .lt. 0 ) .or. (nlst%OVRTSWCRT .gt. 1) ) then
-      call hydro_stop('hydro.namelist ERROR: Invalid OVRTSWCRT specified')
+   if( (nlst%TDRAINRT .lt. 0 ) .or. (nlst%TDRAINRT .gt. 1) ) then
+      call hydro_stop('hydro.namelist ERROR: Invalid TDRAINRT specified')
    endif
    if( (nlst%OVRTSWCRT .eq. 1 ) .or. (nlst%SUBRTSWCRT .eq. 1) ) then
       if( (nlst%rt_option .lt. 1 ) .or. (nlst%rt_option .gt. 2) ) then
