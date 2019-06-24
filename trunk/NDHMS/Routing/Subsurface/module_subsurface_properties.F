@@ -12,6 +12,9 @@ module module_subsurface_properties
         ! soil depth on routing grid
         real, allocatable, dimension(:,:) :: soldeprt
 
+        ! bedrock layer on routing grid
+        real, allocatable, dimension(:,:) :: bedrockrt
+
         !soil depth by layer
         real, allocatable, dimension(:) :: sldpth
 
@@ -89,6 +92,14 @@ contains
             allocation_error = .true.
         end if
 
+        ! allocate the array only if not already allocated
+        if ( .not. allocated(this%bedrockrt) ) then
+            allocate( this%bedrockrt(ix,jx) )
+            this%bedrockrt = nsoil
+        else
+            allocation_error = .true.
+        end if
+
         !allocate storage for sldpth
         if ( .not. allocated(this%sldpth) ) then
             allocate( this%sldpth(nsoil) )
@@ -160,6 +171,13 @@ contains
         ! only deallocated if already allocated
         if ( allocated(this%soldeprt) ) then
             deallocate( this%soldeprt)
+        else
+            allocation_error = .true.
+        end if
+
+        ! only deallocated if already allocated
+        if ( allocated(this%bedrockrt) ) then
+            deallocate( this%bedrockrt)
         else
             allocation_error = .true.
         end if

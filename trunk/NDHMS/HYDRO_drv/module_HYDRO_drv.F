@@ -292,7 +292,7 @@ module module_HYDRO_drv
                     endif ! End check for io_form_outputs value
                 endif ! End check for rtout_factor
                 rtout_factor = rtout_factor + 1
-            endif
+            endif  ! End check for RT_DOMAIN
             !! JLM disable GW output for NWM. Bring this line back when runtime output options avail.
             !! JLM This seems like a more logical place?
             if(nlst_rt(did)%io_form_outputs .ne. 0) then
@@ -426,9 +426,8 @@ module module_HYDRO_drv
                             , RT_DOMAIN(did)%qSfcLatRunoff,   RT_DOMAIN(did)%qBucket &
                             , RT_DOMAIN(did)%qin_gwsubbas,    nlst_rt(did)%UDMP_OPT &
                             )
-                    endif
+                    endif ! end if CHRTOUT_DOMAIN check
 
-                endif
             endif ! End of checking for io_form_outputs flag value
 
 #ifdef MPP_LAND
@@ -446,7 +445,7 @@ module module_HYDRO_drv
                 else
                     call output_chrtout_grd_NWM(did,nlst_rt(did)%igrid)
                 endif
-            endif
+            endif  ! End of CHRTOUT_GRID
             if (RT_DOMAIN(did)%NLAKES.gt.0)  then
                 if(nlst_rt(did)%io_form_outputs .ne. 0) then
                     ! Output lakes in NWM format
@@ -485,6 +484,9 @@ module module_HYDRO_drv
 
                 endif ! end of check for io_form_outputs value
             endif   ! end if block of rNLAKES .gt. 0
+
+          endif   ! end if channel routing check
+ 
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
             write(6,*) "end calling output functions"
@@ -1055,7 +1057,7 @@ endif
          do j=1,RT_DOMAIN(did)%JXRT
             suminfxsrt1 = suminfxsrt1 + rt_domain(did)%overland%control%surface_water_head_routing(I,J) &
                                / float(RT_DOMAIN(did)%IXRT * RT_DOMAIN(did)%JXRT)
-            do kk=1,nlst_rt(did)%NSOIL
+            do kk=1,RT_DOMAIN(did)%subsurface%properties%bedrockrt(i,j)
                 smcrttot1 = smcrttot1 + rt_domain(did)%subsurface%grid_transform%smcrt(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
                                / float(RT_DOMAIN(did)%IXRT * RT_DOMAIN(did)%JXRT)
             end do
@@ -1106,7 +1108,7 @@ endif
                                       + rt_domain(did)%overland%control%surface_water_head_routing(IXXRT,JYYRT) &
                                       * rt_domain(did)%overland%properties%distance_to_neighbor(IXXRT,JYYRT,9)
 
-                do KRT=1,nlst_rt(did)%NSOIL
+                do KRT=1,rt_domain(did)%BEDROCK(I,J)
 !DJG               SMCAGGRT(KRT)=SMCAGGRT(KRT)+SMCRT(IXXRT,JYYRT,KRT)
                    RT_DOMAIN(did)%SH2OAGGRT(KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                                  + rt_domain(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT)
@@ -1120,7 +1122,7 @@ endif
             rt_domain(did)%overland%control%surface_water_head_lsm(I,J) = RT_DOMAIN(did)%SFCHEADAGGRT &
                                           / (nlst_rt(did)%AGGFACTRT**2)
 
-            do KRT=1,nlst_rt(did)%NSOIL
+            do KRT=1,rt_domain(did)%BEDROCK(I,J)
 !DJG              SMC(I,J,KRT)=SMCAGGRT(KRT)/(AGGFACTRT**2)
                RT_DOMAIN(did)%SH2OX(I,J,KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                              / (nlst_rt(did)%AGGFACTRT**2)
@@ -1152,7 +1154,7 @@ endif
                                           = 1./FLOAT(nlst_rt(did)%AGGFACTRT**2)
                   end if
 
-                  do KRT=1,nlst_rt(did)%NSOIL
+                  do KRT=1,rt_domain(did)%BEDROCK(I,J)
 
 !!!yw added for debug
                    if(rt_domain(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT) .lt. 0) then
@@ -1248,7 +1250,7 @@ endif
          do j=1,RT_DOMAIN(did)%JX
             suminfxs2 = suminfxs2 + rt_domain(did)%overland%control%surface_water_head_lsm(I,J) &
                                / float(RT_DOMAIN(did)%IX * RT_DOMAIN(did)%JX)
-            do kk=1,nlst_rt(did)%NSOIL
+            do kk=1,RT_DOMAIN(did)%BEDROCK(i,j)
                 smctot2 = smctot2 + rt_domain(did)%SMC(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
                                / float(RT_DOMAIN(did)%IX * RT_DOMAIN(did)%JX)
                sicetot2 = sicetot2 + rt_domain(did)%SICE(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
@@ -1777,8 +1779,8 @@ end subroutine HYDRO_ini
                     !The min diffs were pulled from the existing HYDRO.TBL defaults.
                     !Currently water is 0, so enforcing 0 as the absolute min.
                     rt_domain(did)%SMCMAX1(i,j) = min(rt_domain(did)%SMCMAX1(i,j), 1.0)
-                    rt_domain(did)%SMCREF1(i,j) = max(min(rt_domain(did)%SMCREF1(i,j), rt_domain(did)%SMCMAX1(i,j) - 0.01), 0.0)
-                    rt_domain(did)%SMCWLT1(i,j) = max(min(rt_domain(did)%SMCWLT1(i,j), rt_domain(did)%SMCREF1(i,j) - 0.01), 0.0)
+                    rt_domain(did)%SMCREF1(i,j) = max(min(rt_domain(did)%SMCREF1(i,j), rt_domain(did)%SMCMAX1(i,j)), 0.0)
+                    rt_domain(did)%SMCWLT1(i,j) = max(min(rt_domain(did)%SMCWLT1(i,j), rt_domain(did)%SMCREF1(i,j)), 0.0)
                 ENDIF
                 IF(rt_domain(did)%VEGTYP(i,j) > 0 ) THEN   ! created 2d ov_rough
                     rt_domain(did)%OV_ROUGH2d(i,j) = RT_DOMAIN(did)%OV_ROUGH(rt_domain(did)%VEGTYP(I,J))
@@ -1798,8 +1800,8 @@ end subroutine HYDRO_ini
           rt_domain(did)%SMCWLT1 = 0.40
        endwhere
        where (rt_domain(did)%SMCMAX1 .gt. 1.0) rt_domain(did)%SMCMAX1 = 1.0
-       rt_domain(did)%SMCREF1 = max(min(rt_domain(did)%SMCREF1, rt_domain(did)%SMCMAX1 - 0.01), 0.0)
-       rt_domain(did)%SMCWLT1 = max(min(rt_domain(did)%SMCWLT1, rt_domain(did)%SMCREF1 - 0.01), 0.0)
+       rt_domain(did)%SMCREF1 = max(min(rt_domain(did)%SMCREF1, rt_domain(did)%SMCMAX1), 0.0)
+       rt_domain(did)%SMCWLT1 = max(min(rt_domain(did)%SMCWLT1, rt_domain(did)%SMCREF1), 0.0)
     endif
 
        rt_domain(did)%soiltyp = soltyp

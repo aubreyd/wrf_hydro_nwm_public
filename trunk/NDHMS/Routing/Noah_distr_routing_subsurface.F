@@ -35,7 +35,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
         subrt_data%grid_transform%smcmaxrt, &
         subrt_data%grid_transform%smcrefrt, &
         subrt_data%grid_transform%smcwltrt, subrt_data%properties%zsoil,SATLYRCHK,subrt_data%properties%zwattablrt, &
-        CWATAVAIL,subrt_data%properties%sldpth)
+        CWATAVAIL,subrt_data%properties%sldpth, subrt_data%properties%bedrockrt)
 #ifdef MPP_LAND
     call MPP_LAND_COM_REAL(subrt_data%properties%zwattablrt,subrt_static%ixrt,subrt_static%jxrt,99)
     call MPP_LAND_COM_REAL(CWATAVAIL,subrt_static%ixrt,subrt_static%jxrt,99)
@@ -99,7 +99,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     !REAL, INTENT(IN), DIMENSION(IXRT,JXRT)   :: ZWATTABLRT
     REAL, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt)   :: CWATAVAIL
     INTEGER, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: SATLYRCHK
-
 
     !REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBRT
     !REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBBDRYRT
@@ -173,7 +172,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
             suminfxsrt1 = suminfxsrt1 + subrt_input%infiltration_excess(I,J) / float(subrt_static%IXRT*subrt_static%JXRT)
             qbdry1 = qbdry1 + subrt_data%state%qsubbdryrt(i,j) / subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
             sumqsubrt1 = sumqsubrt1 + subrt_data%state%qsubrt(i,j) / subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
-            do kk=1,subrt_static%nsoil
+            do kk=1,subrt_data%properties%bedrockrt(i,j)
                 smctot1 = smctot1 + subrt_data%grid_transform%smcrt(I,J,KK)*subrt_data%properties%sldpth(KK)*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
             end do
         end do
@@ -244,7 +243,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                            subrt_static%IXRT, subrt_static%JXRT, &
                            subrt_data%properties%surface_slope, &
                            subrt_data%properties%max_surface_slope_index, &
-                           CWATAVAIL, SUBDT, &
+                           CWATAVAIL, SUBDT,  &
                            subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
                            subrt_data%state%qsubrt)
     !     else
@@ -285,7 +284,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
             IF (SUBFLO.GT.0) THEN ! Increase soil moist for +SUBFLO (Inflow)
 
                 ! Loop through soil layers from bottom to top
-                DO KK=subrt_static%nsoil,1,-1
+                DO KK=subrt_data%properties%bedrockrt(i,j),1,-1
 
 
                     ! Check for saturated layers
@@ -339,7 +338,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                 !    now set to SMCREF, 8/24/07
                 !DJG and then using unsat cond as opposed to Ksat...
 
-                DO KK=SATLYRCHK(I,J),subrt_static%nsoil
+                DO KK=SATLYRCHK(I,J),subrt_data%properties%bedrockrt(i,j)
                     WATAVAIL = (subrt_data%grid_transform%smcrt(I,J,KK) - subrt_data%grid_transform%smcrefrt(I,J,KK)) * subrt_data%properties%sldpth(KK)
                     IF (WATAVAIL.GE.ABS(SUBFLO)) THEN
                         !?yw mod                 IF (WATAVAIL.GE.(ABS(SUBFLO)+0.000001) ) THEN
@@ -398,7 +397,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
             suminfxsrt2 = suminfxsrt2 + subrt_input%infiltration_excess(I,J) / float(subrt_static%IXRT*subrt_static%JXRT)  !
             qbdry2 = qbdry2 + subrt_data%state%qsubbdryrt(i,j)/subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
             sumqsubrt2 = sumqsubrt2 + subrt_data%state%qsubrt(i,j)/subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
-            do kk=1,subrt_static%nsoil
+            do kk=1,subrt_data%properties%bedrockrt(i,j)
                 smctot2 = smctot2 + subrt_data%grid_transform%smcrt(I,J,KK)*subrt_data%properties%sldpth(KK)*1000. / float(subrt_static%IXRT*subrt_static%JXRT)
             end do
         end do
@@ -451,7 +450,7 @@ END SUBROUTINE SUBSFC_RTNG
 !DJG ------------------------------------------------------------------------
 SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
         SMCWLTRT,ZSOIL,SATLYRCHK,ZWATTABLRT,CWATAVAIL,&
-        SLDPTH)
+        SLDPTH, BEDROCKRT)
 
     IMPLICIT NONE
 
@@ -467,6 +466,7 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
     REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: ZWATTABLRT
     REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: CWATAVAIL
     INTEGER, INTENT(OUT), DIMENSION(IXRT,JXRT) :: SATLYRCHK
+    integer, intent(in), dimension(IXRT, JXRT) :: BEDROCKRT
 
     !DJG Local Variables
     INTEGER :: KK,i,j
@@ -482,7 +482,7 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
         DO I=1,IXRT
 
             ! Loop through soil layers from bottom to top
-            DO KK=NSOIL,1,-1
+            DO KK=BEDROCKRT(i,j),1,-1
 
                 ! Check for saturated layers
                 ! Add additional logical check to ensure water is 'available' for routing,
@@ -492,7 +492,7 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                 IF ( (SMCRT(I,J,KK).GE.SMCREFRT(I,J,KK)).AND.(SMCREFRT(I,J,KK) &
                         .GT.SMCWLTRT(I,J,KK)) ) THEN
                     ! Add additional check to ensure saturation from bottom up only...8/8/05
-                    IF((SATLYRCHK(I,J).EQ.KK+1) .OR. (KK.EQ.NSOIL) ) SATLYRCHK(I,J) = KK
+                    IF((SATLYRCHK(I,J).EQ.KK+1) .OR. (KK.EQ.BEDROCKRT(i,j)) ) SATLYRCHK(I,J) = KK
                 END IF
 
             END DO
@@ -521,13 +521,13 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                     !DJG 2/16/2016 fix                  END DO
                 END IF
                 !DJG 2/16/2016 fix accumulation of CWATAVAIL...
-                DO KK=SATLYRCHK(I,J),NSOIL
+                DO KK=SATLYRCHK(I,J),BEDROCKRT(i,j)
                     CWATAVAIL(I,J) = CWATAVAIL(I,J)+(SMCRT(I,J,KK)- &
                         SMCREFRT(I,J,KK))*SLDPTH(KK)
                 END DO
             ELSE  ! no saturated layers...
-                ZWATTABLRT(I,J) = -ZSOIL(NSOIL)
-                SATLYRCHK(I,J) = NSOIL + 1
+                ZWATTABLRT(I,J) = -ZSOIL(BEDROCKRT(i,j))
+                SATLYRCHK(I,J) = BEDROCKRT(i,j) + 1
             END IF
 
         END DO
@@ -561,7 +561,8 @@ END SUBROUTINE FINDZWAT
 !===================================================================================================
 SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                              XX, YY, SO8RT, SO8RT_D, &
-                             CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub)
+                             CWATAVAIL, SUBDT,  &
+                             QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id, down_id, right_id, up_id, &
                               mpp_land_com_real8, my_id, mpp_land_com_real
