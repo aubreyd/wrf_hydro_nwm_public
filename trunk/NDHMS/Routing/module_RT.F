@@ -268,6 +268,9 @@ CONTAINS
 
   allocate( rt_domain(did)%OV_ROUGH2d   (IX,JX) )
 
+  allocate( rt_domain(did)%BEDROCK   (IX,JX) )
+            rt_domain(did)%BEDROCK = nsoil
+
   allocate( rt_domain(did)%SOILTYP   (IX,JX) )
 
   allocate( rt_domain(did)%GWSUBBASMSK   (IX,JX) )
