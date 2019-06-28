@@ -13,7 +13,7 @@ module module_subsurface_properties
         real, allocatable, dimension(:,:) :: soldeprt
 
         ! bedrock layer on routing grid
-        real, allocatable, dimension(:,:) :: bedrockrt
+        integer, allocatable, dimension(:,:) :: bedrockrt
 
         !soil depth by layer
         real, allocatable, dimension(:) :: sldpth
