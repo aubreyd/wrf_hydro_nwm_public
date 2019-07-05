@@ -11099,7 +11099,7 @@ subroutine hdtbl_out(did)
       call hdtbl_out_nc(did,ncid, count,count_flag,"SMCWLT1",rt_domain(did)%SMCWLT1,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"LKSAT",rt_domain(did)%LKSAT,"",ixd,jxd)
-      call hdtbl_out_nc_int(did,ncid, count,count_flag,"BEDROCK",rt_domain(did)%BEDROCK,"",ixd,jxd)
+      call hdtbl_out_nc_int(did,ncid, count,count_flag,"bedrocklyr",rt_domain(did)%bedrocklyr,"",ixd,jxd)
    end do
 
 end subroutine hdtbl_out
@@ -11112,7 +11112,7 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"SMCWLT1",rt_domain(did)%SMCWLT1)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D)
    call read2dlsm(did,trim(nlst_rt(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT)
-   call read2dlsm_int(did,trim(nlst_rt(did)%hydrotbl_f),"BEDROCK",rt_domain(did)%BEDROCK)
+   call read2dlsm_int(did,trim(nlst_rt(did)%hydrotbl_f),"bedrocklyr",rt_domain(did)%bedrocklyr)
 end subroutine hdtbl_in_nc
 
 subroutine read2dlsm(did,file,varName,varOut)

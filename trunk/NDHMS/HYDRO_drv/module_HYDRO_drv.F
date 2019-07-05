@@ -1057,7 +1057,7 @@ endif
          do j=1,RT_DOMAIN(did)%JXRT
             suminfxsrt1 = suminfxsrt1 + rt_domain(did)%overland%control%surface_water_head_routing(I,J) &
                                / float(RT_DOMAIN(did)%IXRT * RT_DOMAIN(did)%JXRT)
-            do kk=1,RT_DOMAIN(did)%subsurface%properties%bedrockrt(i,j)
+            do kk=1,RT_DOMAIN(did)%subsurface%properties%bedrocklyr_rt(i,j)
                 smcrttot1 = smcrttot1 + rt_domain(did)%subsurface%grid_transform%smcrt(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
                                / float(RT_DOMAIN(did)%IXRT * RT_DOMAIN(did)%JXRT)
             end do
@@ -1108,7 +1108,7 @@ endif
                                       + rt_domain(did)%overland%control%surface_water_head_routing(IXXRT,JYYRT) &
                                       * rt_domain(did)%overland%properties%distance_to_neighbor(IXXRT,JYYRT,9)
 
-                do KRT=1,rt_domain(did)%BEDROCK(I,J)
+                do KRT=1,rt_domain(did)%bedrocklyr(I,J)
 !DJG               SMCAGGRT(KRT)=SMCAGGRT(KRT)+SMCRT(IXXRT,JYYRT,KRT)
                    RT_DOMAIN(did)%SH2OAGGRT(KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                                  + rt_domain(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT)
@@ -1122,7 +1122,7 @@ endif
             rt_domain(did)%overland%control%surface_water_head_lsm(I,J) = RT_DOMAIN(did)%SFCHEADAGGRT &
                                           / (nlst_rt(did)%AGGFACTRT**2)
 
-            do KRT=1,rt_domain(did)%BEDROCK(I,J)
+            do KRT=1,rt_domain(did)%bedrocklyr(I,J)
 !DJG              SMC(I,J,KRT)=SMCAGGRT(KRT)/(AGGFACTRT**2)
                RT_DOMAIN(did)%SH2OX(I,J,KRT) = RT_DOMAIN(did)%SH2OAGGRT(KRT) &
                                              / (nlst_rt(did)%AGGFACTRT**2)
@@ -1154,7 +1154,7 @@ endif
                                           = 1./FLOAT(nlst_rt(did)%AGGFACTRT**2)
                   end if
 
-                  do KRT=1,rt_domain(did)%BEDROCK(I,J)
+                  do KRT=1,rt_domain(did)%bedrocklyr(I,J)
 
 !!!yw added for debug
                    if(rt_domain(did)%subsurface%grid_transform%smcrt(IXXRT,JYYRT,KRT) .lt. 0) then
@@ -1250,7 +1250,7 @@ endif
          do j=1,RT_DOMAIN(did)%JX
             suminfxs2 = suminfxs2 + rt_domain(did)%overland%control%surface_water_head_lsm(I,J) &
                                / float(RT_DOMAIN(did)%IX * RT_DOMAIN(did)%JX)
-            do kk=1,RT_DOMAIN(did)%BEDROCK(i,j)
+            do kk=1,RT_DOMAIN(did)%bedrocklyr(i,j)
                 smctot2 = smctot2 + rt_domain(did)%SMC(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
                                / float(RT_DOMAIN(did)%IX * RT_DOMAIN(did)%JX)
                sicetot2 = sicetot2 + rt_domain(did)%SICE(I,J,KK)*RT_DOMAIN(did)%subsurface%properties%sldpth(KK)*1000. &
