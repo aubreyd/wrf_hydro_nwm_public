@@ -1143,6 +1143,21 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
   END IF
 
 !------------------------------------------------------------------------------------------!
+! Transfer tiledrain parameters
+!------------------------------------------------------------------------------------------!
+   parameters%TDSMC_FAC       = TDSMCFAC_TABLE(SOILTYPE)
+   parameters%TD_DEPTH        = TD_DEPTH_TABLE(SOILTYPE)
+   parameters%DRAIN_LAYER_OPT = DRAIN_LAYER_OPT_TABLE
+   parameters%TD_DC           = TD_DC_TABLE(SOILTYPE)
+   
+   parameters%TD_DCOEF        = TD_DCOEF_TABLE(SOILTYPE) 
+   parameters%TD_D            = TD_D_TABLE(SOILTYPE) 
+   parameters%TD_ADEPTH       = TD_ADEPTH_TABLE(SOILTYPE) 
+   parameters%TD_RADI         = TD_RADI_TABLE(SOILTYPE) 
+   parameters%TD_SPAC         = TD_SPAC_TABLE(SOILTYPE) 
+   parameters%TD_DDRAIN       = TD_DDRAIN_TABLE(SOILTYPE) 
+   parameters%KLAT_FAC        = KLAT_FAC_TABLE(SOILTYPE) 
+!------------------------------------------------------------------------------------------!
 ! Transfer global parameters
 !------------------------------------------------------------------------------------------!
 
@@ -1358,7 +1373,8 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     call read_mp_rad_parameters()
     call read_mp_global_parameters()
     call read_mp_crop_parameters()
-
+    call read_tiledrain_parameters()
+    
     IF( .NOT. restart ) THEN
 
        itf=min0(ite,ide-1)
