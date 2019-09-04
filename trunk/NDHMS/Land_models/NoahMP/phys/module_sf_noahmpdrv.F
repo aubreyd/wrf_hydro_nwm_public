@@ -1191,7 +1191,11 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%HVT    =    HVT_TABLE(VEGTYPE)       !top of canopy (m)
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
     parameters%RSURF_EXP  =   RSURF_EXP_TABLE
-    parameters%IMPERV = IMPERV_TABLE
+    IF (parameters%URBAN_FLAG) THEN 
+      parameters%IMPERV = IMPERV_URBAN_TABLE
+    ELSE
+      parameters%IMPERV = 0.0
+    ENDIF
 #endif
 
 ! ----------------------------------------------------------------------
