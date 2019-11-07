@@ -155,6 +155,22 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  hvt_2D     ! Canopy Height
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  mfsno_2D   ! Snow cover m parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfexp_2D! exponent in the shape parameter for soil resistance option 1
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  z0sno_2D   ! snow surface roughness length (m)
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  ssi_2D     ! liquid water holding capacity for snowpack (m3/m3)
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  snowretfac_2D   ! snowpack water release timescale factor (1/s)
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  swemx_2D   ! new snow mass to fully cover old snow (mm); equivalent to 10mm depth (density = 100 kg/m3)
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  tau0_2D    ! tau0 from Yang97 eqn. 10a
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  graingrowth_2D  ! growth from vapor diffusion Yang97 eqn. 10b
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  extragrowth_2D  ! extra growth near freezing Yang97 eqn. 10c
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  dirtsoot_2D     ! dirt and soot term Yang97 eqn. 10d
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_cosz_2D    ! zenith angle snow albedo adjustment; b in Yang97 eqn. 15
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_visnew_2D  ! new snow visible albedo
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_nirnew_2D  ! new snow NIR albedo
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_visage_2D  ! age factor for diffuse visible snow albedo Yang97 eqn. 17
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_nirage_2D ! age factor for diffuse NIR snow albedo Yang97 eqn. 18
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_visdir_2D  ! cosz factor for direct visible snow albedo Yang97 eqn. 15
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_nirdir_2D  ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfsnow_2D    ! surface resistence for snow [s/m] 
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -732,6 +748,22 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( hvt_2D     (XSTART:XEND,YSTART:YEND) )            ! Canopy Height
   ALLOCATE ( mfsno_2D   (XSTART:XEND,YSTART:YEND) )            ! Snow cover m parameter
   ALLOCATE ( rsurfexp_2D(XSTART:XEND,YSTART:YEND) )            ! exponent in the shape parameter for soil resistance option 1
+  ALLOCATE ( z0sno_2D(XSTART:XEND,YSTART:YEND) )               ! snow surface roughness length (m)
+  ALLOCATE ( ssi_2D(XSTART:XEND,YSTART:YEND) )                 ! liquid water holding capacity for snowpack (m3/m3)
+  ALLOCATE ( snowretfac_2D(XSTART:XEND,YSTART:YEND) )          ! snowpack water release timescale factor (1/s)
+  ALLOCATE ( swemx_2D(XSTART:XEND,YSTART:YEND) )               ! new snow mass to fully cover old snow (mm); equivalent to 10mm depth (density = 100 kg/m3)
+  ALLOCATE ( tau0_2D(XSTART:XEND,YSTART:YEND) )                ! tau0 from Yang97 eqn. 10a
+  ALLOCATE ( graingrowth_2D(XSTART:XEND,YSTART:YEND) )         ! growth from vapor diffusion Yang97 eqn. 10b
+  ALLOCATE ( extragrowth_2D(XSTART:XEND,YSTART:YEND) )         ! extra growth near freezing Yang97 eqn. 10c
+  ALLOCATE ( dirtsoot_2D(XSTART:XEND,YSTART:YEND) )            ! dirt and soot term Yang97 eqn. 10d
+  ALLOCATE ( bats_cosz_2D(XSTART:XEND,YSTART:YEND) )           ! zenith angle snow albedo adjustment; b in Yang97 eqn. 15
+  ALLOCATE ( bats_visnew_2D(XSTART:XEND,YSTART:YEND) )         ! new snow visible albedo
+  ALLOCATE ( bats_nirnew_2D(XSTART:XEND,YSTART:YEND) )         ! new snow NIR albedo
+  ALLOCATE ( bats_visage_2D(XSTART:XEND,YSTART:YEND) )         ! age factor for diffuse visible snow albedo Yang97 eqn. 17
+  ALLOCATE ( bats_nirage_2D(XSTART:XEND,YSTART:YEND) )         ! age factor for diffuse NIR snow albedo Yang97 eqn. 18
+  ALLOCATE ( bats_visdir_2D(XSTART:XEND,YSTART:YEND) )         ! cosz factor for direct visible snow albedo Yang97 eqn. 15
+  ALLOCATE ( bats_nirdir_2D(XSTART:XEND,YSTART:YEND) )         ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
+  ALLOCATE ( rsurfsnow_2D(XSTART:XEND,YSTART:YEND) )           ! surface resistence for snow [s/m]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1074,7 +1106,11 @@ module module_NoahMP_hrldas_driver
     CALL READ_3D_SOIL(noah_lsm%SPATIAL_FILENAME, XSTART, XEND, YSTART, YEND, &
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
-		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D)
+		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,&
+                      Z0SNO_2D, SSI_2D, SNOWRETFAC_2D, SWEMX_2D, TAU0_2D,&
+                      GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,&
+                      BATS_VISNEW_2D, BATS_NIRNEW_2D, BATS_VISAGE_2D, BATS_NIRAGE_2D,&
+                      BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D)
 #endif
 
 !------------------------------------------------------------------------
@@ -1644,6 +1680,11 @@ end subroutine land_driver_ini
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+                 Z0SNO_2D, SSI_2D, SNOWRETFAC_2D, SWEMX_2D, TAU0_2D,          &
+                 GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,   &
+                 BATS_VISNEW_2D, BATS_NIRNEW_2D,                              &
+                 BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
+                 BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D,                &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O

@@ -767,7 +767,11 @@ contains
   subroutine read_3d_soil(spatial_filename,xstart, xend,ystart, yend,           &
                           nsoil,bexp_3d,smcdry_3d,smcwlt_3d,smcref_3d,smcmax_3d,  &
 		          dksat_3d,dwsat_3d,psisat_3d,quartz_3d,refdk_2d,refkdt_2d,slope_2d,&
-			  cwpvt_2d,vcmx25_2d,mp_2d,hvt_2d,mfsno_2d,rsurfexp_2d)
+			  cwpvt_2d,vcmx25_2d,mp_2d,hvt_2d,mfsno_2d,rsurfexp_2d,&
+                          z0sno_2d, ssi_2d, snowretfac_2d, swemx_2d, tau0_2d,&
+                          graingrowth_2d, extragrowth_2d, dirtsoot_2d, bats_cosz_2d,&
+                          bats_visnew_2d, bats_nirnew_2d, bats_visage_2d, bats_nirage_2d,&
+                          bats_visdir_2d, bats_nirdir_2d, rsurfsnow_2d)
     implicit none
     character(len=*),          intent(in)  :: spatial_filename
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -790,6 +794,22 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: hvt_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: mfsno_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: rsurfexp_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: z0sno_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: ssi_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: snowretfac_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: swemx_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tau0_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: graingrowth_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: extragrowth_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: dirtsoot_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_cosz_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_visnew_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_nirnew_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_visage_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_nirage_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_visdir_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_nirdir_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: rsurfsnow_2d
 
     character(len=24)  :: name
     character(len=256) :: units
@@ -1018,6 +1038,167 @@ contains
     endif
 
     iret = nf90_get_var(ncid, varid, rsurfexp_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "z0sno"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, z0sno_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "ssi"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, ssi_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "snowretfac"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, snowretfac_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "swemx"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, swemx_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "tau0"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tau0_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "graingrowth"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, graingrowth_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "extragrowth"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, extragrowth_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "dirtsoot"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, dirtsoot_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_cosz"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_cosz_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_visnew"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_visnew_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_nirnew"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_nirnew_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_visage"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_visage_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_nirage"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_nirage_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_visdir"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_visdir_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "bats_nirdir"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, bats_nirdir_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "rsurfsnow"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, rsurfsnow_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+
 
     ! Close the NetCDF file
     ierr = nf90_close(ncid)

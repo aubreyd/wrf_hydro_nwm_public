@@ -63,6 +63,11 @@ CONTAINS
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+                 Z0SNO_2D, SSI_2D, SNOWRETFAC_2D, SWEMX_2D, TAU0_2D,          &
+                 GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,   &
+                 BATS_VISNEW_2D, BATS_NIRNEW_2D,                              &
+                 BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
+                 BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D,                &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -161,6 +166,22 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  HVT_2D    ! Canopy Height
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MFSNO_2D  ! Snow cover m parameter
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFEXP_2D ! exponent in the shape parameter for soil resistance option 1
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  Z0SNO_2D       ! snow surface roughness length (m) 
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SSI_2D         ! liquid water holding capacity for snowpack (m3/m3)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SNOWRETFAC_2D  ! snowpack water release timescale factor (1/s)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SWEMX_2D       ! new snow mass to fully cover old snow (mm); equivalent to 10mm depth (density = 100 kg/m3)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TAU0_2D        ! tau0 from Yang97 eqn. 10a
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  GRAINGROWTH_2D ! growth from vapor diffusion Yang97 eqn. 10b
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  EXTRAGROWTH_2D ! extra growth near freezing Yang97 eqn. 10c
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  DIRTSOOT_2D    ! dirt and soot term Yang97 eqn. 10d
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_COSZ_2D   ! zenith angle snow albedo adjustment; b in Yang97 eqn. 15
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_VISNEW_2D ! new snow visible albedo
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_NIRNEW_2D ! new snow NIR albedo
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_VISAGE_2D ! age factor for diffuse visible snow albedo Yang97 eqn. 17
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_NIRAGE_2D ! age factor for diffuse NIR snow albedo Yang97 eqn. 18
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_VISDIR_2D ! cosz factor for direct visible snow albedo Yang97 eqn. 15
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_NIRDIR_2D ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFSNOW_2D   ! surface resistence for snow [s/m]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -657,6 +678,22 @@ CONTAINS
        parameters%hvt    = HVT_2D(I,J)            ! Canopy Height
        parameters%mfsno  = MFSNO_2D(I,J)          ! Snow cover m parameter
        parameters%rsurf_exp = RSURFEXP_2D(I,J)    ! exponent in the shape parameter for soil resistance option 1
+       parameters%z0sno       = Z0SNO_2D(I,J)        ! snow surface roughness length (m)
+       parameters%ssi         = SSI_2D(I,J)          ! liquid water holding capacity for snowpack (m3/m3)
+       parameters%snow_ret_fac  = SNOWRETFAC_2D(I,J)   ! snowpack water release timescale factor (1/s)
+       parameters%swemx       = SWEMX_2D(I,J)        ! new snow mass to fully cover old snow (mm); equivalent to 10mm depth (density = 100 kg/m3)
+       parameters%tau0        = TAU0_2D(I,J)         ! tau0 from Yang97 eqn. 10a
+       parameters%grain_growth = GRAINGROWTH_2D(I,J)  ! growth from vapor diffusion Yang97 eqn. 10b
+       parameters%extra_growth = EXTRAGROWTH_2D(I,J)  ! extra growth near freezing Yang97 eqn. 10c
+       parameters%dirt_soot    = DIRTSOOT_2D(I,J)     ! dirt and soot term Yang97 eqn. 10d
+       parameters%bats_cosz   = BATS_COSZ_2D(I,J)    ! zenith angle snow albedo adjustment; b in Yang97 eqn. 15
+       parameters%bats_vis_new = BATS_VISNEW_2D(I,J)  ! new snow visible albedo
+       parameters%bats_nir_new = BATS_NIRNEW_2D(I,J)  ! new snow NIR albedo
+       parameters%bats_vis_age = BATS_VISAGE_2D(I,J)  ! age factor for diffuse visible snow albedo Yang97 eqn. 17
+       parameters%bats_nir_age = BATS_NIRAGE_2D(I,J)  ! age factor for diffuse NIR snow albedo Yang97 eqn. 18
+       parameters%bats_vis_dir = BATS_VISDIR_2D(I,J)  ! cosz factor for direct visible snow albedo Yang97 eqn. 15
+       parameters%bats_nir_dir = BATS_NIRDIR_2D(I,J)  ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
+       parameters%rsurf_snow   = RSURFSNOW_2D(I,J)    ! surface resistence for snow [s/m]
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1149,22 +1186,6 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
    parameters%O2         =          O2_TABLE
    parameters%TIMEAN     =      TIMEAN_TABLE
    parameters%FSATMX     =      FSATMX_TABLE
-   parameters%Z0SNO      =       Z0SNO_TABLE
-   parameters%SSI        =         SSI_TABLE
-   parameters%SNOW_RET_FAC =  SNOW_RET_FAC_TABLE    
-   parameters%SWEMX      =       SWEMX_TABLE
-   parameters%TAU0         =      TAU0_TABLE
-   parameters%GRAIN_GROWTH = GRAIN_GROWTH_TABLE
-   parameters%EXTRA_GROWTH = EXTRA_GROWTH_TABLE
-   parameters%DIRT_SOOT    =    DIRT_SOOT_TABLE
-   parameters%BATS_COSZ    =    BATS_COSZ_TABLE
-   parameters%BATS_VIS_NEW = BATS_VIS_NEW_TABLE
-   parameters%BATS_NIR_NEW = BATS_NIR_NEW_TABLE
-   parameters%BATS_VIS_AGE = BATS_VIS_AGE_TABLE
-   parameters%BATS_NIR_AGE = BATS_NIR_AGE_TABLE
-   parameters%BATS_VIS_DIR = BATS_VIS_DIR_TABLE
-   parameters%BATS_NIR_DIR = BATS_NIR_DIR_TABLE
-   parameters%RSURF_SNOW =  RSURF_SNOW_TABLE
 
 ! ----------------------------------------------------------------------
 !  Transfer soil parameters
@@ -1189,7 +1210,23 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%MFSNO  =  MFSNO_TABLE(VEGTYPE)       !snowmelt m parameter ()
     parameters%HVT    =    HVT_TABLE(VEGTYPE)       !top of canopy (m)
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
-   parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+    parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+    parameters%Z0SNO      =       Z0SNO_TABLE
+    parameters%SSI        =         SSI_TABLE
+    parameters%SNOW_RET_FAC =  SNOW_RET_FAC_TABLE
+    parameters%SWEMX      =       SWEMX_TABLE
+    parameters%TAU0         =      TAU0_TABLE
+    parameters%GRAIN_GROWTH = GRAIN_GROWTH_TABLE
+    parameters%EXTRA_GROWTH = EXTRA_GROWTH_TABLE
+    parameters%DIRT_SOOT    =    DIRT_SOOT_TABLE
+    parameters%BATS_COSZ    =    BATS_COSZ_TABLE
+    parameters%BATS_VIS_NEW = BATS_VIS_NEW_TABLE
+    parameters%BATS_NIR_NEW = BATS_NIR_NEW_TABLE
+    parameters%BATS_VIS_AGE = BATS_VIS_AGE_TABLE
+    parameters%BATS_NIR_AGE = BATS_NIR_AGE_TABLE
+    parameters%BATS_VIS_DIR = BATS_VIS_DIR_TABLE
+    parameters%BATS_NIR_DIR = BATS_NIR_DIR_TABLE
+    parameters%RSURF_SNOW =  RSURF_SNOW_TABLE
 #endif
 
 ! ----------------------------------------------------------------------
