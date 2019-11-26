@@ -7216,13 +7216,13 @@ ENDIF   ! CROPTYPE == 0
        INFMAX = INFMAX * FCR
 
 ! imperviousness adjustment
-       INFMAX = INFMAX * (1. - parameters%imperv)
+       RUNSRF = QINSUR * parameters%imperv
 
        CALL WDFCND2 (parameters,WDF,WCND,SH2O(1),SICEMAX,1)
        INFMAX = MAX (INFMAX,WCND)
        INFMAX = MIN (INFMAX,PX)
 
-       RUNSRF= MAX(0., QINSUR - INFMAX)
+       RUNSRF = RUNSRF + MAX(0., (QINSUR * (1. - parameters%imperv)) - INFMAX)
        PDDUM = QINSUR - RUNSRF
 
     END IF
