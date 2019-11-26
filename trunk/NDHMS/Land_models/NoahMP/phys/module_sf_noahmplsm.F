@@ -7219,13 +7219,13 @@ ENDIF   ! CROPTYPE == 0
 ! imperviousness adjustment
        ! Effective imperviousness from Alley & Veenhuis
        imperv_eff = 0.0015 * ( (100. * parameters%imperv)**1.41 )
-       INFMAX = INFMAX * (1. - imperv_eff)
+       RUNSRF = QINSUR * imperv_eff
 
        CALL WDFCND2 (parameters,WDF,WCND,SH2O(1),SICEMAX,1)
        INFMAX = MAX (INFMAX,WCND)
        INFMAX = MIN (INFMAX,PX)
 
-       RUNSRF= MAX(0., QINSUR - INFMAX)
+       RUNSRF = RUNSRF + MAX(0., (QINSUR * (1. - imperv_eff)) - INFMAX)
        PDDUM = QINSUR - RUNSRF
 
     END IF
