@@ -104,73 +104,92 @@ END SUBROUTINE RT_PARM
 !DJG ----------------------------------------------------------------
 
 
-!DJG ----------------------------------------------------------------
-SUBROUTINE GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,sox,tmp_gsize,max,XX,YY)
-    implicit none
-    INTEGER:: IXX0,JYY0,IXX8,JYY8, XX, YY
-    INTEGER, INTENT(IN) :: I,J
+!------------------------------------------------------------------------
+! Subroutines for calculating steepest slope neighbor for overland flow
+!------------------------------------------------------------------------
 
-    REAL,INTENT(IN) :: H(XX,YY),RETENT_DEP(XX,YY),sox(XX,YY,8),tmp_gsize(9)
-    REAL  max
-    IXX0 = -1
-    max = 0
-    if (h(I,J).LE.retent_dep(I,J)) return
+SUBROUTINE GetSfcMax8dir(I, J, XX, YY, depth, terrslpNeighbors, distNeighbors, &
+                   maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
+   implicit none
+   integer, intent(in)    :: I, J ! i, j indices for cell of interest
+   integer, intent(in)    :: XX, YY ! rt domain dimensions
+   real, intent(in)       :: depth(XX, YY) ! overland water depth domain array (mm)
+   real, intent(in)       :: terrslpNeighbors(XX, YY, 8)
+                             ! terrain slope 2d domain array for all 8 neighbors (m/m)
+   real, intent(in)       :: distNeighbors(9)
+                             ! lateral distance array for all 8 neighbors of I,J cell (m)
+   integer, intent(inout) :: maxneighI, maxneighJ ! i, j for max terrain+head slope neighbor
+   integer, intent(inout) :: maxneighIndx
+                             ! neighbor cell direction index for max terrain+head slope neighbor
+   real, intent(inout)    :: maxneighSlp ! terrain+head slope for max slope neighbor (m/m)
 
-    IXX8 = I
-    JYY8 = J+1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,1),IXX0,JYY0,max,tmp_gsize(1),XX,YY)
+   ! Local variables
+   integer                :: neighIndx ! local neighbor direction index (1-8)
+   integer                :: neighI(8), neighJ(8) ! arrays of neighbor i, j indices
 
-    IXX8 = I+1
-    JYY8 = J+1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,2),IXX0,JYY0,max,tmp_gsize(2),XX,YY)
+   ! Initialize neighbor i to negative in case max cannot be found
+   ! ADNOTE: Not sure why slope is initialized to 0?
+   maxneighI = -1
+   maxneighSlp = 0.
 
-    IXX8 = I+1
-    JYY8 = J
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,3),IXX0,JYY0,max,tmp_gsize(3),XX,YY)
+   ! Setup i, j arrays for neighbors, starting north and rotating clockwise
+   neighI = (/ I,   I+1, I+1, I+1, I,   I-1, I-1, I-1 /)
+   neighJ = (/ J+1, J+1, J,   J-1, J-1, J-1, J,   J+1 /)
 
-    IXX8 = I+1
-    JYY8 = J-1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,4),IXX0,JYY0,max,tmp_gsize(4),XX,YY)
+   ! Loop through all neighbors to update max elev+head slope neighbor
+   do neighIndx = 1, 8
+      call GetSfc8dir(I, J, depth(I, J), &
+                      neighI(neighIndx), neighJ(neighIndx), neighIndx, &
+                      depth(neighI(neighIndx), neighJ(neighIndx)), &
+                      terrslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), &
+                      maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
+   enddo
+   RETURN
+END SUBROUTINE GetSfcMax8dir
 
-    IXX8 = I
-    JYY8 = J-1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,5),IXX0,JYY0,max,tmp_gsize(5),XX,YY)
+SUBROUTINE GetSfc8dir(I, J, selfDepth, &
+                      neighI, neighJ, neighIndx, neighDepth, &
+                      neighTerrslp, neighDist, &
+                      maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
+   implicit none
+   integer, intent(in)    :: I, J ! i, j indices for cell of interest
+   real, intent(in)       :: selfDepth ! overland water depth for cell of interest (mm)
+   integer, intent(in)    :: neighI, neighJ ! neighbor cell i, j indices
+   integer, intent(in)    :: neighIndx ! neighbor cell direction index (1-8)
+   real, intent(in)       :: neighDepth ! overland water depth for specified neighbor index (mm)
+   real, intent(in)       :: neighTerrslp
+                             ! terrain slope for specified neighbor index (m/m)
+   real, intent(in)       :: neighDist
+                             ! lateral distance for specified neighbor index (m)
+   integer, intent(inout) :: maxneighI, maxneighJ ! i, j for max terrain+head slope neighbor
+   integer, intent(inout) :: maxneighIndx
+                             ! neighbor cell direction index for max terrain+head slope neighbor
+   real, intent(inout)    :: maxneighSlp
+                             ! terrain+head slope for max terrain+head slope neighbor (m/m)
 
-    IXX8 = I-1
-    JYY8 = J-1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,6),IXX0,JYY0,max,tmp_gsize(6),XX,YY)
+   ! Local variables
+   real                   :: dhdx ! water surface head slope (m/m)
+   real                   :: slope ! total terrain+head slope (m/m)
 
-    IXX8 = I-1
-    JYY8 = J
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,7),IXX0,JYY0,max,tmp_gsize(7),XX,YY)
+   ! Calculate total head slope
+   ! NOTE: Overland depth is depth of water surface above ground surface.
+   ! So total head slope should be:
+   !    slope = ( (elev + depth) - (elev_neigh + depth_neigh) ) / distance
+   !          = terrain_slope + dhdx
+   ! Coverting depth from mm to m to match elevation slope
+   dhdx = ( selfDepth - neighDepth )*0.001 / neighDist
+   slope = neighTerrslp + dhdx
+   if (slope .le. 0) return
+   ! Check if this is max and update tracking variables
+   if ( maxneighSlp < slope ) then
+      maxneighI = neighI
+      maxneighJ = neighJ
+      maxneighSlp = slope
+      maxneighIndx = neighIndx
+   end if
+END SUBROUTINE GetSfc8dir
 
-    IXX8 = I-1
-    JYY8 = J+1
-    call GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox(:,:,8),IXX0,JYY0,max,tmp_gsize(8),XX,YY)
-    RETURN
-END SUBROUTINE GETMAX8DIR
-
-SUBROUTINE GET8DIR(IXX8,JYY8,I,J,H,RETENT_DEP,sox   &
-        ,IXX0,JYY0,max,tmp_gsize,XX,YY)
-    implicit none
-    integer,INTENT(INOUT) ::IXX0,JYY0
-    INTEGER, INTENT(IN) :: I,J,IXX8,JYY8,XX,YY
-    REAL,INTENT(IN) :: H(XX,YY),RETENT_DEP(XX,YY),sox(XX,YY)
-    REAL, INTENT(INOUT) ::max
-    real, INTENT(IN) :: tmp_gsize
-    real :: sfx
-
-    sfx = sox(i,j)-(h(IXX8,JYY8)-h(i,j))*0.001/tmp_gsize
-    if(sfx .le. 0 ) return
-    if(max < sfx ) then
-        IXX0 = IXX8
-        JYY0 = JYY8
-        max = sfx
-    end if
-
-END SUBROUTINE GET8DIR
-
-!DJG------------------------------------------------------------
+!------------------------------------------------------------------------
 
 
 SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, terrslpNeighbors, distNeighbors, &

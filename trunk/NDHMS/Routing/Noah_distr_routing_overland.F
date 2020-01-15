@@ -379,9 +379,6 @@ subroutine ov_rtng( &
             CALL ROUTE_OVERLAND1(DTRT_TER, &
                 ovrt_data%properties%distance_to_neighbor, &
                 ovrt_data%control%surface_water_head_routing, &
-                ovrt_data%control%DHRT, &
-                ovrt_data%properties%surface_slope_x,   &
-                ovrt_data%properties%surface_slope_y, &
                 ovrt_data%properties%retention_depth, &
                 ovrt_data%properties%roughness, &
                 IXRT, JXRT, &
@@ -419,193 +416,232 @@ subroutine ov_rtng( &
     !DJG ----------------------------------------------------------------
 END SUBROUTINE OV_RTNG
 
-!DJG ----------------------------------------------------------------
-
-!DJG     SUBROUTINE ROUTE_OVERLAND1
-!DJG ----------------------------------------------------------------
-
-SUBROUTINE ROUTE_OVERLAND1(dt,                                &
-        &          gsize,h,qsfc,sox,soy,                                   &
-        &     retent_dep,dist_rough,XX,YY,QBDRY,QBDRYT,SO8RT,SO8RT_D,      &
-        &     q_sfcflx_x,q_sfcflx_y)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !
-    !  Subroutine to route excess rainfall over the watershed
-    !     using a 2d diffusion routing scheme.
-    !
-    !  Called from: main.f
-    !
-    !      Will try to formulate this to be called from NOAH
-    !
-    !  Returns: qsfc=DQOV   which in turn becomes DH in head calc.
-    !
-    !  Created:  Adaptded from CASC2D source code
-    !  NOTE: dh from original code has been replaced by qsfc
-    !        dhh replaced by qqsfc
-    !
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!===================================================================================================
+! Subroutine Name:
+!   subroutine ROUTE_OVERLAND1
+! Author(s)/Contact(s):
+!   D. Gochis <gochis><ucar><edu>
+! Abstract:
+!   Route excess rainfall over the watershed using a 1d (steepest slope) diffusion routing scheme.
+! History Log:
+!   ??/??/?? -Created, DG.
+!   01/14/20 -Modified, AD.
+! Usage:
+! Parameters:
+! Input Files:
+! Output Files:
+! Condition codes:
+! User controllable options: None.
+! Notes:
+!  - Adapted from CASC2D source code
+!  - Returns: qsfc=DQOV   which in turn becomes DH in head calc.
+!  - dh from original code has been replaced by qsfc
+!  - dhh replaced by qqsfc
+!===================================================================================================
+SUBROUTINE ROUTE_OVERLAND1(dt, &
+              dist, &
+              h, &
+              retent_dep, &
+              roughness, &
+              XX, YY, &
+              QBDRY, &
+              QBDRYT, &
+              SO8RT, &
+              SO8RT_D, &
+              q_sfcflx_x, q_sfcflx_y)
 
 #ifdef MPP_LAND
-    use module_mpp_land, only: left_id,down_id,right_id, &
-        up_id,mpp_land_com_real, my_id, mpp_land_com_real8,&
-        mpp_land_sync
+   use module_mpp_land, only: left_id, down_id, right_id, &
+                               up_id, mpp_land_com_real, &
+                               my_id, mpp_land_com_real8, &
+                               mpp_land_sync
 #endif
 
-    IMPLICIT NONE
+   IMPLICIT NONE
 
+   ! Passed variables
+   integer, intent(in) :: XX,YY ! x and y dims on the routing grid
+   real, intent(in)    :: dt ! overland routing timestep (sec)
 
-    !! Declare Passed variables
+   ! Passed arrays
+   real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m)
+   real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
+   integer, intent(in), dimension(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
+   real, intent(in), dimension(XX,YY)      :: retent_dep ! retention depth to hold before water is routed (mm)
+   real, intent(in), dimension(XX,YY)      :: roughness ! manning's roughness coefficient (sec/m^[1/3]?)
+   real, intent(inout), dimension(XX,YY)   :: h ! depth of overland water (mm)
+   real, intent(inout), dimension(XX,YY)   :: QBDRY ! boundary cell flux (mm)
+   real, intent(inout)                     :: QBDRYT ! total boundary flux (m)
+   real, intent(inout), dimension(XX,YY)   :: q_sfcflx_x, q_sfcflx_y ! directional fluxes (m)
 
-    INTEGER, INTENT(IN) :: XX,YY
-    REAL, INTENT(IN) :: dt, gsize(xx,yy,9)
+   ! Local variables
+   integer :: i, j ! indices for local loops
+   integer :: i_max_neigh, j_max_neigh, indx_max_neigh ! i, j, and direction index for steepest slope neighbor
+   real    :: hmax ! maximum depth for mass flux limit check (m)
+   real    :: alfax ! alpha parameter (m^[1/3]/sec)
+   real    :: sfx ! friction slope (m/m)
+   real    :: hh ! depth of water available for overland routing (m)
+   real    :: hh53 ! h to the beta (5/3) exponent (m^[5/3])
+   real    :: qqsfc ! depth of water leaving cell (m) 
+   real    :: h_out ! tracking variable for water depth movement (mm) 
+   real    :: one_over_dist ! 1/neighbor_distance to ease slope calculations (1/m)
 
-    !! Declare passed arrays
+   ! Local arrays
+   real*8, dimension(XX,YY)  :: DH ! head change tracking for self (mm)
+   real*8, dimension(XX,YY)  :: DH_from_neigh ! head change tracking for neighbor (mm)
+   real*8, dimension(XX,YY)  :: QBDRY_from_neigh ! temporary boundary flux accumulator (mm)
 
-    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: h
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: qsfc
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: sox
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: soy
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: retent_dep
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: dist_rough
-    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QBDRY
-    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
-    REAL, INTENT(INOUT) :: QBDRYT
-    REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
-    REAL*8, DIMENSION(XX,YY) :: QBDRY_tmp, DH
-    REAL*8, DIMENSION(XX,YY) :: DH_tmp
+   ! Initialize variables
+   DH = 0.
+   DH_from_neigh = 0.
+   QBDRY_from_neigh = 0.
 
-    !!! Declare Local Variables
+   ! Begin Routing of Excess Rainfall over the Watershed
 
-    REAL :: dhdx,dhdy,alfax,alfay
-    REAL :: hh53,qqsfc,hh,dt_new,hmax
-    REAL :: sfx,sfy
-    REAL :: tmp_adjust
+   ! Loop to route water
+   do j=2,YY-1
+      do i=2,XX-1
 
-    INTEGER :: i,j
-    REAL IXX8,IYY8
-    INTEGER  IXX0,JYY0,index, SO8RT_D(XX,YY,3)
-    REAL  tmp_gsize,hsum
+         if (h(I,J) .GT. retent_dep(I,J)) then
 
-    !!! Initialize variables
+            i_max_neigh = SO8RT_D(i,j,1)
+            j_max_neigh = SO8RT_D(i,j,2)
+            indx_max_neigh = SO8RT_D(i,j,3)
+            one_over_dist = 1.0/dist(i,j,indx_max_neigh)
+            sfx = so8RT(i,j,indx_max_neigh) - (h(i_max_neigh,j_max_neigh)-h(i,j)) * 0.001 * one_over_dist
 
+            hmax = h(i,j)*0.001  !Specify max head for mass flux limit
 
+            if (sfx .lt. 1E-20) then
+               ! ADNOTE: Updates i_max_neigh, j_max_neigh, indx_max_neigh, and sfx for steepest slope neighbor.
+               !call GETMAX8DIR(i_max_neigh,j_max_neigh,I,J,H,RETENT_DEP,so8rt,dist(i,j,:),sfx,XX,YY)
+               call GetSfcMax8dir(i, j, XX, YY, H, so8rt, dist(i,j,:), &
+                                  i_max_neigh, j_max_neigh, indx_max_neigh, sfx)
+               ! ADNOTE: Shouldn't this be updated after the neighbor check?
+               ! one_over_dist = 1.0/dist(i,j,index)
+            end if
 
-    !!! Begin Routing of Excess Rainfall over the Watershed
+            !ADNOTE: GetSfcMax8dir will return i_max_neigh=-1 if steepest slope cannot be found
+            if (i_max_neigh > 0) then  ! do the rest if the lowest grid can be found.
 
-    DH=0.
-    DH_tmp=0.
-    QBDRY_tmp =0.
-
-    !!! Loop to route water
-    do j=2,YY-1
-        do i=2,XX-1
-            if (h(I,J).GT.retent_dep(I,J)) then
-                IXX0 = SO8RT_D(i,j,1)
-                JYY0 = SO8RT_D(i,j,2)
-                index = SO8RT_D(i,j,3)
-                tmp_gsize = 1.0/gsize(i,j,index)
-                sfx = so8RT(i,j,index)-(h(IXX0,JYY0)-h(i,j))*0.001*tmp_gsize
-                hmax = h(i,j)*0.001  !Specify max head for mass flux limit...
-                if(sfx .lt. 1E-20) then
-                    call GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,so8rt,gsize(i,j,:),sfx,XX,YY)
-                end if
-                if(IXX0 > 0) then  ! do the rest if the lowest grid can be found.
-                    if(sfx .lt. 1E-20) then
+               if (sfx .lt. 1E-20) then
 #ifdef HYDRO_D
-                        print*, "Message: sfx reset to 1E-20. sfx =",sfx
-                        print*, "i,j,index,IXX0,JYY0",i,j,index,IXX0,JYY0
-                        print*, "so8RT(i,j,index), h(IXX0,JYY0), h(i,j), gsize(i,j,index) ", &
-                            so8RT(i,j,index), h(IXX0,JYY0), h(i,j), gsize(i,j,index)
+                  print*, "Message: sfx reset to 1E-20. sfx =",sfx
+                  print*, "i,j,indx_max_neigh,i_max_neigh,j_max_neigh",i,j,indx_max_neigh,i_max_neigh,j_max_neigh
+                  print*, "so8RT(i,j,indx_max_neigh), h(i_max_neigh,j_max_neigh), h(i,j), dist(i,j,indx_max_neigh) ", &
+                           so8RT(i,j,indx_max_neigh), h(i_max_neigh,j_max_neigh), h(i,j), dist(i,j,indx_max_neigh)
 #endif
-                        sfx = 1E-20
-                    end if
-                    alfax = sqrt(sfx) / dist_rough(i,j)
-                    hh=(h(i,j)-retent_dep(i,j)) * 0.001
-                    hh53=hh**(5./3.)
+                  sfx = 1E-20
+               end if
 
-                    ! Calculate q-flux...
-                    qqsfc = alfax*hh53*dt * tmp_gsize
+               ! See CASC2D manual (Julien & Saghafian 1991)
+               ! http://hdl.handle.net/10217/173165
+               ! Depth-discharge relationship:
+               !   q_x = alpha_x * ( h ^ beta)
+               ! where alpha & beta parameters for turbulent flow over a rough boundary are:
+               !   alpha_x = sqrt(slopef_x) / n
+               !   beta = 5/3
+               ! Variables:
+               !   q_x = unit flow in x direction
+               !   h = surface flow depth
+               !   slopef_x = friction slope in x direction
+               !   n = manning's n
+               alfax = sqrt(sfx) / roughness(i,j)
+               hh = (h(i,j)-retent_dep(i,j)) * 0.001
+               hh53 = hh**(5./3.)
 
-                    !Courant check (simple mass limit on overland flow)...
-                    if (qqsfc.ge.(hmax*dt*tmp_gsize)) qqsfc = hmax*dt*tmp_gsize
+               ! Calculate q-flux
+               ! Units check: (m^(1/3))/sec * (m^(5/3)) * sec * 1/m = m
+               ! ADNOTE: Is this the right "dist" to use? Should this be flowpath width vs. length?
+               ! OK since identical for square cells, but need to watch for other shapes.
+               qqsfc = alfax * hh53 * dt * one_over_dist ! meters
 
-                    ! Accumulate directional fluxes on routing subgrid...
-                    if (IXX0.gt.i) then
-                        q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + qqsfc * &
-                            (1.0 - 0.5 * (ABS(j-JYY0)))
-                    else if (IXX0.lt.i) then
-                        q_sfcflx_x(I,J) = q_sfcflx_x(I,J) - 1.0 * &
-                            qqsfc * (1.0 - 0.5 * (ABS(j-JYY0)))
-                    else
-                        q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + 0.
-                    end if
-                    if (JYY0.gt.j) then
-                        q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + qqsfc * &
-                            (1.0 - 0.5 * (ABS(i-IXX0)))
-                    elseif (JYY0.lt.j) then
-                        q_sfcflx_y(I,J) = q_sfcflx_y(I,J) - 1.0 * &
-                            qqsfc * (1.0 - 0.5 * (ABS(i-IXX0)))
-                    else
-                        q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + 0.
-                    end if
+               ! Courant check (simple mass limit on overland flow)
+               ! ADNOTE: This check needs updating... not sure where this eqn came from, units don't match.
+               ! Another option: qqsfc = min(qqsfc, 0.6*hmax)
+               if (qqsfc .ge. (hmax*dt*one_over_dist)) qqsfc = hmax*dt*one_over_dist
 
-                    !DJG put adjustment in for (h) due to qqsfc
+               ! Accumulate directional fluxes on routing subgrid
+               ! ADNOTE: Why do these calcs for 1-d flow?
+               if (i_max_neigh .gt. i) then
+                  q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + qqsfc * &
+                                      (1.0 - 0.5 * (ABS(j-j_max_neigh)))
+               else if (i_max_neigh .lt. i) then
+                  q_sfcflx_x(I,J) = q_sfcflx_x(I,J) - 1.0 * &
+                                      qqsfc * (1.0 - 0.5 * (ABS(j-j_max_neigh)))
+               else
+                  q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + 0.
+               end if
+               if (j_max_neigh .gt. j) then
+                  q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + qqsfc * &
+                                      (1.0 - 0.5 * (ABS(i-i_max_neigh)))
+               else if (j_max_neigh .lt. j) then
+                  q_sfcflx_y(I,J) = q_sfcflx_y(I,J) - 1.0 * &
+                                      qqsfc * (1.0 - 0.5 * (ABS(i-i_max_neigh)))
+               else
+                  q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + 0.
+               end if
 
-                    !yw changed as following:
-                    tmp_adjust=qqsfc*1000
-                    if((h(i,j) - tmp_adjust) <0 )  then
+               !DJG put adjustment in for (h) due to qqsfc
+               !yw changed as following:
+               h_out = qqsfc * 1000. ! mm
+               if ((h(i,j) - h_out) <0 )  then
 #ifdef HYDRO_D
-                        print*, "Error Warning: surface head is negative:  ",i,j,ixx0,jyy0, &
-                            h(i,j) - tmp_adjust
+                  print*, "Error Warning: surface head is negative:  ",i,j,i_max_neigh,j_max_neigh, &
+                            h(i,j) - h_out
 #endif
-                        tmp_adjust = h(i,j)
-                    end if
-                    DH(i,j) = DH(i,j)-tmp_adjust
-                    DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
-                    !yw end change
+                  h_out = h(i,j)
+               end if
+               ! Remove water from self and add to neighbor
+               DH(i,j) = DH(i,j) - h_out ! mm
+               DH_from_neigh(i_max_neigh,j_max_neigh) = DH_from_neigh(i_max_neigh,j_max_neigh) + h_out ! mm
+               !yw end change
 
-                    !DG Boundary adjustments here
-                    !DG Constant Flux Condition
+               !DG Boundary adjustments here
+               !DG Constant Flux Condition
 #ifdef MPP_LAND
-                    if( ((ixx0.eq.XX).and.(right_id .lt. 0)) .or. &
-                            ((ixx0.eq.1) .and.(left_id  .lt. 0)) .or. &
-                            ((jyy0.eq.1) .and.(down_id  .lt. 0)) .or. &
-                            ((JYY0.eq.YY).and.(up_id    .lt. 0)) ) then
-                        !QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
+               if ( ((i_max_neigh.eq.XX) .and. (right_id .lt. 0)) .or. &
+                    ((i_max_neigh.eq.1)  .and. (left_id  .lt. 0)) .or. &
+                    ((j_max_neigh.eq.1)  .and. (down_id  .lt. 0)) .or. &
+                    ((j_max_neigh.eq.YY) .and. (up_id    .lt. 0)) ) then
 #else
-                        if ((ixx0.eq.XX).or.(ixx0.eq.1).or.(jyy0.eq.1)   &
-                                .or.(JYY0.eq.YY )) then
-                            !QBDRY(IXX0,JYY0)=QBDRY(IXX0,JYY0) - qqsfc*1000.
+               if ( (i_max_neigh.eq.XX) .or. (i_max_neigh.eq.1) .or. &
+                    (j_max_neigh.eq.1)  .or. (j_max_neigh.eq.YY ) ) then
 #endif
-                            QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
-                            QBDRYT=QBDRYT - qqsfc
-                            DH_tmp(IXX0,JYY0)= DH_tmp(IXX0,JYY0)-tmp_adjust
-                        end if
-                    end if
-                    !! End loop to route sfc water
-                end if
-        end do
-    end do
+                  ! For boundary cells, move water from DH to QBDRY.
+                  ! ADNOTE: Note that QBDRY is negative so by subtracting we are really adding to the negative flux.
+                  ! ADNOTE: Not sure why we are using h_out for one and qqsfc for the other...?
+                  DH_from_neigh(i_max_neigh,j_max_neigh) = DH_from_neigh(i_max_neigh,j_max_neigh) - h_out ! mm
+                  QBDRY_from_neigh(i_max_neigh,j_max_neigh) = QBDRY_from_neigh(i_max_neigh,j_max_neigh) - qqsfc*1000. ! mm
+                  QBDRYT = QBDRYT - qqsfc ! m
+               end if
+
+            end if ! End if lowest grid cell can be found
+         end if ! End if overland flow depth > retention depth
+
+      end do
+   end do
 
 #ifdef MPP_LAND
-    ! use double precision to solve the underflow problem.
-    call MPP_LAND_COM_REAL8(DH_tmp,XX,YY,1)
-    call MPP_LAND_COM_REAL8(QBDRY_tmp,XX,YY,1)
+   ! use double precision to solve the underflow problem.
+   call MPP_LAND_COM_REAL8(DH_from_neigh, XX, YY, 1)
+   call MPP_LAND_COM_REAL8(QBDRY_from_neigh, XX, YY, 1)
 #endif
-    QBDRY = QBDRY + QBDRY_tmp
-    DH = DH+DH_tmp
+   QBDRY = QBDRY + QBDRY_from_neigh ! mm
+   DH = DH + DH_from_neigh ! mm
 
 #ifdef MPP_LAND
-    call MPP_LAND_COM_REAL8(DH,XX,YY,99)
-    call MPP_LAND_COM_REAL(QBDRY,XX,YY,99)
+   call MPP_LAND_COM_REAL8(DH, XX, YY, 99)
+   call MPP_LAND_COM_REAL(QBDRY, XX, YY, 99)
 #endif
 
-    H = H + DH
+   ! Make final full matrix net adjustment to overland depth
+   H = H + DH
 
-    return
+   return
 
-    !DJG ----------------------------------------------------------------------
 end subroutine ROUTE_OVERLAND1
+
 
 !DJG ----------------------------------------------------------------------
 
