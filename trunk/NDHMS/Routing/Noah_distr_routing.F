@@ -108,7 +108,7 @@ END SUBROUTINE RT_PARM
 ! Subroutines for calculating steepest slope neighbor for overland flow
 !------------------------------------------------------------------------
 
-SUBROUTINE GetSfcMax8dir(I, J, XX, YY, depth, terrslpNeighbors, distNeighbors, &
+SUBROUTINE GetOverlandMax8dir(I, J, XX, YY, depth, terrslpNeighbors, distNeighbors, &
                    maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
    implicit none
    integer, intent(in)    :: I, J ! i, j indices for cell of interest
@@ -138,16 +138,16 @@ SUBROUTINE GetSfcMax8dir(I, J, XX, YY, depth, terrslpNeighbors, distNeighbors, &
 
    ! Loop through all neighbors to update max elev+head slope neighbor
    do neighIndx = 1, 8
-      call GetSfc8dir(I, J, depth(I, J), &
+      call GetOverland8dir(I, J, depth(I, J), &
                       neighI(neighIndx), neighJ(neighIndx), neighIndx, &
                       depth(neighI(neighIndx), neighJ(neighIndx)), &
                       terrslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), &
                       maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
    enddo
    RETURN
-END SUBROUTINE GetSfcMax8dir
+END SUBROUTINE GetOverlandMax8dir
 
-SUBROUTINE GetSfc8dir(I, J, selfDepth, &
+SUBROUTINE GetOverland8dir(I, J, selfDepth, &
                       neighI, neighJ, neighIndx, neighDepth, &
                       neighTerrslp, neighDist, &
                       maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
@@ -187,12 +187,15 @@ SUBROUTINE GetSfc8dir(I, J, selfDepth, &
       maxneighSlp = slope
       maxneighIndx = neighIndx
    end if
-END SUBROUTINE GetSfc8dir
+END SUBROUTINE GetOverland8dir
 
 !------------------------------------------------------------------------
 
+!------------------------------------------------------------------------
+! Subroutines for calculating steepest slope neighbor for subsurface flow
+!------------------------------------------------------------------------
 
-SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, terrslpNeighbors, distNeighbors, &
+SUBROUTINE GetSubsurfaceMax8dir(I, J, XX, YY, wattbl, terrslpNeighbors, distNeighbors, &
                    maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
    implicit none
    integer, intent(in)    :: I, J ! i, j indices for cell of interest
@@ -220,16 +223,16 @@ SUBROUTINE GETSUB8(I, J, XX, YY, wattbl, terrslpNeighbors, distNeighbors, &
 
    ! Loop through all neighbors to update max elev+head slope neighbor
    do neighIndx = 1, 8
-      call GETSUB8DIR(I, J, wattbl(I, J), &
+      call GetSubsurface8dir(I, J, wattbl(I, J), &
                       neighI(neighIndx), neighJ(neighIndx), neighIndx, &
                       wattbl(neighI(neighIndx), neighJ(neighIndx)), &
                       terrslpNeighbors(I,J,neighIndx), distNeighbors(neighIndx), &
                       maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
    enddo
    RETURN
-END SUBROUTINE GETSUB8
+END SUBROUTINE GetSubsurfaceMax8dir
 
-SUBROUTINE GETSUB8DIR(I, J, selfWattbl, &
+SUBROUTINE GetSubsurface8dir(I, J, selfWattbl, &
                       neighI, neighJ, neighIndx, neighWattbl, &
                       neighTerrslp, neighDist, &
                       maxneighI, maxneighJ, maxneighIndx, maxneighSlp)
@@ -267,8 +270,9 @@ SUBROUTINE GETSUB8DIR(I, J, selfWattbl, &
       maxneighSlp = beta
       maxneighIndx = neighIndx
    end if
-END SUBROUTINE GETSUB8DIR
+END SUBROUTINE GetSubsurface8dir
 
+!------------------------------------------------------------------------
 
 !DJG-----------------------------------------------------------------------
 !DJG SUBROUTINE TER_ADJ_SOL    - Terrain adjustment of incoming solar radiation

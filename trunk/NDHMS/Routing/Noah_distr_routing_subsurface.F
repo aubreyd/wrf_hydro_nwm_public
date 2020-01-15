@@ -590,7 +590,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
 
    ! Local variables
    integer :: i, j ! indices for local loops
-   integer :: IXX0, JYY0, index ! i, j, and direction index for steepest slope neighbor
+   integer :: i_max_neigh, j_max_neigh, indx_max_neigh ! i, j, and direction index for steepest slope neighbor
    real    :: beta ! total head slope (m/m)
    real    :: hh ! interim variable for subsurface solution per DHSVM (dimensionless)
    real    :: gamma ! interim variable for subsurface solution per DHSVM (m3/s)
@@ -598,13 +598,14 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
    real    :: qqsub ! net subsurface flow out of cell (m3/s?)
    real    :: waterToRoute ! total water to route from cell (m)
    ! Local arrays
-   real*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
+   real*8, DIMENSION(XX,YY) :: qsub_from_neigh ! flux tracking for neighbor (m3/s)
+   real*8, DIMENSION(XX,YY) :: QSUBDRY_from_neigh ! flux tracking for domain boundary (m3/s)
    ! Local parameters
    real, parameter :: nexp=1.0  ! local power law exponent
 
    ! Initialize temp variables
-   qsub_tmp = 0.
-   QSUBDRY_tmp = 0.
+   qsub_from_neigh = 0.
+   QSUBDRY_from_neigh = 0.
 
 #ifdef HYDRO_D
    write(6,*) "call subsurface routing xx= , yy =", yy, xx
@@ -618,18 +619,18 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
             ! check for boundary grid point?
 
             ! Set initial guess values for steepest slope neighbor based on terrain
-            IXX0 = SO8RT_D(i,j,1)
-            JYY0 = SO8RT_D(i,j,2)
-            index = SO8RT_D(i,j,3)
+            i_max_neigh = SO8RT_D(i,j,1)
+            j_max_neigh = SO8RT_D(i,j,2)
+            indx_max_neigh = SO8RT_D(i,j,3)
             !beta = -1.0
 
             ! ADCHANGE: Always call routine to check for steepest elev+head slope
-            ! Updates IXX0, JYY0, index, and beta for steepest slope neighbor.
+            ! Updates i_max_neigh, j_max_neigh, indx_max_neigh, and beta for steepest slope neighbor.
             ! Note that beta will be -1 if steepest slope cannot be found.
-            call GETSUB8(i, j, XX, YY, Z, so8rt, dist(i,j,:), &
-                         IXX0, JYY0, index, beta)
+            call GetSubsurfaceMax8dir(i, j, XX, YY, Z, so8rt, dist(i,j,:), &
+                         i_max_neigh, j_max_neigh, indx_max_neigh, beta)
 
-            if (dist(i,j,index) .le. 0) then
+            if (dist(i,j,indx_max_neigh) .le. 0) then
                 write(6,*) "FATAL ERROR: dist(i,j,index) is <= zero "
                 call hydro_stop("In ROUTE_SUBSURFACE1() - dist(i,j,index) is <= zero ")
             endif
@@ -657,7 +658,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
 
                ! Calculate flux from cell
                ! AD_NOTE: gamma and qqsub are negative when flow is out of cell
-               gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp ) * beta
+               gamma = -1.0 * ( (dist(i,j,indx_max_neigh) * ksat * soldep(i,j)) / nexp ) * beta
                qqsub = gamma * hh
 
                ! AD_NOTE: Moved this water available constraint from outside qsub calc loop
@@ -672,34 +673,35 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
                ! (remember: qqsub is negative when flow is out of cell!)
                qsub(i,j) = qsub(i,j) + qqsub
                ! Add to neighbor cell qsub to track net fluxes over full i, j loop
-               qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) - qqsub
+               qsub_from_neigh(i_max_neigh,j_max_neigh) = qsub_from_neigh(i_max_neigh,j_max_neigh) - qqsub
 
                !DJG Error Checks...
                if (qqsub .gt. 0) then
                   print*, "FATAL ERROR: qqsub should be negative, qqsub =",qqsub,&
                      "gamma=",gamma,"hh=",hh,"beta=",beta,&
-                     "so8RT=",so8RT(i,j,index),"latksat=",ksat, &
-                     "tan(beta)=",tan(beta),i,j,z(i,j),z(IXX0,JYY0)
-                  print*, "ixx0=",ixx0, "jyy0=",jyy0
+                     "so8RT=",so8RT(i,j,indx_max_neigh),"latksat=",ksat, &
+                     "tan(beta)=",tan(beta),i,j,z(i,j),z(i_max_neigh,j_max_neigh)
+                  print*, "i_max_neigh=",i_max_neigh, "j_max_neigh=",j_max_neigh
                   print*, "soldep =", soldep(i,j), "nexp=",nexp
                   call hydro_stop("In ROUTE_SUBSURFACE1() - qqsub should be negative")
                endif
 
                ! Make boundary adjustments if cells are on edge of local domain
 #ifdef MPP_LAND
-               if ( ((ixx0.eq.XX).and.(right_id .lt. 0)) .or. &
-                  ((ixx0.eq.1) .and.(left_id  .lt. 0)) .or. &
-                  ((jyy0.eq.1) .and.(down_id  .lt. 0)) .or. &
-                  ((JYY0.eq.YY).and.(up_id    .lt. 0)) ) then
+               if ( ((i_max_neigh.eq.XX).and.(right_id .lt. 0)) .or. &
+                  ((i_max_neigh.eq.1) .and.(left_id  .lt. 0)) .or. &
+                  ((j_max_neigh.eq.1) .and.(down_id  .lt. 0)) .or. &
+                  ((j_max_neigh.eq.YY).and.(up_id    .lt. 0)) ) then
 #else
-               if ((ixx0.eq.1).or.(ixx0.eq.xx).or.(jyy0.eq.1).or.(jyy0.eq.yy)) then
+               if ((i_max_neigh.eq.1).or.(i_max_neigh.eq.xx).or.(j_max_neigh.eq.1).or.(j_max_neigh.eq.yy)) then
 #endif
                   ! If on edge, move flux tracking BACK from neighbor cell qsub and into
                   ! boundary qsub (note: qsubdry is negative and qqsub is negative, so we
                   ! are making it a bigger sink here)
-                  qsub_tmp(ixx0,jyy0) = qsub_tmp(ixx0,jyy0) + qqsub
-                  QSUBDRY_tmp(ixx0,jyy0) = QSUBDRY_tmp(ixx0,jyy0) + qqsub
+                  qsub_from_neigh(i_max_neigh,j_max_neigh) = qsub_from_neigh(i_max_neigh,j_max_neigh) + qqsub
+                  QSUBDRY_from_neigh(i_max_neigh,j_max_neigh) = QSUBDRY_from_neigh(i_max_neigh,j_max_neigh) + qqsub
                   ! Add to total BOUNDARY qsub
+                  ! ADNOTE: Is this used for anything? Don't see it used anywhere else in the code.
                   QSUBDRYT = QSUBDRYT + qqsub
                endif
 
@@ -712,14 +714,14 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, soldep, &
    end do   ! end j loop
 
 #ifdef MPP_LAND
-   call MPP_LAND_COM_REAL8(qsub_tmp,XX,YY,1)
-   call MPP_LAND_COM_REAL8(QSUBDRY_tmp,XX,YY,1)
+   call MPP_LAND_COM_REAL8(qsub_from_neigh,XX,YY,1)
+   call MPP_LAND_COM_REAL8(QSUBDRY_from_neigh,XX,YY,1)
 #endif
 
    ! Sum grids to get net of self and neighbor fluxes after looping through all cells
    ! (i.e., net of out-flux from one cell and in-flux from its neighbor cell)
-   qsub = qsub + qsub_tmp
-   QSUBDRY = QSUBDRY + QSUBDRY_tmp
+   qsub = qsub + qsub_from_neigh
+   QSUBDRY = QSUBDRY + QSUBDRY_from_neigh
 
 
 #ifdef MPP_LAND

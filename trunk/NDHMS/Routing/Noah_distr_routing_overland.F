@@ -515,7 +515,7 @@ SUBROUTINE ROUTE_OVERLAND1(dt, &
             if (sfx .lt. 1E-20) then
                ! ADNOTE: Updates i_max_neigh, j_max_neigh, indx_max_neigh, and sfx for steepest slope neighbor.
                !call GETMAX8DIR(i_max_neigh,j_max_neigh,I,J,H,RETENT_DEP,so8rt,dist(i,j,:),sfx,XX,YY)
-               call GetSfcMax8dir(i, j, XX, YY, H, so8rt, dist(i,j,:), &
+               call GetOverlandMax8dir(i, j, XX, YY, H, so8rt, dist(i,j,:), &
                                   i_max_neigh, j_max_neigh, indx_max_neigh, sfx)
                ! ADNOTE: Shouldn't this be updated after the neighbor check?
                ! one_over_dist = 1.0/dist(i,j,index)
