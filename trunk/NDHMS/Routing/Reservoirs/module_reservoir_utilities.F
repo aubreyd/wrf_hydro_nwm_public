@@ -286,6 +286,22 @@ contains
     end subroutine read_timeslice_netcdf_real_1D_variables
 
 
+    ! Read integer one dimension parameter arrays from the timeslice NetCDF
+    subroutine read_timeslice_netcdf_integer_1D_variables(ncid, netcdf_array_name, integer_var_array)
+        integer, intent(in) :: ncid
+        character(len=*), intent(in) :: netcdf_array_name
+        integer, dimension(:), intent(out) :: integer_var_array
+        integer :: var_id, status
+
+        status = nf90_inq_varid(ncid, netcdf_array_name, var_id)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+        status = nf90_get_var(ncid, var_id, integer_var_array)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+    end subroutine read_timeslice_netcdf_integer_1D_variables
+
+
     ! Read all gage ids from persistence parameter NetCDF
     subroutine read_persistence_netcdf_gage_ids_all(ncid, netcdf_array_name, var_id, number_of_gages)
         integer, intent(in) :: ncid
@@ -345,9 +361,55 @@ contains
     subroutine read_persistence_netcdf_gage_id(ncid, lake_id_index, netcdf_array_name, gage_id)
         integer, intent(in) :: ncid, lake_id_index
         character(len=*), intent(in) :: netcdf_array_name
-        integer, intent(out) :: gage_id
+        character(len=*), intent(out) :: gage_id
         character(len=15) :: gage_id_string, gage_id_string_trimmed
         character(len=15), allocatable, dimension(:) :: temp_gage_id_array
+        integer :: var_id, status, number_of_lakes
+        integer, dimension(nf90_max_var_dims) :: dim_ids
+        integer        :: char_index, number_counter, temp_val
+        character(len=1)   :: temp_char
+
+        status = nf90_inq_varid(ncid, netcdf_array_name, var_id)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+        status = nf90_inquire_variable(ncid, var_id, dimids = dim_ids)
+        if(status /= nf90_NoErr) call handle_err(status, netcdf_array_name)
+
+        status = nf90_inquire_dimension(ncid, dim_ids(2), len = number_of_lakes)
+        if(status /= nf90_NoErr) call handle_err(status, netcdf_array_name)
+
+        allocate(temp_gage_id_array(number_of_lakes))
+
+        status = nf90_get_var(ncid, var_id, temp_gage_id_array)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+        gage_id_string = temp_gage_id_array(lake_id_index)
+
+        do char_index = 1, 15
+            temp_val = ichar(gage_id_string(char_index:char_index))
+
+            ! Check if null character, then pad with a space
+            if (temp_val == 0) then
+                gage_id_string(char_index:char_index) = ' '
+            end if
+        end do
+
+        gage_id_string_trimmed = ADJUSTL(trim(gage_id_string))
+
+        gage_id = gage_id_string_trimmed
+
+        if(allocated(temp_gage_id_array)) deallocate(temp_gage_id_array)
+
+    end subroutine read_persistence_netcdf_gage_id
+
+
+    ! Read rfc gage id array from the reservoir parameters NetCDF
+    subroutine read_reservoir_parameters_netcdf_rfc_gage_id(ncid, lake_id_index, netcdf_array_name, rfc_gage_id)
+        integer, intent(in) :: ncid, lake_id_index
+        character(len=*), intent(in) :: netcdf_array_name
+        character(len=5), intent(out) :: rfc_gage_id
+        character(len=5) :: gage_id_string, gage_id_string_trimmed
+        character(len=5), allocatable, dimension(:) :: temp_gage_id_array
         integer :: var_id, status, number_of_lakes
         integer, dimension(nf90_max_var_dims) :: dim_ids
         integer        :: char_index, number_counter
@@ -371,25 +433,41 @@ contains
 
         gage_id_string_trimmed = ADJUSTL(trim(gage_id_string))
 
-        number_counter = 0
-
-        do char_index = 1, 15
-            temp_char = gage_id_string_trimmed(char_index:char_index)
-
-            if (temp_char .eq. '0' .or. temp_char .eq. '1' .or. temp_char .eq. '2' &
-            .or. temp_char .eq. '3' .or. temp_char .eq. '4' .or. temp_char .eq. '5' &
-            .or. temp_char .eq. '6' .or. temp_char .eq. '7' .or. temp_char .eq. '8' &
-            .or. temp_char .eq. '9') then
-                number_counter = number_counter + 1
-            end if
-
-        end do
-
-        read(gage_id_string_trimmed(1:number_counter), *) gage_id
+        rfc_gage_id = gage_id_string_trimmed
 
         if(allocated(temp_gage_id_array)) deallocate(temp_gage_id_array)
 
-    end subroutine read_persistence_netcdf_gage_id
+    end subroutine read_reservoir_parameters_netcdf_rfc_gage_id
+
+
+    ! Read an RFC forecast integer variable for a corresponding lake id from the reservoir parameters NetCDF
+    subroutine read_reservoir_parameters_netcdf_rfc_integer(ncid, lake_id_index, netcdf_array_name, integer_var)
+        integer, intent(in) :: ncid, lake_id_index
+        character(len=*), intent(in) :: netcdf_array_name
+        integer, intent(out) :: integer_var
+        integer, allocatable, dimension(:) :: temp_integer_array
+        integer :: var_id, status, number_of_lakes
+        integer, dimension(nf90_max_var_dims) :: dim_ids
+
+        status = nf90_inq_varid(ncid, netcdf_array_name, var_id)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+        status = nf90_inquire_variable(ncid, var_id, dimids = dim_ids)
+        if(status /= nf90_NoErr) call handle_err(status, netcdf_array_name)
+
+        status = nf90_inquire_dimension(ncid, dim_ids(1), len = number_of_lakes)
+        if(status /= nf90_NoErr) call handle_err(status, netcdf_array_name)
+
+        allocate(temp_integer_array(number_of_lakes))
+
+        status = nf90_get_var(ncid, var_id, temp_integer_array)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_array_name)
+
+        integer_var = temp_integer_array(lake_id_index)
+
+        if(allocated(temp_integer_array)) deallocate(temp_integer_array)
+
+    end subroutine read_reservoir_parameters_netcdf_rfc_integer
 
 
     ! Read real two dimension parameter arrays from the persistence parameters NetCDF
@@ -414,6 +492,22 @@ contains
         if(status /= nf90_NoErr) call handle_err(status, netcdf_array_name)
 
     end subroutine read_persistence_netcdf_real_2D_parameters
+
+
+    ! Read integer parameters from the RFC Time Series NetCDF
+    subroutine read_timeslice_netcdf_integer_variables(ncid, netcdf_variable_name, integer_variable)
+        integer, intent(in) :: ncid
+        character(len=*), intent(in) :: netcdf_variable_name
+        integer, intent(out) :: integer_variable
+        integer :: var_id, status
+
+        status = nf90_inq_varid(ncid, netcdf_variable_name, var_id)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_variable_name)
+
+        status = nf90_get_var(ncid, var_id, integer_variable)
+        if (status /= nf90_noerr) call handle_err(status, netcdf_variable_name)
+
+    end subroutine read_timeslice_netcdf_integer_variables
 
 
     ! Handle NetCDF error
@@ -457,11 +551,12 @@ contains
         persistence_current_weight, inflow, current_storage, water_elevation, gage_discharge, &
         persisted_outflow, levelpool_outflow, outflow)
         integer, intent(in) :: lake_number, current_time, timeslice_update_time
-        integer, intent(in) :: weight_update_time, gage_lookback_seconds, gage_id
+        integer, intent(in) :: weight_update_time, gage_lookback_seconds
         integer, intent(in) :: persistence_weight_index
         real,    intent(in) :: persistence_current_weight, inflow, current_storage
         real,    intent(in) :: water_elevation, gage_discharge, persisted_outflow
         real,    intent(in) :: levelpool_outflow, outflow
+        character(len=*), intent(in) :: gage_id
         character(len=15)   :: lake_number_string, lake_number_string_trimmed
         character(len=50)   :: filename_string
 
@@ -471,7 +566,7 @@ contains
 
         open (113, file=filename_string, status="unknown", access = 'append')
 
-        write (113, "(I20, A1, I20, A1, I20, A1, I20, A1, I20, A1, I20, A1, F15.5, A1, F15.5, &
+        write (113, "(I20, A1, I20, A1, I20, A1, I20, A1, A15, A1, I20, A1, F15.5, A1, F15.5, &
         A1, F15.15, A1, F15.5, A1, F15.5, A1, F15.5, A1, F15.5, A1, F15.5)") &
         current_time, ',', timeslice_update_time, ',', weight_update_time, ',', &
         gage_lookback_seconds, ',', gage_id, ',', persistence_weight_index, ',', &
@@ -482,6 +577,56 @@ contains
         close (113)
 
     end subroutine log_hybrid_diagnostic_data
+
+
+    ! Create RFC Forecasts Reservoir Function Diagnostic Log CSV File
+    subroutine create_rfc_forecasts_diagnostic_log_file(lake_number)
+        integer, intent(in) :: lake_number
+        character(len=15)   :: lake_number_string, lake_number_string_trimmed
+        character(len=50)   :: filename_string
+
+        write(lake_number_string, "(I15)") lake_number
+        lake_number_string_trimmed = ADJUSTL(trim(lake_number_string))
+        filename_string = "rfc_forecasts_logs_"//ADJUSTL(trim(lake_number_string_trimmed))//".csv"
+
+        open (113, file=filename_string, status="unknown")
+
+        write (113, "(A256)") "Current_Time, Time_Step, Time_Series_Update_Time, &
+        Lookback_Seconds, Time_Series_Index, Gage_ID, Inflow, Water_Elevation, &
+        Levelpool_Outflow, Outflow"
+
+        close(113)
+
+    end subroutine create_rfc_forecasts_diagnostic_log_file
+
+
+    ! Log data to RFC Forecasts Reservoir Function Diagnostic Log CSV File
+    subroutine log_rfc_forecasts_diagnostic_data(lake_number, current_time, time_step, &
+        time_series_update_time, lookback_seconds, time_series_index, gage_id,  &
+        inflow, water_elevation, levelpool_outflow, outflow)
+        integer, intent(in) :: lake_number, current_time, time_step, time_series_update_time
+        integer, intent(in) :: lookback_seconds, time_series_index
+        character(len=*), intent(in) :: gage_id
+        real,    intent(in) :: inflow, water_elevation, levelpool_outflow, outflow
+        character(len=15)   :: lake_number_string, lake_number_string_trimmed
+        character(len=50)   :: filename_string
+
+        write(lake_number_string, "(I15)") lake_number
+        lake_number_string_trimmed = ADJUSTL(trim(lake_number_string))
+        filename_string = "rfc_forecasts_logs_"//ADJUSTL(trim(lake_number_string_trimmed))//".csv"
+
+        open (113, file=filename_string, status="unknown", access = 'append')
+
+        write (113, "(I20, A1, I20, A1, I20, A1, I20, A1, I20, A1, A5, A1, F15.5, A1, &
+        F15.5, A1, F15.5, A1, F15.5)") &
+        current_time, ',', time_step, ',', time_series_update_time, ',', &
+        lookback_seconds, ',', time_series_index, ',', gage_id, ',', &
+        inflow, ',', water_elevation, ',', levelpool_outflow, ',', outflow
+
+        close (113)
+
+    end subroutine log_rfc_forecasts_diagnostic_data
+
 
     ! Create Levelpool Reservoir Function Diagnostic Log CSV File
     subroutine create_levelpool_diagnostic_log_file(lake_number)
@@ -965,7 +1110,6 @@ contains
     if (punct .and. (oldlen.ge.11) .and. (newlen.ge.11)) ndate(11:11) = sp
 
     end subroutine geth_newdate
-
 
     integer function nfeb(year)
     !
