@@ -771,7 +771,7 @@ contains
                           z0sno_2d, ssi_2d, snowretfac_2d, swemx_2d, tau0_2d,&
                           graingrowth_2d, extragrowth_2d, dirtsoot_2d, bats_cosz_2d,&
                           bats_visnew_2d, bats_nirnew_2d, bats_visage_2d, bats_nirage_2d,&
-                          bats_visdir_2d, bats_nirdir_2d, rsurfsnow_2d)
+                          bats_visdir_2d, bats_nirdir_2d, rsurfsnow_2d, refsnowdens_2d)
     implicit none
     character(len=*),          intent(in)  :: spatial_filename
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -810,6 +810,7 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_visdir_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: bats_nirdir_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: rsurfsnow_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: refsnowdens_2d
 
     character(len=24)  :: name
     character(len=256) :: units
@@ -1198,7 +1199,16 @@ contains
     endif
 
     iret = nf90_get_var(ncid, varid, rsurfsnow_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "refsnowdens"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
 
+    iret = nf90_get_var(ncid, varid, refsnowdens_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
 
     ! Close the NetCDF file
     ierr = nf90_close(ncid)

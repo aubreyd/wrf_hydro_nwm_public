@@ -67,7 +67,8 @@ CONTAINS
                  GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,   &
                  BATS_VISNEW_2D, BATS_NIRNEW_2D,                              &
                  BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
-                 BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D,                &
+                 BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
+                 RSURFSNOW_2D, REFSNOWDENS_2D,                                &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -182,6 +183,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_VISDIR_2D ! cosz factor for direct visible snow albedo Yang97 eqn. 15
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_NIRDIR_2D ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFSNOW_2D   ! surface resistence for snow [s/m]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  REFSNOWDENS_2D ! reference snow density for fSCA calculation [kg/m3]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -697,6 +699,7 @@ CONTAINS
        parameters%bats_vis_dir = BATS_VISDIR_2D(I,J)  ! cosz factor for direct visible snow albedo Yang97 eqn. 15
        parameters%bats_nir_dir = BATS_NIRDIR_2D(I,J)  ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
        parameters%rsurf_snow   = RSURFSNOW_2D(I,J)    ! surface resistence for snow [s/m]
+       parameters%refsnowdens  = REFSNOWDENS_2D(I,J)  ! reference snow density for fSCA calculation [kg/m3]
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1231,6 +1234,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%BATS_VIS_DIR = BATS_VIS_DIR_TABLE
     parameters%BATS_NIR_DIR = BATS_NIR_DIR_TABLE
     parameters%RSURF_SNOW =  RSURF_SNOW_TABLE
+    parameters%REFSNOWDENS =  REFSNOWDENS_TABLE
 #endif
 
 ! ----------------------------------------------------------------------

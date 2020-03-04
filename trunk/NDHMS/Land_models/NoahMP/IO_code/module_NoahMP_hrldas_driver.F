@@ -171,6 +171,7 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_visdir_2D  ! cosz factor for direct visible snow albedo Yang97 eqn. 15
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bats_nirdir_2D  ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfsnow_2D    ! surface resistence for snow [s/m] 
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  refsnowdens_2D  ! reference snow density for fSCA calculation [kg/m3]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -770,6 +771,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( bats_visdir_2D(XSTART:XEND,YSTART:YEND) )         ! cosz factor for direct visible snow albedo Yang97 eqn. 15
   ALLOCATE ( bats_nirdir_2D(XSTART:XEND,YSTART:YEND) )         ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
   ALLOCATE ( rsurfsnow_2D(XSTART:XEND,YSTART:YEND) )           ! surface resistence for snow [s/m]
+  ALLOCATE ( refsnowdens_2D(XSTART:XEND,YSTART:YEND) )         ! reference snow density for fSCA calculation [kg/m3]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1118,7 +1120,7 @@ module module_NoahMP_hrldas_driver
                       Z0SNO_2D, SSI_2D, SNOWRETFAC_2D, SWEMX_2D, TAU0_2D,&
                       GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,&
                       BATS_VISNEW_2D, BATS_NIRNEW_2D, BATS_VISAGE_2D, BATS_NIRAGE_2D,&
-                      BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D)
+                      BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D, REFSNOWDENS_2D)
 #endif
 
 !------------------------------------------------------------------------
@@ -1694,7 +1696,8 @@ end subroutine land_driver_ini
                  GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,   &
                  BATS_VISNEW_2D, BATS_NIRNEW_2D,                              &
                  BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
-                 BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D,                &
+                 BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
+                 RSURFSNOW_2D, REFSNOWDENS_2D,                                &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
