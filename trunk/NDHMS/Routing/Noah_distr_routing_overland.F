@@ -504,6 +504,12 @@ SUBROUTINE ROUTE_OVERLAND1(dt, &
 
          if (h(I,J) .GT. retent_dep(I,J)) then
 
+            i_max_neigh = SO8RT_D(i,j,1)
+            j_max_neigh = SO8RT_D(i,j,2)
+            indx_max_neigh = SO8RT_D(i,j,3)
+            one_over_dist = 1.0/dist(i,j,indx_max_neigh)
+            sfx = so8RT(i,j,indx_max_neigh) - (h(i_max_neigh,j_max_neigh)-h(i,j)) * 0.001 * one_over_dist
+
             hmax = h(i,j)*0.001  !Specify max head for mass flux limit
 
             !ADCHANGE: Always call routine to check for steepest elev+head slope
