@@ -504,22 +504,14 @@ SUBROUTINE ROUTE_OVERLAND1(dt, &
 
          if (h(I,J) .GT. retent_dep(I,J)) then
 
-            i_max_neigh = SO8RT_D(i,j,1)
-            j_max_neigh = SO8RT_D(i,j,2)
-            indx_max_neigh = SO8RT_D(i,j,3)
-            one_over_dist = 1.0/dist(i,j,indx_max_neigh)
-            sfx = so8RT(i,j,indx_max_neigh) - (h(i_max_neigh,j_max_neigh)-h(i,j)) * 0.001 * one_over_dist
-
             hmax = h(i,j)*0.001  !Specify max head for mass flux limit
 
-            if (sfx .lt. 1E-20) then
-               ! ADNOTE: Updates i_max_neigh, j_max_neigh, indx_max_neigh, and sfx for steepest slope neighbor.
-               !call GETMAX8DIR(i_max_neigh,j_max_neigh,I,J,H,RETENT_DEP,so8rt,dist(i,j,:),sfx,XX,YY)
-               call GetOverlandMax8dir(i, j, XX, YY, H, so8rt, dist(i,j,:), &
-                                  i_max_neigh, j_max_neigh, indx_max_neigh, sfx)
-               ! ADNOTE: Shouldn't this be updated after the neighbor check?
-               ! one_over_dist = 1.0/dist(i,j,index)
-            end if
+            !ADCHANGE: Always call routine to check for steepest elev+head slope
+            !(this used to be only called if above sfx is 0 or negative).
+            !Updates i_max_neigh, j_max_neigh, index_max_neigh, and sfx for steepest slope neighbor.
+            call GetOverlandMax8dir(i, j, XX, YY, H, so8rt, dist(i,j,:), &
+                                    i_max_neigh, j_max_neigh, indx_max_neigh, sfx)
+            one_over_dist = 1.0/dist(i, j, indx_max_neigh)
 
             !ADNOTE: GetSfcMax8dir will return i_max_neigh=-1 if steepest slope cannot be found
             if (i_max_neigh > 0) then  ! do the rest if the lowest grid can be found.
