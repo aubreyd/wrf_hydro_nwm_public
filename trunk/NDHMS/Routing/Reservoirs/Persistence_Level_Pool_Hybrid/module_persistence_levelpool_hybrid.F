@@ -61,7 +61,7 @@ contains
         weir_length, dam_length, orifice_elevation, orifice_coefficient, &
         orifice_area, lake_max_water_elevation, initial_fractional_depth, &
         lake_number, reservoir_type, reservoir_parameter_file, start_date, &
-        timeslice_path, observation_lookback_hours, &
+        usgs_timeslice_path, usace_timeslice_path, observation_lookback_hours, &
         observation_update_time_interval_seconds)
         implicit none
         class(persistence_levelpool_hybrid), intent(inout) :: this ! object being initialized
@@ -80,10 +80,13 @@ contains
         integer, intent(in)    :: reservoir_type            ! reservoir type
         character(len=*),   intent(in) :: reservoir_parameter_file
         character(len=19),  intent(in) :: start_date
-        character(len=256), intent(in) :: timeslice_path
+        character(len=256), intent(in) :: usgs_timeslice_path
+        character(len=256), intent(in) :: usace_timeslice_path
         integer,            intent(in) :: observation_lookback_hours
         integer,            intent(in) :: observation_update_time_interval_seconds
         character(len=15)              :: lake_number_string
+        character(len=15)              :: reservoir_type_string
+
 
 #ifdef RESERVOIR_D
         ! Create diagnostic log file only for development/debugging purposes
@@ -97,14 +100,14 @@ contains
             ! so if another reservoir has already initialized the object of a particular data
             ! source, it will return immediately.
             if (reservoir_type == 2) then
-                call usgs_timeslice_data%init(start_date, timeslice_path, &
+                call usgs_timeslice_data%init(start_date, usgs_timeslice_path, &
                 reservoir_parameter_file, "usgs", observation_lookback_hours)
 
                 ! Assign pointer to usgs_timeslice_data object
                 this%timeslice_data=>usgs_timeslice_data
 
             else if (reservoir_type == 3) then
-                call usace_timeslice_data%init(start_date, timeslice_path, &
+                call usace_timeslice_data%init(start_date, usace_timeslice_path, &
                 reservoir_parameter_file, "usace", observation_lookback_hours)
 
                 ! Assign pointer to usace_timeslice_data object
@@ -114,14 +117,19 @@ contains
                 ! Call hydro_stop if reservoir_type is not USGS or USACE because the
                 ! data source is not available.
                 write(lake_number_string, "(I15)") lake_number
-                call hydro_stop("Data source for reservoir " // lake_number_string // " is not available." )
-
+                write(reservoir_type_string, "(I15)") reservoir_type
+                call hydro_stop("ERROR: Incorrect reservoir type for reservoir " // trim(ADJUSTL(lake_number_string)) // &
+                ". Expected reservoir type 2 or 3 and instead received reservoir type "  &
+                // trim(ADJUSTL(reservoir_type_string)) // "." )
             end if
 
+            ! try to allocate input
             allocate ( this%input )
             if ( .not. associated(this%input) ) then
-                ! if the input structure could not be created write an error
-                write(0,*) "Failure to allocate hybrid input structure"
+                ! if the input structure could not be created, call hydro_stop.
+                write(lake_number_string, "(I15)") lake_number
+                call hydro_stop("ERROR: Failure to allocate hybrid input structure for reservoir " &
+                // trim(ADJUSTL(lake_number_string)) // ".")
             else
                 ! initialize the input structure
                 call this%input%init()
@@ -130,8 +138,10 @@ contains
             ! try to allocate output
             allocate ( this%output )
             if ( .not. associated(this%output) ) then
-                ! if the output structure could not be created write an error
-                write(0,*) "Failure to allocate hybrid output structure"
+                ! if the output structure could not be created, call hydro_stop.
+                write(lake_number_string, "(I15)") lake_number
+                call hydro_stop("ERROR: Failure to allocate hybrid output structure for reservoir " &
+                // trim(ADJUSTL(lake_number_string)) // ".")
             else
                 ! initialize the output structure
                 call this%output%init()
@@ -140,8 +150,10 @@ contains
             ! try to allocate properties
             allocate ( this%properties )
             if ( .not. associated(this%properties) ) then
-                ! if the properties structure could not be created write an error
-                write(0,*) "Failure to allocate hybrid properties structure"
+                ! if the properties structure could not be created, call hydro_stop.
+                write(lake_number_string, "(I15)") lake_number
+                call hydro_stop("ERROR: Failure to allocate hybrid properties structure for reservoir " &
+                // trim(ADJUSTL(lake_number_string)) // ".")
             else
                 ! initialize hybrid properties
                 call this%properties%init(lake_area, lake_max_water_elevation, orifice_elevation, lake_number, &
@@ -153,8 +165,10 @@ contains
             ! try to allocate state
             allocate ( this%state )
             if ( .not. associated(this%state) ) then
-                ! if the state structure could not be created write an error
-                write(0,*) "Failure to allocate hybrid state structure"
+                ! if the state structure could not be created, call hydro_stop.
+                write(lake_number_string, "(I15)") lake_number
+                call hydro_stop("ERROR: Failure to allocate hybrid state structure for reservoir " &
+                // trim(ADJUSTL(lake_number_string)) // ".")
             else
                 ! initialize hybrid state
                 call this%state%init(water_elevation, lake_area, lake_max_water_elevation, orifice_elevation, &
@@ -169,13 +183,13 @@ contains
             if (this%state%current_storage > this%properties%max_storage) then
                 this%state%current_storage = this%properties%max_storage
                 write(lake_number_string, "(I15)") lake_number
-                write(log_warning,*) "Warning, initial storage exceeds max storage for reservoir ", lake_number_string, &
+                write(log_warning,*) "WARNING: initial storage exceeds max storage for reservoir ", lake_number_string, &
                 ". Setting initial storage to max storage."
 
             else if (this%state%current_storage < this%properties%min_storage) then
                 this%state%current_storage = this%properties%min_storage
                 write(lake_number_string, "(I15)") lake_number
-                write(log_warning,*) "Warning, initial storage is less than zero for reservoir ", lake_number_string, &
+                write(log_warning,*) "WARNING: initial storage is less than zero for reservoir ", lake_number_string, &
                 ". Setting initial storage to zero."
 
             end if
@@ -246,11 +260,12 @@ contains
 
         local_water_elevation = this%state%water_elevation
 
-        ! If update time to read new timeslice gage discharges. In forecast modes, the update time automatically is set to 1,000,000
-        ! to ensure that gage discharges are only read at the first timestep. For analysis runs, a timeslice update time is set as a
-        ! namelist parameter. A typical update time for an analysis run would be 3600 seconds (1 hour), at which time new observations would
-        ! be retrieved. The first reservoir for each processor to reach an update time will call the function to read a new timeslice file,
-        ! and these timeslice discharges will be held in memory for the subsequent reservoirs to use at that timestep.
+        ! If update time to read new timeslice gage discharges. In forecast modes, the update time automatically is set to
+        ! 1,000,000 to ensure that gage discharges are only read at the first timestep. For analysis runs, a timeslice
+        ! update time is set as a namelist parameter. A typical update time for an analysis run would be 3600 seconds
+        ! (1 hour), at which time new observations would be retrieved. The first reservoir for each processor to reach an
+        ! update time will call the function to read a new timeslice file, and these timeslice discharges will be held in
+        ! memory for the subsequent reservoirs to use at that timestep.
         if (this%state%current_time >= this%state%timeslice_update_time) then
 
             ! Read new timeslice gage discharges
@@ -262,7 +277,8 @@ contains
             ! the weight update logic to set the persistence weight to 0.0. Therefore, only levelpool calculations will be used.
             if (this%state%gage_discharge < 0.0) then
 
-                ! If at weight update time, then increment persistence weight index. Otherwise, continue using previous persistence weight index
+                ! If at weight update time, then increment persistence weight index.
+                ! Otherwise, continue using previous persistence weight index.
                 if (this%state%current_time >= this%state%weight_update_time) then
                     ! Increment weight index
                     this%state%persistence_weight_index = this%state%persistence_weight_index + 1
@@ -290,8 +306,8 @@ contains
                 ! Grab first persistence weight at index 1 from array
                 this%state%persistence_current_weight = this%properties%persistence_weighted_coefficients(this%state%persistence_weight_index)
 
-                ! Set weight update time offset by how long back a timeslice discharge was read. For instance, if the weight update interval is 24 hours, and the gage
-                ! discharge was read 2 hours back, then the weight update time will be set to 22 hours after the current time.
+                ! Set weight update time offset by how long back a timeslice discharge was read. For instance, if the weight update interval is
+                ! 24 hours, and the gage discharge was read 2 hours back, then the weight update time will be set to 22 hours after the current time.
                 this%state%weight_update_time = this%state%current_time + this%properties%weight_update_time_interval - gage_lookback_seconds
 
             end if
@@ -388,7 +404,7 @@ contains
         ! Update water_elevation variable returned from this subroutine
         water_elevation = this%state%water_elevation
 
-        ! Update the dynamic reservoir type
+        ! Update the dynamic_reservoir_type returned from this subroutine
         dynamic_reservoir_type = this%state%dynamic_reservoir_type
 
         ! Update the current time
