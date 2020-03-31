@@ -69,6 +69,7 @@ CONTAINS
                  BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
                  BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
+                 FRAC_DIRECT_2D, FRAC_VISIBLE_2D,                             &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -184,6 +185,8 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BATS_NIRDIR_2D ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFSNOW_2D   ! surface resistence for snow [s/m]
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  REFSNOWDENS_2D ! reference snow density for fSCA calculation [kg/m3]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  FRAC_DIRECT_2D ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1] 
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  FRAC_VISIBLE_2D ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1] 
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -700,6 +703,8 @@ CONTAINS
        parameters%bats_nir_dir = BATS_NIRDIR_2D(I,J)  ! cosz factor for direct NIR snow albedo Yang97 eqn. 16
        parameters%rsurf_snow   = RSURFSNOW_2D(I,J)    ! surface resistence for snow [s/m]
        parameters%refsnowdens  = REFSNOWDENS_2D(I,J)  ! reference snow density for fSCA calculation [kg/m3]
+       parameters%frac_direct  = FRAC_DIRECT_2D(I,J)  ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
+       parameters%frac_visible = FRAC_VISIBLE_2D(I,J) ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1] 
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1235,6 +1240,8 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%BATS_NIR_DIR = BATS_NIR_DIR_TABLE
     parameters%RSURF_SNOW =  RSURF_SNOW_TABLE
     parameters%REFSNOWDENS =  REFSNOWDENS_TABLE
+    parameters%FRAC_DIRECT =  FRAC_DIRECT_TABLE
+    parameters%FRAC_VISIBLE =  FRAC_VISIBLE_TABLE
 #endif
 
 ! ----------------------------------------------------------------------

@@ -304,6 +304,8 @@ MODULE MODULE_SF_NOAHMPLSM
      REAL :: RSURF_SNOW   !surface resistance for snow(s/m)
      REAL :: RSURF_EXP    !exponent in the shape parameter for soil resistance option 1
      REAL :: REFSNOWDENS  !reference snow density for fSCA calculation (kg/m3)
+     REAL :: FRAC_DIRECT  !fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
+     REAL :: FRAC_VISIBLE !fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
 
 !------------------------------------------------------------------------------------------!
 ! From the crop section of MPTABLE.TBL
@@ -935,10 +937,10 @@ contains
           SWDOWN = SOLDN
        END IF 
 
-       SOLAD(1) = SWDOWN*0.7*0.5     ! direct  vis
-       SOLAD(2) = SWDOWN*0.7*0.5     ! direct  nir
-       SOLAI(1) = SWDOWN*0.3*0.5     ! diffuse vis
-       SOLAI(2) = SWDOWN*0.3*0.5     ! diffuse nir
+       SOLAD(1) = SWDOWN*parameters%FRAC_DIRECT*parameters%FRAC_VISIBLE            ! direct  vis
+       SOLAD(2) = SWDOWN*parameters%FRAC_DIRECT*(1.-parameters%FRAC_VISIBLE)       ! direct  nir
+       SOLAI(1) = SWDOWN*(1.-parameters%FRAC_DIRECT)*parameters%FRAC_VISIBLE       ! diffuse vis
+       SOLAI(2) = SWDOWN*(1.-parameters%FRAC_DIRECT)*(1.-parameters%FRAC_VISIBLE)  ! diffuse nir
 
        PRCP = PRCPCONV + PRCPNONC + PRCPSHCV
 
@@ -9176,6 +9178,8 @@ MODULE NOAHMP_TABLES
     REAL :: RSURF_SNOW_TABLE    !surface resistance for snow(s/m)
     REAL :: RSURF_EXP_TABLE    !exponent in the shape parameter for soil resistance option 1
     REAL :: REFSNOWDENS_TABLE   !reference snow density for fSCA calculation (kg/m3)
+    REAL :: FRAC_DIRECT_TABLE   !fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
+    REAL :: FRAC_VISIBLE_TABLE  !fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
 
 ! MPTABLE.TBL crop parameters
 
@@ -9678,12 +9682,12 @@ CONTAINS
     REAL :: CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS
+	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE
 
     NAMELIST / noahmp_global_parameters / CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS
+	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE
 
 
     ! Initialize our variables to bad values, so that if the namelist read fails, we come to a screeching halt as soon as we try to use anything.
@@ -9709,6 +9713,8 @@ BATS_NIR_DIR_TABLE   = -1.E36
 RSURF_SNOW_TABLE     = -1.E36
  RSURF_EXP_TABLE     = -1.E36
 REFSNOWDENS_TABLE    = -1.E36
+FRAC_DIRECT_TABLE    = -1.E36
+FRAC_VISIBLE_TABLE   = -1.E36
 
     inquire( file='MPTABLE.TBL', exist=file_named ) 
     if ( file_named ) then
@@ -9747,6 +9753,8 @@ BATS_NIR_DIR_TABLE   = BATS_NIR_DIR
 RSURF_SNOW_TABLE     = RSURF_SNOW
  RSURF_EXP_TABLE     = RSURF_EXP
 REFSNOWDENS_TABLE    = REFSNOWDENS
+FRAC_DIRECT_TABLE    = FRAC_DIRECT
+FRAC_VISIBLE_TABLE   = FRAC_VISIBLE
   end subroutine read_mp_global_parameters
 
   subroutine read_mp_crop_parameters()

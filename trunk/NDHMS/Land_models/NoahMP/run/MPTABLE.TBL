@@ -343,6 +343,8 @@
   RSURF_SNOW = 50.0     !surface resistence for snow [s/m]
   RSURF_EXP = 5.0       !exponent in the shape parameter for soil resistance option 1
   REFSNOWDENS = 100.0   !reference snow density for fSCA calculation [kg/m3]
+  FRAC_DIRECT = 0.7     !fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
+  FRAC_VISIBLE = 0.5    !fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
 
 /
 
