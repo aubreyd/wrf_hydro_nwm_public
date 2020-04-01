@@ -558,6 +558,7 @@ SUBROUTINE ROUTE_OVERLAND1(dt, &
                ! ADNOTE: This check needs updating... not sure where this eqn came from, units don't match.
                ! Another option: qqsfc = min(qqsfc, 0.6*hmax)
                if (qqsfc .ge. (hmax*dt*one_over_dist)) qqsfc = hmax*dt*one_over_dist
+               qqsfc = min(qqsfc, 0.6*hmax)
 
                ! Accumulate directional fluxes on routing subgrid
                ! ADNOTE: Why do these calcs for 1-d flow?

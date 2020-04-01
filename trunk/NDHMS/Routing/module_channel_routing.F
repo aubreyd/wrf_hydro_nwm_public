@@ -90,10 +90,10 @@ integer :: nod         !- node
 real ::  z20, dzx
 
 ! added by Wei Yu for bad data.
-
+! scale factor to impose minimum slope in channel.
 dzx = (z1 - z20)/dx
-if(dzx .lt. 0.002) then
-   z2 = z1 - dx*0.002
+if(dzx .lt. 0.02) then
+   z2 = z1 - dx*0.02
 else
    z2 = z20
 endif
