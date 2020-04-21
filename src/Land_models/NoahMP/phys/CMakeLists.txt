@@ -8,6 +8,7 @@ add_library(noahmp_phys STATIC
 	module_sf_noahmp_groundwater.F
 	module_sf_noahmplsm.F
 	module_snowcro.F
+	module_sf_lake.F
 )
 
 target_link_libraries(noahmp_phys crocus_surfex)
