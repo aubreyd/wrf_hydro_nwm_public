@@ -174,6 +174,7 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  refsnowdens_2D  ! reference snow density for fSCA calculation [kg/m3]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  frac_direct_2D  ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  frac_visible_2D ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  scamax_2D       ! maximum fractional snow covered area (0.0-1.0)
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -776,6 +777,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( refsnowdens_2D(XSTART:XEND,YSTART:YEND) )         ! reference snow density for fSCA calculation [kg/m3]
   ALLOCATE ( frac_direct_2D(XSTART:XEND,YSTART:YEND) )         ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
   ALLOCATE ( frac_visible_2D(XSTART:XEND,YSTART:YEND) )        ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1] 
+  ALLOCATE ( scamax_2D(XSTART:XEND,YSTART:YEND) )              ! maximum fractional snow covered area (0.0-1.0)
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1125,7 +1127,7 @@ module module_NoahMP_hrldas_driver
                       GRAINGROWTH_2D, EXTRAGROWTH_2D, DIRTSOOT_2D, BATS_COSZ_2D,&
                       BATS_VISNEW_2D, BATS_NIRNEW_2D, BATS_VISAGE_2D, BATS_NIRAGE_2D,&
                       BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D, REFSNOWDENS_2D,&
-                      FRAC_DIRECT_2D, FRAC_VISIBLE_2D)
+                      FRAC_DIRECT_2D, FRAC_VISIBLE_2D,SCAMAX_2D)
 #endif
 
 !------------------------------------------------------------------------
@@ -1703,7 +1705,7 @@ end subroutine land_driver_ini
                  BATS_VISAGE_2D, BATS_NIRAGE_2D,                              &
                  BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
-                 FRAC_DIRECT_2D, FRAC_VISIBLE_2D,                             &
+                 FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O

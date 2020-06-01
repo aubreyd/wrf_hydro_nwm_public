@@ -306,6 +306,7 @@ MODULE MODULE_SF_NOAHMPLSM
      REAL :: REFSNOWDENS  !reference snow density for fSCA calculation (kg/m3)
      REAL :: FRAC_DIRECT  !fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
      REAL :: FRAC_VISIBLE !fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
+     REAL :: SCAMAX       !maximum fractional snow covered area (0.0-1.0)
 
 !------------------------------------------------------------------------------------------!
 ! From the crop section of MPTABLE.TBL
@@ -1823,7 +1824,7 @@ ENDIF   ! CROPTYPE == 0
          BDSNO    = SNEQV / SNOWH
          !FMELT    = (max(BDSNO/parameters%REFSNOWDENS,1.))**parameters%MFSNO
          FMELT    = (BDSNO/parameters%REFSNOWDENS)**parameters%MFSNO
-         FSNO     = TANH( SNOWH /(2.5* Z0 * FMELT))
+         FSNO     = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
      ENDIF
 
 ! ground roughness length
@@ -9180,6 +9181,7 @@ MODULE NOAHMP_TABLES
     REAL :: REFSNOWDENS_TABLE   !reference snow density for fSCA calculation (kg/m3)
     REAL :: FRAC_DIRECT_TABLE   !fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
     REAL :: FRAC_VISIBLE_TABLE  !fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1]
+    REAL :: SCAMAX_TABLE        !maximum fractional snow covered area (0.0-1.0)
 
 ! MPTABLE.TBL crop parameters
 
@@ -9682,12 +9684,12 @@ CONTAINS
     REAL :: CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE
+	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE,SCAMAX
 
     NAMELIST / noahmp_global_parameters / CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE
+	    RSURF_SNOW,RSURF_EXP,REFSNOWDENS,FRAC_DIRECT,FRAC_VISIBLE,SCAMAX
 
 
     ! Initialize our variables to bad values, so that if the namelist read fails, we come to a screeching halt as soon as we try to use anything.
@@ -9715,6 +9717,7 @@ RSURF_SNOW_TABLE     = -1.E36
 REFSNOWDENS_TABLE    = -1.E36
 FRAC_DIRECT_TABLE    = -1.E36
 FRAC_VISIBLE_TABLE   = -1.E36
+    SCAMAX_TABLE     = -1.E36
 
     inquire( file='MPTABLE.TBL', exist=file_named ) 
     if ( file_named ) then
@@ -9755,6 +9758,7 @@ RSURF_SNOW_TABLE     = RSURF_SNOW
 REFSNOWDENS_TABLE    = REFSNOWDENS
 FRAC_DIRECT_TABLE    = FRAC_DIRECT
 FRAC_VISIBLE_TABLE   = FRAC_VISIBLE
+    SCAMAX_TABLE     = SCAMAX
   end subroutine read_mp_global_parameters
 
   subroutine read_mp_crop_parameters()
