@@ -6,12 +6,26 @@
 ! of the system.
 
 module module_rfc_forecasts_state
+
+    use module_levelpool, only: levelpool
     use module_reservoir, only: reservoir_state
     implicit none
 
     ! Extend/derive rfc forecasts state from the abstract base
     ! type for reservoir state.
     type, extends(reservoir_state) :: rfc_forecasts_state_interface
+        real                               :: water_elevation              ! meters AMSL
+        real, allocatable, dimension(:)    :: discharges
+        logical, allocatable, dimension(:) :: synthetic_values
+        integer                         :: time_series_update_time      ! seconds
+        integer                         :: current_time                 ! seconds
+        integer                         :: time_series_index
+        logical                         :: forecast_found
+        logical                         :: all_discharges_synthetic
+        integer                         :: dynamic_reservoir_type       ! dynamic reservoir type sent to lake out files
+        integer                         :: levelpool_reservoir_type     ! reservoir type for levelpool
+
+        type (levelpool), pointer :: levelpool_ptr   ! pointer to levelpool object
 
     contains
 
@@ -23,9 +37,28 @@ module module_rfc_forecasts_state
 contains
 
     ! RFC Forecasts State Constructor
-    subroutine rfc_forecasts_state_init(this)
+    subroutine rfc_forecasts_state_init(this, water_elevation, lake_area, lake_max_water_elevation, orifice_elevation, initial_fractional_depth)
         implicit none
         class(rfc_forecasts_state_interface), intent(inout) :: this ! the type object being initialized
+        real, intent(in) :: water_elevation           ! meters AMSL
+        real, intent(in) :: lake_area                 ! area of lake (km^2)
+        real, intent(in) :: lake_max_water_elevation  ! max water elevation (meters)
+        real, intent(in) :: orifice_elevation         ! orifice elevation (meters AMSL)
+        real, intent(in) :: initial_fractional_depth  ! initial fraction water depth
+
+        ! Initialize the state water elevation in same manner as in module_RT.F
+        this%water_elevation = orifice_elevation + ((lake_max_water_elevation - orifice_elevation) * initial_fractional_depth)
+        this%time_series_update_time = 0
+        this%current_time = 0
+        this%time_series_index = 1
+        this%forecast_found = .FALSE.
+        this%all_discharges_synthetic = .FALSE.
+
+        ! Initialize dynamic_reservoir_type to 4 for RFC type reservoir
+        this%dynamic_reservoir_type = 4
+
+        ! Levelpool reservoir type set to 1
+        this%levelpool_reservoir_type = 1
 
     end subroutine rfc_forecasts_state_init
 
