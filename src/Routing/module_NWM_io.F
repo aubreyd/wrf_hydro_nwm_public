@@ -2488,12 +2488,14 @@ subroutine output_lakes_NWM(domainId,iGrid)
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_lakeLat,g_lakeLon,g_lakeElev
    real, allocatable, dimension(:) :: g_lakeInflow,g_lakeOutflow
+   real, allocatable, dimension(:) :: g_lakePrcp,g_lakeEvap
    real, allocatable, dimension(:) :: g_lakeType
    real, allocatable, dimension(:) :: g_lake_assimilated_value
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_file
    integer(kind=int64), allocatable, dimension(:) :: g_lakeid
    real, allocatable, dimension(:) :: g_lakeLatOut,g_lakeLonOut,g_lakeElevOut
    real, allocatable, dimension(:) :: g_lakeInflowOut,g_lakeOutflowOut
+   real, allocatable, dimension(:) :: g_lakePrcpOut,g_lakeEvapOut
    integer(kind=int64), allocatable, dimension(:) :: g_lakeTypeOut, g_lakeidOut
    real, allocatable, dimension(:) :: g_lake_assimilated_valueOut
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_fileOut
@@ -2547,25 +2549,25 @@ subroutine output_lakes_NWM(domainId,iGrid)
 
    if(nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -2591,6 +2593,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeElev(gsize))
       allocate(g_lakeInflow(gsize))
       allocate(g_lakeOutflow(gsize))
+      allocate(g_lakePrcp(gsize))
+      allocate(g_lakeEvap(gsize))
       allocate(g_lakeType(gsize))
       allocate(g_lake_assimilated_value(gsize))
       allocate(g_lake_assimilated_source_file(gsize))
@@ -2602,6 +2606,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
          allocate(g_lakeElevOut(gsize))
          allocate(g_lakeInflowOut(gsize))
          allocate(g_lakeOutflowOut(gsize))
+         allocate(g_lakePrcpOut(gsize))
+         allocate(g_lakeEvapOut(gsize))
          allocate(g_lakeTypeOut(gsize))
          allocate(g_lake_assimilated_valueOut(gsize))
          allocate(g_lake_assimilated_source_fileOut(gsize))
@@ -2614,6 +2620,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeElev = RT_DOMAIN(domainID)%RESHT
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
+      g_lakePrcp = RT_DOMAIN(domainID)%LAKE_PRECIP
+      g_lakeEvap = RT_DOMAIN(domainID)%LAKE_EVAP
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
       g_lakeType = RT_DOMAIN(domainID)%final_reservoir_type
       g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
@@ -2634,6 +2642,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call write_lake_real(g_lakeElev,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeInflow,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeOutflow,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lakePrcp,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lakeEvap,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeType,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lake_assimilated_value,RT_DOMAIN(domainId)%lake_index,gsize)
       !call write_lake_char(g_lake_assimilated_source_file,RT_DOMAIN(domainId)%lake_index,gsize)
@@ -2647,12 +2657,16 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeElev(gsize))
       allocate(g_lakeInflow(gsize))
       allocate(g_lakeOutflow(gsize))
+      allocate(g_lakePrcp(gsize))
+      allocate(g_lakeEvap(gsize))
       allocate(g_lakeid(gsize))
       allocate(g_lakeLonOut(gsize))
       allocate(g_lakeLatOut(gsize))
       allocate(g_lakeElevOut(gsize))
       allocate(g_lakeInflowOut(gsize))
       allocate(g_lakeOutflowOut(gsize))
+      allocate(g_lakePrcpOut(gsize))
+      allocate(g_lakeEvapOut(gsize))
       allocate(g_lakeidOut(gsize))
       allocate(g_lakeTypeOut(gsize))
       allocate(g_lake_assimilated_valueOut(gsize))
@@ -2663,6 +2677,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeElev = RT_DOMAIN(domainID)%RESHT
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
+      g_lakePrcp = RT_DOMAIN(domainID)%LAKE_PRECIP
+      g_lakeEvap = RT_DOMAIN(domainID)%LAKE_EVAP
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
       g_lakeType = RT_DOMAIN(domainId)%final_reservoir_type
       g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
@@ -2753,6 +2769,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
             indTmp = indTmp + 1 ! Python starts index values at 0, so we need to add one.
             g_lakeInflowOut(iTmp) = g_lakeInflow(indTmp)
             g_lakeOutflowOut(iTmp) = g_lakeOutflow(indTmp)
+            g_lakePrcpOut(iTmp) = g_lakePrcp(indTmp)
+            g_lakeEvapOut(iTmp) = g_lakeEvap(indTmp)
             g_lakeLonOut(iTmp) = g_lakeLon(indTmp)
             g_lakeLatOut(iTmp) = g_lakeLat(indTmp)
             g_lakeElevOut(iTmp) = g_lakeElev(indTmp)
@@ -2764,6 +2782,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       else
          g_lakeInflowOut = g_lakeInflow
          g_lakeOutflowOut = g_lakeOutflow
+         g_lakePrcpOut = g_lakePrcp
+         g_lakeEvapOut = g_lakeEvap
          g_lakeLonOut = g_lakeLon
          g_lakeLatOut = g_lakeLat
          g_lakeElevOut = g_lakeElev
@@ -2774,6 +2794,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       endif
       varOutReal(1,:) = g_lakeInflowOut(:)
       varOutReal(2,:) = g_lakeOutflowOut(:)
+      varOutReal(3,:) = g_lakePrcpOut(:)
+      varOutReal(4,:) = g_lakeEvapOut(:)
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -3125,6 +3147,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
    deallocate(g_lakeElev)
    deallocate(g_lakeInflow)
    deallocate(g_lakeOutflow)
+   deallocate(g_lakePrcp)
+   deallocate(g_lakeEvap)
    deallocate(g_lakeid)
    deallocate(g_lakeType)
    deallocate(g_lake_assimilated_value)
@@ -3136,6 +3160,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       deallocate(g_lakeElevOut)
       deallocate(g_lakeInflowOut)
       deallocate(g_lakeOutflowOut)
+      deallocate(g_lakePrcpOut)
+      deallocate(g_lakeEvapOut)
       deallocate(g_lakeidOut)
       deallocate(g_lakeTypeOut)
       deallocate(g_lake_assimilated_valueOut)
