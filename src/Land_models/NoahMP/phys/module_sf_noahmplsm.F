@@ -199,7 +199,6 @@ MODULE MODULE_SF_NOAHMPLSM
   REAL, PARAMETER :: DENICE = 917.      !density of ice (kg/m3)
 
   INTEGER, PRIVATE, PARAMETER :: MBAND = 2
-  INTEGER, PRIVATE, PARAMETER :: NSOIL = 4
   INTEGER, PRIVATE, PARAMETER :: NSTAGE = 8
 
   TYPE noahmp_parameters ! define a NoahMP parameters type
