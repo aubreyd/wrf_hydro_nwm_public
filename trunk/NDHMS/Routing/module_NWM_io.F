@@ -1131,6 +1131,11 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    integer :: ftnGeo,geoXVarId,geoYVarId
    integer :: waterVal ! Value in HRLDAS in WRFINPUT file used to define water bodies for masking
    integer :: sfcflag
+   ! Local arrays for defining special variable dims
+   character (len=64), dimension(3) :: soilVarList = ["SOIL_T","SOIL_W","SOIL_M"]
+   character (len=64), dimension(4) :: snowVarList = ["ZSNSO_SN","SNICE","SNLIQ","SNOW_T"]
+   character (len=64), dimension(2) :: albVarList = ["ALBSND","ALBSNI"]
+
    ! Allocatable arrays to hold global output arrays, and local arrays for
    ! conversion to integers.
    integer, allocatable, dimension(:,:) :: localCompTmp, globalCompTmp
@@ -1389,7 +1394,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define reference_time dimension')
          ! Only create vis_nir if we are outputting the two snow albedo variables.
          ! Otherwise these are unecessary dimensions.
-         if ((fileMeta%outFlag(96) .eq. 1) .or. (fileMeta%outFlag(96) .eq. 1)) then
+         if ((fileMeta%outFlag(96) .eq. 1) .or. (fileMeta%outFlag(97) .eq. 1)) then
          iret = nf90_def_dim(ftnNoahMP,'vis_nir',fileMeta%numSpectrumBands,dimId(7))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define vis_nir dimension')
          endif
@@ -1471,24 +1476,28 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          do iTmp=1,fileMeta%numVars
             if(fileMeta%outFlag(iTmp) .eq. 1) then
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
-                  if(fileMeta%numLev(iTmp) .eq. fileMeta%numSoilLayers) then
+                  if( any(soilVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
-                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSnowLayers) then
+                  else if( any(snowVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
-                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
+                  else if( any(albVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(3),dimId(1)/),varId)
+                  else
+                     call nwmCheck(diagFlag,iret,"ERROR: Levels gt 1 but not in predefined list: "//trim(fileMeta%varNames(iTmp)))
                   endif
                else
-                  if(fileMeta%numLev(iTmp) .eq. fileMeta%numSoilLayers) then
+                  if( any(soilVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(4),dimId(3),dimId(1)/),varId)
-                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSnowLayers) then
+                  else if( any(snowVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(5),dimId(3),dimId(1)/),varId)
-                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
+                  else if( any(albVarList == fileMeta%varNames(iTmp)) ) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(3),dimId(1)/),varId)
+                  else
+                     call nwmCheck(diagFlag,iret,"ERROR: Levels gt 1 but not in predefined list: "//trim(fileMeta%varNames(iTmp)))
                   endif
                endif
                call nwmCheck(diagFlag,iret,"ERROR: Unable to create variable: "//trim(fileMeta%varNames(iTmp)))
@@ -1823,7 +1832,6 @@ subroutine output_rt_NWM(domainId,iGrid)
    real, allocatable, dimension(:,:) :: localRealTmp
    real, allocatable, dimension(:,:,:) :: globalOutReal
    real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
-   integer :: numLev ! This will be 4 for soil moisture, and 1 for all other variables.
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
    real :: scaleFactorReciprocal
 ! Establish macro variables to hlep guide this subroutine.
@@ -2196,20 +2204,13 @@ subroutine output_rt_NWM(domainId,iGrid)
    ! global routing grid and output through the master I/O process.
    do iTmp2=1,fileMeta%numVars
 
-      ! Specify the number of vertical levels we are dealing with
-      if(iTmp2 .eq. 5) then
-         numLev = 4
-      else
-         numLev = 1
-      endif
-
       scaleFactorReciprocal = 1/fileMeta%scaleFactor(iTmp2)
 
       if(fileMeta%outFlag(iTmp2) .eq. 1) then
          !Allocate memory necessary
          if(myId .eq. 0) then
-            allocate(globalOutComp(RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt))
-            allocate(globalOutReal(RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt))
+            allocate(globalOutComp(RT_DOMAIN(domainId)%g_ixrt,fileMeta%numLev(iTmp2),RT_DOMAIN(domainId)%g_jxrt))
+            allocate(globalOutReal(RT_DOMAIN(domainId)%g_ixrt,fileMeta%numLev(iTmp2),RT_DOMAIN(domainId)%g_jxrt))
          else
             allocate(globalOutComp(1,1,1))
             allocate(globalOutReal(1,1,1))
@@ -2222,7 +2223,7 @@ subroutine output_rt_NWM(domainId,iGrid)
          globalOutReal = fileMeta%fillReal(iTmp2)
 
          ! Loop through the number of levels.
-         do zTmp=1,numLev
+         do zTmp=1,fileMeta%numLev(iTmp2)
             ! Initialize arrays to prescribed NDV value.
             localCompTmp = fileMeta%fillComp(iTmp2)
             localRealTmp = fileMeta%fillReal(iTmp2)
@@ -2301,7 +2302,7 @@ subroutine output_rt_NWM(domainId,iGrid)
          if(myId .eq. 0) then
             iret = nf90_inq_varid(ftn,trim(fileMeta%varNames(iTmp2)),varId)
             call nwmCheck(diagFlag,iret,'ERROR: Unable to find variable ID for var: '//trim(fileMeta%varNames(iTmp2)))
-            if(numLev .eq. 1) then
+            if(fileMeta%numLev(iTmp2) .eq. 1) then
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
                   iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
                else
@@ -2309,9 +2310,9 @@ subroutine output_rt_NWM(domainId,iGrid)
                endif
             else
                if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
-                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutComp,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,fileMeta%numLev(iTmp2),RT_DOMAIN(domainId)%g_jxrt,1/))
                else
-                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,numLev,RT_DOMAIN(domainId)%g_jxrt,1/))
+                  iret = nf90_put_var(ftn,varId,globalOutReal,(/1,1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,fileMeta%numLev(iTmp2),RT_DOMAIN(domainId)%g_jxrt,1/))
                endif
             endif
             call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into output variable: '//trim(fileMeta%varNames(iTmp2)))
