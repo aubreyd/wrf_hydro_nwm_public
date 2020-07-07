@@ -1889,7 +1889,7 @@ IF (OPT_GLA == 1) THEN     ! operate on the ice layers
 
 ! FIRST REMOVE EXCESS HEAT BY REDUCING TEMPERATURE OF LAYERS
 
-    IF (ANY(STC(1:4) > TFRZ) .AND. ANY(STC(1:4) < TFRZ)) THEN
+    IF (ANY(STC(1:nsoil) > TFRZ) .AND. ANY(STC(1:nsoil) < TFRZ)) THEN
       DO J = 1,NSOIL
         IF ( STC(J) > TFRZ ) THEN
 	  HEATR(J) = (STC(J)-TFRZ)/FACT(J)
@@ -1914,7 +1914,7 @@ IF (OPT_GLA == 1) THEN     ! operate on the ice layers
 
 ! NOW REMOVE EXCESS COLD BY INCREASING TEMPERATURE OF LAYERS (MAY NOT BE NECESSARY WITH ABOVE LOOP)
 
-    IF (ANY(STC(1:4) > TFRZ) .AND. ANY(STC(1:4) < TFRZ)) THEN
+    IF (ANY(STC(1:nsoil) > TFRZ) .AND. ANY(STC(1:nsoil) < TFRZ)) THEN
       DO J = 1,NSOIL
         IF ( STC(J) < TFRZ ) THEN
 	  HEATR(J) = (STC(J)-TFRZ)/FACT(J)
@@ -1939,7 +1939,7 @@ IF (OPT_GLA == 1) THEN     ! operate on the ice layers
 
 ! NOW REMOVE EXCESS HEAT BY MELTING ICE
 
-    IF (ANY(STC(1:4) > TFRZ) .AND. ANY(MICE(1:4) > 0.)) THEN
+    IF (ANY(STC(1:nsoil) > TFRZ) .AND. ANY(MICE(1:nsoil) > 0.)) THEN
       DO J = 1,NSOIL
         IF ( STC(J) > TFRZ ) THEN
 	  HEATR(J) = (STC(J)-TFRZ)/FACT(J)
@@ -1968,7 +1968,7 @@ IF (OPT_GLA == 1) THEN     ! operate on the ice layers
 
 ! NOW REMOVE EXCESS COLD BY FREEZING LIQUID OF LAYERS (MAY NOT BE NECESSARY WITH ABOVE LOOP)
 
-    IF (ANY(STC(1:4) < TFRZ) .AND. ANY(MLIQ(1:4) > 0.)) THEN
+    IF (ANY(STC(1:nsoil) < TFRZ) .AND. ANY(MLIQ(1:nsoil) > 0.)) THEN
       DO J = 1,NSOIL
         IF ( STC(J) < TFRZ ) THEN
 	  HEATR(J) = (STC(J)-TFRZ)/FACT(J)
