@@ -1283,7 +1283,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
   type(noahmp_parameters), intent(inout) :: parameters
   integer :: k
 
-  do k = 1,4
+  do k = 1,nsoil
     if(sand(k) <= 0 .or. clay(k) <= 0) then
       sand(k) = 0.41
       clay(k) = 0.18
