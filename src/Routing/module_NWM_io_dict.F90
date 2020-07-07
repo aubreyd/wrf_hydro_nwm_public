@@ -27,7 +27,7 @@ integer, parameter :: numLdasVars_crocus_off = 98
 integer, parameter :: numRtDomainVars = 5
 integer, parameter :: numLakeVars = 2
 integer, parameter :: numChGrdVars = 1
-integer, parameter :: numLsmVars = 14
+integer, parameter :: numLsmVars = 5
 integer, parameter :: numChObsVars = 1
 integer, parameter :: numGwVars = 4
 integer :: i
@@ -2515,40 +2515,31 @@ subroutine initLsmOutDict(lsmOutDict,procId,diagFlag)
 
    endif
 
-   lsmOutDict%varNames(:) = [character(len=64) :: "stc1","smc1","sh2ox1","stc2",&
-                             "smc2","sh2ox2","stc3","smc3","sh2ox3","stc4",&
-                             "smc4","sh2ox4","infxsrt","sfcheadrt"]
-   lsmOutDict%longName(:) = [character(len=64) :: "Soil temperature in the top layer",&
-                             "Soil moisture in the top layer",&
-                             "Volumetric soil moisture in the top layer",&
-                             "Soil temperature in the second layer",&
-                             "Soil moisture in the second layer",&
-                             "Volumetric soil moisture in the second layer",&
-                             "Soil temperature in the third layer",&
-                             "Soil moisture in the third layer",&
-                             "Volumetric soil moisture in the third layer",&
-                             "Soil temperature in the fourth layer",&
-                             "Soil moisture in the fourth layer",&
-                             "Volumetric soil moisture in the fourth layer",&
-                             "Infiltration excess","Surface head"]
-   lsmOutDict%units(:) = [character(len=64) :: "K","fraction","fraction",&
-                          "K","fraction","fraction","K","fraction",&
-                          "fraction","K","fraction","fraction",&
-                          "mm","mm"]
-   lsmOutDict%scaleFactor(:) = [0.1,0.01,0.01,0.1,0.01,0.01,0.1,0.01,0.01,&
-                                0.1,0.01,0.01,1.0,1.0]
-   lsmOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,&
-                              0.0,0.0,0.0,0.0]
-   lsmOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-   lsmOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-   lsmOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                                -9999.0,-9999.0,-9999.0,-9999.0]
-   lsmOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                             -9999.0,-9999.0,-9999.0,-9999.0]
-   lsmOutDict%validMinDbl(:) = [150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, &
-                                 150.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0]
-   lsmOutDict%validMaxDbl(:) = [400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, &
-                                 400.0d0, 1.0d0, 1.0d0, 100000.0d0, 100000.0d0]
+   lsmOutDict%varNames(:) = [character(len=64) :: "stc", "smc", "sh2ox", &
+                             "infxsrt", "sfcheadrt"]
+   lsmOutDict%longName(:) = [character(len=64) :: "Soil temperature", &
+                             "Liquid volumetric soil moisture", &
+                             "Total volumetric soil moisture", &
+                             "Infiltration excess", &
+                             "Surface head"]
+   lsmOutDict%units(:) = [character(len=64) :: "K", "fraction", "fraction", &
+                          "mm", "mm"]
+   lsmOutDict%scaleFactor(:) = [0.1, 0.01, 0.01, &
+                                1.0, 1.0]
+   lsmOutDict%addOffset(:) = [0.0, 0.0, 0.0, &
+                              0.0, 0.0]
+   lsmOutDict%timeZeroFlag(:) = [1, 1, 1, &
+                                 1, 1]
+   lsmOutDict%numLev(:) = [lsmOutDict%numSoilLayers, lsmOutDict%numSoilLayers, lsmOutDict%numSoilLayers, &
+                           1, 1]
+   lsmOutDict%missingReal(:) = [-9999.0, -9999.0, -9999.0, &
+                                -9999.0, -9999.0]
+   lsmOutDict%fillReal(:) = [-9999.0, -9999.0, -9999.0, &
+                             -9999.0, -9999.0]
+   lsmOutDict%validMinDbl(:) = [150.0d0, 0.0d0, 0.0d0, &
+                                0.0d0, 0.0d0]
+   lsmOutDict%validMaxDbl(:) = [400.0d0, 1.0d0, 1.0d0,  &
+                                100000.0d0, 100000.0d0]
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numLsmVars
