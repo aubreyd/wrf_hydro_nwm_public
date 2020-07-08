@@ -903,9 +903,7 @@ subroutine disaggregateDomain_drv(did)
                             RT_DOMAIN(did)%OV_ROUGH2d, &
                             RT_DOMAIN(did)%subsurface%properties%sldpth, &
                             RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, &
-                            rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater, &
-                            RT_DOMAIN(did)%bedrocklyr, rt_domain(did)%subsurface%properties%bedrocklyr_rt,  &
-                            rt_domain(did)%subsurface%properties%zsoil, rt_domain(did)%subsurface%properties%soldeprt )
+                            rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater)
 end subroutine disaggregateDomain_drv
 
 !===================================================================================================
@@ -929,8 +927,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                               SMCWLT1, VEGTYP, LKSAT, dist,INFXSWGT,OVROUGHRTFAC, &
                               LKSATFAC, CH_NETRT,SH2OWGT,SMCREFRT, INFXSUBRT,SMCMAXRT, &
                               SMCWLTRT,SMCRT, OVROUGHRT, LAKE_MSKRT, LKSATRT, OV_ROUGH2d,  &
-                              SLDPTH, soiltypRT, soiltyp, elrt, iswater, &
-                              bedrocklyr, bedrocklyr_rt, zsoil, soldeprt)
+                              SLDPTH, soiltypRT, soiltyp, elrt, iswater)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id,down_id,right_id, &
                               up_id,mpp_land_com_real, my_id, io_id, numprocs, &
@@ -949,7 +946,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    integer, intent(in)                           :: NSOIL ! number of soil layers
    integer, intent(in)                           :: iswater ! water veg class (from geogrid attrib)
    real, intent(in), dimension(NSOIL)            :: SLDPTH ! array soil layer depth intervals (m)
-   real, intent(in), dimension(NSOIL)            :: ZSOIL ! depth to layer bottom (m)
    ! LSM grid parameters:
    real, intent(in),  dimension(IX,JX)           :: area_lsm ! cell area on the coarse grid (m2)
    integer, intent(in), dimension(IX,JX)         :: VEGTYP, soiltyp ! coarse grid veg and soil types
@@ -958,7 +954,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(in),  dimension(IX,JX)           :: SMCWLT1 ! coarse grid wilting point
    real, intent(in),  dimension(IX,JX)           :: LKSAT ! coarse grid lateral ksat (m/s)
    real, intent(in), dimension(ix,jx)            :: OV_ROUGH2d ! overland roughness
-   integer, intent(in), dimension(ix,jx)         :: bedrocklyr ! lowest layer before bedrock
    ! LSM states:
    real, intent(in),  dimension(IX,JX,NSOIL)     :: SMC ! total soil moisture (m3/m3)
    real, intent(in),  dimension(IX,JX,NSOIL)     :: SH2OX ! liquid soil moisture (m3/m3)
@@ -978,7 +973,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
    ! Update Variables ------------------------------------------------------------------------
    integer, intent(inout), dimension(IXRT,JXRT)  :: LAKE_MSKRT ! lake mask on the routing grid
-   real, intent(inout), dimension(IXRT,JXRT)     :: SOLDEPRT ! soil depth on the routing grid (m)
 
    ! Output Variables ------------------------------------------------------------------------
    ! Parameters:
@@ -988,7 +982,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCWLTRT ! wilting point on routing grid
    real, intent(out), dimension(IXRT,JXRT)       :: LKSATRT ! lateral ksat on the routing grid (m/s)
    real, intent(out), dimension(IXRT,JXRT)       :: OVROUGHRT ! overland roughness on the routing grid
-   integer, intent(out), dimension(ixrt,jxrt)    :: bedrocklyr_rt ! bedrock layer on the routing grid
    ! States:
    real, intent(out), dimension(IX,JX,NSOIL)     :: SICE ! soil ice content on coarse grid (m3/m3)
    real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCRT
@@ -1038,7 +1031,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    do ii=1,IX
       do jj=1,JX
          suminfxs1 = suminfxs1 + INFXSRT(ii,jj) / float(IX*JX)
-         do kk=1,bedrocklyr(ii,jj)
+         do kk=1,NSOIL
             smctot1 = smctot1 + SMC(ii,jj,kk)*SLDPTH(kk)*1000. / float(IX*JX)
             sicetot1 = sicetot1 + SICE(ii,jj,kk)*SLDPTH(kk)*1000. / float(IX*JX)
          end do
@@ -1077,12 +1070,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                ! based on subgrid weight factor and current volume of water (mm * m2 / m2 = mm)
                INFXSUBRT(IXXRT,JYYRT) = LSMVOL *     &
                                         INFXSWGT(IXXRT,JYYRT) / dist(IXXRT,JYYRT,9)
-#ifdef HYDRO_D
-   print *, "Beginning Loop..."
-#endif
-               do KRT=1,NSOIL ! Soil layer loop
 
-                  IF (KRT .le. bedrocklyr(I,J)) then
+               do KRT=1,NSOIL ! Soil layer loop
 
                   ! Adjustments for soil ice
                   IF (SICE(I,J,KRT) .gt. 0) then
@@ -1142,19 +1131,10 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                      END IF
                   END IF  !End if for soil moisture saturation excess
 
-                  else ! below bedrocklyr, we keep everything static, even ice
-                     SMCRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
-                     SMCMAXRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
-                     SMCREFRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
-                     SMCWLTRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
-                  end if ! end if above bedrocklyr
-
                end do !End do for soil profile loop
-#ifdef HYDRO_D
-   print *, "Beginning Debug Loop..."
-#endif
+
                ! Debug loop
-               do KRT=1,bedrocklyr(i,j)
+               do KRT=1,NSOIL
                   IF (SMCRT(IXXRT,JYYRT,KRT) .GT. SMCMAXRT(IXXRT,JYYRT,KRT)) THEN
                      print *, "FATAL ERROR: SMCMAX exceeded upon disaggregation3...", &
                               ixxrt, jyyrt, krt, &
@@ -1208,8 +1188,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                ! scheme assumes saturated conditions (and therfore ksat), but we are extending
                ! that slightly to route water up until smcref.
                ! WHY USE BOTTOM LAYER??
-               smScaleFact = (SMCRT(IXXRT,JYYRT,bedrocklyr(i,j)) - SMCREFRT(IXXRT,JYYRT,bedrocklyr(i,j))) / &
-                                (SMCMAXRT(IXXRT,JYYRT,bedrocklyr(i,j)) - SMCREFRT(IXXRT,JYYRT, bedrocklyr(i,j)))
+               smScaleFact = (SMCRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT,NSOIL)) / &
+                                (SMCMAXRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT, NSOIL))
                smScaleFact = max(0., smScaleFact) !becomes 0 if less than SMCREF
                smScaleFact = min(1., smScaleFact) !make sure scale factor doesn't go over 1
                LKSATRT(IXXRT,JYYRT) = LKSAT(I,J) * LKSATFAC(IXXRT,JYYRT) * smScaleFact
@@ -1229,21 +1209,11 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                ! TODO: move this disaggregation code line to lsm_init section because soiltype is time-invariant
                soiltypRT(ixxrt,jyyrt) = soiltyp(i,j)
 
-               ! Bedrock layer
-               bedrocklyr_rt(ixxrt,jyyrt) = bedrocklyr(i,j)
-
             end do ! end disagg fine grid i loop
          end do ! end disagg fine grid j loop
 
       end do ! end coarse grid i loop
    end do ! end coarse fine grid j loop
-#ifdef HYDRO_D
-   print *, "Before Soldeprt..."
-#endif
-   ! AD: Update soil depth var based on bedrock layer input var
-   do krt = 1, nsoil
-      where(bedrocklyr_rt .eq. krt) soldeprt = -1.0*zsoil(krt)
-   enddo
 
    ! AD: Add new zeroing out of -9999 elevation cells which are ocean
    where (ELRT .lt. -9998)
@@ -1259,7 +1229,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    do ii=1,IXRT
       do jj=1,JXRT
          suminfxsrt2 = suminfxsrt2 + INFXSUBRT(ii,jj) / float(IXRT*JXRT)
-         do kk=1,bedrocklyr_rt(ii,jj)
+         do kk=1,NSOIL
             smcrttot2 = smcrttot2 + SMCRT(ii,jj,kk)*SLDPTH(kk)*1000. / float(IXRT*JXRT)
          end do
       end do
@@ -1297,8 +1267,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    call MPP_LAND_COM_REAL(LKSATRT,IXRT,JXRT,99)
    call MPP_LAND_COM_REAL(OVROUGHRT,IXRT,JXRT,99)
    call MPP_LAND_COM_INTEGER(LAKE_MSKRT,IXRT,JXRT,99)
-   call MPP_LAND_COM_INTEGER(bedrocklyr_rt,IXRT,JXRT,99)
-   call MPP_LAND_COM_REAL(soldeprt,IXRT,JXRT,99)
    do i = 1, NSOIL
       call MPP_LAND_COM_REAL(SMCMAXRT(:,:,i),IXRT,JXRT,99)
       call MPP_LAND_COM_REAL(SMCRT(:,:,i),IXRT,JXRT,99)

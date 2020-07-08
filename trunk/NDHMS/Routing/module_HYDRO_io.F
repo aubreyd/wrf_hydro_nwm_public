@@ -658,58 +658,6 @@ end subroutine get_albedo12m_netcdf
 
   end subroutine get_2d_netcdf
 
-  subroutine get_2d_netcdf_int(name, ncid, array, units, idim, jdim, &
-       fatal_if_error, ierr)
-
-    implicit none
-
-    character(len=*), intent(in) :: name
-    integer, intent(in) :: ncid
-    integer, intent(in) :: idim, jdim
-    integer, dimension(idim,jdim), intent(out) :: array
-    character(len=256), intent(out) :: units
-    ! fatal_IF_ERROR:  an input code value:
-    !      .TRUE. if an error in reading the data should stop the program.
-    !      Otherwise the, IERR error flag is set, but the program continues.
-    logical, intent(in) :: fatal_if_error
-    integer, intent(out) :: ierr
-
-    integer :: iret, varid
-    real    :: scale_factor,   add_offset
-
-    units = ""
-
-    iret = nf90_inq_varid(ncid,  name,  varid)
-    if (iret /= 0) then
-       if (fatal_IF_ERROR) then
-          print*, 'name = "', trim(name)//'"'
-          call hydro_stop("In get_2d_netcdf() - nf90_inq_varid problem")
-       else
-          ierr = iret
-          return
-       endif
-    endif
-
-    iret = nf90_get_var(ncid, varid, array)
-    if (iret /= 0) then
-       if (fatal_IF_ERROR) then
-          print*, 'name = "', trim(name)//'"'
-          call hydro_stop("In get_2d_netcdf() - nf90_get_var_real problem")
-       else
-          ierr = iret
-          return
-       endif
-    endif
-
-    iret = nf90_get_att(ncid, varid, 'scale_factor', scale_factor)
-    if(iret .eq. 0) array = array * scale_factor
-    iret = nf90_get_att(ncid, varid, 'add_offset', add_offset)
-    if(iret .eq. 0) array = array + add_offset
-
-    ierr = 0;
-
-  end subroutine get_2d_netcdf_int
-
       subroutine get_2d_netcdf_cows(var_name,ncid,var, &
             ix,jx,tlevel,fatal_if_error,ierr)
           character(len=*), intent(in) :: var_name
@@ -6864,9 +6812,6 @@ end subroutine RESTART_IN_nc
 #ifdef MPP_LAND
          if(my_id .eq. IO_id) then
 #endif
-#ifdef HYDRO_D
-            print*, "level = ", i
-#endif
                  if( i .lt. 10) then
                     write(tmpStr, '(i1)') i
                  else
@@ -6885,7 +6830,7 @@ end subroutine RESTART_IN_nc
             return
          endif
 #ifdef HYDRO_D
-         print*, "read restart variable ", trim(varStr)//trim(tmpStr), varStr, tmpStr
+         print*, "read restart variable ", varStr//trim(tmpStr)
 #endif
 #ifdef MPP_LAND
          if(my_id .eq. IO_id) &
@@ -10944,94 +10889,6 @@ subroutine hdtbl_out_nc(did,ncid,count,count_flag,varName,varIn,descrip,ixd,jxd)
 
 end subroutine hdtbl_out_nc
 
-subroutine hdtbl_out_nc_int(did,ncid,count,count_flag,varName,varIn,descrip,ixd,jxd)
-   implicit none
-   integer :: did, iret, ncid, ixd,jxd, ix,jx, err_flag,count_flag, count,varid
-   integer, allocatable, dimension(:,:) :: xdump
-   integer, dimension(:,:) :: varIn
-   character(len=*) :: descrip
-   character(len=*) ::varName
-
-#ifdef MPP_LAND
-   ix=global_nx
-   jx=global_ny
-#else
-   ix=RT_DOMAIN(did)%ix
-   jx=RT_DOMAIN(did)%jx
-#endif
-   if( count == 0 .and. count_flag == 0) then
-      count_flag = 1
-#ifdef MPP_LAND
-     if(my_id .eq. IO_id) then
-#endif
-#ifdef WRFIO_NCD_LARGE_FILE_SUPPORT
-       iret = nf90_create(trim(nlst(did)%hydrotbl_f), IOR(NF90_CLOBBER,NF90_64BIT_OFFSET), ncid)
-#else
-       iret = nf90_create(trim(nlst(did)%hydrotbl_f), NF90_CLOBBER, ncid)
-#endif
-#ifdef MPP_LAND
-     endif
-     call mpp_land_bcast_int1(iret)
-#endif
-       if (iret /= 0) then
-          call hydro_stop("FATAL ERROR:   - Problem nf90_create  in nc of hydrotab_f file")
-       endif
-
-#ifdef MPP_LAND
-     if(my_id .eq. IO_id) then
-#endif
-       iret = nf90_def_dim(ncid, "west_east", ix, ixd)  !-- make a decimated grid
-       iret = nf90_def_dim(ncid, "south_north", jx, jxd)
-#ifdef MPP_LAND
-     endif
-#endif
-   endif ! count == 0
-
-   if( count == 1 ) then  ! define variables
-#ifdef MPP_LAND
-     if(my_id .eq. io_id) then
-#endif
-       iret = nf90_def_var(ncid, trim(varName), NF90_INT, (/ixd,jxd/), varid)
-       ! iret = nf90_put_att(ncid,varid,'description',256,trim(descrip))
-       iret = nf90_put_att(ncid, varid, 'description', "test")
-#ifdef MPP_LAND
-     endif
-#endif
-   endif  !!! end of count == 1
-
-   if (count == 2) then ! write out the variables
-       if(count_flag == 2) iret = nf90_enddef(ncid)
-       count_flag = 3
-#ifdef MPP_LAND
-     if(my_id .eq. io_id) then
-#endif
-       allocate (xdump(ix, jx))
-#ifdef MPP_LAND
-     else
-       allocate (xdump(1, 1))
-     endif
-#endif
-
-#ifdef MPP_LAND
-     call write_io_int(varIn,xdump)
-     if(my_id .eq. io_id) iret = nf90_inq_varid(ncid, trim(varName), varid)
-     if(my_id .eq. io_id) iret = nf90_put_var(ncid, varid, xdump, (/1,1/), (/ix,jx/))
-#else
-     iret = nf90_inq_varid(ncid,trim(varName), varid)
-     iret = nf90_put_var(ncid, varid, varIn, (/1,1/), (/ix,jx/))
-#endif
-      deallocate(xdump)
-    endif !! end of count == 2
-    if(count == 3 .and. count_flag == 3) then
-       count_flag = 4
-#ifdef MPP_LAND
-       if(my_id .eq. io_id ) &
-#endif
-       iret = nf90_close(ncid)
-    endif !! end of count == 3
-
-end subroutine hdtbl_out_nc_int
-
 subroutine hdtbl_out(did)
    implicit none
    integer :: did, ncid, count,count_flag, i, ixd,jxd
@@ -11043,7 +10900,6 @@ subroutine hdtbl_out(did)
       call hdtbl_out_nc(did,ncid, count,count_flag,"SMCWLT1",rt_domain(did)%SMCWLT1,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"LKSAT",rt_domain(did)%LKSAT,"",ixd,jxd)
-      call hdtbl_out_nc_int(did,ncid, count,count_flag,"bedrocklyr",rt_domain(did)%bedrocklyr,"",ixd,jxd)
    end do
 
 end subroutine hdtbl_out
@@ -11056,7 +10912,6 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"SMCWLT1",rt_domain(did)%SMCWLT1)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT)
-   call read2dlsm_int(did,trim(nlst(did)%hydrotbl_f),"bedrocklyr",rt_domain(did)%bedrocklyr)
 end subroutine hdtbl_in_nc
 
 subroutine read2dlsm(did,file,varName,varOut)
@@ -11085,33 +10940,6 @@ subroutine read2dlsm(did,file,varName,varOut)
      iret = nf90_close(ncid)
 #endif
 end subroutine read2dlsm
-
-subroutine read2dlsm_int(did,file,varName,varOut)
-  implicit none
-  integer :: did, ncid ,ierr,iret
-  character(len=*) :: file,varName
-  integer,dimension(:,:) :: varOut
-  character(len=256) :: units
-#ifdef MPP_LAND
-  integer,allocatable,dimension(:,:) :: tmpArr
-  if(my_id .eq. io_id) then
-     allocate(tmpArr(global_nx,global_ny))
-     iret = nf90_open(trim(file), NF90_NOWRITE, ncid)
-     call get_2d_netcdf_int(trim(varName), ncid, tmpArr, units, global_nx, global_ny, &
-          .false., ierr)
-     iret = nf90_close(ncid)
-  else
-     allocate(tmpArr(1,1))
-  endif
-  call decompose_data_int (tmpArr,varOut)
-  deallocate(tmpArr)
-#else
-     iret = nf90_open(trim(file), NF90_NOWRITE, ncid)
-     call get_2d_netcdf_int(trim(varName), ncid, varOut, units, rt_domain(did)%ix, rt_domain(did)%jx, &
-          .false., ierr)
-     iret = nf90_close(ncid)
-#endif  
-end subroutine read2dlsm_int
 
 subroutine read_channel_only (olddateIn, hgrid, indir, dtbl)
 !use module_HYDRO_io, only: read_rst_crt_reach_nc

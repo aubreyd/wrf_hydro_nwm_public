@@ -63,7 +63,6 @@ CONTAINS
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
-                 BEDROCKLYR_2D,                                               &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -162,7 +161,6 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  HVT_2D    ! Canopy Height
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MFSNO_2D  ! Snow cover m parameter
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFEXP_2D ! exponent in the shape parameter for soil resistance option 1
-    INTEGER, DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BEDROCKLYR_2D ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -674,7 +672,6 @@ CONTAINS
        parameters%hvt    = HVT_2D(I,J)            ! Canopy Height
        parameters%mfsno  = MFSNO_2D(I,J)          ! Snow cover m parameter
        parameters%rsurf_exp = RSURFEXP_2D(I,J)    ! exponent in the shape parameter for soil resistance option 1
-       parameters%bedrocklyr = BEDROCKLYR_2D(I,J) ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -688,21 +685,13 @@ CONTAINS
          parameters%hvb = 0.0
        endif
        
-       if (IOPT_RUN .eq. 3) then
-         !ADCHANGE: Limit nroot to bedrock layer.
-         parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
-         !ADCHANGE: Hard-code soil params below bedrock to be effectively null
-         parameters%smcmax((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-       else
-         parameters%bedrocklyr = NSOIL
-       endif
+       !ADCHANGE: Add some sanity checks in case calibration knocks the order of these out of sequence.
+       !The min diffs were pulled from the existing SOILPARM.TBL defaults.
+       !Currently water is 0, so enforcing 0 as the absolute min.
+       parameters%smcmax = min(parameters%smcmax, 1.0)
+       parameters%smcref = max(min(parameters%smcref, parameters%smcmax - 0.01), 0.0)
+       parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
+       parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
 
 ! Initialized local
 
@@ -1229,7 +1218,6 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%HVT    =    HVT_TABLE(VEGTYPE)       !top of canopy (m)
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
     parameters%RSURF_EXP  =   RSURF_EXP_TABLE
-    parameters%BEDROCKLYR = BEDROCKLYR_TABLE
 #endif
 
 ! ----------------------------------------------------------------------
