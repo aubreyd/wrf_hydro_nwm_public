@@ -1132,9 +1132,9 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    integer :: waterVal ! Value in HRLDAS in WRFINPUT file used to define water bodies for masking
    integer :: sfcflag
    ! Local arrays for defining special variable dims
-   character (len=64), dimension(3) :: soilVarList = ["SOIL_T","SOIL_W","SOIL_M"]
-   character (len=64), dimension(4) :: snowVarList = ["ZSNSO_SN","SNICE","SNLIQ","SNOW_T"]
-   character (len=64), dimension(2) :: albVarList = ["ALBSND","ALBSNI"]
+   character (len=64), dimension(3) :: soilVarList = [character(len=64) :: "SOIL_T","SOIL_W","SOIL_M"]
+   character (len=64), dimension(4) :: snowVarList = [character(len=64) :: "ZSNSO_SN","SNICE","SNLIQ","SNOW_T"]
+   character (len=64), dimension(2) :: albVarList = [character(len=64) :: "ALBSND","ALBSNI"]
 
    ! Allocatable arrays to hold global output arrays, and local arrays for
    ! conversion to integers.
@@ -1835,7 +1835,7 @@ subroutine output_rt_NWM(domainId,iGrid)
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
    real :: scaleFactorReciprocal
 
-   character (len=64), dimension(1) :: soilVarList = ["SOIL_M"]
+   character (len=64), dimension(1) :: soilVarList = [character(len=64) :: "SOIL_M"]
 
 ! Establish macro variables to hlep guide this subroutine.
 #ifdef MPP_LAND
@@ -3642,7 +3642,7 @@ subroutine output_lsmOut_NWM(domainId)
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
-   character (len=64), dimension(3) :: soilVarList = ["stc", "smc", "sh2ox"]
+   character (len=64), dimension(3) :: soilVarList = [character(len=64) :: "stc", "smc", "sh2ox"]
 
 #ifdef MPP_LAND
    mppFlag = 1
