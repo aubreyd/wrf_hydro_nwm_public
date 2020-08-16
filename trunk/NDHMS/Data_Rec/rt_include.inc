@@ -192,6 +192,7 @@
   REAL,    allocatable, DIMENSION(:)       :: SMCAGGRT,STCAGGRT,SH2OAGGRT
   REAL    :: INFXSAGG1RT,SFCHEADAGG1RT,SFCHEADAGGRT
   !REAL,    allocatable, DIMENSION(:,:,:)       :: dist  ! 8 direction of distance moved to overland properties
+  REAL,    allocatable, DIMENSION(:,:)       :: ZWTBLETD 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 

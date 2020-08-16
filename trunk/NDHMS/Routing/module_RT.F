@@ -273,6 +273,8 @@ CONTAINS
             rt_domain(did)%SOLDRAIN    = 0.0
   allocate( rt_domain(did)%QTILEDRAIN   (IX,JX) )
             rt_domain(did)%QTILEDRAIN    = 0.0
+  allocate( rt_domain(did)%ZWTBLETD   (IX,JX) )
+            rt_domain(did)%ZWTBLETD    = 0.0
   end if ! neither channel_only nor channelBucket_only
 
 

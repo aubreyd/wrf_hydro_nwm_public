@@ -42,7 +42,7 @@ CONTAINS
                 SMSTOT,SFCRUNOFF, UDRUNOFF,    ALBEDO,    SNOWC,     SMOIS, & ! IN/OUT LSM eqv
 		  SH2O,     TSLB,     SNOW,     SNOWH,   CANWAT,    ACSNOM, & ! IN/OUT LSM eqv
 		ACSNOW,    EMISS,     QSFC,                                 & ! IN/OUT LSM eqv
- 		    Z0,      ZNT, QTDRAIN,                                  & ! IN/OUT LSM eqv
+ 		    Z0,      ZNT, QTDRAIN, ZWATBLE2D,                        & ! IN/OUT LSM eqv
                ISNOWXY,     TVXY,     TGXY,  CANICEXY, CANLIQXY,     EAHXY, & ! IN/OUT Noah MP only
 	         TAHXY,     CMXY,     CHXY,    FWETXY, SNEQVOXY,  ALBOLDXY, & ! IN/OUT Noah MP only
                QSNOWXY, WSLAKEXY,    ZWTXY,      WAXY,     WTXY,    TSNOXY, & ! IN/OUT Noah MP only
@@ -63,9 +63,10 @@ CONTAINS
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+		 KLAT_FAC,TDSMC_FAC,TD_DC,TD_DCOEF,TD_DDRAIN,TD_RADI,TD_SPAC, &
 #endif
 #ifdef WRF_HYDRO
-               sfcheadrt,INFXSRT,soldrain,qtiledrain,                 &
+               sfcheadrt,INFXSRT,soldrain,qtiledrain,TD_FRACTION,&
 #endif
                ids,ide,  jds,jde,  kds,kde,                    &
                ims,ime,  jms,jme,  kms,kme,                    &
@@ -138,11 +139,12 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_SNOW   ! snow precipitation entering land model [mm]       ! MB/AN : v3.7
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_GRAUP  ! graupel precipitation entering land model [mm]    ! MB/AN : v3.7
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ), OPTIONAL ::  MP_HAIL   ! hail precipitation entering land model [mm]       ! MB/AN : v3.7
-    
+
+!Tile drain variables    
     REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  QTDRAIN   ! Prasanth
-    
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN)    ::  TD_FRACTION
 #ifdef WRF_HYDRO
-    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  sfcheadrt,INFXSRT,soldrain, qtiledrain   ! for WRF-Hydro
+    REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(INOUT) ::  sfcheadrt,INFXSRT,soldrain, qtiledrain, ZWATBLE2D   ! for WRF-Hydro
 #endif
 #ifdef SPATIAL_SOIL
     REAL,    DIMENSION( ims:ime, 1:nsoil, jms:jme ), INTENT(IN) ::  BEXP_3D   ! C-H B exponent
@@ -163,6 +165,13 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  HVT_2D    ! Canopy Height
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MFSNO_2D  ! Snow cover m parameter
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFEXP_2D ! exponent in the shape parameter for soil resistance option 1
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  KLAT_FAC   ! factor multiplier to hydraulic conductivity
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TDSMC_FAC  ! factor multiplier to field capacity
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TD_DC      ! drainage coefficient for simple
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TD_DCOEF   ! drainge coefficient for Hooghoudt 
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TD_DDRAIN  ! depth of drain
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TD_RADI    ! tile radius
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TD_SPAC    ! tile spacing
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -374,7 +383,8 @@ CONTAINS
     REAL                                :: PSAI         ! stem area index
     REAL                                :: TAUSS        ! non-dimensional snow age
     REAL                                :: QTLDRN       ! tile drainage (mm)    
-
+    REAL                                :: WATBLED      ! water table
+    REAL                                :: TDFRACMP
 ! OUT (with no Noah LSM equivalent)
 
     REAL                                :: Z0WRF        ! combined z0 sent to coupled model
@@ -628,6 +638,8 @@ CONTAINS
        RECH                  = 0.
        DEEPRECH              = 0.
        QTLDRN                = 0. !QTDRAIN (I,J)                ! tile drainage (mm)
+       WATBLED               = ZWATBLE2D (I,J)
+       TDFRACMP              = TD_FRACTION(I,J)
 
        SLOPETYP     = 1                               ! set underground runoff slope term
        IST          = 1                               ! MP surface type: 1 = land; 2 = lake
@@ -658,6 +670,13 @@ CONTAINS
        parameters%hvt    = HVT_2D(I,J)            ! Canopy Height
        parameters%mfsno  = MFSNO_2D(I,J)          ! Snow cover m parameter
        parameters%rsurf_exp = RSURFEXP_2D(I,J)    ! exponent in the shape parameter for soil resistance option 1
+       parameters%klat_fac  = KLAT_FAC (I,J)      ! factor multiplier to hydraulic conductivity
+       parameters%tdsmc_fac = TDSMC_FAC(I,J)      ! factor multiplier to field capacity
+       parameters%td_dc     = TD_DC    (I,J)      ! drainage coefficient for simple
+       parameters%td_dcoef  = TD_DCOEF (I,J)      ! drainge coefficient for Hooghoudt 
+       parameters%td_ddrain = TD_DDRAIN(I,J)      ! depth of drain
+       parameters%td_radi   = TD_RADI  (I,J)      ! tile radius
+       parameters%td_spac   = TD_SPAC  (I,J)      ! tile spacing
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -798,7 +817,7 @@ CONTAINS
             STMASS  , WOOD    , STBLCP  , FASTCP  , PLAI    , PSAI    , & ! IN/OUT : 
             CM      , CH      , TAUSS   ,                               & ! IN/OUT : 
             GRAIN   , GDD     , PGS     ,                               & ! IN/OUT 
-            SMCWTD  ,DEEPRECH , RECH    , QTLDRN  ,                     & ! IN/OUT :
+            SMCWTD  ,DEEPRECH , RECH    , QTLDRN  , WATBLED,  TDFRACMP, & ! IN/OUT :
             Z0WRF   ,                                                   &
             FSA     , FSR     , FIRA    , FSH     , SSOIL   , FCEV    , & ! OUT : 
             FGEV    , FCTR    , ECAN    , ETRAN   , ESOIL   , TRAD    , & ! OUT : 
@@ -1143,21 +1162,6 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
   END IF
 
 !------------------------------------------------------------------------------------------!
-! Transfer tiledrain parameters
-!------------------------------------------------------------------------------------------!
-   parameters%TDSMC_FAC       = TDSMCFAC_TABLE(SOILTYPE)
-   parameters%TD_DEPTH        = TD_DEPTH_TABLE(SOILTYPE)
-   parameters%DRAIN_LAYER_OPT = DRAIN_LAYER_OPT_TABLE
-   parameters%TD_DC           = TD_DC_TABLE(SOILTYPE)
-   
-   parameters%TD_DCOEF        = TD_DCOEF_TABLE(SOILTYPE) 
-   parameters%TD_D            = TD_D_TABLE(SOILTYPE) 
-   parameters%TD_ADEPTH       = TD_ADEPTH_TABLE(SOILTYPE) 
-   parameters%TD_RADI         = TD_RADI_TABLE(SOILTYPE) 
-   parameters%TD_SPAC         = TD_SPAC_TABLE(SOILTYPE) 
-   parameters%TD_DDRAIN       = TD_DDRAIN_TABLE(SOILTYPE) 
-   parameters%KLAT_FAC        = KLAT_FAC_TABLE(SOILTYPE) 
-!------------------------------------------------------------------------------------------!
 ! Transfer global parameters
 !------------------------------------------------------------------------------------------!
 
@@ -1204,9 +1208,25 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%MFSNO  =  MFSNO_TABLE(VEGTYPE)       !snowmelt m parameter ()
     parameters%HVT    =    HVT_TABLE(VEGTYPE)       !top of canopy (m)
     parameters%MP     =     MP_TABLE(VEGTYPE)       !slope of conductance-to-photosynthesis relationship
-   parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+    parameters%RSURF_EXP  =   RSURF_EXP_TABLE
+!------------------------------------------------------------------------------------------!
+! Transfer tiledrain parameters
+!------------------------------------------------------------------------------------------!
+    parameters%KLAT_FAC        = KLAT_FAC_TABLE(SOILTYPE)
+    parameters%TDSMC_FAC       = TDSMCFAC_TABLE(SOILTYPE)
+    parameters%TD_DC           = TD_DC_TABLE(SOILTYPE)
+    parameters%TD_DCOEF        = TD_DCOEF_TABLE(SOILTYPE) 
+    parameters%TD_RADI         = TD_RADI_TABLE(SOILTYPE) 
+    parameters%TD_SPAC         = TD_SPAC_TABLE(SOILTYPE) 
+    parameters%TD_DDRAIN       = TD_DDRAIN_TABLE(SOILTYPE) 
 #endif
-
+!------------------------------------------------------------------------------------------!
+! Transfer tiledrain parameters from tables, not included in spatial soil
+!------------------------------------------------------------------------------------------!
+   parameters%TD_DEPTH        = TD_DEPTH_TABLE(SOILTYPE)
+   parameters%TD_ADEPTH       = TD_ADEPTH_TABLE(SOILTYPE)
+   parameters%DRAIN_LAYER_OPT = DRAIN_LAYER_OPT_TABLE
+   parameters%TD_D            = TD_D_TABLE(SOILTYPE) 
 ! ----------------------------------------------------------------------
 ! Transfer GENPARM parameters
 ! ----------------------------------------------------------------------

@@ -722,6 +722,7 @@ if (nlst_rt(did)%GWBASESWCRT        .ne. 0 .or. &
       ! step 6) aggregate specific fields from Hydro to LSM grid
       if (nlst_rt(did)%SUBRTSWCRT .ne.0  .or. nlst_rt(did)%OVRTSWCRT .ne. 0 ) then
          call aggregateDomain(did)
+         call aggregatewattable(did)
       endif
 
    end if !! channel_only & channelBucket_only == 0
@@ -1285,6 +1286,41 @@ IF ( (RT_DOMAIN(did)%SMCRT(IXXRT,JYYRT,KRT)-RT_DOMAIN(did)%SMCMAXRT(IXXRT,JYYRT,
 
       end subroutine aggregateDomain
 
+      
+      subroutine aggregatewattable(did)
+
+       implicit none
+
+       integer, intent(in) :: did
+       integer :: j,i, ixxRT, jyyRT, m,n
+       real :: agg
+
+       do j=1,RT_DOMAIN(did)%JX
+        do i=1,RT_DOMAIN(did)%IX
+
+          agg= 0.
+       
+          do m=nlst_rt(did)%AGGFACTRT-1,0,-1
+            do n=nlst_rt(did)%AGGFACTRT-1,0,-1
+            
+	           ixxRT = i * nlst_rt(did)%AGGFACTRT-n
+	           jyyRT = j * nlst_rt(did)%AGGFACTRT-m
+
+           
+#ifdef MPP_LAND
+	           if(left_id.ge.0) ixxRT=ixxRT+1
+               if(down_id.ge.0) jyyRT=jyyRT+1
+#endif
+               agg = agg + RT_DOMAIN(did)%ZWATTABLRT(ixxRT, jyyRT)
+           end do
+         end do
+	
+         RT_DOMAIN(did)%ZWTBLETD(i,j) = agg/(nlst_rt(did)%AGGFACTRT**2)
+        end do
+       end do
+      end subroutine aggregatewattable
+      
+      
       subroutine RunOffDisag(runoff1x_in, runoff1x, area_lsm,cellArea, infxswgt, AGGFACTRT, ix,jx)
         implicit none
         real, dimension(:,:) :: runoff1x_in, runoff1x, area_lsm, cellArea, infxswgt

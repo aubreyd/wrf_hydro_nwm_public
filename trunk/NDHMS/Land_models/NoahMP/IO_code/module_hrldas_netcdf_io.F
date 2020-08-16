@@ -760,13 +760,71 @@ contains
 
 
   end subroutine read_mmf_runoff
+!---------------------------------------------------------------------------------------------------------
 
+  subroutine read_tile_drain_map(tdinput_flnm,                            &
+       xstart, xend,                                                      &
+       ystart, yend,                                                      &
+       td_fraction)
+
+    implicit none
+    character(len=*),                            intent(in)  :: tdinput_flnm
+    integer,                                     intent(in)  :: xstart, xend, ystart, yend
+    real,    dimension(xstart:xend,ystart:yend), intent(out) :: td_fraction
+    character(len=24)                                        :: name
+    integer                                                  :: ierr,iret
+    integer                                                  :: ncid, varid
+    integer                                                  :: rank
+
+#ifdef _PARALLEL_  
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    if (ierr /= MPI_SUCCESS) stop "MPI_COMM_RANK"
+#else
+    rank = 0
+#endif
+
+
+    ! Open the NetCDF file.
+    if (rank == 0) write(*,'("tdinput_flnm: ''", A, "''")') trim(tdinput_flnm)
+#ifdef _PARALLEL_
+    ierr = nf90_open_par(tdinput_flnm, NF90_NOWRITE, MPI_COMM_WORLD, MPI_INFO_NULL, ncid)
+#else
+    ierr = nf90_open(tdinput_flnm, NF90_NOWRITE, ncid)
+#endif
+    if (ierr /= 0) then
+       write(*,'("read_tile_drain_map:  Problem opening tdinput file: ''", A, "''")') trim(tdinput_flnm)
+#ifdef _PARALLEL_
+       call mpi_finalize(ierr)
+       if (ierr /= 0) write(*, '("Problem with MPI_finalize.")')
+#endif
+       stop
+    endif
+
+! Get Tile Drain Fraction
+    name = "TD_FRACTION"
+    iret = nf90_inq_varid(ncid,  name,  varid)
+    if (iret == 0) then
+      ierr = nf90_get_var(ncid, varid, td_fraction, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+    else
+      write(*,*) "MODULE_HRLDAS_NETCDF_IO:  Problem finding variable '"//trim(name)//"' in NetCDF file. Using default values."
+    endif
+
+
+
+! Close the NetCDF file
+    ierr = nf90_close(ncid)
+    if (ierr /= 0) stop "MODULE_NOAHLSM_HRLDAS_INPUT:  read_tile_drain_map:  NF90_CLOSE"
+												
+
+
+  end subroutine read_tile_drain_map
 !---------------------------------------------------------------------------------------------------------
 
   subroutine read_3d_soil(spatial_filename,xstart, xend,ystart, yend,           &
                           nsoil,bexp_3d,smcdry_3d,smcwlt_3d,smcref_3d,smcmax_3d,  &
 		          dksat_3d,dwsat_3d,psisat_3d,quartz_3d,refdk_2d,refkdt_2d,slope_2d,&
-			  cwpvt_2d,vcmx25_2d,mp_2d,hvt_2d,mfsno_2d,rsurfexp_2d)
+			  cwpvt_2d,vcmx25_2d,mp_2d,hvt_2d,mfsno_2d,rsurfexp_2d,klatfac,tdsmcfac,tddc,&
+			  tddcoef,tdddrain,tdradi,tdspac)
     implicit none
     character(len=*),          intent(in)  :: spatial_filename
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -789,7 +847,14 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: hvt_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: mfsno_2d    
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: rsurfexp_2d
-
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: klatfac
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tdsmcfac
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tddc
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tddcoef
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tdddrain
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tdradi
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: tdspac
+    
     character(len=24)  :: name
     character(len=256) :: units
     integer :: ierr,iret, varid,isoil
@@ -1017,8 +1082,79 @@ contains
     endif
 
     iret = nf90_get_var(ncid, varid, rsurfexp_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+
+    name = "KLAT_FAC"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, klatfac, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))    
     
-    ! Close the NetCDF file
+    name = "TDSMC_FAC"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tdsmcfac, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))     
+    
+    name = "TD_DC"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tddc, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))      
+    
+    name = "TD_DCOEF"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tddcoef, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))     
+   
+    name = "TD_DDRAIN"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tdddrain, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/)) 
+    
+    name = "TD_RADI"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tdradi, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))     
+    
+    name = "TD_SPAC"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, tdspac, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))     
+    
+  
+  ! Close the NetCDF file
     ierr = nf90_close(ncid)
     if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_3d_soil() -  NF90_CLOSE"
 

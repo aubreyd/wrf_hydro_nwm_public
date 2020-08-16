@@ -40,7 +40,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
 #ifdef WRF_HYDRO
-   REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain, qtiledrain
+   REAL,    allocatable, DIMENSION(:,:)   :: infxsrt,sfcheadrt, soldrain, qtiledrain, ZWATBLE2D
    !LRK - Remove HRLDAS_ini_typ for WRF-Hydro
    integer :: forc_typ, snow_assim, HRLDAS_ini_typ
    !integer :: forc_typ, snow_assim
@@ -151,6 +151,13 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  hvt_2D     ! Canopy Height
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  mfsno_2D   ! Snow cover m parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfexp_2D! exponent in the shape parameter for soil resistance option 1
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  KLAT_FAC   ! factor multiplier to hydraulic conductivity
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TDSMC_FAC  ! factor multiplier to field capacity
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TD_DC      ! drainage coefficient for simple
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TD_DCOEF   ! drainge coefficient for Hooghoudt 
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TD_DDRAIN  ! depth of drain
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TD_RADI    ! tile radius
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  TD_SPAC    ! tile spacing
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -297,7 +304,10 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QSLATXY
   REAL                                    ::  WTDDT  = 30.0    ! frequency of groundwater call [minutes]
   INTEGER                                 ::  STEPWTD          ! step of groundwater call
-
+!------------------------------------------------------------------------
+! Needed for TILE DRAINAGE IF IOPT_TDRN = 1 OR 2
+!------------------------------------------------------------------------
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  TD_FRACTION  
 !------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
 !------------------------------------------------------------------------
@@ -423,6 +433,7 @@ module module_NoahMP_hrldas_driver
   real               :: zlvl
   character(len=256) :: hrldas_setup_file = " "
   character(len=256) :: mmf_runoff_file = " "
+  character(len=256) :: tdinput_flnm = " "
   character(len=256) :: external_veg_filename_template = " "
   character(len=256) :: external_lai_filename_template = " "
   integer            :: xstart = 1
@@ -457,7 +468,7 @@ module module_NoahMP_hrldas_driver
        crop_option,drainage_option,& !Prasanth
        split_output_count, &
        khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
-       spatial_filename, &
+       spatial_filename, tdinput_flnm, &
        external_veg_filename_template, external_lai_filename_template, &
        xstart, xend, ystart, yend, rst_bi_out, rst_bi_in
 
@@ -842,6 +853,13 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( hvt_2D     (XSTART:XEND,YSTART:YEND) )            ! Canopy Height
   ALLOCATE ( mfsno_2D   (XSTART:XEND,YSTART:YEND) )            ! Snow cover m parameter
   ALLOCATE ( rsurfexp_2D(XSTART:XEND,YSTART:YEND) )            ! exponent in the shape parameter for soil resistance option 1
+  ALLOCATE ( KLAT_FAC   (XSTART:XEND,YSTART:YEND) )            ! factor multiplier to hydraulic conductivity
+  ALLOCATE ( TDSMC_FAC  (XSTART:XEND,YSTART:YEND) )            ! factor multiplier to field capacity
+  ALLOCATE ( TD_DC      (XSTART:XEND,YSTART:YEND) )            ! drainage coefficient for simple
+  ALLOCATE ( TD_DCOEF   (XSTART:XEND,YSTART:YEND) )            ! drainge coefficient for Hooghoudt 
+  ALLOCATE ( TD_DDRAIN  (XSTART:XEND,YSTART:YEND) )            ! depth of drain
+  ALLOCATE ( TD_RADI    (XSTART:XEND,YSTART:YEND) )            ! tile radius
+  ALLOCATE ( TD_SPAC    (XSTART:XEND,YSTART:YEND) )            ! tile spacing
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -956,6 +974,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( Z0        (XSTART:XEND,YSTART:YEND) )  ! roughness length output to WRF
   ALLOCATE ( ZNT       (XSTART:XEND,YSTART:YEND) )  ! roughness length output to WRF
   ALLOCATE ( QTDRAIN   (XSTART:XEND,YSTART:YEND) )  ! tile drainage (mm) !Prasanth
+  ALLOCATE ( TD_FRACTION (XSTART:XEND,YSTART:YEND) )  ! tile drainage fraction !Prasanth
   
   ALLOCATE ( XLONIN    (XSTART:XEND,YSTART:YEND) )  ! longitude
   ALLOCATE ( TERRAIN   (XSTART:XEND,YSTART:YEND) )  ! terrain height
@@ -1157,7 +1176,7 @@ module module_NoahMP_hrldas_driver
   Z0         = undefined_real
   ZNT        = undefined_real
   QTDRAIN    = undefined_real !Prasanth
-
+  TD_FRACTION= undefined_real !Prasanth
 #ifdef WRF_HYDRO
   SOILSAT_TOP = undefined_real
   SOILSAT     = undefined_real
@@ -1186,7 +1205,8 @@ module module_NoahMP_hrldas_driver
     CALL READ_3D_SOIL(SPATIAL_FILENAME, XSTART, XEND, YSTART, YEND, &
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
-		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D)
+		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,&
+		      KLAT_FAC,TDSMC_FAC,TD_DC,TD_DCOEF,TD_DDRAIN,TD_RADI,TD_SPAC)
 #endif
 
 !------------------------------------------------------------------------
@@ -1199,6 +1219,13 @@ module module_NoahMP_hrldas_driver
                          ZWTXY,EQZWT,RIVERBEDXY,RIVERCONDXY,PEXPXY,FDEPTHXY)
   end if
 
+!------------------------------------------------------------------------
+! For IOPT_TDRN = 1 or 2 READ TILE DRAIN MAP
+!------------------------------------------------------------------------
+  TD_FRACTION = 0.
+  IF (IOPT_TDRN .GT. 0) THEN
+     CALL READ_TILE_DRAIN_MAP(TDINPUT_FLNM,XSTART,XEND,YSTART,YEND,TD_FRACTION)
+  ENDIF
 !----------------------------------------------------------------------
 ! Initialize Model State
 !----------------------------------------------------------------------
@@ -1450,13 +1477,14 @@ module module_NoahMP_hrldas_driver
    allocate( etpnd     (ix,jx) )
    allocate( prcp0     (ix,jx) )
    allocate( qtiledrain(ix,jx) )
+   allocate( ZWATBLE2D (ix,jx) )
    prcp0     = 0
    sfcheadrt = 0.0
    infxsrt   = 0.0
    etpnd     = 0.0
    soldrain  = 0.0
    qtiledrain= 0.0
-   
+   ZWATBLE2D = 0.0
    allocate(zsoil (NSOIL))
    zsoil = 0
 
@@ -1469,7 +1497,7 @@ module module_NoahMP_hrldas_driver
 #endif
 
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
-         infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL, SMOIS,real(noah_timestep),          &
+         infxsrt,sfcheadrt,soldrain,qtiledrain,ZWATBLE2D,ix,jx,NSOIL, SMOIS,real(noah_timestep),          &
          olddate,zsoil(1:NSOIL))
 
 call get_iocflag(1, io_config_outputs)
@@ -1588,7 +1616,7 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
       if(forc_typ .eq. 8) then
           call read_forc_ldasout(olddate,hgrid, indir, dtbl,ix,jx,infxsrt,soldrain,qtiledrain)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ZWATBLE2D,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1603,7 +1631,7 @@ end subroutine land_driver_ini
           call getNameList('igrid', igrid_hydro)  !! get hydro namelist info :: case sensitive
           write(hgrid_hydro,'(I1)') igrid_hydro
           call read_channel_only(olddate, hgrid_hydro, indir, forcing_timestep)
-          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
+          call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ZWATBLE2D,ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1737,7 +1765,7 @@ end subroutine land_driver_ini
 		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
 		   SH2O,     TSLB,     SNOW,    SNOWH,    CANWAT,     ACSNOM, &
 		 ACSNOW,    EMISS,     QSFC,                                  &
- 		     Z0,      ZNT, QTDRAIN,                                   & ! IN/OUT LSM eqv
+ 		     Z0,      ZNT, QTDRAIN,ZWATBLE2D,                          & ! IN/OUT LSM eqv
 		ISNOWXY,     TVXY,     TGXY, CANICEXY,  CANLIQXY,      EAHXY, &
 		  TAHXY,     CMXY,     CHXY,   FWETXY,  SNEQVOXY,   ALBOLDXY, &
 		QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY,      WTXY,     TSNOXY, &
@@ -1758,9 +1786,10 @@ end subroutine land_driver_ini
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+		 KLAT_FAC,TDSMC_FAC,TD_DC,TD_DCOEF,TD_DDRAIN,TD_RADI,TD_SPAC, &
 #endif
 #ifdef WRF_HYDRO
-                 sfcheadrt,INFXSRT,soldrain,qtiledrain,                &    !O
+                 sfcheadrt,INFXSRT,soldrain,qtiledrain,TD_FRACTION,   &    !O
 #endif
                 ids,ide, jds,jde, kds,kde,                      &
                 ims,ime, jms,jme, kms,kme,                      &
@@ -1804,7 +1833,7 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ix,jx,NSOIL)
+     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,qtiledrain,ZWATBLE2D,ix,jx,NSOIL)
 #endif
 
 ! Output for history
