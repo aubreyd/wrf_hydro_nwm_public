@@ -1191,6 +1191,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                ! range of conditions between smcmax and smcref. The DHSVM lateral routing
                ! scheme assumes saturated conditions (and therfore ksat), but we are extending
                ! that slightly to route water up until smcref.
+               ! WHY USE BOTTOM LAYER??
                smScaleFact = (SMCRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT,NSOIL)) / &
                                 (SMCMAXRT(IXXRT,JYYRT,NSOIL) - SMCREFRT(IXXRT,JYYRT, NSOIL))
                smScaleFact = max(0., smScaleFact) !becomes 0 if less than SMCREF

@@ -1221,6 +1221,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
   else  ! for none restart
 
@@ -1319,6 +1322,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
@@ -1972,10 +1978,10 @@ subroutine  ldas_output(itime, state)
    !call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(ZSNOXY(:,-nsnow+1:0,:)),IVGTYP,57)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNICEXY,IVGTYP,58)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNLIQXY,IVGTYP,59)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,TSLB,IVGTYP,60)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2O,IVGTYP,61)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,TSLB,IVGTYP,60)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,SH2O,IVGTYP,61)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%TSNOXY,IVGTYP,62)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS,IVGTYP,63)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,SMOIS,IVGTYP,63)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOWH,IVGTYP,64)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOW,IVGTYP,65)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY,IVGTYP,66)

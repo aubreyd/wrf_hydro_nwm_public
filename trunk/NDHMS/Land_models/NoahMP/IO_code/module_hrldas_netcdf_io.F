@@ -813,7 +813,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       bexp_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -827,7 +827,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcdry_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -841,7 +841,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcwlt_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -855,7 +855,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcref_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -869,7 +869,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       smcmax_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -883,7 +883,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       dksat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -897,7 +897,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       dwsat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -911,7 +911,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       psisat_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -925,7 +925,7 @@ contains
 
     iret = nf90_get_var(ncid, varid, xdum, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil/))
 
-    do isoil = 1,4
+    do isoil = 1,nsoil
       quartz_3d(:,isoil,:) = xdum(:,:,isoil)
     end do
 
@@ -1169,12 +1169,12 @@ contains
 !---------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------
 
-  subroutine get_netcdf_soillevel(name, ncid, array, units, xstart, xend, ystart, yend, fatal_if_error, ierr)
+  subroutine get_netcdf_soillevel(name, ncid, array, units, xstart, xend, ystart, yend, nsoil, fatal_if_error, ierr)
     implicit none
     character(len=*), intent(in) :: name
     integer, intent(in) :: ncid
-    integer, intent(in) :: xstart, xend, ystart, yend
-    real, dimension(xstart:xend,4,ystart:yend), intent(out) :: array
+    integer, intent(in) :: xstart, xend, ystart, yend, nsoil
+    real, dimension(xstart:xend,nsoil,ystart:yend), intent(out) :: array
     character(len=256), intent(out) :: units
     ! FATAL_IF_ERROR:  an input code value:
     !      .TRUE. if an error in reading the data should stop the program.
@@ -1184,10 +1184,10 @@ contains
 
     integer :: iret, varid, isoil
 #ifdef MPP_LAND
-    real:: g_array(global_nx,4,global_ny)
-    real:: insoil(global_nx,global_ny,4)
+    real:: g_array(global_nx,nsoil,global_ny)
+    real:: insoil(global_nx,global_ny,nsoil)
 #else
-    real:: insoil(xstart:xend,ystart:yend,4)
+    real:: insoil(xstart:xend,ystart:yend,nsoil)
 #endif
 
     units = " "
@@ -1215,13 +1215,13 @@ contains
     if (iret /= 0) units = "units unknown"
 
 #ifdef MPP_LAND
-    iret = nf90_get_var(ncid, varid, values=insoil, start=(/1,1,1,1/), count=(/global_nx,global_ny,4,1/))
-    do isoil = 1,4
+    iret = nf90_get_var(ncid, varid, values=insoil, start=(/1,1,1,1/), count=(/global_nx,global_ny,nsoil,1/))
+    do isoil = 1,nsoil
       g_array(:,isoil,:) = insoil(:,:,isoil)
     end do
 #else
-    iret = nf90_get_var(ncid, varid, values=insoil, start=(/xstart,ystart,1,1/), count=(/xend-xstart+1,yend-ystart+1,4,1/))
-    do isoil = 1,4
+    iret = nf90_get_var(ncid, varid, values=insoil, start=(/xstart,ystart,1,1/), count=(/xend-xstart+1,yend-ystart+1,nsoil,1/))
+    do isoil = 1,nsoil
       array(:,isoil,:) = insoil(:,:,isoil)
     end do
 #endif
@@ -1248,7 +1248,7 @@ contains
     call mpp_land_bcast_int1(ierr)
     call mpp_land_bcast_char(256,units)
     if(ierr /= 0) return
-    call decompose_data_real3d(g_array,array,4)
+    call decompose_data_real3d(g_array,array,nsoil)
 #endif
   end subroutine get_netcdf_soillevel
 
@@ -1283,10 +1283,10 @@ contains
     integer :: idx, isoil
     real, dimension(100) :: layer_bottom
     real, dimension(100) :: layer_top
-    real, dimension(4)   :: dzs
+    real, dimension(nsoil)   :: dzs
 
-    real, dimension(xstart:xend, ystart:yend, 4) :: insoil
-    real, dimension(xstart:xend, 4, ystart:yend) :: soildummy
+    real, dimension(xstart:xend, ystart:yend, nsoil) :: insoil
+    real, dimension(xstart:xend, nsoil, ystart:yend) :: soildummy
     integer :: rank
 
     !
@@ -1396,27 +1396,28 @@ contains
     ! Get the interfaces from the input file (not the variable as of v3.7)
 
     ierr = nf90_inq_varid(ncid,  "DZS",  varid)
-    ierr = nf90_get_var(ncid, varid, values=dzs, start=(/1/), count=(/4/))
+    ierr = nf90_get_var(ncid, varid, values=dzs, start=(/1/), count=(/nsoil/))
 
     layer_top(1) = 0.0
     layer_bottom(1) = dzs(1)
-    do isoil = 2, 4
+    do isoil = 2, nsoil
       layer_top(isoil) = layer_bottom(isoil-1)
       layer_bottom(isoil) = layer_top(isoil) + dzs(isoil)
     end do
 
-    call get_netcdf_soillevel("TSLB", ncid, soildummy, units,  xstart, xend, ystart, yend, FATAL, ierr)
-
 #ifdef HYDRO_D
-    write(*, '("layer_bottom(1:4) = ", 4F9.4)') layer_bottom(1:4)
-    write(*, '("layer_top(1:4)    = ", 4F9.4)') layer_top(1:4)
+    write(*, '("layer_bottom(1:nsoil) = ", 4F9.4)') layer_bottom(1:nsoil)
+    write(*, '("layer_top(1:nsoil)    = ", 4F9.4)') layer_top(1:nsoil)
     write(*, '("Soil depth = ", 10F12.6)') sldpth
 #endif
-    call init_interp(xstart, xend, ystart, yend, nsoil, sldpth, stc, 4, soildummy, layer_bottom(1:4), layer_top(1:4))
 
-    call get_netcdf_soillevel("SMOIS", ncid, soildummy, units,  xstart, xend, ystart, yend, FATAL, ierr)
+    call get_netcdf_soillevel("TSLB", ncid, soildummy, units,  xstart, xend, ystart, yend, nsoil, FATAL, ierr)
 
-    call init_interp(xstart, xend, ystart, yend, nsoil, sldpth, smc, 4, soildummy, layer_bottom(1:4), layer_top(1:4))
+    call init_interp(xstart, xend, ystart, yend, nsoil, sldpth, stc, nsoil, soildummy, layer_bottom(1:nsoil), layer_top(1:nsoil))
+
+    call get_netcdf_soillevel("SMOIS", ncid, soildummy, units,  xstart, xend, ystart, yend, nsoil, FATAL, ierr)
+
+    call init_interp(xstart, xend, ystart, yend, nsoil, sldpth, smc, nsoil, soildummy, layer_bottom(1:nsoil), layer_top(1:nsoil))
 
     ierr = nf90_close(ncid)
   end subroutine readinit_hrldas

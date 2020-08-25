@@ -101,7 +101,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     REAL, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt)   :: CWATAVAIL
     INTEGER, INTENT(IN), DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: SATLYRCHK
 
-
     !REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBRT
     !REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: QSUBBDRYRT
 
@@ -563,7 +562,8 @@ END SUBROUTINE FINDZWAT
 !===================================================================================================
 SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                              XX, YY, SO8RT, SO8RT_D, &
-                             CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub)
+                             CWATAVAIL, SUBDT,  &
+                             QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id, down_id, right_id, up_id, &
                               mpp_land_com_real8, my_id, mpp_land_com_real
