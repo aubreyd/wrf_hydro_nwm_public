@@ -70,6 +70,7 @@ CONTAINS
                  BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
                  FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
+                 UNLOAD_TEMP_2D, UNLOAD_WIND_2D,                              &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -188,6 +189,8 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  FRAC_DIRECT_2D ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1] 
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  FRAC_VISIBLE_2D ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1] 
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SCAMAX_2D       ! max fractional snow covered area (0.0-1.0)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_TEMP_2D  ! parameter for temperature-based snow unloading (1.87e5 K*s)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_WIND_2D  ! parameter for wind-based snow unloading (1.56e5 m) 
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -707,6 +710,8 @@ CONTAINS
        parameters%frac_direct  = FRAC_DIRECT_2D(I,J)  ! fraction of incoming solar that is direct; 1-frac_direct will be diffuse [0-1]
        parameters%frac_visible = FRAC_VISIBLE_2D(I,J) ! fraction of incoming solar that is in visible spectrum; 1-frac_visible will be NIR [0-1] 
        parameters%scamax       = SCAMAX_2D(I,J)       ! maximum fractional snow covered area (0.0-1.0)
+       parameters%unload_temp  = UNLOAD_TEMP_2D(I,J)  ! parameter for temperature-based snow unloading (1.87e5 K*s) 
+       parameters%unload_wind  = UNLOAD_WIND_2D(I,J)  ! parameter for wind-based snow unloading (1.56e5 m) 
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1245,6 +1250,8 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%FRAC_DIRECT =  FRAC_DIRECT_TABLE
     parameters%FRAC_VISIBLE =  FRAC_VISIBLE_TABLE
     parameters%SCAMAX = SCAMAX_TABLE
+    parameters%UNLOAD_TEMP = UNLOAD_TEMP_TABLE
+    parameters%UNLOAD_WIND = UNLOAD_WIND_TABLE
 #endif
 
 ! ----------------------------------------------------------------------

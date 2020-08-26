@@ -772,7 +772,8 @@ contains
                           graingrowth_2d, extragrowth_2d, dirtsoot_2d, bats_cosz_2d,&
                           bats_visnew_2d, bats_nirnew_2d, bats_visage_2d, bats_nirage_2d,&
                           bats_visdir_2d, bats_nirdir_2d, rsurfsnow_2d, refsnowdens_2d,&
-                          frac_direct_2d, frac_visible_2d, scamax_2d)
+                          frac_direct_2d, frac_visible_2d, scamax_2d, &
+                          unload_temp_2d, unload_wind_2d)
     implicit none
     character(len=*),          intent(in)  :: spatial_filename
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -815,6 +816,8 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: frac_direct_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: frac_visible_2d
     real,    dimension(xstart:xend,ystart:yend), intent(out)       :: scamax_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: unload_temp_2d
+    real,    dimension(xstart:xend,ystart:yend), intent(out)       :: unload_wind_2d
 
     character(len=24)  :: name
     character(len=256) :: units
@@ -1243,6 +1246,27 @@ contains
     endif
 
     iret = nf90_get_var(ncid, varid, scamax_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "unload_temp"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, unload_temp_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+!
+    name = "unload_wind"
+    iret = nf90_inq_varid(ncid,  trim(name),  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_3d_soil():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, unload_wind_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+
 
     ! Close the NetCDF file
     ierr = nf90_close(ncid)
