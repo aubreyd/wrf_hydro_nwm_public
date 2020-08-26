@@ -70,7 +70,7 @@ CONTAINS
                  BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
                  FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
-                 UNLOAD_TEMP_2D, UNLOAD_WIND_2D,                              &
+                 UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D,                &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -191,6 +191,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SCAMAX_2D       ! max fractional snow covered area (0.0-1.0)
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_TEMP_2D  ! parameter for temperature-based snow unloading (1.87e5 K*s)
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_WIND_2D  ! parameter for wind-based snow unloading (1.56e5 m) 
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MAXSNO_SP_2D       ! snow load coefficient from Schmidt and Gluns 1991
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -712,6 +713,7 @@ CONTAINS
        parameters%scamax       = SCAMAX_2D(I,J)       ! maximum fractional snow covered area (0.0-1.0)
        parameters%unload_temp  = UNLOAD_TEMP_2D(I,J)  ! parameter for temperature-based snow unloading (1.87e5 K*s) 
        parameters%unload_wind  = UNLOAD_WIND_2D(I,J)  ! parameter for wind-based snow unloading (1.56e5 m) 
+       parameters%maxsno_sp    = MAXSNO_SP_2D(I,J)    ! snow load coefficient from Schmidt and Gluns 1991
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1252,6 +1254,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%SCAMAX = SCAMAX_TABLE
     parameters%UNLOAD_TEMP = UNLOAD_TEMP_TABLE
     parameters%UNLOAD_WIND = UNLOAD_WIND_TABLE
+    parameters%MAXSNO_SP = MAXSNO_SP_TABLE
 #endif
 
 ! ----------------------------------------------------------------------

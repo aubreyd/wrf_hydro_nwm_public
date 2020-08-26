@@ -348,6 +348,7 @@
   SCAMAX = 1.0          !maximum fractional snow covered area [0-1]
   UNLOAD_TEMP = 1.87E5  !parameter for temperature-based snow unloading from Roesch2001 (1.87e5 K*s) 
   UNLOAD_WIND = 1.56E5  !parameter for wind-based snow unloading from Roesch2001 (1.56e5 m)
+  MAXSNO_SP = 6.6       !snow load coefficient from Schmidt and Gluns 1991
 
 /
 

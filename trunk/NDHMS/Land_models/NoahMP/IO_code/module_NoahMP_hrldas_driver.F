@@ -177,6 +177,7 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  scamax_2D       ! maximum fractional snow covered area (0.0-1.0)
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  unload_temp_2D  ! parameter for temperature-based snow unloading (1.87e5 K*s)
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  unload_wind_2D  ! parameter for wind-based snow unloading (1.56e5 m) 
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  maxsno_sp_2D    ! snow load coefficient from Schmidt and Gluns 1991
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -782,6 +783,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( scamax_2D(XSTART:XEND,YSTART:YEND) )              ! maximum fractional snow covered area (0.0-1.0)
   ALLOCATE ( unload_temp_2D(XSTART:XEND,YSTART:YEND) )         ! parameter for temperature-based snow unloading (1.87e5 K*s)
   ALLOCATE ( unload_wind_2D(XSTART:XEND,YSTART:YEND) )         ! parameter for wind-based snow unloading (1.56e5 m) 
+  ALLOCATE ( maxsno_sp_2D(XSTART:XEND,YSTART:YEND) )              ! snow load coefficient from Schmidt and Gluns 1991
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1132,7 +1134,7 @@ module module_NoahMP_hrldas_driver
                       BATS_VISNEW_2D, BATS_NIRNEW_2D, BATS_VISAGE_2D, BATS_NIRAGE_2D,&
                       BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D, REFSNOWDENS_2D,&
                       FRAC_DIRECT_2D, FRAC_VISIBLE_2D,SCAMAX_2D,&
-                      UNLOAD_TEMP_2D, UNLOAD_WIND_2D)
+                      UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D)
 #endif
 
 !------------------------------------------------------------------------
@@ -1711,7 +1713,7 @@ end subroutine land_driver_ini
                  BATS_VISDIR_2D, BATS_NIRDIR_2D,                              &
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
                  FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
-                 UNLOAD_TEMP_2D, UNLOAD_WIND_2D,                              &
+                 UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D,                &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
