@@ -1249,12 +1249,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,1,1,1,1,1,1,1,& !71-80
                              1,1,1,1,1,1,1,1,1,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             1,1,1,&               !99-101
-                             1,1,1,&               !102-104
-                             1,1,1,&               !105-107
-                             1,1,1,&               !108-110
-                             1,1,1,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,1,1,&           !99-103 (WRF-Lake)
+                             1,1,1,&               !104-106 (Crocus)
+                             1,1,1,&               !107-109 (Crocus)
+                             1,1,1,&               !110-112 (Crocus)
+                             1,1,1,&               !113-115 (Crocus)
+                             1,1,1,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
 
   else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
@@ -1268,12 +1269,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,1,1,0,1,0,0,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             1,1,1,1,1,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
@@ -1287,12 +1289,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
@@ -1306,12 +1309,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
@@ -1325,12 +1329,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,0,1,1,0,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
@@ -1344,12 +1349,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,0,0,0,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             1,1,0,&               !113-115 (Crocus)
+                             1,0,0,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
@@ -1363,29 +1369,21 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             1,1,0,&               !113-115 (Crocus)
+                             1,0,0,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
 
    ! ! If crocus is off, these should not be outputted
    if (noah_lsm%crocus_opt == 0) then
-      fileMeta%outFlag(101) = 0
-      fileMeta%outFlag(102) = 0
-      fileMeta%outFlag(103) = 0
-      fileMeta%outFlag(104) = 0
-      fileMeta%outFlag(108) = 0
-      fileMeta%outFlag(109) = 0
-      fileMeta%outFlag(111) = 0
-      fileMeta%outFlag(114) = 0
-      fileMeta%outFlag(115) = 0
-      fileMeta%outFlag(116) = 0
-      fileMeta%numVars = numLdasVars_crocus_off ! 98
+      fileMeta%outFlag(104:121) = 0
+      fileMeta%numVars = numLdasVars_crocus_off ! 103
    end if
 
    ! call the GetModelConfigType function
