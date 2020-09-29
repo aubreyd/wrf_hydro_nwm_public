@@ -11,4 +11,7 @@ add_library(noahmp_phys STATIC
 	module_sf_lake.F
 )
 
+add_dependencies(noahmp_phys noahmp_util)
+
 target_link_libraries(noahmp_phys crocus_surfex)
+
