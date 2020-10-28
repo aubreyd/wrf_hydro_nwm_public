@@ -57,14 +57,14 @@ type chrtMeta
    character (len=64), dimension(numChVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numChVars) :: units ! Units for each variable.
    character (len=64), dimension(numChVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numChVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numChVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numChVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numChVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numChVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numChVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numChVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numChVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numChVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numChVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numChVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numChVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                  ! the actual data. This was done because time 0
@@ -96,10 +96,12 @@ type chrtMeta
    character (len=64) :: elevLName ! long_name
    character (len=64) :: elevUnits ! units
    character (len=64) :: elevStName ! Standard Name
+
    ! Order variable attributes
    character (len=64) :: orderLName ! long_name
    character (len=64) :: orderStName ! Standard Name
    ! Global attributes
+   character (len=128) :: title ! file title
    character (len=128) :: fType ! featureType attribute
    character (len=128) :: proj4 ! proj4 attribute
    character (len=128) :: initTime ! model_initialization_time attribute
@@ -133,14 +135,14 @@ type ldasMeta
    character (len=128), dimension(numLdasVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numLdasVars) :: units ! Units for each variable.
    integer, dimension(numLdasVars) :: numLev ! Number of levels for each variable.
-   integer*8, dimension(numLdasVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numLdasVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numLdasVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numLdasVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numLdasVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numLdasVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numLdasVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numLdasVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLdasVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLdasVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numLdasVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numLdasVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numLdasVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numLdasVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                    ! the actual data. This was done because time 0
@@ -181,7 +183,7 @@ type ldasMeta
    integer :: nyRealAtts, nyCharAtts
 
    ! Global attributes
-   character (len=128) :: title ! File TITLE
+   character (len=128) :: title ! file title
    character (len=128) :: initTime ! model_initialization_time attribute
    character (len=128) :: validTime ! model_output_valid_time attribute
    character (len=128) :: conventions ! Conventions string
@@ -206,14 +208,14 @@ type rtDomainMeta
    character (len=64), dimension(numRtDomainVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numRtDomainVars) :: units ! Units for each variable.
    character (len=64), dimension(numRtDomainVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numRtDomainVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numRtDomainVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numRtDomainVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numRtDomainVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numRtDomainVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numRtDomainVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numRtDomainVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numRtDomainVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numRtDomainVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numRtDomainVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numRtDomainVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numRtDomainVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numRtDomainVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numRtDomainVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                        ! the actual data. This was done because time 0
@@ -253,6 +255,7 @@ type rtDomainMeta
 
    ! Global attributes
    integer :: decimation ! Decimation factor
+   character (len=128) :: title ! file title
    character (len=128) :: initTime ! model_initialization_time attribute
    character (len=128) :: validTime ! model_output_valid_time attribute
    character (len=128) :: conventions ! Conventions string
@@ -276,14 +279,14 @@ type lakeMeta
    character (len=64), dimension(numLakeVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numLakeVars) :: units ! Units for each variable.
    character (len=64), dimension(numLakeVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numLakeVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numLakeVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numLakeVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numLakeVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numLakeVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numLakeVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numLakeVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numLakeVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLakeVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLakeVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numLakeVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numLakeVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numLakeVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numLakeVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                    ! the actual data. This was done because time 0
@@ -306,6 +309,15 @@ type lakeMeta
    character (len=256) :: featureIdLName ! long_name - usually lake COMMON ID
    character (len=256) :: featureIdComment ! Comment attribute
    character (len=64) :: cfRole ! cf_role attribute
+   ! reservoir_type attributes
+   character (len=64) :: reservoirTypeLName ! long_name - usually "reservoir_type"
+   integer, dimension(4) :: reservoirTypeFlagValues ! valid flags attribute
+   character (len=64) :: reservoirTypeFlagMeanings ! flag meanings attribute
+   ! reservoir_assimilated_value attributes
+   character (len=64) :: reservoirAssimilatedValueLName ! long_name - usually "reservoir_assimilated_value, m3 s-1"
+   character (len=64) :: reservoirAssimilatedValueUnits ! units
+   ! reservoir_assimilated_source_file attributes
+   character (len=64) :: reservoirAssimilatedSourceFileLName ! long_name - usually "reservoir_assimilated_source_file"
    ! latitude variable attributes
    character (len=64) :: latLName ! long_name
    character (len=64) :: latUnits ! units
@@ -318,7 +330,9 @@ type lakeMeta
    character (len=64) :: elevLName ! long_name
    character (len=64) :: elevUnits ! units
    character (len=64) :: elevStName ! Standard Name
+   character (len=256) :: elevComment ! Comment
    ! Global attributes
+   character (len=128) :: title ! file title
    character (len=128) :: fType ! featureType attribute
    character (len=128) :: proj4 ! proj4 attribute
    character (len=128) :: initTime ! model_initialization_time attribute
@@ -346,14 +360,14 @@ type chrtGrdMeta
    character (len=64), dimension(numChGrdVars) :: longName ! longname for each variable
    character (len=64), dimension(numChGrdVars) :: units ! Units for each variable.
    character (len=64), dimension(numChGrdVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numChGrdVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numChGrdVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numChGrdVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numChGrdVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numChGrdVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numChGrdVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numChGrdVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numChGrdVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChGrdVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChGrdVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numChGrdVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numChGrdVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numChGrdVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numChGrdVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                        ! the actual data. This
@@ -395,6 +409,7 @@ type chrtGrdMeta
 
    ! Global attributes
    integer :: decimation ! Decimation factor
+   character (len=128) :: title ! file title
    character (len=128) :: initTime ! model_initialization_time attribute
    character (len=128) :: validTime ! model_output_valid_time attribute
    character (len=128) :: conventions ! Conventions string
@@ -420,14 +435,14 @@ type lsmMeta
    character (len=64), dimension(numLsmVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numLsmVars) :: units ! Units for each variable.
    integer, dimension(numLsmVars) :: numLev ! Number of levels for each variable.
-   integer*8, dimension(numLsmVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numLsmVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numLsmVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numLsmVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numLsmVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numLsmVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numLsmVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numLsmVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numLsmVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numLsmVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numLsmVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numLsmVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numLsmVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numLsmVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                    ! the actual data. This was
@@ -468,7 +483,7 @@ type lsmMeta
    integer :: nyRealAtts, nyCharAtts
 
    ! Global attributes
-   character (len=128) :: title ! File TITLE
+   character (len=128) :: title ! file title
    character (len=128) :: initTime ! model_initialization_time attribute
    character (len=128) :: validTime ! model_output_valid_time attribute
    character (len=128) :: conventions ! Conventions string
@@ -491,14 +506,14 @@ type chObsMeta
    character (len=64), dimension(numChObsVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numChObsVars) :: units ! Units for each variable.
    character (len=64), dimension(numChObsVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numChObsVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numChObsVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numChObsVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numChObsVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numChObsVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numChObsVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numChObsVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numChObsVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numChObsVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numChObsVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numChObsVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numChObsVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numChObsVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numChObsVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                  ! the actual data. This was
@@ -535,6 +550,7 @@ type chObsMeta
    character (len=64) :: orderLName ! long_name
    character (len=64) :: orderStName ! Standard Name
    ! Global attributes
+   character (len=128) :: title ! file title
    character (len=128) :: fType ! featureType attribute
    character (len=128) :: proj4 ! proj4 attribute
    character (len=128) :: initTime ! model_initialization_time attribute
@@ -564,14 +580,14 @@ type gwMeta
    character (len=64), dimension(numGwVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numGwVars) :: units ! Units for each variable.
    !character (len=64), dimension(numGwVars) :: coordNames ! Coordinate names for each variable.
-   integer*8, dimension(numGwVars) :: validMinComp ! Valid min (after conversion to integer)
-   integer*8, dimension(numGwVars) :: validMaxComp ! Valid max (after conversion to integer)
+   integer(kind=4), dimension(numGwVars) :: validMinComp ! Valid min (after conversion to integer)
+   integer(kind=4), dimension(numGwVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numGwVars) :: validMinDbl ! Valid minimum (before conversion to integer)
    real*8, dimension(numGwVars) :: validMaxDbl ! Valid maximum (before converstion to integer)
-   integer*8, dimension(numGwVars) :: missingComp ! Missing value attribute (after conversion to integer)
+   integer(kind=4), dimension(numGwVars) :: missingComp ! Missing value attribute (after conversion to integer)
    real, dimension(numGwVars) :: missingReal ! Missing value attribute (before conversion to integer)
    real, dimension(numGwVars) :: fillReal ! Fill value (before conversion to integer)
-   integer*8, dimension(numGwVars) :: fillComp ! Fill value (after conversion to integer)
+   integer(kind=4), dimension(numGwVars) :: fillComp ! Fill value (after conversion to integer)
    integer, dimension(numGwVars) :: outFlag ! 0/1 flag to turn outputting off/on
    integer, dimension(numGwVars) :: timeZeroFlag ! 0/1 flag to either set variable to all NDV values or output
                                                    ! the actual data. This was
@@ -609,6 +625,7 @@ type gwMeta
    !character (len=64) :: elevUnits ! units
    !character (len=64) :: elevStName ! Standard Name
    ! Global attributes
+   character (len=128) :: title ! file title
    character (len=128) :: fType ! featureType attribute
    !character (len=128) :: proj4 ! proj4 attribute
    character (len=128) :: initTime ! model_initialization_time attribute
@@ -678,6 +695,7 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
    !            which means meta-data standards have yet to be determined
    !            for these variables. Fill in if it's desired to output....
    ! First establish global attributes for the channel output files
+   chrtOutDict%title = "OUTPUT FROM " // trim(get_model_version())
    chrtOutDict%fType = 'timeSeries'
    chrtOutDict%initTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
    chrtOutDict%validTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
@@ -1354,6 +1372,7 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
    rtDomainDict%modelNdv = -9.E15
 
    ! First establish global attributes.
+   rtDomainDict%title = "OUTPUT FROM " // trim(get_model_version())
    rtDomainDict%initTime = "1970-01-01_00:00:00" ! This will be calculated in I/O code.
    rtDomainDict%validTime = "1970-01-01_00:00:00" ! This will be calculated in I/O code.
    rtDomainDict%decimation = 1
@@ -1626,8 +1645,8 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
 
    rtDomainDict%varNames(:) = [character(len=64) :: "zwattablrt","sfcheadsubrt","QSTRMVOLRT",&
                                "QBDRYRT","SOIL_M"]
-   rtDomainDict%longName(:) = [character(len=64) :: "water table depth","surface head",&
-                               "channel inflow",&
+   rtDomainDict%longName(:) = [character(len=64) :: "depth to saturation, rounded to highest saturated layer",&
+                               "surface head","channel inflow",&
                                "accumulated value of the boundary flux, + into domain - out of domain",&
                                "volumetric soil moisture"]
    rtDomainDict%units(:) = [character(len=64) :: "m","mm","mm","mm","m3 m-3"]
@@ -1678,6 +1697,7 @@ subroutine initLakeDict(lakeOutDict,procId,diagFlag)
    !            which means meta-data standards have yet to be determined
    !            for these variables. Fill in if it's desired to output....
    ! First establish global attributes for the channel output files
+   lakeOutDict%title = "OUTPUT FROM " // trim(get_model_version())
    lakeOutDict%fType = 'timeSeries'
    lakeOutDict%initTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
    lakeOutDict%validTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
@@ -1731,13 +1751,27 @@ subroutine initLakeDict(lakeOutDict,procId,diagFlag)
    ! Establish elevation variable attributes
    lakeOutDict%elevLName = "Water Surface Elevation"
    lakeOutDict%elevUnits = "m" ! meters
+   lakeOutDict%elevComment = "If reservoir_type = 4, " &
+       // "water_sfc_elev is invalid because this value corresponds only to level pool"
 
    ! Establish feature_id attributes
    lakeOutDict%featureIdLName = "Lake ComID"
    lakeOutDict%featureIdComment = "ComID from NHDPlusV2 waterbody layer"
    lakeOutDict%cfRole = 'timeseries_id'
 
-   ! Esatablish lat/lon attributes
+   ! Establish reservoir_type attributes
+   lakeOutDict%reservoirTypeLName = "reservoir_type"
+   lakeOutDict%reservoirTypeFlagValues = [1,2,3,4]
+   lakeOutDict%reservoirTypeFlagMeanings = "Level_pool USGS-persistence USACE-persistence RFC-forecasts"
+
+   ! Establish reservoir_assimilated_value attributes
+   lakeOutDict%reservoirAssimilatedValueLName = "reservoir_assimilated_value"
+   lakeOutDict%reservoirAssimilatedValueUnits = "m3 s-1"
+
+   ! Establish reservoir_assimilated_source_file attributes
+   lakeOutDict%reservoirAssimilatedSourceFileLName= "reservoir_assimilated_source_file"
+
+  ! Esatablish lat/lon attributes
    lakeOutDict%latLName = "Lake latitude"
    lakeOutDict%latUnits = "degrees_north"
    lakeOutDict%latStName = "latitude"
@@ -1801,6 +1835,7 @@ subroutine initChrtGrdDict(chrtGrdDict,procId,diagFlag)
    chrtGrdDict%modelNdv = -9.E15
 
    ! First establish global attributes.
+   chrtGrdDict%title = "OUTPUT FROM " // trim(get_model_version())
    chrtGrdDict%initTime = "1970-01-01_00:00:00" ! This will be calculated in I/O code.
    chrtGrdDict%validTime = "1970-01-01_00:00:00" ! This will be calculated in I/O code.
    chrtGrdDict%decimation = 1
@@ -2456,6 +2491,7 @@ subroutine initChanObsDict(chObsDict,diagFlag,procId)
       endif
    endif
 
+   chObsDict%title = "OUTPUT FROM " // trim(get_model_version())
    chObsDict%fType = 'timeSeries'
    chObsDict%initTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
    chObsDict%validTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code
@@ -2535,6 +2571,7 @@ subroutine initGwDict(gwOutDict)
 
    gwOutDict%modelNdv = -9.E15
 
+   gwOutDict%title = "OUTPUT FROM " // trim(get_model_version())
    gwOutDict%fType = 'timeSeries'
    !gwOutDict%proj4 = '+proj=longlat +datum=NAD83 +no_defs'
    gwOutDict%initTime = '1970-01-01_00:00:00' ! This will be calculated in I/O code

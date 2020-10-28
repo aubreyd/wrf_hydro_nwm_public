@@ -1,11 +1,7 @@
 ! Module for handling National Water Model streamflow, land surface,
 ! gridded routing, lake, and groundwater output.
 
-! Logan Karsten
-! National Center for Atmospheric Research
-! Research Applications Laboratory
-! karsten@ucar.edu
-! 303-497-2693
+! Logan Karsten, NCAR, RAL
 
 module module_NWM_io
 
@@ -172,7 +168,7 @@ subroutine output_chrt_NWM(domainId)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -645,10 +641,12 @@ subroutine output_chrt_NWM(domainId)
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
 
       ! Open output NetCDF file for writing.
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create CHRTOUT NetCDF file.')
 
       ! Write global attributes.
+      iret = nf90_put_att(ftn,NF90_GLOBAL,"TITLE",trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"featureType",trim(fileMeta%fType))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create featureType attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"proj4",trim(fileMeta%proj4))
@@ -671,7 +669,7 @@ subroutine output_chrt_NWM(domainId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create conventions attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -766,7 +764,7 @@ subroutine output_chrt_NWM(domainId)
       iret = nf90_put_att(ftn,featureVarId,'cf_role',trim(fileMeta%cfRole))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place cf_role attribute into feature_id variable')
 
-#ifndef NCEP_WCOSS
+#ifndef NWM_META
       ! Create channel lat/lon variables
       ! NOTE: NWM current operations do not permit the output of latitude and longitude for streamflow.
       iret = nf90_def_var(ftn,"latitude",nf90_float,dimId(1),latVarId)
@@ -814,7 +812,7 @@ subroutine output_chrt_NWM(domainId)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for feature_id.')
          iret = nf90_def_var_deflate(ftn,refTimeId,0,1,2)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for reference_time.')
-#ifndef NCEP_WCOSS
+#ifndef NWM_META
          iret = nf90_def_var_deflate(ftn,latVarId,0,1,2)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for latitude.')
          iret = nf90_def_var_deflate(ftn,lonVarId,0,1,2)
@@ -926,7 +924,7 @@ subroutine output_chrt_NWM(domainId)
       iret = nf90_put_var(ftn,varId,varMetaInt(2,:))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into feature_id output variable.')
 
-#ifndef NCEP_WCOSS
+#ifndef NWM_META
       iret = nf90_inq_varid(ftn,'latitude',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate latitude in NetCDF file.')
       iret = nf90_put_var(ftn,varId,varMetaReal(1,:))
@@ -1112,7 +1110,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -1121,7 +1119,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
    ! Initialize water type to 16.
    ! NOTE THIS MAY CHANGE IN THE FUTURE!!!!!
-   waterVal = 16
+   waterVal = rt_domain(1)%iswater
 
    ! Initialize NWM dictionary derived type containing all the necessary
    ! metadata for the output file.
@@ -1286,7 +1284,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                   date(6:7)//date(9:10)//date(12:13)//date(15:16)//date(18:19), igrid
          endif
 
-         iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+         iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to create LDASOUT NetCDF file.')
          ftnNoahMP = ftn
 
@@ -1303,7 +1301,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          call nwmCheck(diagFlag,iret,'ERROR: Unable to place CF conventions attribute into LDASOUT file.')
          iret = nf90_put_att(ftnNoahMP,NF90_GLOBAL,"code_version",trim(get_code_version()))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
          iret = nf90_put_att(ftnNoahMP,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -1785,7 +1783,7 @@ subroutine output_rt_NWM(domainId,iGrid)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -1869,7 +1867,11 @@ subroutine output_rt_NWM(domainId,iGrid)
    fileMeta%timeValidMax = minSinceEpoch1 + int(nlst(1)%khour * 60/nlst(1)%out_dt) * nlst(1)%out_dt
 
    ! calculate total_valid_time
-   fileMeta%totalValidTime = int(nlst(1)%khour * 60 / nlst(1)%out_dt)  ! # number of valid time (#of output files)
+   if(nlst(domainId)%io_config_outputs .ne. 3 .and. nlst(domainId)%io_config_outputs .ne. 5) then
+       fileMeta%totalValidTime = int(nlst(1)%khour * 60 / nlst(1)%out_dt)  ! # number of valid time (#of output files)
+   else
+       fileMeta%totalValidTime = int(nlst(1)%khour * 60 / nlst(1)%out_dt / 3)  ! # number of valid time (#of output files)
+   endif
 
    ! Create output filename
    write(output_flnm, '(A12,".RTOUT_DOMAIN",I1)') nlst(domainId)%olddate(1:4)//&
@@ -1880,10 +1882,12 @@ subroutine output_rt_NWM(domainId,iGrid)
 
    if(myId .eq. 0) then
       ! Create output NetCDF file for writing.
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create RT_DOMAIN NetCDF file.')
 
       ! Write global attributes
+      iret = nf90_put_att(ftn,NF90_GLOBAL,'TITLE',trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_initialization_time',trim(fileMeta%initTime))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place model init time attribute into RT_DOMAIN file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_output_valid_time',trim(fileMeta%validTime))
@@ -1894,7 +1898,7 @@ subroutine output_rt_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place CF conventions attribute into RT_DOMAIN file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -2313,12 +2317,15 @@ subroutine output_lakes_NWM(domainId,iGrid)
    integer :: ftn ! NetCDF file handle
    character(len=256) :: validTime ! Global attribute time string
    character(len=256) :: initTime ! Global attribute time string
-   integer :: dimId(3) ! Dimension ID values created during NetCDF created.
+   integer :: dimId(4) ! Dimension ID values created during NetCDF created.
    integer :: varId ! Variable ID value created as NetCDF variables are created and populated.
    integer :: timeId ! Dimension ID for the time dimension.
    integer :: refTimeId ! Dimension ID for the reference time dimension.
    integer :: coordVarId ! Variable to hold crs
    integer :: featureVarId ! feature_id NetCDF variable ID
+   integer :: reservoirTypeVarId ! reservoir_type netCDF variable ID
+   integer :: reservoirAssimilatedValueVarId ! reservoir_assimilated_value netCDF variable ID
+   integer :: reservoirAssimilatedSourceFileVarId ! reservoir_assimilated_source_file netCDF variable ID
    integer :: latVarId, lonVarId ! lat/lon NetCDF variable ID values
    integer :: elevVarId ! elevation NetCDF variable ID
    integer :: varRange(2) ! Local storage of valid min/max values
@@ -2331,10 +2338,15 @@ subroutine output_lakes_NWM(domainId,iGrid)
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_lakeLat,g_lakeLon,g_lakeElev
    real, allocatable, dimension(:) :: g_lakeInflow,g_lakeOutflow
+   real, allocatable, dimension(:) :: g_lakeType
+   real, allocatable, dimension(:) :: g_lake_assimilated_value
+   character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_file
    integer, allocatable, dimension(:) :: g_lakeid
    real, allocatable, dimension(:) :: g_lakeLatOut,g_lakeLonOut,g_lakeElevOut
    real, allocatable, dimension(:) :: g_lakeInflowOut,g_lakeOutflowOut
-   integer, allocatable, dimension(:) :: g_lakeidOut
+   integer, allocatable, dimension(:) :: g_lakeTypeOut, g_lakeidOut
+   real, allocatable, dimension(:) :: g_lake_assimilated_valueOut
+   character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_fileOut
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
    integer, allocatable, dimension(:) :: varOutInt ! Array holding output variables after
                                                      ! scale_factor/add_offset
@@ -2366,7 +2378,7 @@ subroutine output_lakes_NWM(domainId,iGrid)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -2429,13 +2441,20 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeElev(gsize))
       allocate(g_lakeInflow(gsize))
       allocate(g_lakeOutflow(gsize))
+      allocate(g_lakeType(gsize))
+      allocate(g_lake_assimilated_value(gsize))
+      allocate(g_lake_assimilated_source_file(gsize))
       allocate(g_lakeid(gsize))
-      if(myId .eq. 0) then
+
+      if(myId == 0) then
          allocate(g_lakeLonOut(gsize))
          allocate(g_lakeLatOut(gsize))
          allocate(g_lakeElevOut(gsize))
          allocate(g_lakeInflowOut(gsize))
          allocate(g_lakeOutflowOut(gsize))
+         allocate(g_lakeTypeOut(gsize))
+         allocate(g_lake_assimilated_valueOut(gsize))
+         allocate(g_lake_assimilated_source_fileOut(gsize))
          allocate(g_lakeidOut(gsize))
          allocate(chIndArray(gsize))
       endif
@@ -2446,6 +2465,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
+      g_lakeType = RT_DOMAIN(domainID)%final_reservoir_type
+      g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
+      g_lake_assimilated_source_file = RT_DOMAIN(domainID)%reservoir_assimilated_source_file
 
       ! Sync everything up before the next step.
       if(mppFlag .eq. 1) then
@@ -2462,6 +2484,10 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call write_lake_real(g_lakeElev,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeInflow,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeOutflow,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lakeType,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lake_assimilated_value,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_char(g_lake_assimilated_source_file,RT_DOMAIN(domainId)%lake_index,gsize)
+
 #endif
    else
       gSize = rt_domain(domainId)%NLAKES
@@ -2478,6 +2504,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeInflowOut(gsize))
       allocate(g_lakeOutflowOut(gsize))
       allocate(g_lakeidOut(gsize))
+      allocate(g_lakeTypeOut(gsize))
+      allocate(g_lake_assimilated_valueOut(gsize))
+      allocate(g_lake_assimilated_source_fileOut(gsize))
       allocate(chIndArray(gsize))
       g_lakeLat = RT_DOMAIN(domainID)%LATLAKE
       g_lakeLon = RT_DOMAIN(domainID)%LONLAKE
@@ -2485,6 +2514,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
+      g_lakeType = RT_DOMAIN(domainId)%final_reservoir_type
+      g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
+      g_lake_assimilated_source_file = RT_DOMAIN(domainID)%reservoir_assimilated_source_file
    endif
 
    ! Sync all processes up.
@@ -2574,6 +2606,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
             g_lakeLonOut(iTmp) = g_lakeLon(indTmp)
             g_lakeLatOut(iTmp) = g_lakeLat(indTmp)
             g_lakeElevOut(iTmp) = g_lakeElev(indTmp)
+            g_lakeTypeOut(iTmp) = g_lakeType(indTmp)
+            g_lake_assimilated_valueOut(iTmp) = g_lake_assimilated_value(indTmp)
+            g_lake_assimilated_source_fileOut(iTmp) = g_lake_assimilated_source_file(indTmp)
             g_lakeidOut(iTmp) = g_lakeid(indTmp)
          end do
       else
@@ -2582,6 +2617,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
          g_lakeLonOut = g_lakeLon
          g_lakeLatOut = g_lakeLat
          g_lakeElevOut = g_lakeElev
+         g_lakeTypeOut = g_lakeType
+         g_lake_assimilated_valueOut = g_lake_assimilated_value
+         g_lake_assimilated_source_fileOut = g_lake_assimilated_source_file
          g_lakeidOut = g_lakeid
       endif
       varOutReal(1,:) = g_lakeInflowOut(:)
@@ -2590,10 +2628,12 @@ subroutine output_lakes_NWM(domainId,iGrid)
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
 
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create LAKEOUT NetCDF file.')
 
       ! Write global attributes.
+      iret = nf90_put_att(ftn,NF90_GLOBAL,"TITLE",trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"featureType",trim(fileMeta%fType))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create featureType attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"proj4",trim(fileMeta%proj4))
@@ -2612,7 +2652,7 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create conventions attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -2628,6 +2668,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create time dimension')
       iret = nf90_def_dim(ftn,"reference_time",1,dimId(3))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create reference_time dimension')
+      iret = nf90_def_dim(ftn,"string_length",256,dimId(4))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create string length dimension')
 
       ! Create and populate reference_time and time variables.
       iret = nf90_def_var(ftn,"time",nf90_int,dimId(2),timeId)
@@ -2693,6 +2735,32 @@ subroutine output_lakes_NWM(domainId,iGrid)
       iret = nf90_put_att(ftn,featureVarId,'cf_role',trim(fileMeta%cfRole))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place cf_role attribute into feature_id variable')
 
+      ! Create reservoir_type variable
+      iret = nf90_def_var(ftn, "reservoir_type", nf90_int, dimId(1), reservoirTypeVarId)
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to create reservoir_type variable.')
+      iret = nf90_put_att(ftn, reservoirTypeVarId, 'long_name', trim(fileMeta%reservoirTypeLName))
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place long_name attribute into reservoir_type variable')
+      iret = nf90_put_att(ftn, reservoirTypeVarId, 'flag_values', fileMeta%reservoirTypeFlagValues)
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place flag_values attribute into reservoir_type variable')
+      iret = nf90_put_att(ftn, reservoirTypeVarId, 'flag_meanings', trim(fileMeta%reservoirTypeFlagMeanings))
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place flag_meanings attribute into reservoir_type variable')
+
+      ! Create reservoir_assimilated_value variable
+      iret = nf90_def_var(ftn, "reservoir_assimilated_value", nf90_float, dimId(1), reservoirAssimilatedValueVarId)
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to create reservoir_assimilated_value variable.')
+      iret = nf90_put_att(ftn, reservoirAssimilatedValueVarId, 'long_name', trim(fileMeta%reservoirAssimilatedValueLName))
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place long_name attribute into reservoir_assimilated_value variable')
+      iret = nf90_put_att(ftn,reservoirAssimilatedValueVarId,'units',trim(fileMeta%reservoirAssimilatedValueUnits))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into reservoir_assimilated_value variable')
+
+      ! Create reservoir_assimilated_source_file variable
+      iret = nf90_def_var(ftn, "reservoir_assimilated_source_file", nf90_char, [dimId(4), dimId(1)], reservoirAssimilatedSourceFileVarId)
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to create reservoir_assimilated_source_file variable.')
+      iret = nf90_put_att(ftn, reservoirAssimilatedSourceFileVarId, 'long_name', trim(fileMeta%reservoirAssimilatedSourceFileLName))
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place long_name attribute into reservoir_assimilated_source_file variable')
+      iret = nf90_def_var_fill(ftn, reservoirAssimilatedSourceFileVarId, 0, 0);
+      call nwmCheck(diagFlag, iret, 'ERROR: Unable to place _FillValue attribute into reservoir_assimilated_source_file variable')
+
       ! Create lake lat/lon variables
       iret = nf90_def_var(ftn,"latitude",nf90_float,dimId(1),latVarId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create latitude variable.')
@@ -2718,6 +2786,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into water_sfc_elev variable')
       iret = nf90_put_att(ftn,elevVarId,'units',trim(fileMeta%elevUnits))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place units attribute into water_sfc_elev variable')
+      iret = nf90_put_att(ftn,elevVarId,'comment',trim(fileMeta%elevComment))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place comment attribute into water_sfc_elev variable')
 
       ! Define deflation levels for these meta-variables. For now, we are going to
       ! default to a compression level of 2. Only compress if io_form_outputs is set to 1.
@@ -2726,6 +2796,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for time.')
          iret = nf90_def_var_deflate(ftn,featureVarId,0,1,2)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for feature_id.')
+         iret = nf90_def_var_deflate(ftn,reservoirTypeVarId,0,1,2)
+         call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for reservoir_type.')
          iret = nf90_def_var_deflate(ftn,refTimeId,0,1,2)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define compression level for reference_time.')
          iret = nf90_def_var_deflate(ftn,latVarId,0,1,2)
@@ -2835,6 +2907,26 @@ subroutine output_lakes_NWM(domainId,iGrid)
       iret = nf90_put_var(ftn,varId,g_lakeidOut)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into feature_id output variable.')
 
+      ! Place reservoir_type values into the NetCDF file
+      iret = nf90_inq_varid(ftn,'reservoir_type',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate reservoir_type in NetCDF file.')
+      iret = nf90_put_var(ftn,varId,g_lakeTypeOut)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into reservoir_type output variable.')
+
+      ! Place reservoir_assimilated_value values into the NetCDF file
+      iret = nf90_inq_varid(ftn,'reservoir_assimilated_value',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate reservoir_assimilated_value in NetCDF file.')
+      iret = nf90_put_var(ftn,varId,g_lake_assimilated_valueOut)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into reservoir_assimilated_value output variable.')
+
+      ! Place reservoir_assimilated_source_file values into the NetCDF file
+      iret = nf90_inq_varid(ftn,'reservoir_assimilated_source_file',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate reservoir_assimilated_source_file in NetCDF file.')
+      do iTmp = 1, gSize
+         iret = nf90_put_var(ftn,varId,trim(g_lake_assimilated_source_fileOut(iTmp)), start=[1,iTmp])
+         call nwmCheck(diagFlag,iret,'ERROR: Unable to place data into reservoir_assimilated_source_file output variable.')
+      end do
+
       ! Place lake metadata into NetCDF file
       iret = nf90_inq_varid(ftn,'water_sfc_elev',varId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to locate water_sfc_elev in NetCDF file.')
@@ -2885,6 +2977,10 @@ subroutine output_lakes_NWM(domainId,iGrid)
    deallocate(g_lakeInflow)
    deallocate(g_lakeOutflow)
    deallocate(g_lakeid)
+   deallocate(g_lakeType)
+   deallocate(g_lake_assimilated_value)
+   deallocate(g_lake_assimilated_source_file)
+
    if(myId .eq. 0) then
       deallocate(g_lakeLonOut)
       deallocate(g_lakeLatOut)
@@ -2892,6 +2988,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
       deallocate(g_lakeInflowOut)
       deallocate(g_lakeOutflowOut)
       deallocate(g_lakeidOut)
+      deallocate(g_lakeTypeOut)
+      deallocate(g_lake_assimilated_valueOut)
+      deallocate(g_lake_assimilated_source_fileOut)
       deallocate(chIndArray)
    endif
 
@@ -2998,7 +3097,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -3109,10 +3208,12 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
 
    if(myId .eq. 0) then
       ! Create output NetCDF file for writing.
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create RT_DOMAIN NetCDF file.')
 
       ! Write global attributes
+      iret = nf90_put_att(ftn,NF90_GLOBAL,'TITLE',trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_initialization_time',trim(fileMeta%initTime))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place model init time attribute into RT_DOMAIN file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_output_valid_time',trim(fileMeta%validTime))
@@ -3123,7 +3224,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place CF conventions attribute into RT_DOMAIN file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -3496,7 +3597,7 @@ subroutine output_lsmOut_NWM(domainId)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -3578,23 +3679,23 @@ subroutine output_lsmOut_NWM(domainId)
             nlst(domainId)%olddate(12:13)//nlst(domainId)%olddate(15:16),&
             nlst(domainId)%igrid
 
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create LSMOUT NetCDF file.')
 
       ! Write global attributes
       iret = nf90_put_att(ftn,NF90_GLOBAL,'TITLE',trim(fileMeta%title))
-      call nwmCheck(diagFlag,iret,'ERROR: Unable to place TITLE attribute into LDASOUT file.')
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place TITLE attribute into LSMOUT file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_initialization_time',trim(fileMeta%initTime))
-      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model init time attribute into LDASOUT file.')
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model init time attribute into LSMOUT file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'model_output_valid_time',trim(fileMeta%validTime))
-      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model output time attribute into LDASOUT file.')
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model output time attribute into LSMOUT file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'modle_total_valid_time',fileMeta%totalValidTime)
-      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model total valid time attribute into LDASOUT file.')
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place model total valid time attribute into LSMOUT file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,'Conventions',trim(fileMeta%conventions))
-      call nwmCheck(diagFlag,iret,'ERROR: Unable to place CF conventions attribute into LDASOUT file.')
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place CF conventions attribute into LSMOUT file.')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -3981,7 +4082,7 @@ implicit none
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -4298,7 +4399,7 @@ subroutine output_chanObs_NWM(domainId)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -4543,10 +4644,12 @@ subroutine output_chanObs_NWM(domainId)
      modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
       ! Create NetCDF for output.
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create CHANOBS NetCDF file.')
 
       ! Write global attributes.
+      iret = nf90_put_att(ftn,NF90_GLOBAL,"TITLE",trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"featureType",trim(fileMeta%fType))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create featureType attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"proj4",trim(fileMeta%proj4))
@@ -4569,7 +4672,7 @@ subroutine output_chanObs_NWM(domainId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create conventions attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
@@ -4705,6 +4808,7 @@ subroutine output_chanObs_NWM(domainId)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place long_name attribute into elevation variable')
       iret = nf90_put_att(ftn,elevVarId,'standard_name',trim(fileMeta%elevStName))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place stndard_name attribute into elevation variable')
+
 
       ! Define deflation levels for these meta-variables. For now, we are going
       ! to
@@ -4989,7 +5093,7 @@ subroutine output_gw_NWM(domainId,iGrid)
    ! If not MPI, then default to 0, which is the I/O ID.
    if(mppFlag .eq. 1) then
 #ifdef MPP_LAND
-      call MPI_COMM_RANK( MPI_COMM_WORLD, myId, ierr )
+      call MPI_COMM_RANK( HYDRO_COMM_WORLD, myId, ierr )
       call nwmCheck(diagFlag,ierr,'ERROR: Unable to determine MPI process ID.')
 #endif
    else
@@ -5180,10 +5284,12 @@ subroutine output_gw_NWM(domainId,iGrid)
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
 
-      iret = nf90_create(trim(output_flnm),cmode=nf90_hdf5,ncid = ftn)
+      iret = nf90_create(trim(output_flnm),cmode=NF90_NETCDF4,ncid = ftn)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create GWOUT NetCDF file.')
 
       ! Write global attributes.
+      iret = nf90_put_att(ftn,NF90_GLOBAL,"TITLE",trim(fileMeta%title))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to create TITLE attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"featureType",trim(fileMeta%fType))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create featureType attribute')
       !iret = nf90_put_att(ftn,NF90_GLOBAL,"proj4",trim(fileMeta%proj4))
@@ -5202,7 +5308,7 @@ subroutine output_gw_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create conventions attribute')
       iret = nf90_put_att(ftn,NF90_GLOBAL,"code_version",trim(get_code_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create code_version attribute')
-#ifdef NCEP_WCOSS
+#ifdef NWM_META
       iret = nf90_put_att(ftn,NF90_GLOBAL,"NWM_version_number",trim(get_nwm_version()))
       call nwmCheck(diagFlag,iret,'ERROR: Unable to create NWM_version_number attribute')
 #endif
