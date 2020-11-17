@@ -192,7 +192,6 @@ MODULE MODULE_SF_NOAHMPLSM
   REAL, PARAMETER :: DENICE = 917.      !density of ice (kg/m3)
 
   INTEGER, PRIVATE, PARAMETER :: MBAND = 2
-  INTEGER, PRIVATE, PARAMETER :: NSOIL = 4
   INTEGER, PRIVATE, PARAMETER :: NSTAGE = 8
 
   TYPE noahmp_parameters ! define a NoahMP parameters type
@@ -350,20 +349,21 @@ MODULE MODULE_SF_NOAHMPLSM
 !------------------------------------------------------------------------------------------!
 ! From the SOILPARM.TBL tables, as functions of soil category.
 !------------------------------------------------------------------------------------------!
-     REAL :: BEXP(NSOIL)   !B parameter
-     REAL :: SMCDRY(NSOIL) !dry soil moisture threshold where direct evap from top
-                           !layer ends (volumetric) (not used MB: 20140718)
-     REAL :: SMCWLT(NSOIL) !wilting point soil moisture (volumetric)
-     REAL :: SMCREF(NSOIL) !reference soil moisture (field capacity) (volumetric)
-     REAL :: SMCMAX(NSOIL) !porosity, saturated value of soil moisture (volumetric)
-     REAL :: PSISAT(NSOIL) !saturated soil matric potential
-     REAL :: DKSAT(NSOIL)  !saturated soil hydraulic conductivity
-     REAL :: DWSAT(NSOIL)  !saturated soil hydraulic diffusivity
-     REAL :: QUARTZ(NSOIL) !soil quartz content
-     REAL :: F1            !soil thermal diffusivity/conductivity coef (not used MB: 20140718)
+     REAL,ALLOCATABLE :: BEXP(:)   !B parameter
+     REAL,ALLOCATABLE :: SMCDRY(:) !dry soil moisture threshold where direct evap from top
+                                   !layer ends (volumetric) (not used MB: 20140718)
+     REAL,ALLOCATABLE :: SMCWLT(:) !wilting point soil moisture (volumetric)
+     REAL,ALLOCATABLE :: SMCREF(:) !reference soil moisture (field capacity) (volumetric)
+     REAL,ALLOCATABLE :: SMCMAX(:) !porosity, saturated value of soil moisture (volumetric)
+     REAL,ALLOCATABLE :: PSISAT(:) !saturated soil matric potential
+     REAL,ALLOCATABLE :: DKSAT(:)  !saturated soil hydraulic conductivity
+     REAL,ALLOCATABLE :: DWSAT(:)  !saturated soil hydraulic diffusivity
+     REAL,ALLOCATABLE :: QUARTZ(:) !soil quartz content
+     REAL :: F1                    !soil thermal diffusivity/conductivity coef (not used MB: 20140718)
      REAL :: AXAJ          !Xinanjiang: Tension water distribution inflection parameter [-]
      REAL :: BXAJ          !Xinanjiang: Tension water distribution shape parameter [-]
      REAL :: XXAJ          !Xinanjiang: Free water distribution shape parameter [-]
+
 !------------------------------------------------------------------------------------------!
 ! From the GENPARM.TBL file
 !------------------------------------------------------------------------------------------!
@@ -6904,6 +6904,7 @@ ENDIF   ! CROPTYPE == 0
   REAL                                    :: DZTOT  !2-m soil depth (m)
   REAL, PARAMETER :: A = 4.0
 ! ----------------------------------------------------------------------
+
     RUNSRF = 0.0
     PDDUM  = 0.0
     RSAT   = 0.0
@@ -7139,7 +7140,7 @@ ENDIF   ! CROPTYPE == 0
 
    WD1 = 0.
    DO K = 1,NSOIL
-     WD1 = WD1 + (parameters%SMCMAX(1)-SH2O(K)) * DZSNSO(K) ! [m]
+     WD1 = WD1 + (parameters%SMCMAX(K)-SH2O(K)) * DZSNSO(K) ! [m]
    ENDDO
 
    DZFINE = 3.0 * (-ZSOIL(NSOIL)) / NFINE  
@@ -7442,6 +7443,7 @@ ENDIF   ! CROPTYPE == 0
     REAL                                    :: EPORE
     REAL                                    :: WMINUS
 ! ----------------------------------------------------------------------
+
     WPLUS = 0.0
 
     DO K = 1,NSOIL
@@ -7737,6 +7739,7 @@ ENDIF   ! CROPTYPE == 0
   REAL, PARAMETER                             :: CMIC = 0.20   !microprore content (0.0-1.0)
                                                                !0.0-close to free drainage
 ! -------------------------------------------------------------
+
       QDIS      = 0.0
       QIN       = 0.0
 
@@ -7905,7 +7908,6 @@ ENDIF   ! CROPTYPE == 0
   REAL,  DIMENSION(       0:NSOIL)            :: ZSOIL0
 ! -------------------------------------------------------------
 
-
 ZSOIL0(1:NSOIL) = ZSOIL(1:NSOIL)
 ZSOIL0(0) = 0.         
  
@@ -7967,7 +7969,8 @@ ZSOIL0(0) = 0.
 !                   QDRAIN = QDRAIN - 1000 * (SMCEQ(NSOIL)-SMC(NSOIL)) * DZSNSO(NSOIL) / DT
 !                   SMC(NSOIL)=SMCEQ(NSOIL)
 !adjust wtd in the ficticious layer below
-                   SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
+                   SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / &
+                               ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
                    WTD = MIN( ( SMCWTD*DZSNSO(NSOIL) &
                    - SMCEQDEEP*ZSOIL0(NSOIL) + parameters%SMCMAX(NSOIL)*(ZSOIL0(NSOIL)-DZSNSO(NSOIL)) ) / &
                        ( parameters%SMCMAX(NSOIL)-SMCEQDEEP ) , ZSOIL0(NSOIL) )
@@ -7979,7 +7982,8 @@ ZSOIL0(0) = 0.
         ELSEIF(WTD.GE.ZSOIL0(NSOIL)-DZSNSO(NSOIL))THEN
 !if wtd was already below the bottom of the resolved soil crust
            WTDOLD=WTD
-           SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
+           SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / &
+                       ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
            IF(SMCWTD.GT.SMCEQDEEP)THEN
                WTD = MIN( ( SMCWTD*DZSNSO(NSOIL) &
                  - SMCEQDEEP*ZSOIL0(NSOIL) + parameters%SMCMAX(NSOIL)*(ZSOIL0(NSOIL)-DZSNSO(NSOIL)) ) / &

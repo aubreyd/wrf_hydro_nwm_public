@@ -257,7 +257,7 @@ module module_HYDRO_drv
         if(nlst(did)%SUBRTSWCRT         .gt. 0 .or. &
                 nlst(did)%OVRTSWCRT          .gt. 0 .or. &
                 nlst(did)%GWBASESWCRT        .gt. 0 .or. &
-   nlst(did)%CHANRTSWCRT        .gt. 0 .or. &
+                nlst(did)%CHANRTSWCRT        .gt. 0 .or. &
                 nlst(did)%channel_only       .gt. 0 .or. &
                 nlst(did)%channelBucket_only .gt. 0      ) then
 
@@ -294,7 +294,7 @@ module module_HYDRO_drv
                     endif ! End check for io_form_outputs value
                 endif ! End check for rtout_factor
                 rtout_factor = rtout_factor + 1
-            endif
+            endif  ! End check for RT_DOMAIN
             !! JLM disable GW output for NWM. Bring this line back when runtime output options avail.
             !! JLM This seems like a more logical place?
             if(nlst(did)%io_form_outputs .ne. 0) then
@@ -428,14 +428,13 @@ module module_HYDRO_drv
                             , RT_DOMAIN(did)%qSfcLatRunoff,   RT_DOMAIN(did)%qBucket &
                             , RT_DOMAIN(did)%qin_gwsubbas,    nlst(did)%UDMP_OPT &
                             )
-                    endif
+                    endif ! end if CHRTOUT_DOMAIN check
 
-                endif
             endif ! End of checking for io_form_outputs flag value
 
-#ifdef MPP_LAND
             if(nlst(did)%CHRTOUT_GRID  .eq. 1)  then
                 if(nlst(did)%io_form_outputs .eq. 0) then
+#ifdef MPP_LAND
                     call mpp_output_chrtgrd(nlst(did)%igrid, nlst(did)%split_output_count, &
                         RT_DOMAIN(did)%ixrt,RT_DOMAIN(did)%jxrt, RT_DOMAIN(did)%NLINKS,   &
                         RT_DOMAIN(did)%GCH_NETLNK, &
@@ -448,7 +447,7 @@ module module_HYDRO_drv
                 else
                     call output_chrtout_grd_NWM(did,nlst(did)%igrid)
                 endif
-            endif
+            endif  ! End of CHRTOUT_GRID
             if (RT_DOMAIN(did)%NLAKES.gt.0)  then
                 if(nlst(did)%io_form_outputs .ne. 0) then
                     ! Output lakes in NWM format
@@ -487,6 +486,9 @@ module module_HYDRO_drv
 
                 endif ! end of check for io_form_outputs value
             endif   ! end if block of rNLAKES .gt. 0
+
+          endif   ! end if channel routing check
+
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
             write(6,*) "end calling output functions"

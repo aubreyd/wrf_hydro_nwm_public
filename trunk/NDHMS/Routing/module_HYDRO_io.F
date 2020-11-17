@@ -658,7 +658,6 @@ end subroutine get_albedo12m_netcdf
 
   end subroutine get_2d_netcdf
 
-
       subroutine get_2d_netcdf_cows(var_name,ncid,var, &
             ix,jx,tlevel,fatal_if_error,ierr)
           character(len=*), intent(in) :: var_name
@@ -10889,6 +10888,7 @@ subroutine hdtbl_out_nc(did,ncid,count,count_flag,varName,varIn,descrip,ixd,jxd)
 
 
 end subroutine hdtbl_out_nc
+
 subroutine hdtbl_out(did)
    implicit none
    integer :: did, ncid, count,count_flag, i, ixd,jxd
@@ -10900,9 +10900,11 @@ subroutine hdtbl_out(did)
       call hdtbl_out_nc(did,ncid, count,count_flag,"SMCWLT1",rt_domain(did)%SMCWLT1,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"LKSAT",rt_domain(did)%LKSAT,"",ixd,jxd)
+      call hdtbl_out_nc(did,ncid, count,count_flag,"NEXP",rt_domain(did)%NEXP,"",ixd,jxd)
    end do
 
 end subroutine hdtbl_out
+
 subroutine hdtbl_in_nc(did)
    implicit none
    integer :: did
@@ -10911,7 +10913,9 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"SMCWLT1",rt_domain(did)%SMCWLT1)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT)
+   call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"NEXP",rt_domain(did)%NEXP)
 end subroutine hdtbl_in_nc
+
 subroutine read2dlsm(did,file,varName,varOut)
   implicit none
   integer :: did, ncid ,ierr,iret
@@ -10937,9 +10941,7 @@ subroutine read2dlsm(did,file,varName,varOut)
           .false., ierr)
      iret = nf90_close(ncid)
 #endif
-
 end subroutine read2dlsm
-
 
 subroutine read_channel_only (olddateIn, hgrid, indir, dtbl)
 !use module_HYDRO_io, only: read_rst_crt_reach_nc

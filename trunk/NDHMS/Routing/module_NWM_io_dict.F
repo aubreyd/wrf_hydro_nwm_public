@@ -23,7 +23,7 @@ integer, parameter :: numLdasVars = 98
 integer, parameter :: numRtDomainVars = 5
 integer, parameter :: numLakeVars = 2
 integer, parameter :: numChGrdVars = 1
-integer, parameter :: numLsmVars = 14
+integer, parameter :: numLsmVars = 5
 integer, parameter :: numChObsVars = 1
 integer, parameter :: numGwVars = 4
 integer :: i
@@ -208,6 +208,7 @@ type rtDomainMeta
    character (len=64), dimension(numRtDomainVars) :: longName  ! Long names for each variable.
    character (len=64), dimension(numRtDomainVars) :: units ! Units for each variable.
    character (len=64), dimension(numRtDomainVars) :: coordNames ! Coordinate names for each variable.
+   integer, dimension(numRtDomainVars) :: numLev ! Number of levels for each variable.
    integer(kind=4), dimension(numRtDomainVars) :: validMinComp ! Valid min (after conversion to integer)
    integer(kind=4), dimension(numRtDomainVars) :: validMaxComp ! Valid max (after conversion to integer)
    real*8, dimension(numRtDomainVars) :: validMinDbl ! Valid minimum (before conversion to integer)
@@ -1242,8 +1243,8 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             1,1,1,1,1,1,1,1,1,1, &  !21-30
                             1,1,1,1,1,1,1,1,1,1, &  !31-40
                             1,1,1,1,1,1,1,1,1,1, &  !41-50
-                            1,1,1,1,1,1,3,3,3,4, &  !51-60
-                            4,3,4,1,1,1,1,1,1,1, &  !61-70
+                            1,1,1,1,1,1,3,3,3,ldasOutDict%numSoilLayers, &  !51-60
+                            ldasOutDict%numSoilLayers,3,ldasOutDict%numSoilLayers,1,1,1,1,1,1,1, &  !61-70
                             1,1,1,1,1,1,1,1,1,1, &  !71-80
                             1,1,1,1,1,1,1,1,1,1, &  !81-90
                             1,1,1,1,1,2,2,1]        !91-98
@@ -1645,8 +1646,8 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
 
    rtDomainDict%varNames(:) = [character(len=64) :: "zwattablrt","sfcheadsubrt","QSTRMVOLRT",&
                                "QBDRYRT","SOIL_M"]
-   rtDomainDict%longName(:) = [character(len=64) :: "water table depth","surface head",&
-                               "channel inflow",&
+   rtDomainDict%longName(:) = [character(len=64) :: "depth to saturation, rounded to highest saturated layer",&
+                               "surface head","channel inflow",&
                                "accumulated value of the boundary flux, + into domain - out of domain",&
                                "volumetric soil moisture"]
    rtDomainDict%units(:) = [character(len=64) :: "m","mm","mm","mm","m3 m-3"]
@@ -1654,6 +1655,7 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
    rtDomainDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0]
    rtDomainDict%outFlag(:) = [0,0,0,0,0]
    rtDomainDict%timeZeroFlag(:) = [1,1,1,1,1]
+   rtDomainDict%numLev(:) = [1,1,1,1,rtDomainDict%numSoilLayers]
    rtDomainDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
    rtDomainDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
    rtDomainDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, -1000000.0d0, 0.0d0]
@@ -2387,40 +2389,31 @@ subroutine initLsmOutDict(lsmOutDict,procId,diagFlag)
 
    endif
 
-   lsmOutDict%varNames(:) = [character(len=64) :: "stc1","smc1","sh2ox1","stc2",&
-                             "smc2","sh2ox2","stc3","smc3","sh2ox3","stc4",&
-                             "smc4","sh2ox4","infxsrt","sfcheadrt"]
-   lsmOutDict%longName(:) = [character(len=64) :: "Soil temperature in the top layer",&
-                             "Soil moisture in the top layer",&
-                             "Volumetric soil moisture in the top layer",&
-                             "Soil temperature in the second layer",&
-                             "Soil moisture in the second layer",&
-                             "Volumetric soil moisture in the second layer",&
-                             "Soil temperature in the third layer",&
-                             "Soil moisture in the third layer",&
-                             "Volumetric soil moisture in the third layer",&
-                             "Soil temperature in the fourth layer",&
-                             "Soil moisture in the fourth layer",&
-                             "Volumetric soil moisture in the fourth layer",&
-                             "Infiltration excess","Surface head"]
-   lsmOutDict%units(:) = [character(len=64) :: "K","fraction","fraction",&
-                          "K","fraction","fraction","K","fraction",&
-                          "fraction","K","fraction","fraction",&
-                          "mm","mm"]
-   lsmOutDict%scaleFactor(:) = [0.1,0.01,0.01,0.1,0.01,0.01,0.1,0.01,0.01,&
-                                0.1,0.01,0.01,1.0,1.0]
-   lsmOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,&
-                              0.0,0.0,0.0,0.0]
-   lsmOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-   lsmOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-   lsmOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                                -9999.0,-9999.0,-9999.0,-9999.0]
-   lsmOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                             -9999.0,-9999.0,-9999.0,-9999.0]
-   lsmOutDict%validMinDbl(:) = [150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, 150.0d0, 0.0d0, 0.0d0, &
-                                 150.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0]
-   lsmOutDict%validMaxDbl(:) = [400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, 400.0d0, 1.0d0, 1.0d0, &
-                                 400.0d0, 1.0d0, 1.0d0, 100000.0d0, 100000.0d0]
+   lsmOutDict%varNames(:) = [character(len=64) :: "stc", "smc", "sh2ox", &
+                             "infxsrt", "sfcheadrt"]
+   lsmOutDict%longName(:) = [character(len=64) :: "Soil temperature", &
+                             "Liquid volumetric soil moisture", &
+                             "Total volumetric soil moisture", &
+                             "Infiltration excess", &
+                             "Surface head"]
+   lsmOutDict%units(:) = [character(len=64) :: "K", "fraction", "fraction", &
+                          "mm", "mm"]
+   lsmOutDict%scaleFactor(:) = [0.1, 0.01, 0.01, &
+                                1.0, 1.0]
+   lsmOutDict%addOffset(:) = [0.0, 0.0, 0.0, &
+                              0.0, 0.0]
+   lsmOutDict%timeZeroFlag(:) = [1, 1, 1, &
+                                 1, 1]
+   lsmOutDict%numLev(:) = [lsmOutDict%numSoilLayers, lsmOutDict%numSoilLayers, lsmOutDict%numSoilLayers, &
+                           1, 1]
+   lsmOutDict%missingReal(:) = [-9999.0, -9999.0, -9999.0, &
+                                -9999.0, -9999.0]
+   lsmOutDict%fillReal(:) = [-9999.0, -9999.0, -9999.0, &
+                             -9999.0, -9999.0]
+   lsmOutDict%validMinDbl(:) = [150.0d0, 0.0d0, 0.0d0, &
+                                0.0d0, 0.0d0]
+   lsmOutDict%validMaxDbl(:) = [400.0d0, 1.0d0, 1.0d0,  &
+                                100000.0d0, 100000.0d0]
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numLsmVars
