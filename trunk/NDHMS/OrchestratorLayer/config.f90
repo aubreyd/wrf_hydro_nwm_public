@@ -40,6 +40,7 @@ module config_base
      integer            :: soil_data_option = 1
      integer            :: pedotransfer_option = 0
      integer            :: crop_option = 0
+     integer            :: imperv_option = 0
 
      integer            :: split_output_count = 1 
      integer            :: khour
@@ -872,6 +873,7 @@ contains
      integer            :: soil_data_option = 1
      integer            :: pedotransfer_option = 0
      integer            :: crop_option = 0
+     integer            :: imperv_option = 0
      integer            :: split_output_count = 1
      integer            :: khour = -999
      integer            :: kday = -999
@@ -905,6 +907,7 @@ contains
          glacier_option, surface_resistance_option, &
          
          soil_data_option, pedotransfer_option, crop_option, &
+         imperv_option, &
 
          split_output_count, &
          khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
@@ -1005,6 +1008,7 @@ contains
     noah_lsm%soil_data_option = soil_data_option
     noah_lsm%pedotransfer_option = pedotransfer_option
     noah_lsm%crop_option = crop_option
+    noah_lsm%imperv_option = imperv_option
 
     noah_lsm%split_output_count = split_output_count
 
