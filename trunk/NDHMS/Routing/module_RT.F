@@ -367,6 +367,7 @@ CONTAINS
      allocate( rt_domain(did)%Tw(nsizes) )
      allocate( rt_domain(did)%Tw_CC(nsizes) )
      allocate( rt_domain(did)%n_CC(nsizes) )
+     allocate( rt_domain(did)%ChannK(nsizes) )
      allocate( rt_domain(did)%LAKEIDA(nsizes) )
      allocate( rt_domain(did)%LAKEIDX(nsizes) )
 
@@ -445,6 +446,10 @@ CONTAINS
 	allocate( rt_domain(did)%velocity(nsizes) )
 	rt_domain(did)%QLateral  = zeroFlt
 	rt_domain(did)%velocity  = zeroFlt
+        if( nlst(did)%channel_option .eq. 2 ) then
+           allocate( rt_domain(did)%qloss(nsizes) )
+           rt_domain(did)%qloss = zeroFlt
+        endif
      endif
 
   if( nlst(did)%channel_option .eq. 1  .or. nlst(did)%channel_option .eq. 2 ) then
@@ -490,6 +495,7 @@ CONTAINS
       rt_domain(did)%Tw = 0.0
       rt_domain(did)%Tw_CC = 0.0
       rt_domain(did)%n_CC = 0.0
+      rt_domain(did)%ChannK = 0.0
 
 
       rt_domain(did)%ZELEV = 0.0
@@ -671,7 +677,7 @@ subroutine LandRT_ini(did)
 
   real,  dimension(50)     :: BOTWID, TOPWID, HLINK_INIT, CHAN_SS, CHMann !Channel parms from table
   real,  dimension(50)     :: TOPWIDCC, NCC    !channnel params of compound
-
+  real,  dimension(50)     :: CHANN_K ! Channel infiltration param
   integer :: i,j,k, ll, count
 
   integer, allocatable, dimension(:) :: tmp_int
@@ -732,6 +738,7 @@ subroutine LandRT_ini(did)
              rt_domain(did)%Tw,                              &
              rt_domain(did)%Tw_CC,                           &
              rt_domain(did)%n_CC,                            &
+             rt_domain(did)%ChannK,                          &
              rt_domain(did)%HRZAREA,      rt_domain(did)%LAKEMAXH, &
              rt_domain(did)%WEIRH,        rt_domain(did)%WEIRC, &
              rt_domain(did)%WEIRL,        rt_domain(did)%DAML, &
@@ -775,6 +782,7 @@ subroutine LandRT_ini(did)
            rt_domain(did)%Tw,                                       &
            rt_domain(did)%Tw_CC,                                    &
            rt_domain(did)%n_CC,                                     &
+           rt_domain(did)%ChannK,                                   &
            rt_domain(did)%LAKEIDA,       rt_domain(did)%HRZAREA,    &
            rt_domain(did)%LAKEMAXH,      rt_domain(did)%WEIRH,      &
            rt_domain(did)%WEIRC,         rt_domain(did)%WEIRL,      &
@@ -1407,10 +1415,10 @@ subroutine LandRT_ini(did)
       ! This conflict of options is caught in Data_Rec/module_namelist.F
       ! Some of the code for reading/using top-width-necessary params from CHANPARM.TBL are available
       ! but commented out in the code, since they were a bridge to nowhere.
-        call mpp_CHAN_PARM_INIT (BOTWID,HLINK_INIT,CHAN_SS,CHMann)  !Read chan parms from table...
+        call mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann)  !Read chan parms from table...
       !call mpp_CHAN_PARM_INIT (BOTWID,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)  !Read chan parms from table...
 #else
-        call CHAN_PARM_INIT (BOTWID, TOPWID, HLINK_INIT, CHAN_SS, CHMann) !,TOPWIDCC,NCC)  !Read chan parms from table...
+        call CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann) !,TOPWIDCC,NCC)  !Read chan parms from table...
 #endif
      end if
 
