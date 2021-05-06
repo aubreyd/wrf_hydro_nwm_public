@@ -161,6 +161,9 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  imperv_2D  ! impervious fraction
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  impconnA_2D ! impervious connectivity A parameter from Sutherland 2000
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  impconnB_2D ! impervious connectivity B parameter from Sutherland 2000
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  axaj_2D    ! Tension water distribution inflection parameter [-]
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bxaj_2D    ! Tension water distribution shape parameter [-]
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  xxaj_2D    ! Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -750,6 +753,9 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( imperv_2D  (XSTART:XEND,YSTART:YEND) )            ! impervious fraction
   ALLOCATE ( impconnA_2D  (XSTART:XEND,YSTART:YEND) )          ! impervious connectivity A parameter from Sutherland 2000
   ALLOCATE ( impconnB_2D  (XSTART:XEND,YSTART:YEND) )          ! impervious connectivity B parameter from Sutherland 2000
+  ALLOCATE ( axaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution inflection parameter [-]
+  ALLOCATE ( bxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution shape parameter [-]
+  ALLOCATE ( xxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1096,7 +1102,7 @@ module module_NoahMP_hrldas_driver
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
 		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D, &
-                      IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D)
+                      IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D,AXAJ_2D,BXAJ_2D,XXAJ_2D)
 #endif
 
 !------------------------------------------------------------------------
@@ -1235,6 +1241,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
   else  ! for none restart
 
@@ -1333,6 +1342,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
@@ -1670,6 +1682,7 @@ end subroutine land_driver_ini
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
                  IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D,                           &
+                 AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
@@ -1988,10 +2001,10 @@ subroutine  ldas_output(itime, state)
    !call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(ZSNOXY(:,-nsnow+1:0,:)),IVGTYP,57)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNICEXY,IVGTYP,58)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%SNLIQXY,IVGTYP,59)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,TSLB,IVGTYP,60)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2O,IVGTYP,61)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,TSLB,IVGTYP,60)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,SH2O,IVGTYP,61)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,state%TSNOXY,IVGTYP,62)
-   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS,IVGTYP,63)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nsoil,SMOIS,IVGTYP,63)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOWH,IVGTYP,64)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,state%SNOW,IVGTYP,65)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY,IVGTYP,66)

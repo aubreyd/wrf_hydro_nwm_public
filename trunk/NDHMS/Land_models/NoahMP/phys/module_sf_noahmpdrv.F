@@ -65,6 +65,7 @@ CONTAINS
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
                  IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D,                           &
+                 AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -168,6 +169,9 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  IMPERV_2D ! impervious fraction
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  IMPCONNA_2D ! impervious connectivity A parameter from Sutherland 2000  
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  IMPCONNB_2D ! impervious connectivity B parameter from Sutherland 2000
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  AXAJ_2D   ! Xinanjiang: Tension water distribution inflection parameter [-]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BXAJ_2D   ! Xinanjiang: Tension water distribution shape parameter [-]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  XXAJ_2D   ! Xinanjiang: Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -481,6 +485,18 @@ CONTAINS
 
 ! ----------------------------------------------------------------------
 
+! Allocate parameters data structures that vary with depth
+
+    allocate(parameters%BEXP(NSOIL))
+    allocate(parameters%SMCDRY(NSOIL))
+    allocate(parameters%SMCWLT(NSOIL))
+    allocate(parameters%SMCREF(NSOIL))
+    allocate(parameters%SMCMAX(NSOIL))
+    allocate(parameters%PSISAT(NSOIL))
+    allocate(parameters%DKSAT(NSOIL))
+    allocate(parameters%DWSAT(NSOIL))
+    allocate(parameters%QUARTZ(NSOIL))
+
     CALL NOAHMP_OPTIONS(IDVEG  ,IOPT_CRS  ,IOPT_BTR  ,IOPT_RUN  ,IOPT_SFC  ,IOPT_FRZ , &
                      IOPT_INF  ,IOPT_RAD  ,IOPT_ALB  ,IOPT_SNF  ,IOPT_TBOT, IOPT_STC , &
 		     IOPT_RSF  ,IOPT_SOIL ,IOPT_PEDO ,IOPT_CROP, IOPT_IMPERV )
@@ -670,6 +686,9 @@ CONTAINS
        parameters%imperv = IMPERV_2D(I,J)         ! impervious fraction
        parameters%impconnA = IMPCONNA_2D(I,J)     ! impervious connectivity A parameter from Sutherland 2000
        parameters%impconnB = IMPCONNB_2D(I,J)     ! impervious connectivity B parameter from Sutherland 2000
+       parameters%axaj   = AXAJ_2D(I,J)           ! Xinanjiang: Tension water distribution inflection parameter [-]
+       parameters%bxaj   = BXAJ_2D(I,J)           ! Xinanjiang: Tension water distribution shape parameter [-]
+       parameters%xxaj   = XXAJ_2D(I,J)           ! Xinanjiang: Free water distribution shape parameter [-]
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters,iopt_imperv)
        
@@ -1003,6 +1022,18 @@ CONTAINS
       ENDDO ILOOP                                                       ! of I loop
    ENDDO JLOOP                                                          ! of J loop
 
+! Deallocate parameters data structures that vary with depth
+
+    deallocate(parameters%BEXP)
+    deallocate(parameters%SMCDRY)
+    deallocate(parameters%SMCWLT)
+    deallocate(parameters%SMCREF)
+    deallocate(parameters%SMCMAX)
+    deallocate(parameters%PSISAT)
+    deallocate(parameters%DKSAT)
+    deallocate(parameters%DWSAT)
+    deallocate(parameters%QUARTZ)
+
 !------------------------------------------------------
   END SUBROUTINE noahmplsm
 !------------------------------------------------------
@@ -1214,8 +1245,10 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
       parameters%IMPCONNA = 1.0
       parameters%IMPCONNB = 1.0
     ENDIF
+    parameters%AXAJ = AXAJ_TABLE(SOILTYPE)
+    parameters%BXAJ = BXAJ_TABLE(SOILTYPE)
+    parameters%XXAJ = XXAJ_TABLE(SOILTYPE)
 #endif
-
 ! ----------------------------------------------------------------------
 ! Transfer GENPARM parameters
 ! ----------------------------------------------------------------------
@@ -1269,7 +1302,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
   type(noahmp_parameters), intent(inout) :: parameters
   integer :: k
 
-  do k = 1,4
+  do k = 1,nsoil
     if(sand(k) <= 0 .or. clay(k) <= 0) then
       sand(k) = 0.41
       clay(k) = 0.18
@@ -1378,7 +1411,11 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
        its,ite, jts,jte, kts,kte,                &
        smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy, dx, dy, msftx, msfty,&     ! Optional groundwater
        wtddt    ,stepwtd  ,dt       ,qrfsxy     ,qspringsxy  , qslatxy    ,  &      ! Optional groundwater
-       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy            )    ! Optional groundwater
+       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy      &          ! Optional groundwater
+#ifdef SPATIAL_SOIL
+       , SMCMAX_3D, BEXP_3D, PSISAT_3D           &
+#endif
+       )
 
   USE NOAHMP_TABLES
 
@@ -1469,6 +1506,10 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     INTEGER,  INTENT(INOUT) , OPTIONAL :: STEPWTD
     REAL, INTENT(IN) , OPTIONAL :: DT, WTDDT
 
+#ifdef SPATIAL_SOIL
+    REAL, DIMENSION(ims:ime, NSOIL, jms:jme), INTENT(INOUT) :: SMCMAX_3D, BEXP_3D, PSISAT_3D
+#endif
+
 !jref:start
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: t2mvxy        !2m temperature vegetation part (k)
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: t2mbxy        !2m temperature bare ground part (k)
@@ -1479,7 +1520,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     REAL, DIMENSION(1:NSOIL)  :: ZSOIL      ! Depth of the soil layer bottom (m) from 
     !                                                   the surface (negative)
 
-    REAL                      :: BEXP, SMCMAX, PSISAT
+    REAL, DIMENSION(1:NSOIL)  :: BEXP, SMCMAX, PSISAT
     REAL                      :: FK, masslai,masssai
 
     REAL, PARAMETER           :: BLIM  = 5.5
@@ -1560,32 +1601,34 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
                 SNOWH(I,J)=SNOW(I,J)*0.01               ! SNOW in mm and SNOWH in m
 	    ELSE
 	      
+#ifdef SPATIAL_SOIL
+              BEXP   = BEXP_3D(I,:,J)
+              SMCMAX = SMCMAX_3D(I,:,J)
+              PSISAT = PSISAT_3D(I,:,J)
+#else
               BEXP   =   BEXP_TABLE(ISLTYP(I,J))
               SMCMAX = SMCMAX_TABLE(ISLTYP(I,J))
               PSISAT = PSISAT_TABLE(ISLTYP(I,J))
+#endif
 
               DO NS=1, NSOIL
-	        IF ( SMOIS(I,NS,J) > SMCMAX )  SMOIS(I,NS,J) = SMCMAX
-              END DO
-              IF ( ( BEXP > 0.0 ) .AND. ( SMCMAX > 0.0 ) .AND. ( PSISAT > 0.0 ) ) THEN
-                DO NS=1, NSOIL
+                IF ( SMOIS(I,NS,J) > SMCMAX(NS) )  SMOIS(I,NS,J) = SMCMAX(NS)
+                IF ( ( BEXP(NS) > 0.0 ) .AND. ( SMCMAX(NS) > 0.0 ) .AND. ( PSISAT(NS) > 0.0 ) ) THEN
                    IF ( TSLB(I,NS,J) < 273.149 ) THEN    ! Use explicit as initial soil ice
-                      FK=(( (HLICE/(GRAV*(-PSISAT))) *                              &
-                           ((TSLB(I,NS,J)-T0)/TSLB(I,NS,J)) )**(-1/BEXP) )*SMCMAX
+                      FK=(( (HLICE/(GRAV*(-PSISAT(NS)))) *                              &
+                           ((TSLB(I,NS,J)-T0)/TSLB(I,NS,J)) )**(-1/BEXP(NS)) )*SMCMAX(NS)
                       FK = MAX(FK, 0.02)
                       SH2O(I,NS,J) = MIN( FK, SMOIS(I,NS,J) )
                    ELSE
                       SH2O(I,NS,J)=SMOIS(I,NS,J)
                    ENDIF
-                END DO
-              ELSE
-                DO NS=1, NSOIL
+                ELSE
                    SH2O(I,NS,J)=SMOIS(I,NS,J)
-                END DO
-              ENDIF
-            ENDIF
-          ENDDO
-       ENDDO
+                ENDIF
+              ENDDO ! end nsoil loop
+            ENDIF ! end if ice
+          ENDDO ! end i loop
+       ENDDO ! end j loop
 !  ENDIF
 
 
