@@ -98,6 +98,7 @@ module module_NoahMP_hrldas_driver
   REAL                                    ::  XICE_THRESHOLD! fraction of grid determining seaice
   INTEGER                                 ::  ISICE     ! land cover category for ice
   INTEGER                                 ::  ISURBAN   ! land cover category for urban
+  INTEGER                                 ::  ISLAKE    ! land cover category for lake
   INTEGER                                 ::  ISWATER   ! land cover category for water
   INTEGER                                 ::  IDVEG     ! dynamic vegetation (1 -> off ; 2 -> on) with opt_crs = 1
   INTEGER                                 ::  IOPT_CRS  ! canopy stomatal resistance (1-> Ball-Berry; 2->Jarvis)
@@ -178,6 +179,9 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  unload_temp_2D  ! parameter for temperature-based snow unloading (1.87e5 K*s)
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  unload_wind_2D  ! parameter for wind-based snow unloading (1.56e5 m) 
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  maxsno_sp_2D    ! snow load coefficient from Schmidt and Gluns 1991
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  axaj_2D    ! Tension water distribution inflection parameter [-]
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bxaj_2D    ! Tension water distribution shape parameter [-]
+  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  xxaj_2D    ! Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -426,15 +430,17 @@ module module_NoahMP_hrldas_driver
      use module_hrldas_HYDRO, only: open_print_mpp
      use state_module, only: state_type
      implicit  none
-     integer:: NTIME_out
+     integer, intent(out) :: NTIME_out
      integer, parameter :: did=1
      integer :: khour
-     type(state_type) :: state
+     type(state_type), intent(out) :: state
 
     ! initilization for stand alone parallel code.
     integer, optional, intent(in) :: wrfits,wrfite,wrfjts,wrfjte
+
 #ifdef MPP_LAND
-    call  MPP_LAND_INIT()
+    call read_dim(noah_lsm%hrldas_setup_file,ix_tmp,jx_tmp)
+    call MPP_LAND_INIT(ix_tmp,jx_tmp)
 #endif
 
 #ifdef WRF_HYDRO
@@ -656,7 +662,7 @@ module module_NoahMP_hrldas_driver
 
     call read_hrldas_hdrinfo(noah_lsm%hrldas_setup_file, ix, jx, &
          noah_lsm%xstart, noah_lsm%xend, noah_lsm%ystart, noah_lsm%yend, &
-         iswater, isurban, isice, llanduse, dx, dy, truelat1, truelat2, cen_lon, lat1, lon1, &
+         iswater, islake, isurban, isice, llanduse, dx, dy, truelat1, truelat2, cen_lon, lat1, lon1, &
          igrid, mapproj)
   write(hgrid,'(I1)') igrid
 
@@ -784,6 +790,9 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( unload_temp_2D(XSTART:XEND,YSTART:YEND) )         ! parameter for temperature-based snow unloading (1.87e5 K*s)
   ALLOCATE ( unload_wind_2D(XSTART:XEND,YSTART:YEND) )         ! parameter for wind-based snow unloading (1.56e5 m) 
   ALLOCATE ( maxsno_sp_2D(XSTART:XEND,YSTART:YEND) )              ! snow load coefficient from Schmidt and Gluns 1991
+  ALLOCATE ( axaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution inflection parameter [-]
+  ALLOCATE ( bxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution shape parameter [-]
+  ALLOCATE ( xxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1116,7 +1125,8 @@ module module_NoahMP_hrldas_driver
 !----------------------------------------------------------------------
 
   CALL READLAND_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, YEND,     &
-       ISWATER, IVGTYP, ISLTYP, TERRAIN, TMN, XLAT_URB2D, XLONIN, XLAND, SEAICE,MSFTX,MSFTY)
+       ISWATER, ISLAKE, IVGTYP, ISLTYP, TERRAIN, TMN, XLAT_URB2D, XLONIN, XLAND,   &
+       SEAICE, MSFTX, MSFTY)
 
   WHERE(SEAICE > 0.0) XICE = 1.0
 
@@ -1135,6 +1145,11 @@ module module_NoahMP_hrldas_driver
                       BATS_VISDIR_2D, BATS_NIRDIR_2D, RSURFSNOW_2D, REFSNOWDENS_2D,&
                       FRAC_DIRECT_2D, FRAC_VISIBLE_2D,SCAMAX_2D,&
                       UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D)
+
+    if (noah_lsm%runoff_option == 7) then
+        CALL READ_XAJ_RUNOFF(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
+                             AXAJ_2D,BXAJ_2D,XXAJ_2D)
+    end if
 #endif
 
 !------------------------------------------------------------------------
@@ -1714,6 +1729,7 @@ end subroutine land_driver_ini
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
                  FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
                  UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D,                &
+                 AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O

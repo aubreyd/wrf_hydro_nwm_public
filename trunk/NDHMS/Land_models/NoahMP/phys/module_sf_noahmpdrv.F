@@ -71,6 +71,7 @@ CONTAINS
                  RSURFSNOW_2D, REFSNOWDENS_2D,                                &
                  FRAC_DIRECT_2D, FRAC_VISIBLE_2D, SCAMAX_2D,                  &
                  UNLOAD_TEMP_2D, UNLOAD_WIND_2D, MAXSNO_SP_2D,                &
+                 AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -192,6 +193,9 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_TEMP_2D  ! parameter for temperature-based snow unloading (1.87e5 K*s)
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  UNLOAD_WIND_2D  ! parameter for wind-based snow unloading (1.56e5 m) 
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  MAXSNO_SP_2D       ! snow load coefficient from Schmidt and Gluns 1991
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  AXAJ_2D   ! Xinanjiang: Tension water distribution inflection parameter [-]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BXAJ_2D   ! Xinanjiang: Tension water distribution shape parameter [-]
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  XXAJ_2D   ! Xinanjiang: Free water distribution shape parameter [-]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -714,6 +718,9 @@ CONTAINS
        parameters%unload_temp  = UNLOAD_TEMP_2D(I,J)  ! parameter for temperature-based snow unloading (1.87e5 K*s) 
        parameters%unload_wind  = UNLOAD_WIND_2D(I,J)  ! parameter for wind-based snow unloading (1.56e5 m) 
        parameters%maxsno_sp    = MAXSNO_SP_2D(I,J)    ! snow load coefficient from Schmidt and Gluns 1991
+       parameters%axaj   = AXAJ_2D(I,J)           ! Xinanjiang: Tension water distribution inflection parameter [-]
+       parameters%bxaj   = BXAJ_2D(I,J)           ! Xinanjiang: Tension water distribution shape parameter [-]
+       parameters%xxaj   = XXAJ_2D(I,J)           ! Xinanjiang: Free water distribution shape parameter [-]
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters)
        
@@ -1255,8 +1262,10 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%UNLOAD_TEMP = UNLOAD_TEMP_TABLE
     parameters%UNLOAD_WIND = UNLOAD_WIND_TABLE
     parameters%MAXSNO_SP = MAXSNO_SP_TABLE
+    parameters%AXAJ = AXAJ_TABLE(SOILTYPE)
+    parameters%BXAJ = BXAJ_TABLE(SOILTYPE)
+    parameters%XXAJ = XXAJ_TABLE(SOILTYPE)
 #endif
-
 ! ----------------------------------------------------------------------
 ! Transfer GENPARM parameters
 ! ----------------------------------------------------------------------
@@ -1505,7 +1514,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: RIVERCONDXY !river conductance
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: PEXPXY      !factor for river conductance
 
-    INTEGER,  INTENT(OUT) , OPTIONAL :: STEPWTD
+    INTEGER,  INTENT(INOUT) , OPTIONAL :: STEPWTD
     REAL, INTENT(IN) , OPTIONAL :: DT, WTDDT
 
 !jref:start
