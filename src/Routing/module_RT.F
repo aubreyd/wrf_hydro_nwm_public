@@ -43,6 +43,7 @@ MODULE module_Routing
    use hashtable
    use iso_fortran_env, only: int64
    use module_river_temperature, only: river_temperature
+   use disaggregateWeatherModule, only: fineWeatherData
 #ifdef OUTPUT_CHAN_CONN
 #ifdef MPP_LAND
    use mpi
@@ -903,7 +904,7 @@ subroutine LandRT_ini(did)
    end do
    
    !-- Reza's code goes here to be initialized
-   !-- This will be finalized
+   !fineWeatherData%init (...)
    call river_temperature%run()
    
 
