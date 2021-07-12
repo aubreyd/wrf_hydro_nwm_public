@@ -277,7 +277,7 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:,:)   :: TSLB_1D_fine
    REAL,    allocatable, DIMENSION(:,:)   :: T_QSUM
    ! NEW FOR module_channel_routing.F
-   REAL,    allocatable, DIMENSION(:,:)   :: XS_Peremeter 
+   REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter 
    REAL                                   :: ChanCondConst 
    
    
