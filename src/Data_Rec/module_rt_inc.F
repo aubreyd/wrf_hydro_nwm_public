@@ -158,6 +158,11 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)      :: Tw     ! top width of channel
   REAL, allocatable, DIMENSION(:)      :: Tw_CC  ! top width of the (CC) compound channel
   REAL, allocatable, DIMENSION(:)      :: n_CC   ! mannings N of (CC) compound channel
+  REAL, allocatable, DIMENSION(:)      :: C_Emb    ! Embeddedness coefficient (fraction 0-1)
+  REAL, allocatable, DIMENSION(:)      :: P_Size   ! Particle size (mm)
+  REAL, allocatable, DIMENSION(:)      :: F_Shade  ! Shading factor (0 to 1)
+  REAL, allocatable, DIMENSION(:)      :: S_Albedo ! Surface albedo (0-1)
+  REAL, allocatable, DIMENSION(:)      :: C_Cloud  ! Cloudiness (0-1)
   REAL, allocatable, DIMENSION(:,:)    :: QLINK      !flow in link
   integer, allocatable, DIMENSION(:)   :: ascendIndex !sorting of routelink
 #ifdef WRF_HYDRO_NUDGING
@@ -167,6 +172,7 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)      :: ZELEV      !elevation of nodes for channel
   INTEGER, allocatable, DIMENSION(:)   :: CHANXI,CHANYJ !map chan to fine grid
   REAL,  DIMENSION(50)     :: BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann !Channel parms from table
+  REAL,  DIMENSION(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud            !Channel parms from table - new
   REAL,  DIMENSION(50)     :: TOPWIDCC, NCC  !topwidth and mannings n of compund
 
   ! VARIABLES FOR  RESERVOIRS
