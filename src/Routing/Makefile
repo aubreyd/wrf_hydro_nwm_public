@@ -23,7 +23,7 @@ OBJS = \
 	module_NWM_io_dict.o \
 	module_NWM_io.o \
         module_reservoir_routing.o \
-	Module riverTemperatureExecutor.o
+	module riverTemperatureExecutor.o
 
 all:	$(OBJS)
 
