@@ -122,12 +122,13 @@ subroutine river_temperature_destroy(this)
 ! ------------------------------------------------
 !   SUBROUTINE RIVER_TEMPERATURE_SOLVER
 ! ------------------------------------------------
-Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, V_w, W_w, Q_str, Q_GW, &
+Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, V_w, W_w, Q_str, Q_GW, &
 								Q_Trib, T_GW, T_hyp, T_Trib, albedo, SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, &
 								CH_NETRT, QLINK, DT_STEPS, DTCT, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
 	implicit none
+        class(river_temperature), INTENT(inout)             :: this
 	! -------- DECLARATIONS ------------------------
-	REAL, INTENT(IN)     :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
+        INTEGER, INTENT(IN)  :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
 	INTEGER, INTENT(IN)  :: dt			! time intervals which in most of cases should be 1 hour           - ??? should be based on the hydraulic routing module
 	!INTEGER, INTENT(IN) :: t 			! the current and previous time steps for the simulation, t=2
 	INTEGER, INTENT(IN)  :: totLength          	! Total length (# of cells) of the domain for simulation -===========================> NLINKS
