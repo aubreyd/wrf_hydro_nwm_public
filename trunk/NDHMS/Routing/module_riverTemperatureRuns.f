@@ -51,8 +51,8 @@ subroutine riverTemperature_run(this, did)
 						rt_domain(did)%IXRT,       &
 						rt_domain(did)%JXRT,       &
 						!weather2d,                 &
-						weather2d%T2,             &  
-						weather2d%short,          &
+						weather2d%T2,              &  
+						weather2d%short,           &
 						weather2d%q2x,	           &
 						weather2d%u,	           &   
 		                                rt_domain(did)%NLINKS,	   &
@@ -67,7 +67,8 @@ subroutine riverTemperature_run(this, did)
 						nlst(did)%AGGFACTRT                                   &
                             )
          
-  call riverTempSolver%runRiverTempModel(nlst(did)%dxrt0,		&
+  call riverTempSolver%runRiverTempModel(this,                          &
+                                        nlst(did)%dxrt0,		&
 					rt_domain(did)%DT_STEPS,        &
 					rt_domain(did)%IXRT,            &                 
 					rt_domain(did)%JXRT,            &
