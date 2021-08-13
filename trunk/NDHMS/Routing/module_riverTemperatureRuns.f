@@ -50,11 +50,11 @@ subroutine riverTemperature_run(this, did)
                            			rt_domain(did)%JX,         &
 						rt_domain(did)%IXRT,       &
 						rt_domain(did)%JXRT,       &
-						weather2d,                 &
-						!weather2d%T2,             &  
-						!weather2d%short,          &
-						!weather2d%q2x,	           &
-						!weather2d%u,	           &   
+						!weather2d,                 &
+						weather2d%T2,             &  
+						weather2d%short,          &
+						weather2d%q2x,	           &
+						weather2d%u,	           &   
 		                                rt_domain(did)%NLINKS,	   &
 						rt_domain(did)%CH_NETRT,   &
 						rt_domain(did)%CHANXI,	   & 
