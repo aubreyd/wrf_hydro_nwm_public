@@ -39,7 +39,7 @@ type  :: fineWeatherData
 
 	procedure :: init => fineWeatherData_init
         procedure :: destroy => fineWeatherData_destroy
-        procedure :: run => fineWeatherData_run
+        !procedure :: run => fineWeatherData_run
 	procedure :: runWeatherDisagg => disaggregateWeather
 		
 end type fineWeatherData
@@ -109,17 +109,17 @@ end subroutine fineWeatherData_destroy
 
 ! --------------------------------------------------------------------------
 
-!subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, windSpd, &
-!                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
-			
-subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, weather2d_local, &
+subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, windSpd, &
                                NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
+			
+!subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, weather2d_local, &
+!                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
     implicit none
     class(fineWeatherData), intent(inout)                ::    this
     ! Input Variables ------------------------------------------------------------------------						   
     integer                    		       :: IX, JX, IXRT, JXRT, NLINKS, nsoil, AGGFACTRT
-    !REAL, INTENT(IN), DIMENSION(IX,JX)	       :: Tair, SolarRad, RelH, windSpd,
-    REAL, INTENT(IN), DIMENSION(IX,JX)	       :: weather2d_local
+    REAL, INTENT(IN), DIMENSION(IX,JX)	       :: Tair, SolarRad, RelH, windSpd
+    !REAL, INTENT(IN), DIMENSION(IX,JX)	       :: weather2d_local
     REAL, INTENT(IN), DIMENSION(IX,JX)	       :: TMN, TSK
     REAL, INTENT(IN), DIMENSION(IX,1:nsoil,JX) :: TSLB
     INTEGER,INTENT(in), DIMENSION(IXRT,JXRT)   :: CH_NETRT, LAKE_MSKRT
@@ -144,10 +144,15 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, weather2d_local, &
 						IXXRT = I * AGGFACTRT - AGGFACXRT ! Define fine grid i
 						JYYRT = J * AGGFACTRT - AGGFACYRT ! Define fine grid j
 						
-						Tair_fine(IXXRT,JYYRT) = weather_2d_input(I,J)%Tair
-						SolarRad_fine(IXXRT,JYYRT) = weather_2d_input(I,J)%SolarRad
-						RelH_fine(IXXRT,JYYRT) = weather_2d_input(I,J)%RelH
-						windSpd_fine(IXXRT,JYYRT) = weather_2d_input(I,J)%wind_speed
+						!Tair_fine(IXXRT,JYYRT) = weather2d_local(I,J)%Tair
+						!SolarRad_fine(IXXRT,JYYRT) = weather2d_local(I,J)%SolarRad
+						!RelH_fine(IXXRT,JYYRT) = weather2d_local(I,J)%RelH
+						!windSpd_fine(IXXRT,JYYRT) = weather2d_local(I,J)%wind_speed
+
+						Tair_fine(IXXRT,JYYRT) =Tair(I,J)
+						SolarRad_fine(IXXRT,JYYRT) = SolarRad(I,J)
+						RelH_fine(IXXRT,JYYRT) = RelH(I,J)
+						windSpd_fine(IXXRT,JYYRT) = windSpd(I,J)
 						
 						TMN_fine(IXXRT,JYYRT)  = TMN(I,J)
 						TSK_fine(IXXRT,JYYRT)  = TSK(I,J)

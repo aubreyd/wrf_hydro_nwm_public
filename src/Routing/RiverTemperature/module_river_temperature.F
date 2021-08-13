@@ -31,7 +31,7 @@ type  :: river_temperature
      contains
      procedure :: init => river_temperature_init
      procedure :: destroy => river_temperature_destroy
-     procedure :: run => river_temperature_run
+     !procedure :: run => river_temperature_run
      procedure :: runRiverTempModel => river_TEMPERATURE_SOLVER
 
 end type river_temperature
@@ -127,7 +127,7 @@ Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_
 								CH_NETRT, QLINK, DT_STEPS, DTCT, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
 	implicit none
 	! -------- DECLARATIONS ------------------------
-	INTEGER, INTENT(IN)  :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
+	REAL, INTENT(IN)     :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
 	INTEGER, INTENT(IN)  :: dt			! time intervals which in most of cases should be 1 hour           - ??? should be based on the hydraulic routing module
 	!INTEGER, INTENT(IN) :: t 			! the current and previous time steps for the simulation, t=2
 	INTEGER, INTENT(IN)  :: totLength          	! Total length (# of cells) of the domain for simulation -===========================> NLINKS
@@ -154,7 +154,6 @@ Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_
 	! Shading related parameters
 	REAL, INTENT(IN), DIMENSION(:)    :: albedo		! albedo at the stream surface (0 to 1)						- ???
 	REAL, INTENT(IN), DIMENSION(:)    :: SF			! Shading factor for each grid of the reach					- ???
-	REAL, INTENT(IN), DIMENSION(:)    :: vts 		! View to sky factor (1-SF)								
 	! Fluxes
 	REAL                              :: SW_rad		! Shortwave radiation flux (W/m2)
 	REAL                              :: LW_rad		! Longwave radiation flux (W/m2)
@@ -196,7 +195,7 @@ Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_
 	REAL,    INTENT(IN),    DIMENSION(totLength,2)        :: QLINK
 	INTEGER, INTENT(in)                                   :: DT_STEPS               !-- number of timestep in routing
 	REAL,    INTENT(in)                                   :: DTCT
-	REAL,   INTENT(in),    DIMENSION(:)                  :: node_area
+	REAL,    INTENT(in),    DIMENSION(:)                   :: node_area
 	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
@@ -205,8 +204,9 @@ Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_
         ! Simulated water temeprature (C)
 	REAL,                   DIMENSION(totLength,2)        :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
         REAL                                                  :: Q_strTot, T_strTot 
-		
-	vts = 1. - SF
+	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)								
+	
+	viewSky = 1. - SF
         ! ++++++++++++++++++++++++++++update this part
 	! Assigning the upstream water temeprature boundary condition to the main matrix
 		
@@ -429,7 +429,7 @@ Subroutine river_TEMPERATURE_SOLVER(dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_
       Do i = 1 , totLength
 		! Calculate the heat fluxes
 		SW_rad = SW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), s_in, SF, albedo)
-		LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim, T_a, H, C_L, vts)	
+		LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim, T_a, H, C_L, viewSky)	
 		LH     = LatentHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_elv)
 		SH     = SensibleHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim, LH, T_a, H, z_elv)
 		CH     = BedSediment_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)),  dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
@@ -564,7 +564,7 @@ end function SW_RAD_FLUX
 !   FUNCTION Longwave radiation flux
 ! ------------------------------------------------
 
-real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, vts)
+real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky)
 	! Longwav radiation flux for the desired time step and grid
 	implicit none
 
@@ -578,7 +578,7 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, vts)
 	REAL    :: LW_Back	! Back radiation
         INTEGER :: space        ! The node we are calculating the flux for that
         REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
-        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, C_L, vts 
+        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, C_L, viewSky 
         
 	SBConst = 0.000000056696;	! Initializing the Stefan-Boltzman constant
 
@@ -603,9 +603,9 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, vts)
 	
 	! Atmospheric Longwave Radiation Flux Attenuated in Water Column 
 	! (Benyahya et al.,2010; Boyd and Kasper, 2003; Westhoff et al., 2007, 2011)
-	LW_Atm = 0.96 * emis * SBConst * ((T_a(space) + 273.2)**4.0) * vts(space)
+	LW_Atm = 0.96 * emis * SBConst * ((T_a(space) + 273.2)**4.0) * viewSky(space)
 	! Land cover longwave radiation (Boyd and Kasper, 2003; Westhoff et al., 2007)
-	LW_LC = 0.96 * (1.0 - vts(space)) * 0.96 * SBConst * ((T_a(space) + 273.2) ** 4.0)
+	LW_LC = 0.96 * (1.0 - viewSky(space)) * 0.96 * SBConst * ((T_a(space) + 273.2) ** 4.0)
 	! Back radiation
 	! (Boyd and Kasper, 2003; Evans et al., 1998; Kim and Chapra, 1997; Ouellet et al., 2014; Westhoff et al., 2007)
 	LW_Back = -0.96 * SBConst * (StrTemp ** 4.0)
