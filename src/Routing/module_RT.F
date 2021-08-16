@@ -42,8 +42,8 @@ MODULE module_Routing
    use module_hydro_stop, only: HYDRO_stop
    use hashtable
    use iso_fortran_env, only: int64
-   use module_river_temperature, only: river_temperature
-   use disaggregateWeatherModule, only: fineWeatherData
+   use module_river_temperature, only: river_temperature_type
+   use disaggregateWeatherModule, only: fineWeatherData_type
 #ifdef OUTPUT_CHAN_CONN
 #ifdef MPP_LAND
    use mpi
@@ -693,6 +693,7 @@ subroutine LandRT_ini(did)
   integer :: lake_index, NLAKES_total
 
   real,  dimension(50)     :: BOTWID, TOPWID, HLINK_INIT, CHAN_SS, CHMann !Channel parms from table
+  real,  dimension(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud        ! Channel params for river temp.
   real,  dimension(50)     :: TOPWIDCC, NCC    !channnel params of compound
   real,  dimension(50)     :: CHANN_K ! Channel infiltration param
   integer :: i,j,k, ll, count
@@ -914,7 +915,7 @@ subroutine LandRT_ini(did)
    end do
    
    !-- Reza's code goes here to be initialized
-   call fineWeatherData%init (                      &
+   call fineWeatherData_type%init (                      &
                    rt_domain(did)%Tair_fine_1D,     &
 		   rt_domain(did)%RelH_fine_1D,     &
 		   rt_domain(did)%windSpd_fine_1D,  &
@@ -923,7 +924,7 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%TSK_1D_fine,      &
 		   rt_domain(did)%TSLB_1D_fine      &
 		   )
-   call river_temperature%init(rt_domain(did)%T_QSUM)
+   call river_temperature_type%init(rt_domain(did)%T_QSUM)
 
    !ADCHANGE: Add lake reach output
 #ifdef HYDRO_D
@@ -1773,7 +1774,7 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%S_Albedo (j) = SAlbedo (5)
               endif
 	      if(rt_domain(did)%C_Cloud (j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud (j) = C_Cloud (5)
+                 rt_domain(did)%C_Cloud (j) = CCloud (5)
               endif
            endif
 
