@@ -22,7 +22,7 @@ MODULE module_river_temperature
 	!use config_base, only: nlst
 	IMPLICIT NONE
 		
-type  :: river_temperature
+type  :: river_temperature_type
 		!type (temperature_sim_H_inputs), pointer :: hydraulics_sim => null() 
 		!type (fineWeatherData), pointer :: weather_sim => null() 
 
@@ -34,7 +34,7 @@ type  :: river_temperature
      !procedure :: run => river_temperature_run
      procedure :: runRiverTempModel => river_TEMPERATURE_SOLVER
 
-end type river_temperature
+end type river_temperature_type
 
 REAL, parameter ::  rho_water = 1000.
 REAL, parameter ::  c_water = 4182.
@@ -51,7 +51,7 @@ contains
 subroutine river_temperature_init(this, T_QSUM)
 
 	implicit none
-	class(river_temperature), INTENT(inout)       :: this              ! the type object being initialize
+	class(river_temperature_type), INTENT(inout)       :: this              ! the type object being initialize
         REAL, INTENT(inout), DIMENSION(:)             :: T_QSUM        
 		
 end subroutine river_temperature_init
@@ -59,7 +59,7 @@ end subroutine river_temperature_init
 ! river_temperature Destructor
 subroutine river_temperature_destroy(this)
         implicit none
-        class(river_temperature), intent(inout) :: this ! object being destroyed
+        class(river_temperature_type), intent(inout) :: this ! object being destroyed
  end subroutine river_temperature_destroy
 
 ! --------------------------------------------------------------------------
@@ -126,7 +126,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
 								Q_Trib, T_GW, T_hyp, T_Trib, albedo, SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, &
 								CH_NETRT, QLINK, DT_STEPS, DTCT, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
 	implicit none
-        class(river_temperature), INTENT(inout)             :: this
+        class(river_temperature_type), INTENT(inout)             :: this
 	! -------- DECLARATIONS ------------------------
         INTEGER, INTENT(IN)  :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
 	INTEGER, INTENT(IN)  :: dt			! time intervals which in most of cases should be 1 hour           - ??? should be based on the hydraulic routing module

@@ -23,13 +23,13 @@ use module_lsm_forcing, only: weather2d
 use config_base, only: noah_lsm, nlst
 use module_NoahMP_hrldas_driver
 use module_RT_data, only: rt_domain
-use disaggregateWeatherModule, only: fineWeatherData
-use module_river_temperature, only: river_temperature
+use disaggregateWeatherModule, only: fineWeatherData_type
+use module_river_temperature, only: river_temperature_type
 
 type  :: riverTemperatureRuns
 	    
-	type (fineWeatherData), pointer   :: weatherDisaggregate => null()
-	type (river_temperature), pointer :: riverTempSolver => null()
+	type (fineWeatherData_type), pointer   :: weatherDisaggregate => null()
+	type (river_temperatur_typee), pointer :: riverTempSolver => null()
 
     contains
 	procedure :: riverTemp_run => riverTemperature_run

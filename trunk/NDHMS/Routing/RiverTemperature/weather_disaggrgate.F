@@ -24,7 +24,7 @@ MODULE disaggregateWeatherModule
 
 IMPLICIT NONE
 	
-type  :: fineWeatherData
+type  :: fineWeatherData_type
 	    !INTEGER                                  :: NLINKS
             REAL, DIMENSION(:), allocatable          :: TAIR_FINE_1D, RELH_FINE_1D, WINDSPD_FINE_1D, SOLARRAD_FINE_1D
             REAL, DIMENSION(:), allocatable          :: TMN_1D_FINE, TSLB_1D_FINE, TSK_1D_FINE
@@ -42,7 +42,7 @@ type  :: fineWeatherData
         !procedure :: run => fineWeatherData_run
 	procedure :: runWeatherDisagg => disaggregateWeather
 		
-end type fineWeatherData
+end type fineWeatherData_type
 	
 ! --------------------------------------------------------------------------
 contains 
@@ -50,7 +50,7 @@ contains
 subroutine fineWeatherData_init(this, Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, &
 				SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine)
 	implicit none
-	class(fineWeatherData), intent(inout)       :: this                   ! the type object being initialized
+	class(fineWeatherData_type), intent(inout)       :: this                   ! the type object being initialized
 	!character(len=20)                           :: Reach_number_string
 
 	REAL,    INTENT(inout), DIMENSION(:)        :: Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D
@@ -73,7 +73,7 @@ end subroutine fineWeatherData_init
 	! fineWeatherData Destructor
 subroutine fineWeatherData_destroy(this)
       implicit none
-      class(fineWeatherData), intent(inout) :: this ! object being destroyed
+      class(fineWeatherData_type), intent(inout) :: this ! object being destroyed
 end subroutine fineWeatherData_destroy
 
 ! --------------------------------------------------------------------------
@@ -115,7 +115,7 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
 !subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, weather2d_local, &
 !                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
     implicit none
-    class(fineWeatherData), intent(inout)                ::    this
+    class(fineWeatherData_type), intent(inout)                ::    this
     ! Input Variables ------------------------------------------------------------------------						   
     integer                    		       :: IX, JX, IXRT, JXRT, NLINKS, nsoil, AGGFACTRT
     REAL, INTENT(IN), DIMENSION(IX,JX)	       :: Tair, SolarRad, RelH, windSpd
