@@ -23,8 +23,11 @@ use module_lsm_forcing, only: weather2d
 use config_base, only: noah_lsm, nlst
 use module_NoahMP_hrldas_driver
 use module_RT_data, only: rt_domain
-use disaggregateWeatherModule, only: fineWeatherData_type
-use module_river_temperature, only: river_temperature_type
+use disaggregateWeatherModule, only: fineWeathData
+use module_river_temperature, only: riverTemp
+
+implicit none
+
 
 type  :: riverTemperatureRuns
 	    
@@ -36,6 +39,7 @@ type  :: riverTemperatureRuns
         
 end type riverTemperatureRuns
 
+type(riverTemperatureRuns) :: riverTempRuns
 
 contains 
 
@@ -45,7 +49,7 @@ subroutine riverTemperature_run(this, did)
 	INTEGER                                          ::  did  ! for the rt_domain
   	class(riverTemperatureRuns), intent(inout)       ::  this
   
-	call weatherDisaggregate%runWeatherDisagg (this,                   &
+	call fineWeathData%runWeatherDisagg (this,                   &
                            			rt_domain(did)%IX,         &
                            			rt_domain(did)%JX,         &
 						rt_domain(did)%IXRT,       &
@@ -67,7 +71,7 @@ subroutine riverTemperature_run(this, did)
 						nlst(did)%AGGFACTRT                                   &
                             )
          
-  call riverTempSolver%runRiverTempModel(this,                          &
+  call riverTemp%runRiverTempModel(this,                          &
                                         nlst(did)%dxrt0,		&
 					rt_domain(did)%DT_STEPS,        &
 					rt_domain(did)%IXRT,            &                 
