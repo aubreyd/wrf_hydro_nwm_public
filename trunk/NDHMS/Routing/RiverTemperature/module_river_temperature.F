@@ -21,7 +21,8 @@ MODULE module_river_temperature
 	!use module_RT_data, only: rt_domain
 	!use config_base, only: nlst
 	IMPLICIT NONE
-		
+
+
 type  :: river_temperature_type
 		!type (temperature_sim_H_inputs), pointer :: hydraulics_sim => null() 
 		!type (fineWeatherData), pointer :: weather_sim => null() 
@@ -35,6 +36,8 @@ type  :: river_temperature_type
      procedure :: runRiverTempModel => river_TEMPERATURE_SOLVER
 
 end type river_temperature_type
+
+type(river_temperature_type)  :: riverTemp
 
 REAL, parameter ::  rho_water = 1000.
 REAL, parameter ::  c_water = 4182.

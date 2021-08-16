@@ -41,8 +41,8 @@ MODULE module_Routing
    use module_rfc_forecasts, only: rfc_forecasts
    use module_hydro_stop, only: HYDRO_stop
    use hashtable
-   use module_river_temperature, only: river_temperature_type	
-   use disaggregateWeatherModule, only: fineWeatherData_type
+   use module_river_temperature, only: riverTemp
+   use disaggregateWeatherModule, only: fineWeathData
    
 
    IMPLICIT NONE
@@ -904,7 +904,7 @@ subroutine LandRT_ini(did)
    end do
    
    !-- Reza's code goes here to be initialized
-   call fineWeatherData_type%init (                      &
+   call fineWeathData%init (                      &
                    rt_domain(did)%Tair_fine_1D,     &
 		   rt_domain(did)%RelH_fine_1D,     &
 		   rt_domain(did)%windSpd_fine_1D,  &
@@ -913,7 +913,7 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%TSK_1D_fine,      &
 		   rt_domain(did)%TSLB_1D_fine      &
 		   )
-   call river_temperature_type%init(rt_domain(did)%T_QSUM)
+   call riverTemp%init(rt_domain(did)%T_QSUM)
 
    !ADCHANGE: Add lake reach output
 #ifdef HYDRO_D

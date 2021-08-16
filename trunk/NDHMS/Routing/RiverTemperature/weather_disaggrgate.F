@@ -23,7 +23,7 @@ MODULE disaggregateWeatherModule
 !use module_RT_data, only: rt_domain
 
 IMPLICIT NONE
-	
+
 type  :: fineWeatherData_type
 	    !INTEGER                                  :: NLINKS
             REAL, DIMENSION(:), allocatable          :: TAIR_FINE_1D, RELH_FINE_1D, WINDSPD_FINE_1D, SOLARRAD_FINE_1D
@@ -43,6 +43,8 @@ type  :: fineWeatherData_type
 	procedure :: runWeatherDisagg => disaggregateWeather
 		
 end type fineWeatherData_type
+
+type(fineWeatherData_type) :: fineWeathData
 	
 ! --------------------------------------------------------------------------
 contains 
