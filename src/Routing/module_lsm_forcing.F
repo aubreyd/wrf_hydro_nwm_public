@@ -30,7 +30,7 @@ implicit none
 #include <netcdf.inc>
     integer :: i_forcing
 character(len=19) out_date
-type(weather_2D_inputs), allocatable :: weather2d(:,:) 
+ 
 
 interface read_hydro_forcing
 #ifdef MPP_LAND
@@ -56,7 +56,7 @@ type :: weather_2D_inputs
       procedure :: destroy => weather_2D_inputs_destroy
                 
 end type weather_2D_inputs
-
+type(weather_2D_inputs), allocatable :: weather2d(:,:)
 
 Contains
 
