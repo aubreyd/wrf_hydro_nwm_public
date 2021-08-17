@@ -17,13 +17,14 @@ OBJS = \
 	Noah_distr_routing.o \
 	Noah_distr_routing_overland.o \
 	Noah_distr_routing_subsurface.o \
+	module_riverTemperatureRuns.o \
 	module_channel_routing.o \
 	module_lsm_forcing.o \
 	module_date_utilities_rt.o \
 	module_NWM_io_dict.o \
 	module_NWM_io.o \
-        module_reservoir_routing.o \
-	module_riverTemperatureRuns.o
+	module_reservoir_routing.o 
+
 
 all:	$(OBJS)
 
@@ -108,7 +109,8 @@ else
 module_channel_routing.o: module_UDMAP.o\
 			  ../nudging/module_date_utils_nudging.o \
 		          ../nudging/module_nudging_utils.o \
-			  ../nudging/module_stream_nudging.o
+			  ../nudging/module_stream_nudging.o \ 
+			  module_riverTemperatureRuns.o 
 endif
 
 clean:
