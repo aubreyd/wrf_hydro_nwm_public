@@ -113,5 +113,10 @@ module_channel_routing.o: module_UDMAP.o\
 			  module_riverTemperatureRuns.o 
 endif
 
+module_riverTemperatureRuns.o: module_lsm_forcing.o \
+			       ../Land_models/NoahMP/IO_code/module_NoahMP_hrldas_driver.o
+
+
+
 clean:
 	rm -f *.o *.mod *.stb *~
