@@ -71,12 +71,12 @@ subroutine weather_2D_inputs_init(this, IX, JX, T2, q2x, u, short)
 	REAL,    INTENT(in), DIMENSION(:,:) :: short		! Shortwave radiation
 
 	! Assign the values passed in to a particular
-	this%IX        = IX
-	this%JX        = JX
-	this%T2        = T2
-	this%q2x       = q2x
-	this%u         = u
-	this%short     = short
+	!this%IX        = IX
+	!this%JX        = JX
+	!this%T2        = T2
+	!this%q2x       = q2x
+	!this%u         = u
+	!this%short     = short
 
 end subroutine weather_2D_inputs_init
 
