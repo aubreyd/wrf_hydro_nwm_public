@@ -1,3 +1,4 @@
+
 !  Program Name:
 !  Author(s)/Contact(s):
 !  Abstract:
@@ -1339,6 +1340,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
            !-- Reza's update goes in here:
            !-- The RUN function should be called here. 
 	   ! Run the subroutine to diaggregate
+           rt_domain(did)%QSUM = QSUM
            call riverTempRuns%riverTemp_run(did)
 
 	   

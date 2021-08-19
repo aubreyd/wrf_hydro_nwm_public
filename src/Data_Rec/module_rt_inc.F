@@ -288,7 +288,8 @@ module module_rt_inc
    !-- to get the temperature data from NoahMP
    REAL,    allocatable, DIMENSION(:,:)   :: TMN
    REAL,    allocatable, DIMENSION(:,:)   :: TSK
-   REAL,    allocatable, DIMENSION(:,:,:)  :: TSLB
+   REAL,    allocatable, DIMENSION(:,:,:) :: TSLB
+   REAL,    allocatable, DIMENSION(:)     :: QSUM     !--mass bal of node
 
    
    END TYPE RT_FIELD

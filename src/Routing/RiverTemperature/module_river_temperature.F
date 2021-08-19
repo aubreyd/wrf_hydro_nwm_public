@@ -125,14 +125,15 @@ subroutine river_temperature_destroy(this)
 ! ------------------------------------------------
 !   SUBROUTINE RIVER_TEMPERATURE_SOLVER
 ! ------------------------------------------------
-Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, V_w, W_w, Q_str, Q_GW, &
-								Q_Trib, T_GW, T_hyp, T_Trib, albedo, SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, &
-								CH_NETRT, QLINK, DT_STEPS, DTCT, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
+Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, V_w, W_w, Q_str, Q_GW, &
+				Q_Trib, T_GW, T_hyp, T_Trib, albedo, SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, &
+				CH_NETRT, QLINK, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
 	! -------- DECLARATIONS ------------------------
-        INTEGER, INTENT(IN)  :: dx			! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
-	INTEGER, INTENT(IN)  :: dt			! time intervals which in most of cases should be 1 hour           - ??? should be based on the hydraulic routing module
+        REAL, INTENT(IN)  :: dx		! Space intervals which should be based on the HYDRO grid size  -===================> CHANLEN 
+	REAL, INTENT(IN)  :: DT		! time intervals which in most of cases should be 1 hour           - ??? should be based on the hydraulic routing module
+	REAL, INTENT(IN)  :: DTCT
 	!INTEGER, INTENT(IN) :: t 			! the current and previous time steps for the simulation, t=2
 	INTEGER, INTENT(IN)  :: totLength          	! Total length (# of cells) of the domain for simulation -===========================> NLINKS
 	INTEGER, INTENT(IN)  :: IXRT, JXRT
@@ -172,7 +173,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
 	REAL			          :: k_s		! Composite Substrate Hydraulic Conductivity (m/s) 
 	REAL, INTENT(IN),    DIMENSION(:) :: C_E		! Embeddedness                                                                    - As an input
 	REAL, INTENT(IN),    DIMENSION(:) :: P_s		! Substrate particle size (mm)
-	REAL, INTENT(IN),    DIMENSION(:) :: k_s_0		! Dominant Substrate Hydraulic Conductivity (m/s)                                 ===========> ChanCondConst
+	REAL, INTENT(IN)                  :: k_s_0              ! Dominant Substrate Hydraulic Conductivity (m/s)                                 ===========> ChanCondConst
 		
 	REAL                              :: h_D		! Hydraulic Head for Darcy Calculation at location i (m)
 	REAL                              :: h_D_dn		! Hydraulic Head for Darcy Calculation at location i+1 (m)
@@ -197,8 +198,6 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
         INTEGER, INTENT(IN),    DIMENSION(:,:)                :: CH_NETRT
 	REAL,                   DIMENSION(totLength)          :: QLateral
 	REAL,    INTENT(IN),    DIMENSION(totLength,2)        :: QLINK
-	INTEGER, INTENT(in)                                   :: DT_STEPS               !-- number of timestep in routing
-	REAL,    INTENT(in)                                   :: DTCT
 	REAL,    INTENT(in),    DIMENSION(:)                   :: node_area
 	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
@@ -208,9 +207,12 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
         ! Simulated water temeprature (C)
 	REAL,                   DIMENSION(totLength,2)        :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
         REAL                                                  :: Q_strTot, T_strTot 
-	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)								
+	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)							      
+        REAL                                                  :: DT_STEPS               !-- number of timestep in routing
+	
 	
 	viewSky = 1. - SF
+        DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
         ! ++++++++++++++++++++++++++++update this part
 	! Assigning the upstream water temeprature boundary condition to the main matrix
 		
@@ -219,7 +221,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
 	Do i = 1, totLength
 		! Find hyporheic fluxes
 		! Ratio Conductivity of dominant sunstrate
-		Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
+		!Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
+	        Dummy1 = k_s_0 * (1.0 - C_E(i))
 
 	       ! Ratio Conductivity of sand - low range
 	       ! 0.00002 is the embedded Substrate Hydraulic Conductivity for Silt/Sand (m/s)
@@ -446,7 +449,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, dt, IXRT, JXRT,  T_a, H, V_wind, C
 
 		! For the first time step, where the temperature is not calculated for that time step yet:
 		! This is impprtant though! As, basically, here I am definig the upstream boundary condition.
-		if ((BC_Grid(CH_NETLNK(CHANXI(i),CHANYJ(i))) .eq. 1) .and. (dt .eqv. 1)) then		! -- somethoing like this if statement.
+		if ((BC_Grid(CH_NETLNK(CHANXI(i),CHANYJ(i))) .eq. 1) .and. (dt .eq. 1.)) then		! -- somethoing like this if statement.
 		! => changed this one for my example, but not sure if it should be the same for the WRF-Hydro inputs, THE ISSUE WITH CH-NETLINK
 		T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1) =(Q_Trib(CHANXI(i),CHANYJ(i))*(T_Trib(i)-273.1)+ &                 
 							 Q_GW(CHANXI(i),CHANYJ(i))*(T_GW(i)-273.1)+ &
@@ -754,8 +757,8 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
 	REAL  :: Sed_Density		! Substrate Density (kg/m3)
 	REAL  :: HeatCapacity		! Volumetric Weighted Specific Heat Capacity (J/kgC)
 	REAL  :: Sed_HeatCapacity	! Substrate Specific Heat Capacity (J/kgC)
-        REAL  :: Ratio_H2O 
-        INTEGER :: space, dx
+        REAL  :: Ratio_H2O, dx  
+        INTEGER :: space
         REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  P_s, C_E, Pw_river, T_bed
 	

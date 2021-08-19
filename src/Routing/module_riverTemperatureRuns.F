@@ -59,9 +59,9 @@ subroutine riverTemperature_run(this, did)
 						weather2d%q2x,	           &
 						weather2d%u,	           &   
 						rt_domain(did)%NLINKS,	   &
-						rt_domain(did)%CH_NETRT,   &
-						rt_domain(did)%CHANXI,	   & 
-						rt_domain(did)%CHANYJ,	   &
+						rt_domain(did)%overland%streams_and_lakes%CH_NETRT,    &
+						rt_domain(did)%CHANXI,	                               & 
+						rt_domain(did)%CHANYJ,	                               &
 						rt_domain(did)%overland%streams_and_lakes%lake_mask,   &
 						!module_NoahMP_hrldas_driver%TMN,                      &
 						!module_NoahMP_hrldas_driver%TSK,                      &
@@ -73,9 +73,9 @@ subroutine riverTemperature_run(this, did)
 						nlst(did)%AGGFACTRT                                    &
                                                 )
          
-  call riverTemp%runRiverTempModel(this,        	&
-                    nlst(did)%dxrt0,		        &
-					rt_domain(did)%DT_STEPS,        &
+  call riverTemp%runRiverTempModel(     nlst(did)%dxrt0,                &
+					nlst(did)%DT,                   &
+					nlst(did)%DTCT,	                &
 					rt_domain(did)%IXRT,            &                 
 					rt_domain(did)%JXRT,            &
 					rt_domain(did)%Tair_fine_1D,    &
@@ -89,10 +89,10 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%ChSSlp,	        &
 					rt_domain(did)%ZELEV,	        &
 					rt_domain(did)%velocity,        &
-					rt_domain(did)%Tw,        		&
+					rt_domain(did)%Tw,        	&
 					rt_domain(did)%QSUM,	        &
 					rt_domain(did)%QINFLOWBASE,     & 
-					rt_domain(did)%QSTRMVOLRT,      &
+					rt_domain(did)%QSTRMVOLRT_TS,   &
 					rt_domain(did)%TMN_1D_fine,     &
 					rt_domain(did)%TSLB_1D_fine,    &
 					rt_domain(did)%TSK_1D_fine,     &
@@ -104,10 +104,8 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%CHANXI,          &
 					rt_domain(did)%CHANYJ,	        &
 					rt_domain(did)%CH_NETLNK,       &
-					rt_domain(did)%CH_NETRT,        &
+					rt_domain(did)%overland%streams_and_lakes%CH_NETRT,        &
 					rt_domain(did)%QLINK,	        &
-					rt_domain(did)%DT_STEPS,        & 
-					rt_domain(did)%DTCT,	        &
 					rt_domain(did)%node_area,       &
 					rt_domain(did)%TO_NODE,	        &
 					rt_domain(did)%TYPEL,	        &
