@@ -2784,6 +2784,11 @@ subroutine define_rst_variables(ncid, state)
 
    end subroutine define_rst_variables
 
+!-- added by Reza to be used in the river temperature modules
+RT_DOMAIN%TMN = TMN
+RT_DOMAIN%TSK = TSK
+RT_DOMAIN%TSLB = TSLB
+
 end module module_NoahMP_hrldas_driver
 
 !subroutine wrf_message(msg)

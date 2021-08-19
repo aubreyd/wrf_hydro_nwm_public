@@ -285,7 +285,11 @@ module module_rt_inc
    ! NEW FOR module_channel_routing.F
    REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter 
    REAL                                   :: ChanCondConst 
-   
+   !-- to get the temperature data from NoahMP
+   REAL,    allocatable, DIMENSION(:,:)   :: TMN
+   REAL,    allocatable, DIMENSION(:,:)   :: TSK
+   REAL,    allocatable, DIMENSION(:,:,:)  :: TSLB
+
    
    END TYPE RT_FIELD
 end module module_rt_inc

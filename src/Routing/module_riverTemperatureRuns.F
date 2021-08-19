@@ -21,7 +21,7 @@ Module riverTemperatureExecutor
 
 use module_lsm_forcing, only: weather2d
 use config_base, only: noah_lsm, nlst
-use module_NoahMP_hrldas_driver
+!use module_NoahMP_hrldas_driver
 use module_RT_data, only: rt_domain
 use disaggregateWeatherModule, only: fineWeathData
 use module_river_temperature, only: riverTemp
@@ -31,8 +31,8 @@ implicit none
 
 type  :: riverTemperatureRuns
 	    
-	type (fineWeatherData_type), pointer   :: weatherDisaggregate => null()
-	type (river_temperatur_typee), pointer :: riverTempSolver => null()
+	!type (fineWeathData), pointer   :: weatherDisaggregate => null()
+	!type (riverTemp), pointer       :: riverTempSolver => null()
 
     contains
 	procedure :: riverTemp_run => riverTemperature_run
@@ -49,12 +49,11 @@ subroutine riverTemperature_run(this, did)
 	INTEGER                                          ::  did  ! for the rt_domain
   	class(riverTemperatureRuns), intent(inout)       ::  this
   
-	call fineWeathData%runWeatherDisagg (this,     &
-                        rt_domain(did)%IX,         &
-                        rt_domain(did)%JX,         &
+	call fineWeathData%runWeatherDisagg (rt_domain(did)%IX,         &
+                                                rt_domain(did)%JX,         &
 						rt_domain(did)%IXRT,       &
 						rt_domain(did)%JXRT,       &
-						!weather2d,                 &
+						!weather2d,                &
 						weather2d%T2,              &  
 						weather2d%short,           &
 						weather2d%q2x,	           &
@@ -63,13 +62,16 @@ subroutine riverTemperature_run(this, did)
 						rt_domain(did)%CH_NETRT,   &
 						rt_domain(did)%CHANXI,	   & 
 						rt_domain(did)%CHANYJ,	   &
-						rt_domain(did)%overland%streams_and_lakes%lake_mask,  &
-						module_NoahMP_hrldas_driver%TMN,                      &
-						module_NoahMP_hrldas_driver%TSK,                      &
-						module_NoahMP_hrldas_driver%TSLB,                     &
-						noah_lsm%nsoil,                                       &
-						nlst(did)%AGGFACTRT                                   &
-                            )
+						rt_domain(did)%overland%streams_and_lakes%lake_mask,   &
+						!module_NoahMP_hrldas_driver%TMN,                      &
+						!module_NoahMP_hrldas_driver%TSK,                      &
+						!module_NoahMP_hrldas_driver%TSLB,                     &
+						rt_domain(did)%TMN,                                    &
+                                                rt_domain(did)%TSK,                                    &
+                                                rt_domain(did)%TSLB,                                   &
+                                                noah_lsm%nsoil,                                        &
+						nlst(did)%AGGFACTRT                                    &
+                                                )
          
   call riverTemp%runRiverTempModel(this,        	&
                     nlst(did)%dxrt0,		        &
