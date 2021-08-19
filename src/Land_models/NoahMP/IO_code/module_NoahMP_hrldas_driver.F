@@ -437,7 +437,7 @@ module module_NoahMP_hrldas_driver
 
   contains
 
-  subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
+ subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
      use module_HYDRO_drv, only: HYDRO_ini
      use config_base, only: nlst
      use module_rt_data, only: rt_domain
@@ -1655,6 +1655,12 @@ endif
 !#endif
 #endif
 
+
+  !-- added by Reza to be used in the river temperature modules
+  RT_DOMAIN(did)%TMN = TMN
+  RT_DOMAIN(did)%TSK = TSK
+  RT_DOMAIN(did)%TSLB = TSLB
+
 end subroutine land_driver_ini
 
 !===============================================================================
@@ -2784,10 +2790,6 @@ subroutine define_rst_variables(ncid, state)
 
    end subroutine define_rst_variables
 
-!-- added by Reza to be used in the river temperature modules
-RT_DOMAIN%TMN = TMN
-RT_DOMAIN%TSK = TSK
-RT_DOMAIN%TSLB = TSLB
 
 end module module_NoahMP_hrldas_driver
 
