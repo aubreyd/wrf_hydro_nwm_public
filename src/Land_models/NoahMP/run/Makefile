@@ -41,6 +41,8 @@ OBJS = \
 	../phys/surfex/modd_surf_atm.o\
 	../phys/surfex/modd_snow_metamo.o
 
+OBJS_RIV = $(wildcard ../../../Routing/RiverTemperature/*.o)
+
 CMD = hrldas.exe
 all:	$(CMD)
 
@@ -49,7 +51,7 @@ hrldas.exe: $(OBJS)
 	@echo ""
 	echo "${TAO_FORTRAN_LIB} ${TAO_LIB} ${PETSC_LIB} ${PHDF5_INC} -Wl,-rpath,${TACC_HDF5_LIB} -L${TACC_HDF5_LIB} -lhdf5 -lz"
 # We have to include the modules built in ../IO_code
-	$(COMPILERF90) -o $(@) -I../IO_code -I../phys $(OBJS) $(OBJS_NoahMP) $(HYDRO_LIB) $(RAPID_LIB) $(NETCDFLIB) $(RAPID_MACRO) $(LDFLAGS) $(LIBS)
+	$(COMPILERF90) -o $(@) -I../IO_code -I../phys $(OBJS) $(OBJS_NoahMP) $(OBJS_RIV) $(HYDRO_LIB) $(RAPID_LIB) $(NETCDFLIB) $(RAPID_MACRO) $(LDFLAGS) $(LIBS)
 
 	@echo ""
 
