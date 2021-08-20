@@ -10,14 +10,14 @@ include ../user_build_options
 ifeq ($(WRF_HYDRO_RAPID),1)
 PHDF5_INC=-I ${TACC_HDF5_INC}
 RAPID_MACRO = ${TAO_FORTRAN_LIB} ${TAO_LIB} ${PETSC_LIB} ${PHDF5_INC} \
-        -Wl,-rpath,${TACC_HDF5_LIB} -L${TACC_HDF5_LIB} -lhdf5 -lz 
+        -Wl,-rpath,${TACC_HDF5_LIB} -L${TACC_HDF5_LIB} -lhdf5 -lz
 RAPID_LIB =  -lrapid
 else
-RAPID_MACRO = 
-RAPID_LIB =  
+RAPID_MACRO =
+RAPID_LIB =
 endif
 
-OBJS_NoahMP = ../IO_code/module_NoahMP_hrldas_driver.o 
+OBJS_NoahMP = ../IO_code/module_NoahMP_hrldas_driver.o
 
 OBJS = \
 	../IO_code/main_hrldas_driver.o \
@@ -31,6 +31,8 @@ OBJS = \
 	../Utility_routines/module_date_utilities.o \
 	../Utility_routines/kwm_string_utilities.o
 
+OBJS_RIV = $(wildcard ../../../Routing/RiverTemperature/*.o)
+
 CMD = hrldas.exe
 all:	$(CMD)
 
@@ -38,8 +40,8 @@ all:	$(CMD)
 hrldas.exe: $(OBJS)
 	@echo ""
 	echo "${TAO_FORTRAN_LIB} ${TAO_LIB} ${PETSC_LIB} ${PHDF5_INC} -Wl,-rpath,${TACC_HDF5_LIB} -L${TACC_HDF5_LIB} -lhdf5 -lz"
-# We have to include the modules built in ../IO_code 
-	$(COMPILERF90) -o $(@) -I../IO_code -I../phys $(OBJS) $(OBJS_NoahMP) $(HYDRO_LIB) $(RAPID_LIB) $(NETCDFLIB) $(RAPID_MACRO) $(LDFLAGS) $(LIBS)
+# We have to include the modules built in ../IO_code
+	$(COMPILERF90) -o $(@) -I../IO_code -I../phys $(OBJS) $(OBJS_NoahMP) $(OBJS_RIV) $(HYDRO_LIB) $(RAPID_LIB) $(NETCDFLIB) $(RAPID_MACRO) $(LDFLAGS) $(LIBS)
 
 	@echo ""
 
@@ -52,4 +54,3 @@ NoahMP: $(OBJS)
 # This command cleans up
 clean:
 	$(RM) *~ $(CMD)
-
