@@ -622,7 +622,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
 #endif
        , CH_LNKRT_SL &
        ,gwBaseSwCRT, gwHead, qgw_chanrt, gwChanCondSw, gwChanCondConstIn, &
-       gwChanCondConstOut, velocity, qloss)
+       gwChanCondConstOut, velocity, qloss, XS_Peremeter, ChanCondConst)
 
 
        IMPLICIT NONE
@@ -691,11 +691,14 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
         INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
         INTEGER, INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
-        !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
+        !REAL, DIMENSION(NLINKS)                  :: QLateral !--lateral flow
         REAL, DIMENSION(NLINKS)                   :: QSUM     !--mass bal of node
-        REAL*8, DIMENSION(NLINKS)                   :: QSUM8     !--mass bal of node
+        REAL*8, DIMENSION(NLINKS)                 :: QSUM8     !--mass bal of node
         REAL, DIMENSION(NLAKES)                   :: QLLAKE   !-- lateral inflow to lake in diffusion scheme
-        REAL*8, DIMENSION(NLAKES)                   :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
+        REAL*8, DIMENSION(NLAKES)                 :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
+        REAL,   DIMENSION(NLAKES)                 :: XS_Peremeter 
+        REAL                                      :: ChanCondConst        
+
 
 !-- Local Variables
         INTEGER                     :: i,j,k,t,m,jj,kk,KRT,node
@@ -735,7 +738,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
 	!REAL, DIMENSION(NLINKS)	                :: XS_Peremeter   !-- cross sectional area calculated at diffusion function
 	!REAL, INTENT(INOUT), DIMENSION(NLINKS)  :: T_QSUM         ! To save the final products
 	!-- I consider an average value to pass to the temperature routine
-	rt_domain(did)%ChanCondConst = (gwChanCondConstIn + gwChanCondConstOut)/2.0  
+        ChanCondConst = (gwChanCondConstIn + gwChanCondConstOut)/2.0  
 	!-------------------------------------------------------
 
 
@@ -1322,7 +1325,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
                       HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
                       CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
 		      !--Reza-------------------------------------------------------
-                      rt_domain(did)%XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
+                      XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
 	                                            sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
             endif
          enddo
