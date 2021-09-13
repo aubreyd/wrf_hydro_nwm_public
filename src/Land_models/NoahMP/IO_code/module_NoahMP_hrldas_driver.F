@@ -116,7 +116,7 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  IOPT_FRZ  ! supercooled liquid water (1-> NY06; 2->Koren99)
   INTEGER                                 ::  IOPT_INF  ! frozen soil permeability (1-> NY06; 2->Koren99)
   INTEGER                                 ::  IOPT_RAD  ! radiation transfer (1->gap=F(3D,cosz); 2->gap=0; 3->gap=1-Fveg)
-  INTEGER                                 ::  IOPT_ALB  ! snow surface albedo (1->BATS; 2->CLASS)
+  INTEGER                                 ::  IOPT_ALB ! snow surface albedo (1->BATS; 2->CLASS)
   INTEGER                                 ::  IOPT_SNF  ! rainfall & snowfall (1-Jordan91; 2->BATS; 3->Noah)
   INTEGER                                 ::  IOPT_TBOT ! lower boundary of soil temperature (1->zero-flux; 2->Noah)
   INTEGER                                 ::  IOPT_STC  ! snow/soil temperature time scheme
@@ -1657,9 +1657,9 @@ endif
 
 
   !-- added by Reza to be used in the river temperature modules
-  RT_DOMAIN(did)%TMN = TMN
-  RT_DOMAIN(did)%TSK = TSK
-  RT_DOMAIN(did)%TSLB = TSLB
+  RT_DOMAIN(did)%TMN_temp = TMN
+  RT_DOMAIN(did)%TSK_temp = TSK
+  RT_DOMAIN(did)%TSLB_temp = TSLB
 
 end subroutine land_driver_ini
 

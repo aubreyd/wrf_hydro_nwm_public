@@ -457,6 +457,38 @@ CONTAINS
 	allocate( rt_domain(did)%velocity(nsizes) )
 	rt_domain(did)%QLateral  = zeroFlt
 	rt_domain(did)%velocity  = zeroFlt
+        !-- allocating arguments that are gonna be used by the river temperature modules
+        allocate( rt_domain(did)%Tair_fine_1D(nsizes) )
+        allocate( rt_domain(did)%RelH_fine_1D(nsizes) )
+        allocate( rt_domain(did)%windSpd_fine_1D(nsizes) )
+        allocate( rt_domain(did)%SolarRad_fine_1D(nsizes) )
+        allocate( rt_domain(did)%TMN_1D_fine(nsizes) ) 
+        allocate( rt_domain(did)%TSK_1D_fine(nsizes) )
+        allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
+        allocate( rt_domain(did)%T_QSUM(nsizes) )
+        allocate( rt_domain(did)%XS_Peremeter (nsizes) )
+        allocate( rt_domain(did)%QSUM(nsizes) )
+        allocate( rt_domain(did)%TMN_temp(IX,JX) )
+        allocate( rt_domain(did)%TSK_temp(IX,JX) )
+        allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
+        allocate( rt_domain(did)%ChanCondConst )
+        
+        rt_domain(did)%Tair_fine_1D       = 0.
+        rt_domain(did)%RelH_fine_1D       = 0.
+        rt_domain(did)%windSpd_fine_1D    = 0.
+        rt_domain(did)%SolarRad_fine_1D   = 0.
+        rt_domain(did)%TMN_1D_fine        = 0.
+        rt_domain(did)%TSK_1D_fine        = 0.
+        rt_domain(did)%TSLB_1D_fine       = 0.
+        rt_domain(did)%T_QSUM             = 0.
+        rt_domain(did)%XS_Peremeter       = 0.
+        rt_domain(did)%QSUM               = 0.
+        rt_domain(did)%TMN_temp           = 0.
+        rt_domain(did)%TSK_temp           = 0.
+        rt_domain(did)%TSLB_temp          = 0.
+        rt_domain(did)%ChanCondConst      = 0.
+        
+
         if( nlst(did)%channel_option .eq. 2 ) then
            allocate( rt_domain(did)%qloss(nsizes) )
            rt_domain(did)%qloss = zeroFlt
