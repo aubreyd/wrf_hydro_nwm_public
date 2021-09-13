@@ -2317,6 +2317,7 @@ integer  :: i,j,mmflag,ierr_flg
 real,dimension(ix,jx):: lai,fpar
 character(len=4) nwxst_t
 logical :: fexist
+logical :: firstTimeStep = .TRUE.
 
 inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
@@ -2774,7 +2775,10 @@ PRCP1 = PRCP1 * 2.0
 #endif
 
 !-- For grabbing the desired arguments for the weather_disaggregate 
-allocate(weather2D(ix,jx))
+if (firstTimeStep) then
+      allocate(weather2D(ix,jx))
+      firstTimeStep = .FALSE.
+end if
 
 end subroutine read_hydro_forcing_mpp1
 

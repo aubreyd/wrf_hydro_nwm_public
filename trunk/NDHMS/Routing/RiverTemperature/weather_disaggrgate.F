@@ -111,12 +111,17 @@ end subroutine fineWeatherData_destroy
 
 ! --------------------------------------------------------------------------
 
-subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, windSpd, &
-                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
+!subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, windSpd, &
+!                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
 			
 !subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, weather2d_local, &
 !                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT)
-    implicit none
+ 
+subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, windSpd, &
+                               NLINKS, CH_NETRT, CHANXI, CHANYJ, LAKE_MSKRT, TMN, TSK, TSLB, nsoil, AGGFACTRT, &
+			       Tair_fine_1D, SolarRad_fine_1D, RelH_fine_1D, windSpd_fine_1D, TMN_1D_fine, &
+			       TSK_1D_fine, TSLB_1D_fine)
+   implicit none
     class(fineWeatherData_type), intent(inout)                ::    this
     ! Input Variables ------------------------------------------------------------------------						   
     integer                    		       :: IX, JX, IXRT, JXRT, NLINKS, nsoil, AGGFACTRT
@@ -125,7 +130,9 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
     REAL, INTENT(IN), DIMENSION(IX,JX)	       :: TMN, TSK
     REAL, INTENT(IN), DIMENSION(IX,1:nsoil,JX) :: TSLB
     INTEGER,INTENT(in), DIMENSION(IXRT,JXRT)   :: CH_NETRT, LAKE_MSKRT
-    INTEGER, INTENT(in), DIMENSION(NLINKS)     :: CHANXI, CHANYJ						   
+    INTEGER, INTENT(in), DIMENSION(NLINKS)     :: CHANXI, CHANYJ
+    REAL, INTENT(inout), DIMENSION(NLINKS)     :: Tair_fine_1D, SolarRad_fine_1D, RelH_fine_1D, windSpd_fine_1D, TMN_1D_fine
+    REAL, INTENT(inout), DIMENSION(NLINKS)     :: TSK_1D_fine, TSLB_1D_fine					   
     ! Local Variables ------------------------------------------------------------------------					   
     integer                    :: i, j         ! coarse grid loop indices
     integer                    :: IXXRT, JYYRT ! fine grid i,j coordinates
@@ -171,13 +178,21 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
 
 			if((CH_NETRT(CHANXI(i), CHANYJ(i) ) .eq. 0) .and. &
 			   (LAKE_MSKRT(CHANXI(i),CHANYJ(i)) .lt.0)) then			
-					this%Tair_fine_1D(i) = Tair_fine(CHANXI(i),CHANYJ(i))
-					this%SolarRad_fine_1D(i) = SolarRad_fine(CHANXI(i),CHANYJ(i))
-					this%RelH_fine_1D(i) = RelH_fine(CHANXI(i),CHANYJ(i))
-					this%windSpd_fine_1D(i) = windSpd_fine(CHANXI(i),CHANYJ(i))
-					this%TMN_1D_fine(i) = TMN_fine(CHANXI(i),CHANYJ(i))
-					this%TSK_1D_fine(i) = TSK_fine(CHANXI(i),CHANYJ(i))
-					this%TSLB_1D_fine(i) = TSLB_fine(CHANXI(i),CHANYJ(i))
+					!this%Tair_fine_1D(i) = Tair_fine(CHANXI(i),CHANYJ(i))
+					!this%SolarRad_fine_1D(i) = SolarRad_fine(CHANXI(i),CHANYJ(i))
+					!this%RelH_fine_1D(i) = RelH_fine(CHANXI(i),CHANYJ(i))
+					!this%windSpd_fine_1D(i) = windSpd_fine(CHANXI(i),CHANYJ(i))
+					!this%TMN_1D_fine(i) = TMN_fine(CHANXI(i),CHANYJ(i))
+					!this%TSK_1D_fine(i) = TSK_fine(CHANXI(i),CHANYJ(i))
+					!this%TSLB_1D_fine(i) = TSLB_fine(CHANXI(i),CHANYJ(i))
+
+					Tair_fine_1D(i) = Tair_fine(CHANXI(i),CHANYJ(i))
+					SolarRad_fine_1D(i) = SolarRad_fine(CHANXI(i),CHANYJ(i))
+					RelH_fine_1D(i) = RelH_fine(CHANXI(i),CHANYJ(i))
+					windSpd_fine_1D(i) = windSpd_fine(CHANXI(i),CHANYJ(i))
+					TMN_1D_fine(i) = TMN_fine(CHANXI(i),CHANYJ(i))
+					TSK_1D_fine(i) = TSK_fine(CHANXI(i),CHANYJ(i))
+					TSLB_1D_fine(i) = TSLB_fine(CHANXI(i),CHANYJ(i))
 					
 			end if
 		end do

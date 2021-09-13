@@ -66,12 +66,19 @@ subroutine riverTemperature_run(this, did)
 						!module_NoahMP_hrldas_driver%TMN,                      &
 						!module_NoahMP_hrldas_driver%TSK,                      &
 						!module_NoahMP_hrldas_driver%TSLB,                     &
-						rt_domain(did)%TMN,                                    &
-                                                rt_domain(did)%TSK,                                    &
-                                                rt_domain(did)%TSLB,                                   &
+						rt_domain(did)%TMN_temp,                               &
+                                                rt_domain(did)%TSK_temp,                               &
+                                                rt_domain(did)%TSLB_temp,                              &
                                                 noah_lsm%nsoil,                                        &
-						nlst(did)%AGGFACTRT                                    &
-                                                )
+						nlst(did)%AGGFACTRT,                                   &
+                                                rt_domain(did)%Tair_fine_1D,     &
+						rt_domain(did)%SolarRad_fine_1D, &
+						rt_domain(did)%RelH_fine_1D,     &
+						rt_domain(did)%windSpd_fine_1D,  &
+						rt_domain(did)%TMN_1D_fine,      &
+						rt_domain(did)%TSK_1D_fine,      &
+						rt_domain(did)%TSLB_1D_fine      &
+						)
          
   call riverTemp%runRiverTempModel(     nlst(did)%dxrt0,                &
 					nlst(did)%DT,                   &

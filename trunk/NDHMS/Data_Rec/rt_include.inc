@@ -272,11 +272,11 @@
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
    ! NEW FOR module_channel_routing.F
    REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter 
-   REAL                                   :: ChanCondConst 
+   REAL,    allocatable                   :: ChanCondConst 
    !-- to get the temperature data from NoahMP
-   REAL,    allocatable, DIMENSION(:,:)   :: TMN
-   REAL,    allocatable, DIMENSION(:,:)   :: TSK
-   REAL,    allocatable, DIMENSION(:,:,:) :: TSLB
+   REAL,    allocatable, DIMENSION(:,:)   :: TMN_temp
+   REAL,    allocatable, DIMENSION(:,:)   :: TSK_temp
+   REAL,    allocatable, DIMENSION(:,:,:) :: TSLB_temp
    REAL,    allocatable, DIMENSION(:)     :: QSUM     !--mass bal of node
 
    
