@@ -45,30 +45,31 @@ end interface
 ! --------------------------------------------------------------------------
 !-- Reza's edits (June 2021):
 type :: weather_2D_inputs
-      INTEGER :: IX, JX
+      !INTEGER :: IX, JX
       REAL   :: T2	! Air temperature
       REAL   :: q2x	! Humidity
       REAL   :: u	! Near surface wind in the u-component
-      REAL   :: short	! Shortwave radiation.
+      REAL   :: v	! Shortwave radiation.
 
       contains
-      procedure :: init => weather_2D_inputs_init
+      !procedure :: init => weather_2D_inputs_init
       procedure :: destroy => weather_2D_inputs_destroy
                 
 end type weather_2D_inputs
 type(weather_2D_inputs), allocatable :: weather2d(:,:)
 
+
 Contains
 
-subroutine weather_2D_inputs_init(this, IX, JX, T2, q2x, u, short)
+!subroutine weather_2D_inputs_init(this, IX, JX, T2, q2x, u, short)
         
-	implicit none
-	class(weather_2D_inputs), intent(inout) :: this         ! the type object being initialized
-	INTEGER, INTENT(in)                 :: IX,JX            ! IXRT, JXRT
-	REAL,    INTENT(in), DIMENSION(:,:) :: T2		! Air temperature
-	REAL,    INTENT(in), DIMENSION(:,:) :: q2x		! Humidity
-	REAL,    INTENT(in), DIMENSION(:,:) :: u		! Near surface wind in the u-component
-	REAL,    INTENT(in), DIMENSION(:,:) :: short		! Shortwave radiation
+	!implicit none
+	!class(weather_2D_inputs), intent(inout) :: this         ! the type object being initialized
+	!INTEGER, INTENT(in)                 :: IX,JX            ! IXRT, JXRT
+	!REAL,    INTENT(in), DIMENSION(:,:) :: T2		! Air temperature
+	!REAL,    INTENT(in), DIMENSION(:,:) :: q2x		! Humidity
+	!REAL,    INTENT(in), DIMENSION(:,:) :: u		! Near surface wind in the u-component
+	!REAL,    INTENT(in), DIMENSION(:,:) :: short		! Shortwave radiation
 
 	! Assign the values passed in to a particular
 	!this%IX        = IX
@@ -78,7 +79,7 @@ subroutine weather_2D_inputs_init(this, IX, JX, T2, q2x, u, short)
 	!this%u         = u
 	!this%short     = short
 
-end subroutine weather_2D_inputs_init
+!end subroutine weather_2D_inputs_init
 
 
 subroutine weather_2D_inputs_destroy (this)
@@ -2778,10 +2779,23 @@ PRCP1 = PRCP1 * 2.0
 #endif
 
 !-- For grabbing the desired arguments for the weather_disaggregate 
-if (firstTimeStep) then
+!if (weather2D(1,1) .ne. T2(1,1)) then
       allocate(weather2D(ix,jx))
-      firstTimeStep = .FALSE.
-end if
+      !firstTimeStep = .FALSE.
+!end if
+
+!weather2d%T2 = T2
+!weather2d%q2x = q2x
+!weather2d%u = u
+!weather2d%v = v
+
+print *,"Tair"
+print *,T2
+print *,"weather2D"
+print *,weather2d
+print *,"============================="
+
+
 
 end subroutine read_hydro_forcing_mpp1
 
