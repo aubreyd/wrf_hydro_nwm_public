@@ -48,14 +48,14 @@ subroutine riverTemperature_run(this, did)
 	implicit none
 	INTEGER                                          ::  did  ! for the rt_domain
   	class(riverTemperatureRuns), intent(inout)       ::  this
-  
+ 
 	call fineWeathData%runWeatherDisagg (rt_domain(did)%IX,         &
                                                 rt_domain(did)%JX,         &
 						rt_domain(did)%IXRT,       &
 						rt_domain(did)%JXRT,       &
 						!weather2d,                &
 						weather2d%T2,              &  
-						weather2d%short,           &
+						weather2d%v,               &
 						weather2d%q2x,	           &
 						weather2d%u,	           &   
 						rt_domain(did)%NLINKS,	   &
