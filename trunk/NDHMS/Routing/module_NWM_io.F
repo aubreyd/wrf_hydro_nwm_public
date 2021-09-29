@@ -134,6 +134,7 @@ subroutine output_chrt_NWM(domainId)
    integer :: numPtsOut
    real, allocatable, dimension(:,:) :: varMetaReal
    integer, allocatable, dimension(:,:) :: varMetaInt
+   real, allocatable, dimension(:) :: g_riverTemp, g_riverTempOut  ! Added by Reza
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -184,25 +185,25 @@ subroutine output_chrt_NWM(domainId)
    ! OWP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    if (nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0,1] !Reza updated these arrays; size=12
    else if (nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -261,6 +262,8 @@ subroutine output_chrt_NWM(domainId)
          allocate(chIndArray(gsize))
          allocate(g_linkidOut(gsize))
          allocate(g_outInd(gsize))
+         allocate(g_riverTemp(gsize))
+         allocate(g_riverTempOut(gsize))
          if (nlst(domainId)%channel_loss_option > 0) then
             allocate(g_qloss(gsize))
             allocate(g_qlossOut(gsize))
@@ -298,6 +301,8 @@ subroutine output_chrt_NWM(domainId)
          allocate(chIndArray(1))
          allocate(g_linkidOut(1))
          allocate(g_outInd(1))
+         allocate(g_riverTemp(1))
+         allocate(g_riverTempOut(1))
          if (nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
             allocate(g_qloss(1))
             allocate(g_qlossOut(1))
@@ -355,6 +360,7 @@ subroutine output_chrt_NWM(domainId)
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral,g_QLateral)
          call ReachLS_write_io(velocityLocal,g_velocity)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
+         call ReachLS_write_io(RT_DOMAIN(domainId)%T_QSUM,g_riverTemp)
          ! Optional outputs
          if(nudgeFlag .eq. 1)then
 #ifdef WRF_HYDRO_NUDGING
@@ -411,6 +417,7 @@ subroutine output_chrt_NWM(domainId)
          call write_chanel_real(RT_DOMAIN(domainId)%ZELEV,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_zelev)
          call write_chanel_real(RT_DOMAIN(domainId)%QLateral,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_QLateral)
          call write_chanel_real(velocityLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_velocity)
+         call write_chanel_real(RT_DOMAIN(domainId)%T_QSUM,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_riverTemp)
          if(nlst(domainId)%output_channelBucket_influx .ne. 0) then
             call postDiagMsg(diagFlag,'WARNING: This channelBucket_influx only available for reach-based routing.')
          endif
@@ -459,6 +466,8 @@ subroutine output_chrt_NWM(domainId)
       allocate(chIndArray(gsize))
       allocate(g_linkidOut(gsize))
       allocate(g_outInd(gsize))
+      allocate(g_riverTemp(gsize))
+      allocate(g_riverTempOut(gsize))
       g_chlon = RT_DOMAIN(domainId)%CHLON
       g_chlat = RT_DOMAIN(domainId)%CHLAT
       g_zelev = RT_DOMAIN(domainId)%ZELEV
@@ -468,6 +477,7 @@ subroutine output_chrt_NWM(domainId)
       g_qlink = RT_DOMAIN(domainId)%QLINK
       g_QLateral = RT_DOMAIN(domainId)%QLateral
       g_velocity = RT_DOMAIN(domainId)%velocity
+      g_riverTemp =  RT_DOMAIN(domainId)%T_QSUM
       ! Optional outputs
       if(nudgeFlag .eq. 1)then
 #ifdef WRF_HYDRO_NUDGING
@@ -603,6 +613,7 @@ subroutine output_chrt_NWM(domainId)
             g_chlonOut(iTmp) = g_chlon(indTmp)
             g_orderOut(iTmp) = g_order(indTmp)
             g_zelevOut(iTmp) = g_zelev(indTmp)
+            g_riverTempOut(iTmp) = g_riverTemp(indTmp)
             if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
                g_qlossOut(iTmp) = g_qloss(indTmp)
             end if
@@ -623,6 +634,7 @@ subroutine output_chrt_NWM(domainId)
          g_chlonOut = g_chlon
          g_orderOut = g_order
          g_zelevOut = g_zelev
+         g_riverTempOut = g_riverTemp
          if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
             g_qlossOut = g_qloss
          end if
@@ -669,6 +681,7 @@ subroutine output_chrt_NWM(domainId)
       if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
          varOutReal(11,:) = PACK(g_qlossOut,g_outInd == 1)
       end if
+      varOutReal(12,:) = PACK(g_riverTempOut,g_outInd == 1)
 
       varMetaReal(1,:) = PACK(g_chlatOut,g_outInd == 1)
       varMetaReal(2,:) = PACK(g_chlonOut,g_outInd == 1)
@@ -1047,6 +1060,7 @@ subroutine output_chrt_NWM(domainId)
    deallocate(g_accBucket)
    deallocate(strFlowLocal)
    deallocate(velocityLocal)
+   deallocate(g_riverTempOut)   
    if (allocated(qlossLocal)) then
       deallocate(qlossLocal)
    end if

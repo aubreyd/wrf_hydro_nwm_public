@@ -24,7 +24,7 @@ MODULE module_noah_chan_param_init_rt
 CONTAINS
 !
 !-----------------------------------------------------------------
-  SUBROUTINE CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, CEmb, PSize, FShade, SAlbedo, CCloud)
+  SUBROUTINE CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK)
 !  SUBROUTINE CHAN_PARM_INIT (BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)
 !-----------------------------------------------------------------
 
@@ -34,7 +34,7 @@ CONTAINS
     integer :: ORDER, IUNIT
     integer, PARAMETER :: NCHANTYPES=50 
     real,dimension(NCHANTYPES)    :: BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann
-    real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud
+    real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK
     real,dimension(NCHANTYPES)    :: TOPWIDCC, NCC
     character(LEN=11) :: DATATYPE
 
@@ -53,7 +53,7 @@ CONTAINS
 !            FShade: Shading factor (0 as no shade to 1 as full shade)
 !           SAlbedo: Surface albedo (0-1)
 !            CCloud: Cloudiness (0-1)
-!         
+!            G_Channk: Dominant Substrate Hydraulic Conductivity (m/s) 
 
 !-----READ IN CHANNEL PROPERTIES FROM CHANPARM.TBL :
     IUNIT = 23
@@ -80,7 +80,7 @@ CONTAINS
        do ORDER=1,CHANCATS
 
           read (IUNIT,*)IINDEX, BOTWID(ORDER), HLINK_INIT(ORDER), CHAN_SS(ORDER), CHMann(ORDER), &
-                CEmb(ORDER), PSize(ORDER), FShade(ORDER), SAlbedo(ORDER), CCloud(ORDER)
+                CEmb(ORDER), PSize(ORDER), FShade(ORDER), SAlbedo(ORDER), CCloud(ORDER), G_Channk(ORDER)
 !          READ (IUNIT,*)IINDEX,BOTWID(ORDER),TOPWID(ORDER), &
 !               HLINK_INIT(ORDER),CHAN_SS(ORDER),CHMann(ORDER),&
 !               TOPWIDCC(ORDER),NCC(ORDER)
@@ -88,7 +88,7 @@ CONTAINS
 #ifdef HYDRO_D
           PRINT *, IINDEX, BOTWID(ORDER), CHANN_K(ORDER), HLINK_INIT(ORDER), CHAN_SS(ORDER),  &
                & CHMann(ORDER), CEmb(ORDER), PSize(ORDER), FShade(ORDER), SAlbedo(ORDER), &
-               CCloud(ORDER)
+               CCloud(ORDER), G_Channk(ORDER)
 !          PRINT *, IINDEX,BOTWID(ORDER),& 
 !                HLINK_INIT(ORDER),CHAN_SS(ORDER),   &
 !                CHMann(ORDER),TOPWIDCC(ORDER),NCC(ORDER)
@@ -108,7 +108,7 @@ CONTAINS
 
 
 #ifdef MPP_LAND
-  SUBROUTINE mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, CEmb, PSize, FShade, SAlbedo, CCloud )
+  SUBROUTINE mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk)
 !  subroutine mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)
     use module_mpp_land, only:  my_id, IO_id,mpp_land_bcast_int1, &
        mpp_land_bcast_real,mpp_land_bcast_int,mpp_land_bcast_real1
@@ -117,13 +117,13 @@ CONTAINS
     integer :: ORDER
     integer, PARAMETER :: NCHANTYPES=50 
     real,dimension(NCHANTYPES)    :: BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann
-    real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud
+    real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk
     !real,dimension(NCHANTYPES)    :: TOPWID, TOPWIDCC, NCC  ! compound components
     character(LEN=11) :: DATATYPE
 
     if(my_id.eq.io_id) then
        call CHAN_PARM_INIT(BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, &
-                           CEmb, PSize, FShade, SAlbedo, CCloud)
+                           CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK)
 !       call CHAN_PARM_INIT(BOTWID,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)
     end if
        call mpp_land_bcast_real(NCHANTYPES,BOTWID)
@@ -136,6 +136,7 @@ CONTAINS
        call mpp_land_bcast_real(NCHANTYPES,FShade)
        call mpp_land_bcast_real(NCHANTYPES,SAlbedo)
        call mpp_land_bcast_real(NCHANTYPES,CCloud)
+       call mpp_land_bcast_real(NCHANTYPES,G_ChannK)
 !       call mpp_land_bcast_real(NCHANTYPES,TOPWID)
 !       call mpp_land_bcast_real(NCHANTYPES,TOPWIDCC)
 !       call mpp_land_bcast_real(NCHANTYPES,NCC)

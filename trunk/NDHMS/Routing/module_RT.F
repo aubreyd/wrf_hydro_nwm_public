@@ -373,7 +373,8 @@ CONTAINS
      allocate( rt_domain(did)%P_Size(nsizes) )
      allocate( rt_domain(did)%F_Shade(nsizes) )
      allocate( rt_domain(did)%S_Albedo(nsizes) )
-     allocate( rt_domain(did)%C_Cloud (nsizes) )
+     allocate( rt_domain(did)%C_Cloud(nsizes) )
+     allocate( rt_domain(did)%G_Chann_k(nsizes) )
 
      if(NLAKES .gt. 0) then
 
@@ -464,7 +465,7 @@ CONTAINS
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
         allocate( rt_domain(did)%TSK_temp(IX,JX) )
         allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
-        allocate( rt_domain(did)%ChanCondConst )
+       
         
         rt_domain(did)%Tair_fine_1D       = 0.
         rt_domain(did)%RelH_fine_1D       = 0.
@@ -479,7 +480,7 @@ CONTAINS
         rt_domain(did)%TMN_temp           = 0.
         rt_domain(did)%TSK_temp           = 0.
         rt_domain(did)%TSLB_temp          = 0.
-        rt_domain(did)%ChanCondConst      = 0.
+       
         
 
         if( nlst(did)%channel_option .eq. 2 ) then
@@ -537,6 +538,7 @@ CONTAINS
       rt_domain(did)%F_Shade = 0.0
       rt_domain(did)%S_Albedo = 0.0 
       rt_domain(did)%C_Cloud = 0.0
+      rt_domain(did)%G_Chann_k = 0.0
 
 
       rt_domain(did)%ZELEV = 0.0
@@ -717,7 +719,7 @@ subroutine LandRT_ini(did)
   integer :: lake_index, NLAKES_total
 
   real,  dimension(50)     :: BOTWID, TOPWID, HLINK_INIT, CHAN_SS, CHMann !Channel parms from table
-  real,  dimension(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud        ! Channel params for river temp.
+  real,  dimension(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk        ! Channel params for river temp.
   real,  dimension(50)     :: TOPWIDCC, NCC    !channnel params of compound
   real,  dimension(50)     :: CHANN_K ! Channel infiltration param
   integer :: i,j,k, ll, count
@@ -1470,11 +1472,11 @@ subroutine LandRT_ini(did)
       ! Some of the code for reading/using top-width-necessary params from CHANPARM.TBL are available
       ! but commented out in the code, since they were a bridge to nowhere.
         call mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, &
-	                         CEmb, PSize, FShade, SAlbedo, CCloud)  !Read chan parms from table...
+	                         CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk)        !Read chan parms from table...
       !call mpp_CHAN_PARM_INIT (BOTWID,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)  !Read chan parms from table...
 #else
         call CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, &
-	                     CEmb, PSize, FShade, SAlbedo, CCloud) !,TOPWIDCC,NCC)  !Read chan parms from table...
+	                     CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK) !,TOPWIDCC,NCC)  !Read chan parms from table...
 #endif
      end if
 
@@ -1536,6 +1538,9 @@ subroutine LandRT_ini(did)
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
               endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
+              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 2) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1570,6 +1575,9 @@ subroutine LandRT_ini(did)
               endif
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
+              endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
               endif
            elseif (rt_domain(did)%ORDER(j) .eq. 3) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
@@ -1606,6 +1614,9 @@ subroutine LandRT_ini(did)
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
               endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
+              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 4) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1640,6 +1651,9 @@ subroutine LandRT_ini(did)
               endif
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
+              endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
               endif
            elseif (rt_domain(did)%ORDER(j) .eq. 5) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
@@ -1676,6 +1690,9 @@ subroutine LandRT_ini(did)
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
               endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
+              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 6) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1711,6 +1728,9 @@ subroutine LandRT_ini(did)
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
               endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
+              endif
            elseif (rt_domain(did)%ORDER(j) .ge. 7) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1745,6 +1765,9 @@ subroutine LandRT_ini(did)
               endif
 	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
+              endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
               endif
            else   !-- the outlets won't have orders since there's no nodes, so
               !-- assign the order 5 values
@@ -1784,6 +1807,9 @@ subroutine LandRT_ini(did)
               endif
 	      if(rt_domain(did)%C_Cloud (j) .eq. 0.0) then
                  rt_domain(did)%C_Cloud (j) = CCloud (5)
+              endif
+	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
+                 rt_domain(did)%G_Chann_k(j) = G_Channk(5)
               endif
            endif
 
