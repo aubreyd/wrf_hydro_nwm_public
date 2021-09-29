@@ -624,7 +624,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
 #endif
        , CH_LNKRT_SL &
        ,gwBaseSwCRT, gwHead, qgw_chanrt, gwChanCondSw, gwChanCondConstIn, &
-       gwChanCondConstOut, velocity, qloss, XS_Peremeter, ChanCondConst)
+       gwChanCondConstOut, velocity, qloss, XS_Peremeter)
 
 
        IMPLICIT NONE
@@ -699,8 +699,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, DIMENSION(NLAKES)                   :: QLLAKE   !-- lateral inflow to lake in diffusion scheme
         REAL*8, DIMENSION(NLAKES)                 :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
         REAL,   DIMENSION(NLAKES)                 :: XS_Peremeter 
-        REAL                                      :: ChanCondConst        
-
+        
 
 !-- Local Variables
         INTEGER                     :: i,j,k,t,m,jj,kk,KRT,node
@@ -739,8 +738,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
 	!-- Reza (June 2021):
 	!REAL, DIMENSION(NLINKS)	                :: XS_Peremeter   !-- cross sectional area calculated at diffusion function
 	!REAL, INTENT(INOUT), DIMENSION(NLINKS)  :: T_QSUM         ! To save the final products
-	!-- I consider an average value to pass to the temperature routine
-        ChanCondConst = (gwChanCondConstIn + gwChanCondConstOut)/2.0  
+  
 	!-------------------------------------------------------
 
 

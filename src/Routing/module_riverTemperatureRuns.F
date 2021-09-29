@@ -105,7 +105,7 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%TSK_1D_fine,     &
 					rt_domain(did)%S_Albedo,        &
 					rt_domain(did)%F_Shade,         &
-					rt_domain(did)%ChanCondConst,   &
+					rt_domain(did)%G_Chann_K,       &
 					rt_domain(did)%C_Emb,	        &
 					rt_domain(did)%P_Size,          &
 					rt_domain(did)%CHANXI,          &

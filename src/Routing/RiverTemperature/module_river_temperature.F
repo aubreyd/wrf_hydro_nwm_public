@@ -171,9 +171,9 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 	REAL, DIMENSION(IXRT,JXRT)        :: Disp_coef
         REAL		          	  :: A_s		! Cross-Sectional Across Seepage Face (m2)	
 	REAL			          :: k_s		! Composite Substrate Hydraulic Conductivity (m/s) 
-	REAL, INTENT(IN),    DIMENSION(:) :: C_E		! Embeddedness                                                                    - As an input
-	REAL, INTENT(IN),    DIMENSION(:) :: P_s		! Substrate particle size (mm)
-	REAL, INTENT(IN)                  :: k_s_0              ! Dominant Substrate Hydraulic Conductivity (m/s)                                 ===========> ChanCondConst
+	REAL, INTENT(IN), DIMENSION(:)    :: C_E		! Embeddedness                                                          - As an input
+	REAL, INTENT(IN), DIMENSION(:)    :: P_s		! Substrate particle size (mm)
+	REAL, INTENT(IN), DIMENSION(:)    :: k_s_0              ! Dominant Substrate Hydraulic Conductivity (m/s)                       ===========> ChanCondConst
 		
 	REAL                              :: h_D		! Hydraulic Head for Darcy Calculation at location i (m)
 	REAL                              :: h_D_dn		! Hydraulic Head for Darcy Calculation at location i+1 (m)
@@ -208,21 +208,147 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 	REAL,                   DIMENSION(totLength,2)        :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
         REAL                                                  :: Q_strTot, T_strTot 
 	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)							      
-        REAL                                                  :: DT_STEPS               !-- number of timestep in routing
+        !REAL                                                  :: DT_STEPS               !-- number of timestep in routing
 	
 	
 	viewSky = 1. - SF
-        DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
+        !DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
         ! ++++++++++++++++++++++++++++update this part
 	! Assigning the upstream water temeprature boundary condition to the main matrix
 		
+
+	print *,"**********************************"
+	print *,"dx"
+	print *,dx
+	print *,"**********************************"
+	print *,"DT"
+	print *,DT
+	print *,"**********************************"
+	print *,"DTCT"
+	print *,DTCT
+	print *,"**********************************"
+	print *,"IXRT"
+	print *,IXRT
+	print *,"**********************************"
+	print *,"JXRT"
+	print *,JXRT
+	print *,"**********************************"
+	print *,"T_a"
+	print *,T_a
+	print *,"**********************************"
+	print *,"H"
+	print *,H
+	print *,"**********************************"
+	print *,"V_wind"
+	print *,V_wind
+	print *,"**********************************"
+	print *,"C_L"
+	print *,C_L
+	print *,"**********************************"
+	print *,"T_bed"
+	print *,T_bed
+	print *,"**********************************"
+	print *,"s_in"
+	print *,s_in
+	print *,"**********************************"
+	print *,"Pw_river"
+	print *,Pw_river
+	print *,"**********************************"
+	print *,"y_w"
+	print *,y_w
+	print *,"**********************************"
+	print *,"S_0"
+	print *,S_0
+	print *,"**********************************"
+	print *,"z_elv"
+	print *,z_elv
+	print *,"**********************************"
+	print *,"V_w"
+	print *,V_w
+	print *,"**********************************"
+	print *,"W_w"
+	print *,W_w
+	print *,"**********************************"
+	print *,"Q_str"
+	print *,Q_str
+	print *,"**********************************"
+	print *,"Q_GW"
+	print *,Q_GW
+	print *,"**********************************"
+	print *,"Q_Trib"
+	print *,Q_Trib
+	print *,"**********************************"
+	print *,"T_GW"
+	print *,T_GW
+	print *,"**********************************"
+	print *,"T_hyp"
+	print *,T_hyp
+	print *,"**********************************"
+	print *,"T_Trib"
+	print *,T_Trib
+	print *,"**********************************"
+	print *,"albedo"
+	print *,albedo
+	print *,"**********************************"
+	print *,"SF"
+	print *,SF
+	print *,"**********************************"
+	print *,"k_s_0"
+	print *,k_s_0
+	print *,"**********************************"
+	print *,"C_E"
+	print *,C_E
+	print *,"**********************************"
+	print *,"P_s"
+	print *,P_s
+	print *,"**********************************"
+	print *,"CHANXI"
+	print *,CHANXI
+	print *,"**********************************"
+	print *,"CHANYJ"
+	print *,CHANYJ
+	print *,"**********************************"
+	print *,"CH_NETLNK"
+	print *,CH_NETLNK
+	print *,"**********************************"
+	print *,"CH_NETRT"
+	print *,CH_NETRT
+	print *,"**********************************"
+	print *,"QLINK"
+	print *,QLINK
+	print *,"**********************************"
+	print *,"node_area"
+	print *,node_area
+	print *,"**********************************"
+	print *,"TO_NODE"
+	print *,TO_NODE
+	print *,"**********************************"
+	print *,"TYPEL"
+	print *,TYPEL
+	print *,"**********************************"
+	print *,"T_QSUM_local"
+	print *,T_QSUM_local
+	print *,"**********************************"
+	print *,"totLength"
+	print *,totLength
+	stop
+
+
+
+
+
+
+
+
+
+
 	Disp_coef = 0.
         ! Calculating hyporheic fluxes
 	Do i = 1, totLength
 		! Find hyporheic fluxes
 		! Ratio Conductivity of dominant sunstrate
-		!Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
-	        Dummy1 = k_s_0 * (1.0 - C_E(i))
+		Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
+	        !Dummy1 = k_s_0 * (1.0 - C_E(i))
 
 	       ! Ratio Conductivity of sand - low range
 	       ! 0.00002 is the embedded Substrate Hydraulic Conductivity for Silt/Sand (m/s)
@@ -477,7 +603,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 
 		end if
 
-
+		
 		! -- We don't apply the lateral inflows to T_w_sim; They will be applied to the final porduct, T_QSUM later, 
 		T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),2) = FluxTemp
 
@@ -491,13 +617,27 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 							    Q_hyp(CHANXI(i),CHANYJ(i))*(T_hyp(i)-273.1))/ &
 							   (Q_Trib(CHANXI(i),CHANYJ(i))+Q_GW(CHANXI(i),CHANYJ(i))+ &
 							    Q_hyp(CHANXI(i),CHANYJ(i)))
-		!-- I am not about this part "(DT_STEPS*node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/1000./DTCT)" here. 
-                !-- I should check this when I wanna combine my code with the WRF-Hydro. I assume it's correct for the WRF-Hydro
-		QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib(CHANXI(i),CHANYJ(i)) + Q_GW(CHANXI(i),CHANYJ(i))) / &
-							   (DT_STEPS*node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/1000./DTCT)) + &
-							    Q_hyp(CHANXI(i),CHANYJ(i))
-														  
-		end if
+		
+                !-- I am not about this part "(DT_STEPS*node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/1000./DTCT)" here.
+		!-- => Actually, I was right! It seems we don't need to add the upper converter here. Here's why:
+		!-- For now, I realized that we're dealing with 4 different discharge values: QSUM, QINFLOWBASE, QSTORMVOLRT, QLINK
+		!-- I am getting these values from module_channel_routing. Overall, it seems they all are in m3/s
+		!-- Okay, let's look at the units of these variables based on the code we have in module_channel_routing:
+		!-- L779:  QINFLOWBASE, QSTORMVOLRT: Based on the conversion here (Q/1000*node_area/Time), it seems in code m3/s is going to be mm 
+                !-- (don't know the reason). But based on the form of the conversion it looks like they are in m3/s
+		!-- L1089: QLINK: Well, this one is based on the diffusion function and as we can see from L181 - L187,
+		!--  the diffusion function uses Manning's equation for calculating the answer. Therefore, it should also be on m3/s					    
+		!-- L1110: QSUM: Since it's a function of QLINK with no additional conversion, we can say, that one also is in m3/s			    
+                !-- Okay, based on what I learned from module_channel_routing, I am gonna remove the DT_STEPS from caluating the QLateral
+		
+		!QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib(CHANXI(i),CHANYJ(i)) + Q_GW(CHANXI(i),CHANYJ(i))) / &
+		!					   (DT_STEPS*node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/1000./DTCT)) + &
+		!					    Q_hyp(CHANXI(i),CHANYJ(i))
+		
+		QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib(CHANXI(i),CHANYJ(i)) + Q_GW(CHANXI(i),CHANYJ(i)) +  Q_hyp(CHANXI(i),CHANYJ(i))										  
+		
+
+	        end if
 
                               
 	      !-- Here I wanna detect the cells/grids discharging to the current cell

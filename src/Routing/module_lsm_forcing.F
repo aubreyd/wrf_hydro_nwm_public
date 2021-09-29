@@ -46,17 +46,17 @@ end interface
 !-- Reza's edits (June 2021):
 type :: weather_2D_inputs
       !INTEGER :: IX, JX
-      REAL   :: T2	! Air temperature
-      REAL   :: q2x	! Humidity
-      REAL   :: u	! Near surface wind in the u-component
-      REAL   :: v	! Shortwave radiation.
+      REAL, allocatable, dimension(:,:)   :: T2 	! Air temperature
+      REAL, allocatable, dimension(:,:)   :: q2x	! Humidity
+      REAL, allocatable, dimension(:,:)   :: u  	! Near surface wind in the u-component
+      REAL, allocatable, dimension(:,:)   :: v  	! Shortwave radiation.
 
       contains
       !procedure :: init => weather_2D_inputs_init
       procedure :: destroy => weather_2D_inputs_destroy
                 
 end type weather_2D_inputs
-type(weather_2D_inputs), allocatable :: weather2d(:,:)
+type(weather_2D_inputs) :: weather2d
 
 
 Contains
@@ -2779,22 +2779,15 @@ PRCP1 = PRCP1 * 2.0
 #endif
 
 !-- For grabbing the desired arguments for the weather_disaggregate 
-!if (weather2D(1,1) .ne. T2(1,1)) then
-      allocate(weather2D(ix,jx))
-      !firstTimeStep = .FALSE.
-!end if
+allocate(weather2D%T2(ix,jx))
+allocate(weather2D%q2x(ix,jx))
+allocate(weather2D%u(ix,jx))
+allocate(weather2D%v(ix,jx))
 
-!weather2d%T2 = T2
-!weather2d%q2x = q2x
-!weather2d%u = u
-!weather2d%v = v
-
-print *,"Tair"
-print *,T2
-print *,"weather2D"
-print *,weather2d
-print *,"============================="
-
+weather2D%T2 = T2
+weather2D%q2x = q2x
+weather2D%u = u
+weather2D%v = v
 
 
 end subroutine read_hydro_forcing_mpp1
