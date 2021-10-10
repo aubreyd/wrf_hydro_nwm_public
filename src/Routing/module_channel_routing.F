@@ -741,8 +741,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
   
 	!-------------------------------------------------------
 
-
-
         QLAKEIP = 0
         QLAKEI8 = 0
         HLINKTMP = 0
