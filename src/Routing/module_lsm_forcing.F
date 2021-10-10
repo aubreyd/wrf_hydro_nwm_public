@@ -57,7 +57,7 @@ type :: weather_2D_inputs
                 
 end type weather_2D_inputs
 type(weather_2D_inputs) :: weather2d
-
+logical ::  first_timestep = .true.
 
 Contains
 
@@ -2779,10 +2779,13 @@ PRCP1 = PRCP1 * 2.0
 #endif
 
 !-- For grabbing the desired arguments for the weather_disaggregate 
-allocate(weather2D%T2(ix,jx))
-allocate(weather2D%q2x(ix,jx))
-allocate(weather2D%u(ix,jx))
-allocate(weather2D%v(ix,jx))
+if (first_timestep) then
+      allocate(weather2D%T2(ix,jx))
+      allocate(weather2D%q2x(ix,jx))
+      allocate(weather2D%u(ix,jx))
+      allocate(weather2D%v(ix,jx))
+      first_timestep = .false.
+end if
 
 weather2D%T2 = T2
 weather2D%q2x = q2x

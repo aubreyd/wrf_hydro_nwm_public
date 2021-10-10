@@ -738,7 +738,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
 	!-- Reza (June 2021):
 	!REAL, DIMENSION(NLINKS)	                :: XS_Peremeter   !-- cross sectional area calculated at diffusion function
 	!REAL, INTENT(INOUT), DIMENSION(NLINKS)  :: T_QSUM         ! To save the final products
-  
 	!-------------------------------------------------------
 
         QLAKEIP = 0
@@ -1332,17 +1331,19 @@ gwOption:   if(gwBaseSwCRT == 3) then
           call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-           !-- Reza's update goes in here:
-           !-- The RUN function should be called here. 
-	   ! Run the subroutine to diaggregate
-           rt_domain(did)%QSUM = QSUM
-           call riverTempRuns%riverTemp_run(did)
-
 	   
            KRT = KRT + 1                     !-- iterate on the timestep
-           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
+           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval             
 
           end do crnt   !--- DTCT timestep of DT_STEPS
+
+           
+          !-- Reza's update goes in here:
+          !-- The RUN function should be called here. 
+	  ! Run the subroutine to diaggregate
+          rt_domain(did)%QSUM = QSUM
+          call riverTempRuns%riverTemp_run(did)
+
 
            HLINK = HLINKTMP                 !-- update head based on final solution in timestep
            CVOL  = CVOLTMP                  !-- update volume
