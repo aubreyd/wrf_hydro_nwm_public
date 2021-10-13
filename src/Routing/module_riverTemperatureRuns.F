@@ -114,7 +114,7 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%overland%streams_and_lakes%CH_NETRT,        &
 					rt_domain(did)%QLINK,	        &
 					rt_domain(did)%node_area,       &
-					rt_domain(did)%FROM_NODE,       &
+					!rt_domain(did)%FROM_NODE,       &
 					rt_domain(did)%TO_NODE,	        &
 					rt_domain(did)%TYPEL,	        &
 					rt_domain(did)%T_QSUM,	        &

@@ -1331,7 +1331,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
           call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-	   
+   
            KRT = KRT + 1                     !-- iterate on the timestep
            if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval             
 

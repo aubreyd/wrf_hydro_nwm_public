@@ -127,7 +127,7 @@ subroutine river_temperature_destroy(this)
 ! ------------------------------------------------
 Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, V_w, W_w, Q_str, Q_GW, &
 				Q_Trib, T_GW, T_hyp, T_Trib, albedo, SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, &
-				CH_NETRT, QLINK, node_area, FROM_NODE, TO_NODE, TYPEL, T_QSUM_local, totLength)
+				CH_NETRT, QLINK, node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
 	! -------- DECLARATIONS ------------------------
@@ -186,7 +186,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 	! Component of the main equaion of the simulated water temperature
 	REAL                              :: Advection  	!
 	REAL                              :: Dispersion 	! 
-	REAL                              :: up
+	REAL                              :: self
 	REAL                              :: FluxTemp	        !
 	!REAL                              :: Disp_coef      	! Dispersion Coefficient (m2/s)
 	REAL                              :: Shear_Velocity	! Shear Velocity (m/s)
@@ -199,13 +199,13 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 	REAL,                   DIMENSION(totLength)          :: QLateral
 	REAL,    INTENT(IN),    DIMENSION(totLength,2)        :: QLINK
 	REAL,    INTENT(in),    DIMENSION(:)                   :: node_area
-	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE, FROM_NODE
+	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
 	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
 	INTEGER                                               :: neighbours, i, j
         ! Simulated water temeprature (C)
-	REAL,                   DIMENSION(totLength,2)        :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
+	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
         REAL                                                  :: Q_strTot, T_strTot 
 	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)
 	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp	
@@ -222,6 +222,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 
 
 	Disp_coef = 0.
+	!-- Setting everything to zero first.
+        Q_hyp = 0.
         ! Calculating hyporheic fluxes
 	Do i = 1, totLength
 		! Find hyporheic fluxes
@@ -291,7 +293,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
   
 	!-- I have this long if statement for determining the headwaters within the grid. 
 	BC_Grid = 0
-	
+	!-- WITH NEW UPDATE AND LOOKING DOWNSTREAM, WE REALLY DON'T NEED THIS IF AND UPDATING BC_GRID,
+	!-- BUT I KEEP THAT HERE FOR NOW! 
 	if (first_time_step_DT) then	!-- To do this only one time!
 		neighbours = 0
 		DO i = 1,IXRT  !rows
@@ -436,7 +439,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
           			end if
 			end do
 		end do
-
+		!-- to convert to Deg C 
 		T_w_sim_temp = T_Trib - 273.2
 		first_time_step_DT = .false.
       
@@ -449,7 +452,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
       
       
       else
-           T_w_sim_temp = T_QSUM_local
+	 !-- It's supposed to be in Deg C
+         T_w_sim_temp = T_QSUM_local
  
       end if
      
@@ -462,10 +466,10 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
       Do i = 1 , totLength
 		! Calculate the heat fluxes
 		SW_rad = SW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), s_in, SF, albedo)
-		LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, T_a, H, C_L, viewSky, BC_Grid, FROM_NODE)	
-		LH     = LatentHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), SW_rad, LW_rad, T_w_sim_temp, T_a, H, V_wind, z_elv, BC_Grid, FROM_NODE)
-		SH     = SensibleHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, LH, T_a, H, z_elv, BC_Grid, FROM_NODE)
-		CH     = BedSediment_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)),  dx, T_w_sim_temp, P_s, C_E, Pw_river, T_bed, BC_Grid, FROM_NODE)
+		LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, T_a, H, C_L, viewSky)	
+		LH     = LatentHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), SW_rad, LW_rad, T_w_sim_temp, T_a, H, V_wind, z_elv)
+		SH     = SensibleHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, LH, T_a, H, z_elv)
+		CH     = BedSediment_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)),  dx, T_w_sim_temp, P_s, C_E, Pw_river, T_bed)
 		! Net heat flux
 		Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = SW_rad + LW_rad + LH + SH + CH
 		! Calculate mixture temperature for each node and time step 
@@ -495,57 +499,64 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 		! -- ##### TO HERE #####
 
 		! For the very upstream grid where there is no information in the prior grid:
-		if (BC_Grid(CH_NETLNK(CHANXI(i),CHANYJ(i))) .eq. 1) then
-			up = 0.
-			if ((y_w(FROM_NODE(i)) .EQ. 0.) .OR. (V_w(FROM_NODE(i)) .EQ. 0.)) then
-			   Dispersion = 0.
- 			   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
-			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-			else
-			   Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
-						 (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * &
-						  V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))) - up)) / dx
-			   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			end if
+		! Since I am looking downstream inplace of upstream now!
+		!if (BC_Grid(CH_NETLNK(CHANXI(i),CHANYJ(i))) .eq. 1) then
+		!	self = 0.
+		!	if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
+		!	   Dispersion = 0.
+ 		!	   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
+		!	   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		!	else
+		!	   Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
+		!				 (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * &
+		!				  V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))) - self)) / dx
+		!	   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		!	   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		!	end if
 
 		!-- Sooo, I had to update this code here because I don't know how to get access to the upper cell which is discharing to our target cell.
 		!-- I though the "FROM_NODE" would be the key but after printing the array, it turns out that the array is actually starts form 1 to the NLINKS.
 		!-- nothing speccific about the FROM_NODE
 		!-- To me, that means the model doesn't care about that FROM_NODE. 
-		!-- Still, I make write the code with this idea that the FROM_NODE works properly. 
-		else	
-                        if ((y_w(FROM_NODE(i)) .EQ. 0.) .OR. (V_w(FROM_NODE(i)) .EQ. 0.)) then
-			   up = 0.
-			   Dispersion = 0.
-			   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1)
-			   FluxTemp = T_w_sim_temp(FROM_NODE(i))
-			else
-			   !up = (Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))-1) / &
-			   !	(rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))-1) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))-1)))
-			   up = Net_HeatFlux(FROM_NODE(i)) / &
-				(rho_water * c_water * y_w(FROM_NODE(i)) * V_w(FROM_NODE(i)))
-			   Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
-				 (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * &
-					      V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))) - up)) / dx
+		!-- Therefore, I updated the model's formulation to wotk with TO_NODE instead 
+		!else
+		!-- Self
+                 if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
+		     self = 0.
+		 else
+		     self = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
+				(rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		 end if
+		 !-- looking downstream
+		 if ((y_w(TO_NODE(i)) .EQ. 0.) .OR. (V_w(TO_NODE(i)) .EQ. 0.)) then
+		     Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * -1. * self) / dx  
+		 else
+		     Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(TO_NODE(i)) / &
+				 (rho_water * c_water * y_w(TO_NODE(i)) * V_w(TO_NODE(i)))) - self)) / dx
+		 end if
+		 !-- Putting everything together, for the advection and dispersion
+		 if (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then 
 			   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			   FluxTemp = T_w_sim_temp(FROM_NODE(i)) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			end if
+			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		 else
+			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		 end if
 
-		end if
+		!end if
 
 		! -- We don't apply the lateral inflows to T_w_sim; They will be applied to the final porduct, T_QSUM later, 
-		T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),2) = FluxTemp
-
+                !-- Deg C to Deg K
+		T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
 
 		!-- getting a weighted average
 		if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .gt. 0) then
 		   if ((Q_Trib_csm(CHANXI(i),CHANYJ(i))+Q_GW_csm(CHANXI(i),CHANYJ(i))+ Q_hyp(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
 		      TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.
 		   else
-		      TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_csm(CHANXI(i),CHANYJ(i))*(T_Trib(i)-273.1)) + & 
-                                                            (Q_GW_csm(CHANXI(i),CHANYJ(i))*(T_GW(i)-273.1)) + &
-							    (Q_hyp(CHANXI(i),CHANYJ(i))*(T_hyp(i)-273.1))) / &
+		      !-- in Deg K
+		      TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_csm(CHANXI(i),CHANYJ(i))*T_Trib(i)) + &                                                     
+                                                            (Q_GW_csm(CHANXI(i),CHANYJ(i))*T_GW(i)) + &
+							    (Q_hyp(CHANXI(i),CHANYJ(i))*T_hyp(i))) / &
 							   (Q_Trib_csm(CHANXI(i),CHANYJ(i))+Q_GW_csm(CHANXI(i),CHANYJ(i))+ &
 							    Q_hyp(CHANXI(i),CHANYJ(i)))
 		   end if
@@ -568,46 +579,51 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 	      Q_strTot = 0.
 	      T_strTot = 0.
 	      Do j = 1, totLength
-		 if (TO_NODE(j) .eq. i) then
-		     Q_strTot = Q_strTot + Q_str(j)
-		     if ((Q_strTot +  Q_str(j)) .EQ. 0.) then
-			T_strTot = 0.
+	      	 if (TO_NODE(j) .eq. i) then
+	      	     Q_strTot = Q_strTot + Q_str(j)
+	      	     if ((Q_strTot +  Q_str(j)) .EQ. 0.) then
+	      		T_strTot = 0.
 		     else
-			T_strTot = (Q_strTot * T_strTot + Q_str(j) * T_w_sim_temp(j)) / &
-				(Q_strTot +  Q_str(j))
-		     end if
+			T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
+				(Q_strTot + Q_str(j))		
+		     end if   
 		  end if
+		  
 	      end do
-
+	      
+              !-- to Deg K
+	      T_strTot = T_strTot + 273.2
 			
 	      !-- inflow to node across each face  
 	      !if(TYPEL(i) .eq. 0) then                         ! -- If stream; only regular nodes have to attribute
-
-	      T_QSUM_local(i) = ((Q_strTot * T_strTot) + &
-			   (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i,2)) + &
-			   (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
-			   (Q_strTot+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+	      !-- in Deg K
+	      T_QSUM_local(i) = ((ABS(Q_strTot) * T_strTot) + &
+			   (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))*T_w_sim(i)) + &
+			   (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))*TLateral(i))) / &
+			   (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))))
 
 			   !print *,"---------------------------"
 			   !print *,"Q_strTot=", Q_strTot
 			   !print *,"T_strTot=", T_strTot
 			   !print *,"QLINK(i,1)=", QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
-			   !print *,"T_w_sim(i,2)=", T_w_sim(i,2)  
+			   !print *,"T_w_sim(i,2)=", T_w_sim(i)  
 			   !print *,"QLateral=", QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 			   !print *,"TLateral=", TLateral(i)   
 			   !print *,"T_QSUM_local(i)", T_QSUM_local(i)
 			   !print *,"---------------------------"
-
+              
+              ! Deg K to Deg C for the output and energy balance
+	      T_QSUM_local(i) = T_QSUM_local(i) - 273.2
 
               ! Update the vector to be used in the next time step.		 
-	      !T_w_sim(i,2) = T_QSUM_local(i)						
+	      !T_w_sim(i) = T_QSUM_local(i)						
 
 	      ! -- Q_str = QSUM(TO_NODE(i))                   : The amount of the water is gonna be sent to the grid in the downstream?
 	      ! -- 						QSUM's unit is volume, that means the QLateral also should be converted to the volume. 
 	      ! -- T_QSUM(TO_NODE(i))                         : The temperature we are gonna attach to the QSUM to affect it's downstream
 	      ! -- QLINK(i,1)                                 : Volume of the water that updates the QSUM and in the case of cells 9 & 13 go to 14 (my example),  
 	      !                                                 They could both update the flux of the cell #14. It's unit also is volume
-	      ! -- T_w_sim(i,2)                               : Simulated water temperature based on the energy budget calculations, not affected by the lateral inlflows
+	      ! -- T_w_sim(i)                                 : Simulated water temperature based on the energy budget calculations, not affected by the lateral inlflows
 	      ! -- QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))   : Lateral surface and subsurface inflows
 	      ! -- TLateral(i)                                : Temperature of the lateral surface and subsurface inflows,(combined) 
 	      !						        based on the equation I showed earlier today
@@ -616,21 +632,17 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  T_a, H, V_w
 
      end DO
 
-    print *,"---------------------------"
-    print *,"Q_strTot="
-    print *,Q_strTot			   
-    print *,"T_strTot="
-    print *,T_strTot
-    print *,"QLINK(:,1)="
-    print *,QLINK(:,1)
-    print *,"T_w_sim(:,2)=" 
-    print *,T_w_sim(:,2) 
-    print *,"QLateral="
-    print *,QLateral
-    print *,"TLateral="   
-    print *,TLateral
-    print *,"T_QSUM_local:"
-    print *,T_QSUM_local
+    !print *,"---------------------------"
+    !print *,"QLINK(:,1)="
+    !print *,QLINK(:,1)
+    !print *,"T_w_sim=" 
+    !print *,T_w_sim
+    !print *,"QLateral="
+    !print *,QLateral
+    !print *,"TLateral="   
+    !print *,TLateral
+    !print *,"T_QSUM_local:"
+    !print *,T_QSUM_local
 
     first_time_step_DTCT = .false.
              
@@ -664,7 +676,7 @@ end function SW_RAD_FLUX
 !   FUNCTION Longwave radiation flux
 ! ------------------------------------------------
 
-real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky, BC_Grid, FROM_NODE)
+real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky)
 	! Longwav radiation flux for the desired time step and grid
 	implicit none
 
@@ -680,22 +692,17 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky, BC_Grid, FROM_NO
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, C_L, viewSky
-	INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
+	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
         
 	SBConst = 0.000000056696;	! Initializing the Stefan-Boltzman constant
-
-	if ((BC_Grid(space) .EQ. 1) .or. (space .EQ. 1)) then
-		StrTemp = T_w_sim(space)
-	else
-		StrTemp = T_w_sim(FROM_NODE(space))
-	end if
+	StrTemp = T_w_sim(space)
 	
 	! Saturation Vapor Pressure (modified from Chapra 1997 and Raudkivi 1979)
-	satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (T_a(space)))
+	satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (T_a(space)-273.2))
 	! Vapor Pressure (Bedient and Huber 1992)
 	VapPreReal = (H(space) / 100.0) * satVapPre
 	! Atmospheric Emissivity (Dingman 2002, Kustas et al. 1994)
-	emis = 1.72 * (((VapPreReal) / (T_a(space)))**(1.0 / 7.0)) * &
+	emis = 1.72 * (((VapPreReal) / (T_a(space)-273.2))**(1.0 / 7.0)) * &
 		(1.0 + ((0.22 * C_L(space)) ** 2.0))		! See Dingman (2002) p 282
 
         ! Put a control here		
@@ -721,7 +728,7 @@ end function LW_RAD_FLUX
 ! ------------------------------------------------
 !   FUNCTION Latent heat flux
 ! ------------------------------------------------
-real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_elv, BC_Grid, FROM_NODE)
+real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_elv)
 	
 	implicit none
 	REAL    :: c_air = 1004.	! Heat capacity of air (J/kg deg C)
@@ -740,26 +747,21 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, V_wind, z_elv
-	INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE 
-	
-	if ((BC_Grid(space) .EQ. 1) .or. (space .EQ. 1)) then
-		StrTemp = T_w_sim(space)
-	else
-		StrTemp = T_w_sim(FROM_NODE(space))
-	end if
+	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE 
+	StrTemp = T_w_sim(space)
 	
 	! <<<<<<<<< Evaporation section >>>>>>>>
 	! Calculate the latent heat of vaporization J/kg ((Maidment, 1993)
 	L_e = 1000000 * (2.501 - (0.002361 * StrTemp))		
 	! Calculate the slope of the saturation vapor pressure curve at a given air temperature
 	! (modified from Chapra 1997 and Raudkivi 1979)
-	satVapPreLat = 0.611 * exp((17.27 * T_a(space)) / (T_a(space)))
+	satVapPreLat = 0.611 * exp((17.27 * T_a(space)-273.2) / (T_a(space)-273.2))
 	! Vapor Pressure Based on Saturation Vapor Pressure Using Stream Temperature
 	! (Bedient and Huber 1992)
 	VapPreReal = (H(space) / 100.0) * satVapPreLat
 	! Slope of the saturation vapor pressure curve (kPa/C) is calculated as 
 	! (Maidment, 1993)
-	s = (4100.0 * satVapPreLat) / ((T_a(space)) ** 2.0)
+	s = (4100.0 * satVapPreLat) / ((T_a(space)-273.2) ** 2.0)
 	! Calculate the aerodynamic resistance (s/m)
 	! (Westhoff et al., 2007)
 	r_a = 245.0 / ((0.54 * V_wind(space)) + 0.5)
@@ -784,7 +786,7 @@ end function LatentHeat_FLUX
 ! ------------------------------------------------
 !   FUNCTION Sensible heat flux
 ! ------------------------------------------------
-real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, z_elv, BC_Grid, FROM_NODE)
+real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, z_elv)
 	
 	implicit none
 	REAL    :: c_air = 1004.	! Heat capacity of air (J/kgC)
@@ -800,14 +802,9 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, z_elv, BC_Grid, FROM
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, z_elv
-	INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
+	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
        
-
-	if ((BC_Grid(space) .EQ. 1) .or. (space .EQ. 1)) then
-		StrTemp = T_w_sim(space)
-	else
-		StrTemp = T_w_sim(FROM_NODE(space))
-	endif
+	StrTemp = T_w_sim(space)
 	
 	! Saturation vapor pressure of the evaporating surface (KPa)
 	! (Dingman, 1994; Maidment, 1993)
@@ -825,7 +822,7 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, z_elv, BC_Grid, FROM
 	! Bowen ratio
 	! (Evans et al.,1998; Magnusson et al., 2012; Webb and Zhang, 1997; Westhoff et al., 2007)
 	! (modified for units from Bedient and Huber 1992)
-	B_r = 0.00061 * Pa_air * ((StrTemp - T_a(space)) / (ews - ewa))
+	B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
 
 	SensibleHeat_FLUX = B_r * LH
 	
@@ -835,7 +832,7 @@ end function SensibleHeat_FLUX
 ! ------------------------------------------------
 !   FUNCTION Conduction Flux
 ! ------------------------------------------------
-real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed, BC_Grid, FROM_NODE)
+real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
 	
 	implicit none
 
@@ -860,19 +857,13 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed, BC
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  P_s, C_E, Pw_river, T_bed
-	INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
-	
+	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
+	StrTemp = T_w_sim(space)
 	! Assigning the numbers
 	Sed_ThermalDiffuse = 0.0000045
 	H2O_ThermalDiffuse = 0.00000014331
 	Sed_Density = 1600.0
 	Sed_HeatCapacity = 2219.0
-
-	if ((BC_Grid(space) .EQ. 1) .or. (space .EQ. 1)) then
-		StrTemp = T_w_sim(space)
-	else
-		StrTemp = T_w_sim(FROM_NODE(space))
-	end if
 
 	! ======================================================
 	! Calculate Volumetric Ratio of Water and Substrate
