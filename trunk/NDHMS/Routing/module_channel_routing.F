@@ -1332,15 +1332,15 @@ gwOption:   if(gwBaseSwCRT == 3) then
    
            KRT = KRT + 1                     !-- iterate on the timestep
            if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval             
-
-          end do crnt   !--- DTCT timestep of DT_STEPS
-
            
           !-- Reza's update goes in here:
           !-- The RUN function should be called here. 
 	  ! Run the subroutine to diaggregate
           rt_domain(did)%QSUM = QSUM
           call riverTempRuns%riverTemp_run(did)
+
+          end do crnt   !--- DTCT timestep of DT_STEPS
+
 
 
            HLINK = HLINKTMP                 !-- update head based on final solution in timestep
