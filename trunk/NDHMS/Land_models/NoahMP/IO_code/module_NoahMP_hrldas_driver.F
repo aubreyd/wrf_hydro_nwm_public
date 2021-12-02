@@ -119,7 +119,7 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  IOPT_PEDO ! soil pedotransfer function option
   INTEGER                                 ::  IOPT_CROP ! crop model option (0->none; 1->Liu et al.)
   INTEGER                                 ::  IOPT_IMPERV !imperviousness infiltration adjustment (0->none; 1->total; 
-                                                                                        !2->Alley&Veenhuis; 3->Sutherland)
+                                                                                        !2->Alley&Veenhuis)
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  T_PHY     ! 3D atmospheric temperature valid at mid-levels [K]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  QV_CURR   ! 3D water vapor mixing ratio [kg/kg_dry]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  U_PHY     ! 3D U wind component [m/s]
@@ -159,8 +159,6 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  mfsno_2D   ! Snow cover m parameter
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfexp_2D! exponent in the shape parameter for soil resistance option 1
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  imperv_2D  ! impervious fraction
-  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  impconnA_2D ! impervious connectivity A parameter from Sutherland 2000
-  REAL, ALLOCATABLE, DIMENSION(:,:)       ::  impconnB_2D ! impervious connectivity B parameter from Sutherland 2000
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  axaj_2D    ! Tension water distribution inflection parameter [-]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  bxaj_2D    ! Tension water distribution shape parameter [-]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  xxaj_2D    ! Free water distribution shape parameter [-]
@@ -751,8 +749,6 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( mfsno_2D   (XSTART:XEND,YSTART:YEND) )            ! Snow cover m parameter
   ALLOCATE ( rsurfexp_2D(XSTART:XEND,YSTART:YEND) )            ! exponent in the shape parameter for soil resistance option 1
   ALLOCATE ( imperv_2D  (XSTART:XEND,YSTART:YEND) )            ! impervious fraction
-  ALLOCATE ( impconnA_2D  (XSTART:XEND,YSTART:YEND) )          ! impervious connectivity A parameter from Sutherland 2000
-  ALLOCATE ( impconnB_2D  (XSTART:XEND,YSTART:YEND) )          ! impervious connectivity B parameter from Sutherland 2000
   ALLOCATE ( axaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution inflection parameter [-]
   ALLOCATE ( bxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Tension water distribution shape parameter [-]
   ALLOCATE ( xxaj_2D    (XSTART:XEND,YSTART:YEND) )            ! Free water distribution shape parameter [-]
@@ -1101,13 +1097,18 @@ module module_NoahMP_hrldas_driver
     CALL READ_3D_SOIL(noah_lsm%SPATIAL_FILENAME, XSTART, XEND, YSTART, YEND, &
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
-		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D, &
-                      IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D)
+		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D)
 
     if (noah_lsm%runoff_option == 7) then
         CALL READ_XAJ_RUNOFF(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
                              AXAJ_2D,BXAJ_2D,XXAJ_2D)
     end if
+
+    if (noah_lsm%imperv_option > 0) then
+        CALL READ_IMPERV(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
+                             IMPERV_2D)
+    end if
+
 #endif
 
 !------------------------------------------------------------------------
@@ -1686,7 +1687,7 @@ end subroutine land_driver_ini
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
-                 IMPERV_2D,IMPCONNA_2D,IMPCONNB_2D,                           &
+                 IMPERV_2D,                                                   &
                  AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
 #endif
 #ifdef WRF_HYDRO
