@@ -1367,16 +1367,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
    ! ! If crocus is off, these should not be outputted
    if (noah_lsm%crocus_opt == 0) then
-      fileMeta%outFlag(101) = 0
-      fileMeta%outFlag(102) = 0
-      fileMeta%outFlag(103) = 0
-      fileMeta%outFlag(104) = 0
-      fileMeta%outFlag(108) = 0
-      fileMeta%outFlag(109) = 0
-      fileMeta%outFlag(111) = 0
-      fileMeta%outFlag(114) = 0
-      fileMeta%outFlag(115) = 0
-      fileMeta%outFlag(116) = 0
+      fileMeta%outFlag(99:116) = 0
    end if
 
    ! call the GetModelConfigType function
@@ -1448,14 +1439,15 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define snow_layers dimension')
          iret = nf90_def_dim(ftnNoahMP,'reference_time',1,dimId(6))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define reference_time dimension')
-         if (noah_lsm%crocus_opt == 1) &
-              iret = nf90_def_dim(ftnNoahMP,'glacier_levels',fileMeta%act_lev,dimId(8))
-         call nwmCheck(diagFlag,iret,'ERROR: Unable to define act_layers dimension')
          ! Only create vis_nir if we are outputting the two snow albedo variables.
          ! Otherwise these are unecessary dimensions.
          if ((fileMeta%outFlag(96) .eq. 1) .or. (fileMeta%outFlag(96) .eq. 1)) then
-         iret = nf90_def_dim(ftnNoahMP,'vis_nir',fileMeta%numSpectrumBands,dimId(7))
-         call nwmCheck(diagFlag,iret,'ERROR: Unable to define vis_nir dimension')
+           iret = nf90_def_dim(ftnNoahMP,'vis_nir',fileMeta%numSpectrumBands,dimId(7))
+           call nwmCheck(diagFlag,iret,'ERROR: Unable to define vis_nir dimension')
+         endif
+         if (noah_lsm%crocus_opt == 1) then
+           iret = nf90_def_dim(ftnNoahMP,'glacier_levels',fileMeta%act_lev,dimId(8))
+           call nwmCheck(diagFlag,iret,'ERROR: Unable to define act_layers dimension')
          endif
 
          ! Create and populate reference_time and time variables.

@@ -1322,7 +1322,9 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             40,40,40, &             !108-110
                             40,40,40, &             !111-113
                             40,1,1]                 !114-116
-   ldasOutDict%numLev(105:114) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
+   ! Set crocus levels to number from namelist.
+   ! Note that this will be 0 if crocus is not active... do we need an if check?
+   ldasOutDict%numLev(105:114) = ldasOutDict%act_lev 
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10
