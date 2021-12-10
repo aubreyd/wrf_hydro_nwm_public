@@ -309,6 +309,7 @@ MODULE MODULE_SF_NOAHMPLSM
      REAL :: BATS_NIR_DIR !cosz factor for direct NIR snow albedo Yang97 eqn. 16
      REAL :: RSURF_SNOW   !surface resistance for snow(s/m)
      REAL :: RSURF_EXP    !exponent in the shape parameter for soil resistance option 1
+     REAL :: SWE_LIMIT    !maximum SWE limit (mm)
      REAL :: IMPERV       !impervious fraction
 
 !------------------------------------------------------------------------------------------!
@@ -1113,7 +1114,11 @@ ENDIF   ! CROPTYPE == 0
 
      IF(parameters%HVT> 0. .AND. parameters%HVT <= 1.0) THEN          !MB: change to 1.0 and 0.2 to reflect
        SNOWHC = parameters%HVT*EXP(-SNOWH/0.2)             !      changes to HVT in MPTABLE
-       FB     = MIN(SNOWH,SNOWHC)/SNOWHC
+       if (SNOWHC .le. SNOWH) then  ! AD: change this min to an if then since precision was leading to divide by 0s
+          FB = 1.
+       else 
+          FB = SNOWH/SNOWHC
+       endif
      ENDIF
 
      ELAI =  LAI*(1.-FB)
@@ -6102,9 +6107,9 @@ ENDIF   ! CROPTYPE == 0
 
 !to obtain equilibrium state of snow in glacier region
        
-   IF(SNEQV > 5000.) THEN   ! 5000 mm -> maximum water depth
+   IF(SNEQV > parameters%SWE_LIMIT) THEN   ! 5000 mm -> maximum water depth
       BDSNOW      = SNICE(0) / DZSNSO(0)
-      SNOFLOW     = (SNEQV - 5000.)
+      SNOFLOW     = (SNEQV - parameters%SWE_LIMIT)
       SNICE(0)    = SNICE(0)  - SNOFLOW 
       DZSNSO(0)   = DZSNSO(0) - SNOFLOW/BDSNOW
       SNOFLOW     = SNOFLOW / DT
@@ -9305,6 +9310,7 @@ MODULE NOAHMP_TABLES
     REAL :: BATS_NIR_DIR_TABLE  !cosz factor for direct NIR snow albedo Yang97 eqn. 16
     REAL :: RSURF_SNOW_TABLE    !surface resistance for snow(s/m)
     REAL :: RSURF_EXP_TABLE    !exponent in the shape parameter for soil resistance option 1
+    REAL :: SWE_LIMIT_TABLE     !maximum SWE limit (mm)
     REAL :: IMPERV_URBAN_TABLE  !imperviousness fraction
 
 ! MPTABLE.TBL crop parameters
@@ -9811,12 +9817,12 @@ CONTAINS
     REAL :: CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN
+	    RSURF_SNOW,RSURF_EXP,SWE_LIMIT,IMPERV_URBAN
 
     NAMELIST / noahmp_global_parameters / CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN
+	    RSURF_SNOW,RSURF_EXP,SWE_LIMIT,IMPERV_URBAN
 
 
     ! Initialize our variables to bad values, so that if the namelist read fails, we come to a screeching halt as soon as we try to use anything.
@@ -9841,6 +9847,7 @@ BATS_VIS_DIR_TABLE   = -1.E36
 BATS_NIR_DIR_TABLE   = -1.E36
 RSURF_SNOW_TABLE     = -1.E36
  RSURF_EXP_TABLE     = -1.E36
+ SWE_LIMIT_TABLE     = -1.E36
 IMPERV_URBAN_TABLE   = -1.E36
 
     inquire( file='MPTABLE.TBL', exist=file_named ) 
@@ -9879,6 +9886,7 @@ BATS_VIS_DIR_TABLE   = BATS_VIS_DIR
 BATS_NIR_DIR_TABLE   = BATS_NIR_DIR
 RSURF_SNOW_TABLE     = RSURF_SNOW
  RSURF_EXP_TABLE     = RSURF_EXP
+ SWE_LIMIT_TABLE     = SWE_LIMIT
 IMPERV_URBAN_TABLE   = IMPERV_URBAN
 
   end subroutine read_mp_global_parameters
