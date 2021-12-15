@@ -63,6 +63,8 @@ module config_base
      integer  :: finemesh_factor
      integer  :: forc_typ
      integer  :: snow_assim
+     real     :: precip_multiplier = 1.0
+     real     :: temp_addition = 0.0
   end type WRF_HYDRO_OFFLINE_
 
   TYPE namelist_rt_
@@ -811,10 +813,12 @@ contains
     integer  :: ierr
     integer  :: finemesh, finemesh_factor
     integer  :: forc_typ, snow_assim
+    real     :: precip_multiplier = 1.0
+    real     :: temp_addition = 0.0
 
     namelist /WRF_HYDRO_OFFLINE/ &
          !LRK - Remove HRLDAS_ini_typ and GEO_STATIC_FLNM for WRF-Hydro
-         finemesh,finemesh_factor,forc_typ, snow_assim
+         finemesh,finemesh_factor,forc_typ, snow_assim, precip_multiplier, temp_addition
     !finemesh,finemesh_factor,forc_typ, snow_assim , GEO_STATIC_FLNM, HRLDAS_ini_typ
 
 #ifndef NCEP_WCOSS
@@ -837,6 +841,8 @@ contains
     wrf_hydro%finemesh_factor = finemesh_factor
     wrf_hydro%forc_typ = forc_typ
     wrf_hydro%snow_assim = snow_assim
+    wrf_hydro%precip_multiplier = precip_multiplier
+    wrf_hydro%temp_addition = temp_addition
 
   end subroutine init_wrf_hydro
 
@@ -891,6 +897,8 @@ contains
 
     integer  :: finemesh, finemesh_factor
     integer  :: forc_typ, snow_assim
+    real     :: precip_multiplier = 1.0
+    real     :: temp_addition = 0.0
 
     namelist / NOAHLSM_OFFLINE /    &
          indir, nsoil, soil_thick_input, forcing_timestep, noah_timestep, &
@@ -913,7 +921,7 @@ contains
          xstart, xend, ystart, yend, rst_bi_out, rst_bi_in
 
     namelist /WRF_HYDRO_OFFLINE/ &
-         finemesh,finemesh_factor,forc_typ, snow_assim
+         finemesh,finemesh_factor,forc_typ, snow_assim, precip_multiplier, temp_addition
 
     noah_lsm%nsoil                   = -999
     noah_lsm%soil_thick_input        = -999
@@ -973,6 +981,8 @@ contains
     wrf_hydro%finemesh_factor = 0!finemesh_factor
     wrf_hydro%forc_typ = forc_typ
     wrf_hydro%snow_assim = 0!snow_assim
+    wrf_hydro%precip_multiplier = precip_multiplier
+    wrf_hydro%temp_addition = temp_addition
 
     noah_lsm%indir = indir
     noah_lsm%nsoil = nsoil ! number of soil layers

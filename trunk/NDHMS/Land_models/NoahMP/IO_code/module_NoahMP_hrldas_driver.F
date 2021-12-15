@@ -1535,7 +1535,8 @@ end subroutine land_driver_ini
            CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
                T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
-               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0)
+               GLW,SWDOWN,RAINBL_tmp,LAI,VEGFRA,state%SNOWH,ITIME,noah_lsm%FORCING_TIMESTEP,prcp0, &
+               wrf_hydro%precip_multiplier, wrf_hydro%temp_addition)
 
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 

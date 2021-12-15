@@ -74,7 +74,8 @@
 
        subroutine HYDRO_frocing_drv (indir,forc_typ, snow_assim,olddate,     &
           ixs, ixe,jxs,jxe,                       &
-          T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1,lai,fpar,snodep, kt, FORCING_TIMESTEP,pcp_old)
+          T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1,lai,fpar,snodep, kt, FORCING_TIMESTEP,pcp_old, &
+          precip_multiplier, temp_addition)
 
          use module_lsm_forcing, only: read_hydro_forcing
          use config_base, only: nlst
@@ -86,6 +87,7 @@
          real, dimension(ixs:ixe,jxs:jxe):: T2,Q2X,U,V,PRES,XLONG,SHORT,PRCP1, &
                  lai, fpar,snodep, pcp_old
          integer :: forc_typ, snow_assim, FORCING_TIMESTEP
+         real    :: precip_multiplier, temp_addition
 
          ix = ixe-ixs+1
          jx = jxe-jxs+1
@@ -96,6 +98,11 @@
             ix,jx,forc_typ,snow_assim,  &
             T2,q2x,u,v,pres,xlong,short,prcp1,&
             lai,fpar,snodep,FORCING_TIMESTEP*1.0,kt, pcp_old)
+         ! Apply forcing adjusters
+         prcp1 = prcp1 * precip_multiplier
+         pcp_old = pcp_old * precip_multiplier
+         T2 = T2 + temp_addition
+
        end subroutine HYDRO_frocing_drv
 
        subroutine get_greenfrac(inFile,greenfrac, idim, jdim, olddate,SHDMAX)
