@@ -2901,8 +2901,11 @@ contains
     integer :: ierr
     integer :: varid
     integer :: dimid_times, dimid_datelen, dimid_ix, dimid_jx, dimid_dum, dimid_layers, dimid_snow_layers, dimid_sosn_layers, dimid_lake_layers
+    integer :: dimid_lakesoilsnow_layers, dimid_lakesoilsnow_layers2, dimid_lakesoil_layers
     character(len=19) :: date19
     integer :: rank
+    integer, parameter :: nlevsnow = 5
+    integer, parameter :: nlevsoil = 10
 
 #ifdef _PARALLEL_
 
@@ -2951,6 +2954,9 @@ contains
     ierr = nf90_def_dim(ncid, "snow_layers", nsnow, dimid_snow_layers)
     ierr = nf90_def_dim(ncid, "sosn_layers", nsnow+nsoil, dimid_sosn_layers)
     ierr = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
+    ierr = nf90_def_dim(ncid, "lakesoilsnow_layers", nlevsnow+nlevsoil, dimid_lakesoilsnow_layers)
+    ierr = nf90_def_dim(ncid, "lakesoilsnow_layers2", nlevsnow+nlevsoil+1, dimid_lakesoilsnow_layers2)
+    ierr = nf90_def_dim(ncid, "lakesoil_layers", nlevsoil, dimid_lakesoil_layers)
 
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "RESTART FILE FROM HRLDAS "//version)
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "missing_value", -1.E33)
@@ -3766,6 +3772,22 @@ contains
        ierr = nf90_inq_dimid(ncid, "sosn_layers", dimid_kx)
        call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
                                 "Problem nf90_inq_dimid for 'sosn_layers'")
+    else if (output_layers == "LKSS") then
+       ierr = nf90_inq_dimid(ncid, "lakesoilsnow_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoilsnow_layers'")
+    else if (output_layers == "LKEX") then
+       ierr = nf90_inq_dimid(ncid, "lakesoilsnow_layers2", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoilsnow_layers2'")
+    else if (output_layers == "LKSO") then
+       ierr = nf90_inq_dimid(ncid, "lakesoil_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoil_layers'")
+    else if (output_layers == "LAKE") then
+       ierr = nf90_inq_dimid(ncid, "lake_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lake_layers'")
     else
        stop "FATAL ERROR: In module_hrldas_netcdf_io.F add_to_restart_3d() - PANIC!"
     endif

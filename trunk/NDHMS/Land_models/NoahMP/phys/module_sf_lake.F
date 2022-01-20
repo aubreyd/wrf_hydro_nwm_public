@@ -233,7 +233,7 @@ MODULE module_sf_lake
       real(r8)  :: forc_q(1)          ! atmospheric specific humidity (kg/kg)
       real(r8)  :: forc_u(1)          ! atmospheric wind speed in east direction (m/s)
       real(r8)  :: forc_v(1)          ! atmospheric wind speed in north direction (m/s)
-     ! real(r8)  :: forc_rho(1)        ! density (kg/m**3)
+      ! real(r8)  :: forc_rho(1)        ! density (kg/m**3)
       real(r8)  :: forc_lwrad(1)      ! downward infrared (longwave) radiation (W/m**2)
       real(r8)  :: prec(1)               ! snow or rain rate [mm/s]
       real(r8)  :: sabg(1)            ! solar radiation absorbed by ground (W/m**2)
@@ -324,7 +324,6 @@ MODULE module_sf_lake
             sabg(c)            = SOLNET
             lat(c)             = XLAT_URB2D(I,J)*pie/180  ! [radian] 
             do_capsnow(c)      = .false.
-
             lakedepth(c)           = lakedepth2d(i,j)
             savedtke1(c)           = savedtke12d(i,j)
             snowdp(c)              = snowdp2d(i,j)
@@ -339,7 +338,7 @@ MODULE module_sf_lake
             enddo
             do k = -nlevsnow+1,nlevsoil
                t_soisno(c,k)      = t_soisno3d(i,k,j)
-	       h2osoi_ice(c,k)    = h2osoi_ice3d(i,k,j)
+               h2osoi_ice(c,k)    = h2osoi_ice3d(i,k,j)
                h2osoi_liq(c,k)    = h2osoi_liq3d(i,k,j)
                h2osoi_vol(c,k)    = h2osoi_vol3d(i,k,j)
                z(c,k)             = z3d(i,k,j)
@@ -384,7 +383,7 @@ MODULE module_sf_lake
             if( tsk(i,j) >= tfrz ) then
                 qfx(i,j)      = eflx_lh_tot(c)/hvap
             else
-                qfx(i,j)      = eflx_lh_tot(c)/hsub       ! heat flux (W/m^2)=>mass flux(kg/(sm^2))
+                qfx(i,j)      = eflx_lh_tot(c)/hsub      ! heat flux (W/m^2)=>mass flux(kg/(sm^2))
             endif
            enddo
 
@@ -394,11 +393,11 @@ MODULE module_sf_lake
             savedtke12d(i,j)         = savedtke1(c)
             snowdp2d(i,j)            = snowdp(c)
             h2osno2d(i,j)            = h2osno(c)
-	    snl2d(i,j)               = snl(c)
+            snl2d(i,j)               = snl(c)
             t_grnd2d(i,j)            = t_grnd(c)
             do k = 1,nlevlake
                t_lake3d(i,k,j)       = t_lake(c,k)
-	       lake_icefrac3d(i,k,j) = lake_icefrac(c,k)
+               lake_icefrac3d(i,k,j) = lake_icefrac(c,k)
             enddo
 	    do k = -nlevsnow+1,nlevsoil
 	       z3d(i,k,j)            = z(c,k)
@@ -406,7 +405,7 @@ MODULE module_sf_lake
 	       t_soisno3d(i,k,j)     = t_soisno(c,k)
 	       h2osoi_liq3d(i,k,j)   = h2osoi_liq(c,k)
 	       h2osoi_ice3d(i,k,j)   = h2osoi_ice(c,k)
-               h2osoi_vol3d(i,k,j)   = h2osoi_vol(c,k)
+           h2osoi_vol3d(i,k,j)   = h2osoi_vol(c,k)
 	   enddo
            do k = -nlevsnow+0,nlevsoil
                zi3d(i,k,j)           = zi(c,k)
@@ -576,7 +575,6 @@ MODULE module_sf_lake
                           eflx_lh_grnd,t_veg,t_ref2m,q_ref2m,taux,tauy,   &
                           ram1,ws,ks,eflx_gnet,z0mg)
  
-
     CALL ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,             & !i
                                  z_lake,ws,ks,snl,eflx_gnet,lakedepth,       &
                                  lake_icefrac,snowdp,                        & !i&o
@@ -584,8 +582,6 @@ MODULE module_sf_lake
                                  t_lake,t_soisno,h2osoi_liq,                 &
                                  h2osoi_ice,savedtke1,                       &
                                  frac_iceold,qflx_snomelt,imelt)
-
-
 
     CALL ShalLakeHydrology(dz_lake,forc_rain,forc_snow,                          & !i
                                begwb,qflx_evap_tot,forc_t,do_capsnow,            &
@@ -601,7 +597,7 @@ MODULE module_sf_lake
                                qflx_evap_tot_col,soilalpha,zwt,fcov,             &
                                rootr_column,qflx_evap_grnd,qflx_sub_snow,        &
                                qflx_dew_snow,qflx_dew_grnd,qflx_rain_grnd_col)
-                       
+
 !==================================================================================
 ! !DESCRIPTION:
 ! Calculation of Shallow Lake Hydrology. Full hydrology of snow layers is
@@ -959,7 +955,6 @@ SUBROUTINE ShalLakeFluxes(forc_t,forc_pbot,forc_psrf,forc_hgt,forc_hgt_q,       
                + htvp(c)*forc_rho(g)/raw(p)*qsatgdT(c) + tksur/dzsur(c)
 
           t_grnd(c) = ax/bx
-
           ! Update htvp
 #ifndef PERGRO
        if (t_grnd(c) > tfrz) then
@@ -1056,7 +1051,6 @@ SUBROUTINE ShalLakeFluxes(forc_t,forc_pbot,forc_psrf,forc_hgt,forc_hgt_q,       
           eflx_sh_grnd(p) = forc_rho(g)*cpair*(t_grnd(c)-thm(c))/rah(p)
           qflx_evap_soi(p) = forc_rho(g)*(qsatg(c)+qsatgdT(c)*(t_grnd(c)-t_grnd_temp) - forc_q(g))/raw(p)
        end if
-
           ! Update htvp
 #ifndef PERGRO
        if (t_grnd(c) > tfrz) then
@@ -1315,6 +1309,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
     real(r8) :: ocvts(lbc:ubc)          ! (cwat*(t_lake[n  ])*dz
     real(r8) :: ncvts(lbc:ubc)          ! (cwat*(t_lake[n+1])*dz
     real(r8) :: ke                      ! eddy diffusion coefficient (m**2/s)
+    real(r8) :: ke1                     ! eddy diffusion coefficient (m**2/s)
     real(r8) :: zin                     ! depth at top of layer (m)
     real(r8) :: zout                    ! depth at bottom of layer (m)
     real(r8) :: drhodz                  ! d [rhow] /dz (kg/m**4)
@@ -1473,23 +1468,28 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
           den = max( (ws(c)**2) * exp(-2._r8*ks(c)*z_lake(c,j)), 1.e-10_r8 )
           ri = ( -1._r8 + sqrt( max(1._r8+num/den, 0._r8) ) ) / 20._r8
           if (t_grnd(c) > tfrz .and. t_lake(c,1) > tfrz .and. snl(c) == 0) then
-            ! ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+             ke1 = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
 
              if( t_lake(c,1) > 277.15_r8 ) then 
                 if (lakedepth(c) > 15.0 ) then 
-                   ke = 1.e+2_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                   !ke = 1.e+2_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    ke  = 1.e+2_r8*ke1
                 else 
-                   ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                   !ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    ke  = ke1
                 endif
              else 
                 if (lakedepth(c) > 15.0 ) then 
                   if (lakedepth(c) > 150.0 ) then 
-                    ke = 1.e+5_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    !ke = 1.e+5_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    ke  = 1.e+5_r8*ke1
                   else 
-                    ke =1.e+4_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    !ke =1.e+4_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    ke  = 1.e+4_r8*ke1
                   end if
                 else 
-                  ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                  !ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
+                    ke  = ke1
                 endif 
              end if
 
@@ -1620,8 +1620,11 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
                 ocvts(c) = ocvts(c) - h2osno(c)*hfus
              end if
              t_soisno_bef(c,j) = t_soisno(c,j)
-             if(abs(t_soisno(c,j)-288) > 150)   then 
+
+             if(abs(t_soisno(c,j)-273) > 200)   then ! condition was originally (abs(t_soisno(c,j)-288) > 150)
                 WRITE( message,* ) 'WARNING: Extreme t_soisno at c, level',c, j
+                WRITE( message,* ) 't_soisno at c, level = ',c, j, t_soisno(c,j)
+
                 CALL wrf_error_fatal ( message )
              endif
           end if
@@ -4981,8 +4984,8 @@ end subroutine LakeDebug
   integer                  :: numb_lak    ! for debug
   character*256 :: message
 
-  IF ( RESTART ) RETURN 
-
+  IF ( RESTART ) RETURN
+  write(*,*) 'Initiate Lake Physics Model for non-restart case'
   DO j = jts,jte
   DO i = its,ite
         snowdp2d(i,j)         = snow(i,j)*0.005               ! SNOW in kg/m^2 and snowdp in m
@@ -4999,12 +5002,12 @@ end subroutine LakeDebug
     do k = -nlevsnow+1,nlevsoil
         h2osoi_liq3d(i,k,j)      = defval
         h2osoi_ice3d(i,k,j)      = defval
-	t_soisno3d(i,k,j)        = defval
+        t_soisno3d(i,k,j)        = defval
         z3d(i,k,j)               = defval 
         dz3d(i,k,j)              = defval                           
     enddo
     do k = 1,nlevlake 
-	t_lake3d(i,k,j)          = defval
+        t_lake3d(i,k,j)          = defval
         lake_icefrac3d(i,k,j)    = defval
         z_lake3d(i,k,j)          = defval
         dz_lake3d(i,k,j)         = defval
@@ -5266,7 +5269,7 @@ end subroutine LakeDebug
             z_lake3d(i,2:nlevlake,j) = zlak(2:nlevlake)*depthratio2d(i,j) + dz_lake3d(i,1,j)*(1._r8 - depthratio2d(i,j))
          end if
 ! initial t_lake3d here
-	t_soisno3d(i,1,j)      = tsk(i,j)
+        t_soisno3d(i,1,j)      = tsk(i,j)
         t_lake3d(i,1,j)        = tsk(i,j)
         t_grnd2d(i,j)          = 277.0
         do k = 2, nlevlake
@@ -5274,8 +5277,8 @@ end subroutine LakeDebug
          t_soisno3d(i,k,j)=tsk(i,j)+(277.0-tsk(i,j))/depth_c*z_lake3d(i,k,j)
          t_lake3d(i,k,j)=tsk(i,j)+(277.0-tsk(i,j))/depth_c*z_lake3d(i,k,j)
         else
-	t_soisno3d(i,k,j)      = 277.0
-        t_lake3d(i,k,j)        = 277.0
+         t_soisno3d(i,k,j)      = 277.0
+         t_lake3d(i,k,j)        = 277.0
         end if 
         enddo
 !end initial t_lake3d here
@@ -5394,7 +5397,315 @@ end subroutine LakeDebug
     end if   !lake(i,j)
   ENDDO
   ENDDO
-
+  write(*,*) 'End of Lake Physics Model initiation for non-restart case'
   END SUBROUTINE lakeini
+
+ SUBROUTINE lakeini_rst(IVGTYP,         ISLTYP,          HT,              SNOW,           & !i
+                    lake_min_elev,     restart,        lakedepth_default, lake_depth,     &
+                    lakedepth2d,    savedtke12d,     snowdp2d,        h2osno2d,       & !o
+                    snl2d,          t_grnd2d,        t_lake3d,        lake_icefrac3d, &
+                    z_lake3d,       dz_lake3d,       t_soisno3d,      h2osoi_ice3d,   &
+                    h2osoi_liq3d,   h2osoi_vol3d,    z3d,             dz3d,           &
+                    zi3d,           watsat3d,        csol3d,          tkmg3d,         &
+                    iswater,        xice,            xice_threshold,  xland,   tsk,   &
+#if (EM_CORE == 1)
+                    lakemask,       lakeflag,                                         &
+#endif
+                    lake_depth_flag, use_lakedepth,                                   &
+                    tkdry3d,        tksatu3d,        lake,            its, ite, jts, jte, &
+                    ims,ime, jms,jme)
+
+!==============================================================================
+! This subroutine was written based on SUBROUTINE lakeini for the restart case
+! 10/12/2020
+!==============================================================================
+
+!  USE module_wrf_error
+  implicit none
+
+  INTEGER , INTENT (IN) :: iswater
+  REAL,     INTENT(IN)  :: xice_threshold
+  REAL, DIMENSION( ims:ime , jms:jme ), INTENT(INOUT)::   XICE
+  REAL, DIMENSION( ims:ime , jms:jme ), INTENT(IN)::      TSK
+  REAL, DIMENSION( ims:ime, jms:jme )  ,INTENT(INOUT)  :: XLAND
+
+#if (EM_CORE == 1)
+  REAL, DIMENSION( ims:ime , jms:jme ) ::   LAKEMASK
+  INTEGER , INTENT (IN) :: lakeflag
+#endif
+  INTEGER , INTENT (INOUT) :: lake_depth_flag
+  INTEGER , INTENT (IN) ::   use_lakedepth
+
+  LOGICAL , INTENT(IN)      ::     restart
+  INTEGER,  INTENT(IN   )   ::     ims,ime, jms,jme
+  INTEGER,  INTENT(IN   )   ::     its,ite, jts,jte
+  INTEGER, DIMENSION( ims:ime, jms:jme ), INTENT(INOUT)       :: IVGTYP,       &
+                                                              ISLTYP
+  REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)       :: HT
+  REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(INOUT)    :: SNOW
+  real,    intent(in)                                      :: lakedepth_default,lake_min_elev
+
+  real,    dimension(ims:ime,jms:jme ),intent(in)                        :: lakedepth2d,    &
+                                                                             savedtke12d
+  real,    dimension(ims:ime,jms:jme ),intent(in)                        :: snowdp2d,       &
+                                                                             h2osno2d,       &
+                                                                             snl2d,          &
+                                                                             t_grnd2d
+
+  real,    dimension( ims:ime,1:nlevlake, jms:jme ),INTENT(in)            :: t_lake3d,       &
+                                                                             lake_icefrac3d, &
+                                                                             z_lake3d,       &
+                                                                             dz_lake3d
+  real,    dimension( ims:ime,-nlevsnow+1:nlevsoil, jms:jme ),INTENT(in)   :: t_soisno3d,     &
+                                                                             h2osoi_ice3d,   &
+                                                                             h2osoi_liq3d,   &
+                                                                             h2osoi_vol3d,   &
+                                                                             z3d,            &
+                                                                             dz3d
+  real,    dimension( ims:ime,1:nlevsoil, jms:jme ),INTENT(in)            :: watsat3d,       &
+                                                                             csol3d,         &
+                                                                             tkmg3d,         &
+                                                                             tkdry3d,        &
+                                                                             tksatu3d
+  real,    dimension( ims:ime,-nlevsnow+0:nlevsoil, jms:jme ),INTENT(in)   :: zi3d
+
+  LOGICAL, DIMENSION( ims:ime, jms:jme ),intent(out)                      :: lake
+  REAL, OPTIONAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)    ::  lake_depth
+
+  real,    dimension( ims:ime,1:nlevsoil, jms:jme )   :: bsw3d,    &
+                                                        bsw23d,   &
+                                                        psisat3d, &
+                                                        vwcsat3d, &
+                                                        watdry3d, &
+                                                        watopt3d, &
+                                                        hksat3d,  &
+                                                        sucsat3d, &
+                                                        clay3d,   &
+                                                        sand3d
+  integer  :: n,i,j,k,ib,lev,bottom      ! indices
+  real(r8),dimension(ims:ime,jms:jme )    :: bd2d               ! bulk density of dry soil material [kg/m^3]
+  real(r8),dimension(ims:ime,jms:jme )    :: tkm2d              ! mineral conductivity
+  real(r8),dimension(ims:ime,jms:jme )    :: xksat2d            ! maximum hydraulic conductivity of soil [mm/s]
+  real(r8),dimension(ims:ime,jms:jme )    :: depthratio2d       ! ratio of lake depth to standard deep lake depth
+  real(r8),dimension(ims:ime,jms:jme )    :: clay2d             ! temporary
+  real(r8),dimension(ims:ime,jms:jme )    :: sand2d             ! temporary
+
+  real(r8)                 :: scalez  = 0.025_r8   ! Soil layer thickness discretization (m)
+  logical,parameter        :: arbinit = .true.
+  real,parameter           :: defval  = -9999.0
+  integer                  :: isl
+  integer                  :: numb_lak    ! for debug
+  character*256 :: message
+
+  !IF ( RESTART ) RETURN
+  write(*,*) 'Initiate Lake Physics Model for restart case'
+
+! judge whether the grid is lake grid
+   numb_lak = 0
+       do i=its,ite
+         do j=jts,jte
+#if (EM_CORE==1)
+         IF (lakeflag.eq.0) THEN
+            if(ht(i,j)>=lake_min_elev) then
+              if ( xice(i,j).gt.xice_threshold) then   !mchen
+                   ivgtyp(i,j) = iswater
+                   xland(i,j) = 2.
+                   !lake_icefrac3d(i,1,j) = xice(i,j)
+                   xice(i,j)=0.0
+               endif
+            endif
+
+            if(ivgtyp(i,j)==iswater.and.ht(i,j)>=lake_min_elev) then
+                lake(i,j)  = .true.
+                lakemask(i,j) = 1
+                numb_lak   = numb_lak + 1
+            else
+                lake(i,j)  = .false.
+                lakemask(i,j) = 0
+            end if
+          ELSE
+            if(lakemask(i,j).eq.1) then
+                lake(i,j)  = .true.
+                numb_lak   = numb_lak + 1
+                if ( xice(i,j).gt.xice_threshold) then   !mchen
+                   ivgtyp(i,j) = iswater
+                   xland(i,j) = 2.
+                   !lake_icefrac3d(i,1,j) = xice(i,j)
+                   xice(i,j)=0.0
+                endif
+             else
+                lake(i,j)  = .false.
+             endif
+         ENDIF   ! end if lakeflag=0
+#else
+            if(ht(i,j)>=lake_min_elev) then
+              if ( xice(i,j).gt.xice_threshold) then   !mchen
+                   ivgtyp(i,j) = iswater
+                   xland(i,j) = 2.
+                   !lake_icefrac3d(i,1,j) = xice(i,j)
+                   xice(i,j)=0.0
+               endif
+            endif
+            if(ivgtyp(i,j)==iswater.and.ht(i,j)>=lake_min_elev) then
+                lake(i,j)  = .true.
+                numb_lak   = numb_lak + 1
+            else
+                lake(i,j)  = .false.
+            end if
+
+#endif
+        end do
+       end do
+    write(message,*) "the total number of lake grid is :", numb_lak
+    CALL wrf_message(message)
+!    CALL LakeDebug(msg)
+! initialize lake grid
+
+  DO j = jts,jte
+  DO i = its,ite
+
+     if ( lake(i,j) ) then
+          if ( use_lakedepth.eq.1 .and.lake_depth_flag.eq.0 ) then !mchen
+          call wrf_error_fatal ( 'STOP: You need lake-depth information. Rerun WPS or set use_lakedepth = 0')
+          end if
+
+     endif
+
+  ENDDO
+  ENDDO
+
+#ifndef EXTRALAKELAYERS
+!  dzlak(1) = 0.1_r8
+!  dzlak(2) = 1._r8
+!  dzlak(3) = 2._r8
+!  dzlak(4) = 3._r8
+!  dzlak(5) = 4._r8
+!  dzlak(6) = 5._r8
+!  dzlak(7) = 7._r8
+!  dzlak(8) = 7._r8
+!  dzlak(9) = 10.45_r8
+!  dzlak(10)= 10.45_r8
+!
+!  zlak(1) =  0.05_r8
+!  zlak(2) =  0.6_r8
+!  zlak(3) =  2.1_r8
+!  zlak(4) =  4.6_r8
+!  zlak(5) =  8.1_r8
+!  zlak(6) = 12.6_r8
+!  zlak(7) = 18.6_r8
+!  zlak(8) = 25.6_r8
+!  zlak(9) = 34.325_r8
+!  zlak(10)= 44.775_r8
+  dzlak(1) = 0.1_r8
+  dzlak(2) = 0.1_r8
+  dzlak(3) = 0.1_r8
+  dzlak(4) = 0.1_r8
+  dzlak(5) = 0.1_r8
+  dzlak(6) = 0.1_r8
+  dzlak(7) = 0.1_r8
+  dzlak(8) = 0.1_r8
+  dzlak(9) = 0.1_r8
+  dzlak(10)= 0.1_r8
+
+  zlak(1) =  0.05_r8
+  zlak(2) =  0.15_r8
+  zlak(3) =  0.25_r8
+  zlak(4) =  0.35_r8
+  zlak(5) =  0.45_r8
+  zlak(6) = 0.55_r8
+  zlak(7) = 0.65_r8
+  zlak(8) = 0.75_r8
+  zlak(9) = 0.85_r8
+  zlak(10)= 0.95_r8
+#else
+  dzlak(1) =0.1_r8
+  dzlak(2) =0.25_r8
+  dzlak(3) =0.25_r8
+  dzlak(4) =0.25_r8
+  dzlak(5) =0.25_r8
+  dzlak(6) =0.5_r8
+  dzlak(7) =0.5_r8
+  dzlak(8) =0.5_r8
+  dzlak(9) =0.5_r8
+  dzlak(10) =0.75_r8
+  dzlak(11) =0.75_r8
+  dzlak(12) =0.75_r8
+  dzlak(13) =0.75_r8
+  dzlak(14) =2_r8
+  dzlak(15) =2_r8
+  dzlak(16) =2.5_r8
+  dzlak(17) =2.5_r8
+  dzlak(18) =3.5_r8
+  dzlak(19) =3.5_r8
+  dzlak(20) =3.5_r8
+  dzlak(21) =3.5_r8
+  dzlak(22) =5.225_r8
+  dzlak(23) =5.225_r8
+  dzlak(24) =5.225_r8
+  dzlak(25) =5.225_r8
+
+  zlak(1) = dzlak(1)/2._r8
+  do k = 2,nlevlake
+     zlak(k) = zlak(k-1) + (dzlak(k-1)+dzlak(k))/2._r8
+  end do
+#endif
+
+   ! "0" refers to soil surface and "nlevsoil" refers to the bottom of model soil
+
+   do j = 1, nlevsoil
+      zsoi(j) = scalez*(exp(0.5_r8*(j-0.5_r8))-1._r8)    !node depths
+   enddo
+
+   dzsoi(1) = 0.5_r8*(zsoi(1)+zsoi(2))             !thickness b/n two interfaces
+   do j = 2,nlevsoil-1
+      dzsoi(j)= 0.5_r8*(zsoi(j+1)-zsoi(j-1))
+   enddo
+   dzsoi(nlevsoil) = zsoi(nlevsoil)-zsoi(nlevsoil-1)
+
+   zisoi(0) = 0._r8
+   do j = 1, nlevsoil-1
+      zisoi(j) = 0.5_r8*(zsoi(j)+zsoi(j+1))         !interface depths
+   enddo
+   zisoi(nlevsoil) = zsoi(nlevsoil) + 0.5_r8*dzsoi(nlevsoil)
+
+
+!!!!!!!!!!!!!!!!!!begin to initialize lake variables!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  DO j = jts,jte
+  DO i = its,ite
+
+     if ( lake(i,j) ) then
+
+                             ! Soil hydraulic and thermal properties
+         isl = ISLTYP(i,j)
+         if (isl == 14 ) isl = isl + 1
+         do k = 1,nlevsoil
+            sand3d(i,k,j)  = sand(isl)
+            clay3d(i,k,j)  = clay(isl)
+         enddo
+
+         do k = 1,nlevsoil
+            clay2d(i,j) = clay3d(i,k,j)
+            sand2d(i,j) = sand3d(i,k,j)
+            bd2d(i,j)    = (1._r8-watsat3d(i,k,j))*2.7e3_r8
+            xksat2d(i,j) = 0.0070556_r8 *( 10._r8**(-0.884_r8+0.0153_r8*sand2d(i,j)) ) ! mm/s
+            tkm2d(i,j) = (8.80_r8*sand2d(i,j)+2.92_r8*clay2d(i,j))/(sand2d(i,j)+clay2d(i,j))          ! W/(m K)
+
+            bsw3d(i,k,j) = 2.91_r8 + 0.159_r8*clay2d(i,j)
+            bsw23d(i,k,j) = -(3.10_r8 + 0.157_r8*clay2d(i,j) - 0.003_r8*sand2d(i,j))
+            psisat3d(i,k,j) = -(exp((1.54_r8 - 0.0095_r8*sand2d(i,j) + 0.0063_r8*(100.0_r8-sand2d(i,j)  &
+                              -clay2d(i,j)))*log(10.0_r8))*9.8e-5_r8)
+            vwcsat3d(i,k,j) = (50.5_r8 - 0.142_r8*sand2d(i,j) - 0.037_r8*clay2d(i,j))/100.0_r8
+            hksat3d(i,k,j) = xksat2d(i,j)
+            sucsat3d(i,k,j) = 10._r8 * ( 10._r8**(1.88_r8-0.0131_r8*sand2d(i,j)) )
+         end do
+         if (lakedepth2d(i,j) /= spval) then
+            depthratio2d(i,j) = lakedepth2d(i,j) / (zlak(nlevlake) + 0.5_r8*dzlak(nlevlake))
+         end if
+     end if
+  ENDDO
+  ENDDO
+  write(*,*) 'End of Lake Physics Model initiation for restart case'
+  END SUBROUTINE lakeini_rst
 
 END MODULE module_sf_lake

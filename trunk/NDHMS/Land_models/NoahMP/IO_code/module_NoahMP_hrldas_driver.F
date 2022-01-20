@@ -23,7 +23,7 @@ module module_NoahMP_hrldas_driver
   USE module_hrldas_netcdf_io
   USE module_sf_noahmp_groundwater
   USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm
-  USE module_sf_lake, only: lake, lakeini, nlevsoil, nlevlake, nlevsnow
+  USE module_sf_lake, only: lake, lakeini, lakeini_rst, nlevsoil, nlevlake, nlevsnow
   USE module_date_utilities
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
@@ -353,6 +353,7 @@ module module_NoahMP_hrldas_driver
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_precip
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_evap
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_grids
+  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_dh_avg      ! average change in lake water level due to P and ET (m)
 
   INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_id
 #endif
@@ -1352,9 +1353,38 @@ module module_NoahMP_hrldas_driver
                      )
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
- 
-             call  lakeini(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
-                           noah_lsm%lake_min_elev,   .true.,        noah_lsm%lakedepth_default, lake_depth,     &
+             ! If restart = T, read from RESTART files instead of call to lakeini function:
+             ! 2Ds:
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_DEPTH" ,lakedepth2d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_SAVETKE1" ,savedtke12d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_SNOWP" ,snowdp2d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_H2OSNO" ,h2osno2d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_SNL" ,snl2d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_T_GRND" ,t_grnd2d )
+             !call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_LAKE" ,lake2d )
+             ! 3Ds:
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_T_SOILSNOW" ,t_soisno3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_H2OSOI_ICE" ,h2osoi_ice3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_H2OSOI_LIQ" ,h2osoi_liq3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_H2OSOI_VOL" ,h2osoi_vol3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_Z" ,z3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_DZ" ,dz3d )
+
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_T_LAKE" ,t_lake3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_ICEFRAC" ,lake_icefrac3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_Z_LAKE" ,z_lake3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_DZ_LAKE" ,dz_lake3d )
+
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_WATSAT" ,watsat3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_CSOL" ,csol3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_TKMG" ,tkmg3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_TKDRY" ,tkdry3d )
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_TKSATU" ,tksatu3d )
+
+             call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_ZI" ,zi3d )
+
+             call  lakeini_rst(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
+                           noah_lsm%lake_min_elev,   restart_flag,        noah_lsm%lakedepth_default, lake_depth,     &
                            lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
                            snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
                            z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
@@ -1362,9 +1392,11 @@ module module_NoahMP_hrldas_driver
                            zi3d,            watsat3d,      csol3d,            tkmg3d,         &
                            iswater,         xice,          xice_threshold,     xland,  tsk,   &
                            lakemask,        lakeflag,                                         &
-                           lake_depth_flag, noah_lsm%use_lakedepth,                                    &
+                           lake_depth_flag, noah_lsm%use_lakedepth,                           &
                            tkdry3d,         tksatu3d,      lake2d,                            &
                            its,ite,jts,jte,ims,ime,jms,jme)
+            where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
+            where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
          ENDIF
  
   else  ! for none restart
@@ -1469,9 +1501,8 @@ module module_NoahMP_hrldas_driver
       TAUSSXY = 0.0   ! Need to be added to _INIT later
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
- 
              call  lakeini(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
-                           noah_lsm%lake_min_elev,   .false.,       noah_lsm%lakedepth_default, lake_depth,     &
+                           noah_lsm%lake_min_elev,   restart_flag,       noah_lsm%lakedepth_default, lake_depth,     &
                            lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
                            snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
                            z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
@@ -1482,7 +1513,6 @@ module module_NoahMP_hrldas_driver
                            lake_depth_flag, noah_lsm%use_lakedepth,                                    &
                            tkdry3d,         tksatu3d,      lake2d,                            &
                            its,ite,jts,jte,ims,ime,jms,jme)
-
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
             where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
 
@@ -1549,9 +1579,11 @@ endif
    allocate(lake_precip(nlakes))
    allocate(lake_evap(nlakes))
    allocate(lake_grids(nlakes))
+   allocate(lake_dh_avg(nlakes))
    lake_precip = 0.0
    lake_evap   = 0.0
    lake_grids  = 0
+   lake_dh_avg = 0.0
 #endif
 
    !!--- Setup variable list. Change as needed; rest of parsing should adapt automatically.
@@ -1566,8 +1598,6 @@ endif
    endif
    if (io_config_outputs .eq. 1) then
         VARLIST = 'SNOWH,SNEQV,FSNO,SOILSAT_TOP,SNOWT_AVG,ACCET'
-        ! bkhazaei: this doesn't match with the io_config ==1 in module_NWM_io.F (before adding new vars 99-103). 
-        ! For example, "EDIR" flag var number =17 is on but not listed here! Similar to vars 59 and 60 (SNLIQ and SOIL_T).
    endif
    if (io_config_outputs .eq. 2) then
         VARLIST = 'SNOWH,SNEQV,FSNO,SOILSAT_TOP,SNOWT_AVG,ACCET'
@@ -1884,25 +1914,32 @@ end subroutine land_driver_ini
          ! fake values for testing:
          !where(ivgtyp == islake) rainbl  = 2.0
          !where(ivgtyp == islake) qfx = 1.0
-
-         ! mask lake output variables:
-         LAKERAINOUT = -9999.0
-         where(IVGTYP == 28) LAKERAINOUT = RAINBL
-         LAKEEVAPOUT = -9999.0
-         where(IVGTYP == 28) LAKEEVAPOUT = QFX * 3600.0 ! to convert from kg/m2/s to mm in the LDASOUT file
-         LAKEDEPTHOUT = -9999.0
-         where(IVGTYP == 28) LAKEDEPTHOUT = lakedepth2d
 #ifdef WRF_HYDRO
+#endif
          do ilake = 1, nlakes
-           ! find this ID for this lake
+
+           ! find ID for this lake:
            lake_idx = rt_domain(did)%lakeidm(ilake)
 
            lake_precip(ilake) = sum(rainbl , mask = lake_id == lake_idx)
            lake_evap(ilake) = sum(qfx, mask = lake_id == lake_idx)
            lake_grids(ilake) = count(mask = lake_id == lake_idx)
-         end do
-#endif
 
+           ! update lake depth based on based on net (P-ET) at surface
+           ! lake_precip units converted from mm/s to m
+           ! lake_evap units converted from kg/m2/s to m
+           ! dtbl is time step in seconds
+           lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600.)*dtbl/3600./1000.
+           where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
+         end do
+
+         ! mask lake output variables:
+         LAKERAINOUT = -9999.0
+         where(IVGTYP == 28) LAKERAINOUT = RAINBL * dtbl / 3600.0 ! to convert from mm/s to mm in the LDASOUT file
+         LAKEEVAPOUT = -9999.0
+         where(IVGTYP == 28) LAKEEVAPOUT = QFX * 3600.0 * dtbl / 3600.0 ! to convert from kg/m2/s to mm in the LDASOUT file
+         LAKEDEPTHOUT = -9999.0
+         where(IVGTYP == 28) LAKEDEPTHOUT = lakedepth2d
          ENDIF
  
   IF(noah_lsm%RUNOFF_OPTION.EQ.5.AND.MOD(ITIME,STEPWTD).EQ.0)THEN
@@ -2248,6 +2285,7 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKEDEPTHOUT,IVGTYP,101)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nlevlake,t_lake3d,IVGTYP,102)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nlevlake,lake_icefrac3d,IVGTYP,103)
+
 #endif /* WRF_HYDRO */
 
 !#ifdef WRF_HYDRO
@@ -2350,7 +2388,37 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,RIVERBEDXY , "RIVERBEDXY"  )
   call add_to_restart(ncid,EQZWT , "EQZWT"  )
   call add_to_restart(ncid,PEXPXY , "PEXPXY"  )
+  ! If lake model is on (sf_lake_physics = 1)
+  IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+     ! 2Ds:
+     call add_to_restart(ncid,lakedepth2d , "LAKE_DEPTH")
+     call add_to_restart(ncid,savedtke12d , "LAKE_SAVETKE1")
+     call add_to_restart(ncid,snowdp2d , "LAKE_SNOWP")
+     call add_to_restart(ncid,h2osno2d , "LAKE_H2OSNO")
+     call add_to_restart(ncid,snl2d , "LAKE_SNL")
+     call add_to_restart(ncid,t_grnd2d , "LAKE_T_GRND")
+     !call add_to_restart(ncid,lake2d , "LAKE_LAKE")
+     ! 3Ds:
+     call add_to_restart(ncid,t_soisno3d, "LAKE_T_SOILSNOW", layers="LKSS") ! LKSS is lake soil+snow layers =15
+     call add_to_restart(ncid,h2osoi_ice3d , "LAKE_H2OSOI_ICE", layers="LKSS") ! LKSS is lake soil+snow layers =15
+     call add_to_restart(ncid,h2osoi_liq3d , "LAKE_H2OSOI_LIQ", layers="LKSS") ! LKSS is lake soil+snow layers =15
+     call add_to_restart(ncid,h2osoi_vol3d , "LAKE_H2OSOI_VOL", layers="LKSS") ! LKSS is lake soil+snow layers =15
+     call add_to_restart(ncid,z3d , "LAKE_Z", layers="LKSS") ! LKSS is lake soil+snow layers =15
+     call add_to_restart(ncid,dz3d , "LAKE_DZ", layers="LKSS") ! LKSS is lake soil+snow layers =15
 
+     call add_to_restart(ncid,t_lake3d , "LAKE_T_LAKE", layers="LAKE") ! Lake layers =10
+     call add_to_restart(ncid,lake_icefrac3d,"LAKE_ICEFRAC", layers="LAKE") ! Lake layers =10
+     call add_to_restart(ncid,z_lake3d , "LAKE_Z_LAKE", layers="LAKE") ! Lake layers =10
+     call add_to_restart(ncid,dz_lake3d , "LAKE_DZ_LAKE", layers="LAKE") ! Lake layers =10
+
+     call add_to_restart(ncid,watsat3d , "LAKE_WATSAT", layers="LKSO") ! LKSO soil layers =10
+     call add_to_restart(ncid,csol3d , "LAKE_CSOL", layers="LKSO") ! LKSO soil layers =10
+     call add_to_restart(ncid,tkmg3d , "LAKE_TKMG", layers="LKSO") ! LKSO soil layers =10
+     call add_to_restart(ncid,tkdry3d , "LAKE_TKDRY", layers="LKSO") ! LKSO soil layers =10
+     call add_to_restart(ncid,tksatu3d , "LAKE_TKSATU", layers="LKSO") ! LKSO soil layers =10
+
+     call add_to_restart(ncid,zi3d , "LAKE_ZI", layers="LKEX") ! LKEX is lake soil+snow+1 layers =16
+  ENDIF
 #ifdef MPP_LAND
   if(my_id .eq. io_id) then
      ierr = nf90_close(ncid)
@@ -2446,6 +2514,36 @@ subroutine lsm_rst_bi_out(state)
   write(iunit,ERR=101) QSFC
   write(iunit,ERR=101) SFCRUNOFF
   write(iunit,ERR=101) UDRUNOFF
+  IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+   write(iunit,ERR=101) lakedepth2d
+   write(iunit,ERR=101) savedtke12d
+   write(iunit,ERR=101) snowdp2d
+   write(iunit,ERR=101) h2osno2d
+   write(iunit,ERR=101) snl2d
+   write(iunit,ERR=101) t_grnd2d
+   !write(iunit,ERR=101) lake2d
+
+   write(iunit,ERR=101) t_soisno3d
+   write(iunit,ERR=101) h2osoi_ice3d
+   write(iunit,ERR=101) h2osoi_liq3d
+   write(iunit,ERR=101) h2osoi_vol3d
+   write(iunit,ERR=101) z3d
+   write(iunit,ERR=101) dz3d
+
+   write(iunit,ERR=101) t_lake3d
+   write(iunit,ERR=101) lake_icefrac3d
+   write(iunit,ERR=101) z_lake3d
+   write(iunit,ERR=101) dz_lake3d
+
+   write(iunit,ERR=101) watsat3d
+   write(iunit,ERR=101) csol3d
+   write(iunit,ERR=101) tkmg3d
+   write(iunit,ERR=101) tkdry3d
+   write(iunit,ERR=101) tksatu3d
+
+   write(iunit,ERR=101) zi3d
+  ENDIF
+
 ! #ifndef REALTIME
 ! #ifdef WRF_HYDRO
 !   write(iunit,ERR=101) ACCPRCP
@@ -2576,6 +2674,35 @@ subroutine lsm_rst_bi_in(state)
   read(iunit,ERR=101) QSFC
   read(iunit,ERR=101) SFCRUNOFF
   read(iunit,ERR=101) UDRUNOFF
+  IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+   read(iunit,ERR=101) lakedepth2d
+   read(iunit,ERR=101) savedtke12d
+   read(iunit,ERR=101) snowdp2d
+   read(iunit,ERR=101) h2osno2d
+   read(iunit,ERR=101) snl2d
+   read(iunit,ERR=101) t_grnd2d
+   !read(iunit,ERR=101) lake2d
+
+   read(iunit,ERR=101) t_soisno3d
+   read(iunit,ERR=101) h2osoi_ice3d
+   read(iunit,ERR=101) h2osoi_liq3d
+   read(iunit,ERR=101) h2osoi_vol3d
+   read(iunit,ERR=101) z3d
+   read(iunit,ERR=101) dz3d
+
+   read(iunit,ERR=101) t_lake3d
+   read(iunit,ERR=101) lake_icefrac3d
+   read(iunit,ERR=101) z_lake3d
+   read(iunit,ERR=101) dz_lake3d
+
+   read(iunit,ERR=101) watsat3d
+   read(iunit,ERR=101) csol3d
+   read(iunit,ERR=101) tkmg3d
+   read(iunit,ERR=101) tkdry3d
+   read(iunit,ERR=101) tksatu3d
+
+   read(iunit,ERR=101) zi3d
+  ENDIF
 ! #ifndef REALTIME
 ! #ifdef WRF_HYDRO
 !   read(iunit,ERR=101) ACCPRCP
@@ -2703,6 +2830,37 @@ subroutine define_rst_variables(ncid, state)
   call define_rst_var(ncid,RIVERBEDXY , "RIVERBEDXY"  )
   call define_rst_var(ncid,EQZWT , "EQZWT"  )
   call define_rst_var(ncid,PEXPXY , "PEXPXY"  )
+  IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+  ! If lake model is on (sf_lake_physics = 1)
+   ! 2Ds:
+   call define_rst_var(ncid, lakedepth2d,   "LAKE_DEPTH")
+   call define_rst_var(ncid, savedtke12d,   "LAKE_SAVETKE1")
+   call define_rst_var(ncid, snowdp2d,   "LAKE_SNOWP")
+   call define_rst_var(ncid, h2osno2d,   "LAKE_H2OSNO")
+   call define_rst_var(ncid, snl2d,   "LAKE_SNL")
+   call define_rst_var(ncid, t_grnd2d,   "LAKE_T_GRND")
+   !call define_rst_var(ncid, lake2d,   "LAKE_LAKE")
+   ! 3Ds:
+   call define_rst_var(ncid,t_soisno3d ,   "LAKE_T_SOILSNOW", layers="LKSS") ! LKSS is lake soil+snow layers =15
+   call define_rst_var(ncid,h2osoi_ice3d , "LAKE_H2OSOI_ICE", layers="LKSS") ! LKSS is lake soil+snow layers =15
+   call define_rst_var(ncid,h2osoi_liq3d , "LAKE_H2OSOI_LIQ", layers="LKSS") ! LKSS is lake soil+snow layers =15
+   call define_rst_var(ncid,h2osoi_vol3d , "LAKE_H2OSOI_VOL", layers="LKSS") ! LKSS is lake soil+snow layers =15
+   call define_rst_var(ncid, z3d,   "LAKE_Z", layers="LKSS") ! LKSS is lake soil+snow layers =15
+   call define_rst_var(ncid, dz3d,   "LAKE_DZ", layers="LKSS") ! LKSS is lake soil+snow layers =15
+
+   call define_rst_var(ncid,t_lake3d , "LAKE_T_LAKE", layers="LAKE") ! Lake layers =10
+   call define_rst_var(ncid,lake_icefrac3d , "LAKE_ICEFRAC", layers="LAKE") ! Lake layers =10
+   call define_rst_var(ncid, z_lake3d,   "LAKE_Z_LAKE", layers="LAKE") ! Lake layers =10
+   call define_rst_var(ncid, dz_lake3d,   "LAKE_DZ_LAKE", layers="LAKE") ! Lake layers =10
+
+   call define_rst_var(ncid, watsat3d,   "LAKE_WATSAT", layers="LKSO") ! LKSO soil layers =10
+   call define_rst_var(ncid, csol3d,   "LAKE_CSOL", layers="LKSO") ! LKSO soil layers =10
+   call define_rst_var(ncid, tkmg3d,   "LAKE_TKMG", layers="LKSO") ! LKSO soil layers =10
+   call define_rst_var(ncid, tkdry3d,   "LAKE_TKDRY", layers="LKSO") ! LKSO soil layers =10
+   call define_rst_var(ncid, tksatu3d,   "LAKE_TKSATU", layers="LKSO") ! LKSO soil layers =10
+
+   call define_rst_var(ncid,zi3d ,   "LAKE_ZI", layers="LKEX") ! LKEX is lake soil+snow+1 layers =16
+  ENDIF
       ierr = nf90_enddef(ncid)
       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_2d_float() - "// &
                              "Problem nf90_enddef")
