@@ -381,8 +381,8 @@ contains
 		   ! lakep (precip) units converted from mm to m
 		   ! lakeet (evap) units converted from kg/m2/s to m
 		   H = H + dh + (lakep - lakeet*3600.)*dt/3600./1000.
-		   write(*,*) 'Test LAKE_P, LAKE_ET'
-		   write(*,*) lakep, lakeet
+		   !write(*,*) 'Test LAKE_P, LAKE_ET'
+		   !write(*,*) lakep, lakeet
 
            !-- compute final discharge
            dh = H - we
