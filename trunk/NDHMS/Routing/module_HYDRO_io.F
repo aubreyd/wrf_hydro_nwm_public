@@ -11180,10 +11180,10 @@ subroutine hdtbl_in_nc(did)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"LKSAT",rt_domain(did)%LKSAT,ierr)
    call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"NEXP",rt_domain(did)%NEXP,ierr)
    ! Letting this variable be optional and setting to global default value if not found
-   if (ierr /= 0) then
-     write(6,*)  "WARNING (hydtbl_in_nc): NEXP not found so setting to global 1.0"
-     rt_domain(did)%NEXP = 1.0
-   endif
+   !if (ierr /= 0) then
+   !  write(6,*)  "WARNING (hydtbl_in_nc): NEXP not found so setting to global 1.0"
+   !  rt_domain(did)%NEXP = 1.0
+   !endif
 end subroutine hdtbl_in_nc
 
 subroutine read2dlsm(did,file,varName,varOut,ierr)
