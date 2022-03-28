@@ -8325,6 +8325,12 @@ call MPP_CHANNEL_COM_INT(Link_location,ixrt,jxrt,int(TYPEL, int64),NLINKS,99)
 call MPP_CHANNEL_COM_INT(Link_location,ixrt,jxrt,LAKENODE,NLINKS,99)
 #endif
 
+if (channel_option .eq. 3) then
+  do i = 1,NLINKS
+    So(i) = ( ZELEV(FROM_NODE(i)) - ZELEV(TO_NODE(i)) ) / CHANLEN(i)
+  end do
+end if
+
 end subroutine READ_CHROUTING1
 
 
