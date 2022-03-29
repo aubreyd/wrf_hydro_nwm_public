@@ -8327,7 +8327,11 @@ call MPP_CHANNEL_COM_INT(Link_location,ixrt,jxrt,LAKENODE,NLINKS,99)
 
 if (channel_option .eq. 3) then
   do i = 1,NLINKS
-    So(i) = ( ZELEV(FROM_NODE(i)) - ZELEV(TO_NODE(i)) ) / CHANLEN(i)
+    if (CHANLEN(i) < 0) then ! edge
+      So(i) = 0.0
+    else
+      So(i) = ( ZELEV(FROM_NODE(i)) - ZELEV(TO_NODE(i)) ) / CHANLEN(i)
+    end if
   end do
 end if
 

@@ -119,7 +119,7 @@ end function MUSKING
 !   FUNCTION Diffusive wave
 ! ------------------------------------------------
 real function DIFFUSION(nod,z1,z20,h1,h2,dx,n, &
-     Bw, Cs)
+     Bw, Cs, vel)
 implicit none
 !-- channel geometry and characteristics
 real    :: Bw         !-bottom width (meters)
@@ -138,6 +138,7 @@ real    :: Sf         !-friction slope
 real    :: sgn        !-0 or 1
 integer :: nod         !- node
 real ::  z20, dzx
+real, intent(inout) :: vel  ! velocity (m/s)
 
 ! added by Wei Yu for bad data.
 
@@ -188,6 +189,7 @@ Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- convenyance
 
 Kf =  (1.0-w)*Kd + w*Ku      !-- conveyance
 DIFFUSION = Kf * sqrt(abs(Sf))*sgn
+vel = DIFFUSION / AREA
 
 100 format('z1,z2,h1,h2,kf,Dif, Sf, sgn  ',f8.3,2x,f8.3,2x,f8.4,2x,f8.4,2x,f8.3,2x,f8.3,2x,f8.3,2x,f8.0)
 
@@ -1085,7 +1087,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
                if(from_node(i) .ne. to_node(i) .and. (to_node(i) .gt. 0) .and.(from_node(i) .gt. 0) ) &  ! added by Wei Yu
                    QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                      HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
+                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i))
             else !--  we are just computing critical depth for outflow points
                QLINK(i,1) =0.
             endif
@@ -1219,7 +1221,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
                !yw DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*DXRT),HLINKTMP(i), &
                    CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
                        DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                       CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i)) ) * DTCT
+                       CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
           elseif (TYPEL(i) .eq. 2) then              !--- into a reservoir, assume critical depth
               if ((QSUM(i)+QLateral(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
@@ -1233,7 +1235,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
               !-- compute volume in reach (m^3)
                    CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
                           DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                             CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i)) ) * DTCT
+                             CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
           else
               print *, "FATAL ERROR: This node does not have a type.. error TYPEL =", TYPEL(i)
               call hydro_stop("In drive_CHANNEL() - error TYPEL")
@@ -1310,7 +1312,6 @@ gwOption:   if(gwBaseSwCRT == 3) then
     endif
 #endif
 
-
 #ifdef MPP_LAND
          do iyw = 1,yw_MPP_NLINKS
             i = nlinks_index(iyw)
@@ -1320,7 +1321,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
             if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
                    QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                       HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
+                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i))
 		      !--Reza-------------------------------------------------------
                       XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
 	                                            sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
