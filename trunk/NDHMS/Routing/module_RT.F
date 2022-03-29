@@ -43,7 +43,7 @@ MODULE module_Routing
    use hashtable
    use module_river_temperature, only: riverTemp
    use disaggregateWeatherModule, only: fineWeathData
-   
+
 
    IMPLICIT NONE
 
@@ -456,7 +456,7 @@ CONTAINS
         allocate( rt_domain(did)%RelH_fine_1D(nsizes) )
         allocate( rt_domain(did)%windSpd_fine_1D(nsizes) )
         allocate( rt_domain(did)%SolarRad_fine_1D(nsizes) )
-        allocate( rt_domain(did)%TMN_1D_fine(nsizes) ) 
+        allocate( rt_domain(did)%TMN_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSK_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
@@ -465,8 +465,8 @@ CONTAINS
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
         allocate( rt_domain(did)%TSK_temp(IX,JX) )
         allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
-       
-        
+
+
         rt_domain(did)%Tair_fine_1D       = 0.
         rt_domain(did)%RelH_fine_1D       = 0.
         rt_domain(did)%windSpd_fine_1D    = 0.
@@ -480,8 +480,8 @@ CONTAINS
         rt_domain(did)%TMN_temp           = 0.
         rt_domain(did)%TSK_temp           = 0.
         rt_domain(did)%TSLB_temp          = 0.
-       
-        
+
+
 
         if( nlst(did)%channel_option .eq. 2 ) then
            allocate( rt_domain(did)%qloss(nsizes) )
@@ -536,7 +536,7 @@ CONTAINS
       rt_domain(did)%C_Emb = 0.0
       rt_domain(did)%P_Size = 0.0
       rt_domain(did)%F_Shade = 0.0
-      rt_domain(did)%S_Albedo = 0.0 
+      rt_domain(did)%S_Albedo = 0.0
       rt_domain(did)%C_Cloud = 0.0
       rt_domain(did)%G_Chann_k = 0.0
 
@@ -812,7 +812,6 @@ subroutine LandRT_ini(did)
 
    end if  !! neither channel_only nor channelBucket_only
 
-
    if((nlst(did)%CHANRTSWCRT    .eq. 1 .or. nlst(did)%CHANRTSWCRT    .eq. 2) .and. &
       (nlst(did)%channel_option .eq. 1 .or. nlst(did)%channel_option .eq. 2)        ) then
       call read_routelink( &
@@ -936,7 +935,7 @@ subroutine LandRT_ini(did)
            end select
 
    end do
-   
+
    !-- Reza's code goes here to be initialized
    call fineWeathData%init (                      &
                    rt_domain(did)%Tair_fine_1D,     &
@@ -1080,7 +1079,7 @@ subroutine LandRT_ini(did)
           type(hash_t) :: hash_table
           integer :: val,ii,jj
           logical :: found
-          
+
           call hash_table%set_all_idx(rt_domain(did)%LLINKID, rt_domain(did)%LNLINKSL)
           do jj = new_start_j, new_end_j
              do ii = new_start_i, new_end_i
@@ -1792,7 +1791,7 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(5)
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(5)
-	      
+
 	      if(rt_domain(did)%C_Emb (j) .eq. 0.0) then
                  rt_domain(did)%C_Emb (j) = CEmb (5)
               endif
@@ -1908,4 +1907,3 @@ subroutine deriveFromNode(did)
 end subroutine deriveFromNode
 
 END MODULE module_Routing
-

@@ -2378,10 +2378,10 @@ endif
 #endif
 
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
          call hydro_stop("In output_gw_spinup() - Problem nf90_create")
-       endif 
+       endif
 
        iret = nf90_def_dim(ncid, "time", NF90_UNLIMITED, dimid_times)
        iret = nf90_def_dim(ncid, "x", ixrtd, dimid_ix)  !-- make a decimated grid
@@ -2716,7 +2716,7 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
 #endif
 
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
          call hydro_stop("In output_gw_spinup() - Problem nf90_create")
        endif
@@ -3140,15 +3140,15 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
         print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
         if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create points")
-        endif 
+        endif
 
-        iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2) 
+        iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2)
         if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create observation")
-        endif 
+        endif
 
        do i=1,nlk
         if(ORDER(i) .ge. order_to_write) then
@@ -3895,12 +3895,12 @@ end subroutine output_chrt
         print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create points")
        endif
 
-       iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2) 
+       iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2)
        if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create observation")
        endif
@@ -4807,10 +4807,10 @@ end subroutine mpp_output_chrt
       print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
       if (iret /= 0) then
          call hydro_stop("In output_lakes() - Problem nf90_create")
-      endif 
+      endif
 
       do i=1,NLAKES
          station_id(i) = i
@@ -5041,10 +5041,10 @@ end subroutine mpp_output_chrt
       print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
       if (iret /= 0) then
          call hydro_stop("In output_lakes() - Problem nf90_create")
-      endif 
+      endif
 
       iret = nf90_def_dim(ncid, "station", nlakes, stationdim)
 
@@ -5256,10 +5256,10 @@ end subroutine mpp_output_chrt
 
 
 !--- define dimension
-        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
         if (iret /= 0) then
            call hydro_stop("In output_chrtgrd() - Problem nf90_create")
-        endif 
+        endif
 
         iret = nf90_def_dim(ncid, "time", NF90_UNLIMITED, timedim)
         iret = nf90_def_dim(ncid, "x", ixrt, ixlondim)
@@ -5623,7 +5623,7 @@ end subroutine mpp_output_chrt
      if(IO_id.eq.my_id) &
 #endif
 
-       iret = nf90_create(trim(outFile), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(outFile), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
 
 #ifdef MPP_LAND
        call mpp_land_bcast_int1(iret)
@@ -7463,7 +7463,6 @@ ChSSlp  = 0.0
 ChannK  = 0.0
 ChannKG = 0.0
 
-
 if (channel_option .eq. 3) then
 
 #ifdef MPP_LAND
@@ -7548,7 +7547,7 @@ do j = 1,JXRT  !rows
                MannN(cnt) = MannNG(i,j)
                ChSSlp(cnt) = ChSSlpG(i,j)
                Bw(cnt) = BwG(i,j)
-               ChannK(cnt) = ChannKG(i,j) 
+               ChannK(cnt) = ChannKG(i,j)
                Tw(cnt) = TwG(i,j)
                Tw_CC(cnt) = Tw_CCG(i,j)
                n_CC(cnt) = n_CCG(i,j)
@@ -7821,7 +7820,7 @@ do j = 1,JXRT
             MannN(cnt) = MannNG(i,j)
             ChSSlp(cnt) = ChSSlpG(i,j)
             Bw(cnt) = BwG(i,j)
-            ChannK(cnt) = ChannKG(i,j) 
+            ChannK(cnt) = ChannKG(i,j)
             Tw(cnt) = TwG(i,j)
             Tw_CC(cnt) = Tw_CCG(i,j)
             n_CC(cnt) = n_CCG(i,j)
@@ -8332,13 +8331,13 @@ end subroutine read_routelink
         real, allocatable, dimension(:) ::  tmpCHLON, tmpCHLAT, tmpZELEV, tmpMUSK, tmpMUSX, tmpCHANLEN
         real, allocatable, dimension(:) ::  tmpMannN, tmpSo, tmpChSSlp, tmpBw, tmpTw, tmpTw_CC, tmpn_CC
         real, allocatable, dimension(:) ::  tmpChannK
-#endif 
+#endif
 
         !! is RouteLink file netcdf (*.nc) or csv (*.csv)
         route_link_f_r = adjustr(route_link_f)
         lenRouteLinkFR = len(route_link_f_r)
         routeLinkNetcdf = route_link_f_r( (lenRouteLinkFR-2):lenRouteLinkFR) .eq. '.nc'
-
+        print *, "routelinknetcdf = ", routeLinkNetcdf
         !! is RouteLake file netcdf (*.nc) or .TBL
         route_lake_f_r = adjustr(route_lake_f)
         lenRouteLakeFR = len(route_lake_f_r)
@@ -8347,6 +8346,9 @@ end subroutine read_routelink
 #ifdef MPP_LAND
        tmpQLINK = 0
        tmpGages = gageMiss
+
+       print *, "my_id=",my_id
+       print *, "IO_id=",IO_id
 
        if(my_id .eq. IO_id) then
 
@@ -8366,6 +8368,7 @@ end subroutine read_routelink
           allocate(tmpChannK(GNLINKSL))
 
           if(routeLinkNetcdf) then
+            print *, "calling read_route_link_netcdf"
 
              call read_route_link_netcdf(                                &
                   route_link_f,                                          &
@@ -8495,7 +8498,7 @@ end subroutine read_routelink
                  CHLAT,      ZELEV,     TYPEL,    ORDER,    &
                  QLINK(:,1), MUSK,      MUSX,     CHANLEN,  &
                  MannN,      So,        ChSSlp,   Bw,       &
-                 Tw,         Tw_CC,     n_CC,     ChannK, gages,    & 
+                 Tw,         Tw_CC,     n_CC,     ChannK, gages,    &
                  LAKEIDA                                     )
 
         else
@@ -8607,7 +8610,7 @@ real, intent(INOUT),  dimension(NLAKES)      :: ORIFICEE
 integer, intent(INOUT), dimension(NLAKES)    :: reservoir_type
 character(len=*), intent(in)                 :: reservoir_parameter_file
 real, intent(INOUT),  dimension(NLAKES)      :: LATLAKE,LONLAKE,ELEVLAKE
-real, intent(INOUT), dimension(NLINKS)       :: ChSSlp, Bw, Tw 
+real, intent(INOUT), dimension(NLINKS)       :: ChSSlp, Bw, Tw
 real, intent(INOUT), dimension(NLINKS)       :: Tw_CC, n_CC, ChannK
 
 character(len=*  )                           :: geo_finegrid_flnm, route_lake_f
@@ -8785,9 +8788,9 @@ end subroutine MPP_READ_CHROUTING_new
         real, dimension(:) :: chlat,chlon
         integer :: iret, nodes, i, ncid, dimid_n, varid
 
-        nodes = size(chlon,1)        
+        nodes = size(chlon,1)
 
-       iret = nf90_create("nodeInfor.nc", OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create("nodeInfor.nc", OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        iret = nf90_def_dim(ncid, "node", nodes, dimid_n)  !-- make a decimated grid
 !  define the varialbes
        iret = nf90_def_var(ncid, "fromNode", NF90_INT, (/dimid_n/), varid)
@@ -8843,7 +8846,7 @@ real,    dimension(:),   intent(out) :: CHLON, CHLAT, ZELEV
 integer, dimension(:),   intent(out) :: TYPEL, ORDER
 real,    dimension(:),   intent(out) :: QLINK
 real,    dimension(:),   intent(out) :: MUSK, MUSX, CHANLEN
-real,    dimension(:),   intent(out) :: MannN, So, ChSSlp, Bw, Tw 
+real,    dimension(:),   intent(out) :: MannN, So, ChSSlp, Bw, Tw
 real,    dimension(:),   intent(out) :: Tw_CC, n_CC, ChannK
 
 character(len=15), dimension(:), intent(inout) :: gages
@@ -9275,7 +9278,7 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
        !                z_max(k) = tmpz_max(i)
        !                z_init(k) = tmpz_init(i)
        !                nhdBuckMask(k) = 1
-       !                goto 301 
+       !                goto 301
        !             endif
        !         end do
        ! 301     continue
@@ -9285,7 +9288,7 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
          type(hash_t) :: hash_table
          integer :: val,it
          logical :: found
-         
+
          call hash_table%set_all_idx(LINKID,numbasns)
          do it=1, gnid
             call hash_table%get(tmpLinkid(it), val, found)
@@ -10080,9 +10083,9 @@ end subroutine output_chrt2
       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
 
       if (iret /= 0) then
-          print*, "Problem nf90_create" 
-          call hydro_stop("output_gw_netcdf") 
-      endif 
+          print*, "Problem nf90_create"
+          call hydro_stop("output_gw_netcdf")
+      endif
 
 !!! Define dimensions
 
@@ -10352,11 +10355,11 @@ end subroutine output_chrt2
         integer :: val,it
         integer, allocatable :: num_a(:)
         logical :: found
-        
+
         allocate(num_a(NLINKSL))
         num_a = 0
         kk = 0
-        
+
         call hash_table%set_all_idx(linkid, NLINKSL)
         do it=1, gnlinksl
            call hash_table%get(gto(it), val, found)
@@ -10367,7 +10370,7 @@ end subroutine output_chrt2
         end do
         maxNum = maxval(num_a)
         num_a = 1
-      
+
         allocate(ind(kk))
         allocate(gToNodeOut(NLINKSL,maxNum+1))
         gToNodeOut = -99
@@ -10376,7 +10379,7 @@ end subroutine output_chrt2
         allocate(tmpLAKEIDA(kk))
         allocate(tmpOUTLAKEID(kk))
         allocate(tmpTO_NODE(kk))
-        
+
         if(kk .gt. 0) then
            tmpOUTLAKEID = -999
            tmpTYPEL = -999
@@ -10386,9 +10389,9 @@ end subroutine output_chrt2
            OUTLAKEID = -999
            TYPEL = -999
         endif
-        
+
         kk = 0
-        
+
         ! The following loops are replaced by a hashtable-based algorithm
         ! do m = 1, NLINKSL
         !          num = 1
@@ -10403,7 +10406,7 @@ end subroutine output_chrt2
         !              endif
         !           end do
         ! enddo
-        
+
         do it=1, gnlinksl
            call hash_table%get(gto(it), val, found)
            if(found .eqv. .true.) then
@@ -10415,12 +10418,12 @@ end subroutine output_chrt2
               num_a(val) = num_a(val) + 1
            end if
         end do
-        
+
         deallocate(num_a)
         call hash_table%clear()
-        
+
       end block
-      
+
       size2 = kk
       deallocate (gto)
 
@@ -10645,11 +10648,11 @@ end subroutine output_chrt2
         integer :: val,it
         integer, allocatable :: num_a(:)
         logical :: found
-        
+
         allocate(num_a(NLINKSL))
         num_a = 0
         kk = 0
-         
+
         call hash_table%set_all_idx(linkid, NLINKSL)
         do it=1, gnlinksl
            call hash_table%get(gto(it), val, found)
@@ -10661,15 +10664,15 @@ end subroutine output_chrt2
         end do
         maxNum = maxval(num_a)
         num_a = 1
-        
+
         allocate(ind(kk))
         allocate(gToNodeOut(NLINKSL,maxNum+1))
         gToNodeOut = -99
         allocate(tmpLAKEIDA(kk))
         allocate(tmpTO_NODE(kk))
-        
-        kk = 0 
-        
+
+        kk = 0
+
         ! The following loops are replaced by a hashtable-based algorithm
         ! do m = 1, NLINKSL
         !    num = 1
@@ -10684,7 +10687,7 @@ end subroutine output_chrt2
         !       endif
         !    end do
         ! end do
-        
+
         do it=1, gnlinksl
            call hash_table%get(gto(it), val, found)
            if(found .eqv. .true.) then
@@ -10696,12 +10699,12 @@ end subroutine output_chrt2
               num_a(val) = num_a(val) + 1
            end if
         end do
-        
+
         deallocate(num_a)
         call hash_table%clear()
-        
+
       end block
-         
+
       size = kk
       if(allocated(gto)) deallocate (gto)
 
