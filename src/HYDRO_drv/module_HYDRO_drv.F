@@ -722,6 +722,7 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
    end if !! channel_only == 0
 
    ! step 5) river channel physics
+   print *, "calling driveChannelRouting"
    call driveChannelRouting(did)
 #ifdef HYDRO_D
    call system_clock(count=clock_count_2, count_rate=clock_rate)
@@ -963,7 +964,7 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        , nlst(did)%channel_bypass )
 
 else
-
+    print *, "calling drive_CHANNEL"
     call drive_CHANNEL(did, RT_DOMAIN(did)%latval,RT_DOMAIN(did)%lonval, &
        RT_DOMAIN(did)%timestep_flag,RT_DOMAIN(did)%IXRT,RT_DOMAIN(did)%JXRT, &
        nlst(did)%SUBRTSWCRT, rt_domain(did)%subsurface%state%qsubrt, &
@@ -977,7 +978,7 @@ else
        RT_DOMAIN(did)%HLINK, RT_DOMAIN(did)%ELRT,RT_DOMAIN(did)%CHANLEN,&
        RT_DOMAIN(did)%MannN,RT_DOMAIN(did)%So, RT_DOMAIN(did)%ChSSlp, &
        RT_DOMAIN(did)%Bw,RT_DOMAIN(did)%Tw,RT_DOMAIN(did)%Tw_CC, RT_DOMAIN(did)%n_CC, &
-       RT_DOMAIN(did)%ChannK,& 
+       RT_DOMAIN(did)%ChannK,&
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
        RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
@@ -997,7 +998,7 @@ else
        ,nlst(did)%GwBaseSwCRT, gw2d(did)%ho, gw2d(did)%qgw_chanrt, &
        nlst(did)%gwChanCondSw, nlst(did)%gwChanCondConstIn, &
        nlst(did)%gwChanCondConstOut, rt_domain(did)%velocity, rt_domain(did)%qloss, &
-       rt_domain(did)%XS_Peremeter) 
+       rt_domain(did)%XS_Peremeter)
 endif
 
     if((nlst(did)%gwBaseSwCRT == 3) .and. (nlst(did)%gwChanCondSw .eq. 1)) then

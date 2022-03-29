@@ -4,8 +4,8 @@
 ! Author(s)/Contact(s):
 !   R. Abdi <rabdi><ucar><edu>
 ! Abstract:
-!   Calls the run subroutines for 
-!   1st: Weather Disaggregate and 
+!   Calls the run subroutines for
+!   1st: Weather Disaggregate and
 !   2nd: River Temperature Physical Model
 ! History Log:
 ! Usage:
@@ -30,37 +30,37 @@ implicit none
 
 
 type  :: riverTemperatureRuns
-	    
+
 	!type (fineWeathData), pointer   :: weatherDisaggregate => null()
 	!type (riverTemp), pointer       :: riverTempSolver => null()
 
     contains
 	procedure :: riverTemp_run => riverTemperature_run
-        
+
 end type riverTemperatureRuns
 
 type(riverTemperatureRuns) :: riverTempRuns
 
-contains 
+contains
 
 subroutine riverTemperature_run(this, did)
-	
+
 	implicit none
 	INTEGER                                          ::  did  ! for the rt_domain
   	class(riverTemperatureRuns), intent(inout)       ::  this
- 
+
 	call fineWeathData%runWeatherDisagg (rt_domain(did)%IX,         &
                                                 rt_domain(did)%JX,         &
 						rt_domain(did)%IXRT,       &
 						rt_domain(did)%JXRT,       &
 						!weather2d,                &
-						weather2d%T2,              &  
+						weather2d%T2,              &
 						weather2d%v,               &
 						weather2d%q2x,	           &
-						weather2d%u,	           &   
+						weather2d%u,	           &
 						rt_domain(did)%NLINKS,	   &
 						rt_domain(did)%overland%streams_and_lakes%CH_NETRT,    &
-						rt_domain(did)%CHANXI,	                               & 
+						rt_domain(did)%CHANXI,	                               &
 						rt_domain(did)%CHANYJ,	                               &
 						rt_domain(did)%overland%streams_and_lakes%lake_mask,   &
 						!module_NoahMP_hrldas_driver%TMN,                      &
@@ -79,11 +79,14 @@ subroutine riverTemperature_run(this, did)
 						rt_domain(did)%TSK_1D_fine,      &
 						rt_domain(did)%TSLB_1D_fine      &
 						)
-         
+
+
+	print *, "calling river temperature module"
+  print *, "So = ", rt_domain(did)%So
   call riverTemp%runRiverTempModel(     nlst(did)%dxrt0,                &
 					nlst(did)%DT,                   &
 					nlst(did)%DTCT,	                &
-					rt_domain(did)%IXRT,            &                 
+					rt_domain(did)%IXRT,            &
 					rt_domain(did)%JXRT,            &
 					rt_domain(did)%Tair_fine_1D,    &
 					rt_domain(did)%RelH_fine_1D,    &
@@ -92,13 +95,14 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%TSLB_1D_fine,    &
 					rt_domain(did)%SolarRad_fine_1D,&
 					rt_domain(did)%XS_Peremeter,    &
-					rt_domain(did)%HLINK,	        & 	 	
-					rt_domain(did)%ChSSlp,	        &
+					rt_domain(did)%HLINK,	        &
+!					rt_domain(did)%ChSSlp,	        &
+          rt_domain(did)%So,            &
 					rt_domain(did)%ZELEV,	        &
 					rt_domain(did)%velocity,        &
 					rt_domain(did)%Tw,        	&
 					rt_domain(did)%QSUM,	        &
-					rt_domain(did)%QINFLOWBASE,     & 
+					rt_domain(did)%QINFLOWBASE,     &
 					rt_domain(did)%QSTRMVOLRT_TS,   &
 					rt_domain(did)%TMN_1D_fine,     &
 					rt_domain(did)%TSLB_1D_fine,    &
@@ -120,8 +124,8 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%T_QSUM,	        &
 					rt_domain(did)%NLINKS           &
 					)
-	
-	
+
+
 end subroutine riverTemperature_run
 
 End Module riverTemperatureExecutor

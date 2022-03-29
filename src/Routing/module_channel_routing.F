@@ -40,31 +40,31 @@ implicit none
 
 
 !-- Reza's code starts here (June 2021):
-!-- Type, to be used by the weather disaggregate	
-		
+!-- Type, to be used by the weather disaggregate
+
 type :: vectorizing_tools
       INTEGER :: NLINKS, IXRT,JXRT
       INTEGER, DIMENSION(:,:), allocatable    :: CH_NETRT, LAKE_MSKRT
       INTEGER, DIMENSION(:), allocatable      :: CHANXI, CHANYJ
-   
+
       contains
       procedure :: init => vectorizing_tools_init
-      procedure :: destroy => vectorizing_tools_destroy 
+      procedure :: destroy => vectorizing_tools_destroy
 
 end type vectorizing_tools
 
 ! --------------------------------------------------------------------------
 contains
 
-		
+
 subroutine vectorizing_tools_init(this, NLINKS, IXRT, JXRT, CH_NETRT, &
 	                          CHANXI, CHANYJ, LAKE_MSKRT)
 	implicit none
 	class(vectorizing_tools), intent(inout)         :: this             ! the type object being initialized
 	INTEGER, INTENT(in)                             :: NLINKS, IXRT, JXRT
 	INTEGER ,INTENT(in), DIMENSION(IXRT,JXRT)  	:: CH_NETRT, LAKE_MSKRT
-	INTEGER, INTENT(in), DIMENSION(NLINKS)  	:: CHANXI, CHANYJ 
-	
+	INTEGER, INTENT(in), DIMENSION(NLINKS)  	:: CHANXI, CHANYJ
+
 	this%NLINKS = NLINKS
 	this%IXRT = IXRT
 	this%JXRT = JXRT
@@ -72,16 +72,16 @@ subroutine vectorizing_tools_init(this, NLINKS, IXRT, JXRT, CH_NETRT, &
 	this%CHANXI = CHANXI
 	this%CHANYJ = CHANYJ
 	this%LAKE_MSKRT = LAKE_MSKRT
-		
+
 end subroutine vectorizing_tools_init
 
 subroutine vectorizing_tools_destroy(this)
 
 	implicit none
 	! the type object being destroyed
-	class(vectorizing_tools), intent(inout) :: this 
+	class(vectorizing_tools), intent(inout) :: this
 
-end subroutine vectorizing_tools_destroy 
+end subroutine vectorizing_tools_destroy
 
 !-- Reza's code ends here
 
@@ -698,8 +698,8 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL*8, DIMENSION(NLINKS)                 :: QSUM8     !--mass bal of node
         REAL, DIMENSION(NLAKES)                   :: QLLAKE   !-- lateral inflow to lake in diffusion scheme
         REAL*8, DIMENSION(NLAKES)                 :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
-        REAL,   DIMENSION(NLAKES)                 :: XS_Peremeter 
-        
+        REAL,   DIMENSION(NLAKES)                 :: XS_Peremeter
+
 
 !-- Local Variables
         INTEGER                     :: i,j,k,t,m,jj,kk,KRT,node
@@ -1331,14 +1331,15 @@ gwOption:   if(gwBaseSwCRT == 3) then
           call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-   
+
            KRT = KRT + 1                     !-- iterate on the timestep
-           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval             
-           
+           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
+
           !-- Reza's update goes in here:
-          !-- The RUN function should be called here. 
+          !-- The RUN function should be called here.
 	  ! Run the subroutine to diaggregate
           rt_domain(did)%QSUM = QSUM
+          print *, "calling rivertemp_run"
           call riverTempRuns%riverTemp_run(did)
 
           end do crnt   !--- DTCT timestep of DT_STEPS
