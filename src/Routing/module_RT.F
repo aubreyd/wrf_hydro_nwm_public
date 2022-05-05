@@ -466,6 +466,7 @@ CONTAINS
         allocate( rt_domain(did)%TMN_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSK_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
+        allocate( rt_domain(did)%SFCP_1D(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
         allocate( rt_domain(did)%QSUM(nsizes) )
@@ -481,6 +482,7 @@ CONTAINS
         rt_domain(did)%TMN_1D_fine        = 0.
         rt_domain(did)%TSK_1D_fine        = 0.
         rt_domain(did)%TSLB_1D_fine       = 0.
+        rt_domain(did)%SFCP_1D            = 0.
         rt_domain(did)%T_QSUM             = 0.
         rt_domain(did)%XS_Peremeter       = 0.
         rt_domain(did)%QSUM               = 0.
@@ -955,7 +957,8 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%SolarRad_fine_1D, &
 		   rt_domain(did)%TMN_1D_fine,      &
 		   rt_domain(did)%TSK_1D_fine,      &
-		   rt_domain(did)%TSLB_1D_fine      &
+		   rt_domain(did)%TSLB_1D_fine,     &
+       rt_domain(did)%SFCP_1D           &
 		   )
    call riverTemp%init(rt_domain(did)%T_QSUM)
 
@@ -1522,9 +1525,11 @@ subroutine LandRT_ini(did)
 
      else       !-- parameterize according to order of diffusion scheme, or if read from hi res file, use its value
                 !--  put condition within the if/then structure, which will assign a value if something is missing in hi res
-
+        print *, "setting channel widths for diffusion scheme"
         do j=1,rt_domain(did)%NLINKS
-
+          print *, "rt_domain(did)%Tw(j) = ", rt_domain(did)%Tw(j)
+          print *, "rt_domain(did)%ORDER(j) = ", rt_domain(did)%ORDER(j)
+          print *, "TOPWID(rt_domain(did)%ORDER(j)) = ", TOPWID(rt_domain(did)%ORDER(j))
            if (rt_domain(did)%ORDER(j) .eq. 1) then    !-- smallest stream reach
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))

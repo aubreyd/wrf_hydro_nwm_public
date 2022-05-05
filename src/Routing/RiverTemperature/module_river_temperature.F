@@ -126,7 +126,7 @@ subroutine river_temperature_destroy(this)
 !   SUBROUTINE RIVER_TEMPERATURE_SOLVER
 ! ------------------------------------------------
 Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
-	      T_a, H, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
+	      T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
 				V_w, W_w, Q_str, Q_GW, Q_Trib, T_GW, T_hyp, T_Trib, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
 				node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
@@ -141,7 +141,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	INTEGER, INTENT(IN)  :: totLength          	! Total length (# of cells) of the domain for simulation -===========================> NLINKS
 	INTEGER, INTENT(IN)  :: IXRT, JXRT
 	REAL, INTENT(IN), DIMENSION(:)    :: T_a		! Air temperature 						               - As an input
-	REAL, INTENT(IN), DIMENSION(:)    :: H		        ! Humidity (%) - relative humidity			                       - As an input
+	REAL, INTENT(IN), DIMENSION(:)    :: H		        ! Humidity (%) - Specific humidity			                       - As an input
+	REAL, INTENT(IN), DIMENSION(:)    :: sfcp         ! surface pressure (Pa)
 	REAL, INTENT(IN), DIMENSION(:)    :: V_wind	        ! Wind speed (m/s)							       - As an input
 	REAL, INTENT(IN), DIMENSION(:)	  :: C_L	        ! Cloudiness (0 to 1)					                       - As an input - should find it from somewhere!
 	REAL, INTENT(IN), DIMENSION(:)	  :: T_bed	        ! Conduction Layer Temperature (C)			                       - As an input
@@ -191,6 +192,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL                              :: Dispersion 	!
 	REAL                              :: self
 	REAL                              :: FluxTemp	        !
+	REAL                              :: FluxDelta        ! TLE: added this as a tracker variable to see T update in this timestep
 	!REAL                              :: Disp_coef      	! Dispersion Coefficient (m2/s)
 	REAL                              :: Shear_Velocity	! Shear Velocity (m/s)
 	REAL                              :: SlopeWS		! Water surface slope
@@ -206,7 +208,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
 	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
-	INTEGER                                               :: neighbours, i, j
+	INTEGER,                DIMENSION(totLength)          :: FROM_NODE, N_UPSTR, node_order, node_headwater, node_branch
+	INTEGER                                               :: neighbours, i, j, k, loop_break, c_index, node_current, c_hw, c_br
         ! Simulated water temeprature (C)
 	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
         REAL                                                  :: Q_strTot, T_strTot, Q_strTmp
@@ -225,235 +228,332 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
         !DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
         ! ++++++++++++++++++++++++++++update this part
 	! Assigning the upstream water temeprature boundary condition to the main matrix
-
-	Disp_coef = 0.
 	!-- Setting everything to zero first.
-        Q_hyp = 0.
-        ! Calculating hyporheic fluxes
+	Disp_coef = 0.
+  Q_hyp = 0.
+
+	! Calculating hyporheic fluxes
 	Do i = 1, totLength
-		! Find hyporheic fluxes
-		! Ratio Conductivity of dominant sunstrate
-		Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
-	        !Dummy1 = k_s_0 * (1.0 - C_E(i))
+	    ! Find hyporheic fluxes
+		  ! Ratio Conductivity of dominant sunstrate
+		  Dummy1 = k_s_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * (1.0 - C_E(i))
+	    !Dummy1 = k_s_0 * (1.0 - C_E(i))
 
-	       ! Ratio Conductivity of sand - low range
-	       ! 0.00002 is the embedded Substrate Hydraulic Conductivity for Silt/Sand (m/s)
-	       Dummy2 = 0.00002 * C_E(i)
-	       ! True cond. (m/s); Composite Substrate Hydraulic Conductivity
-	       k_s = Dummy1 + Dummy2
+	    ! Ratio Conductivity of sand - low range
+	    ! 0.00002 is the embedded Substrate Hydraulic Conductivity for Silt/Sand (m/s)
+	    Dummy2 = 0.00002 * C_E(i)
+	    ! True cond. (m/s); Composite Substrate Hydraulic Conductivity
+	    k_s = Dummy1 + Dummy2
 
-	       ! For the last grid where there is no water surface in the downstream
-	       if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .EQ. totLength) then
+	    ! For the last grid where there is no water surface in the downstream
+			!!!TLE: I think this if block might be wrong. I think we may want this at the outlet,
+			!      which in my understanding is not the same as CH_NETLNK == totLength. Commenting
+			!      ifs out for now.
+			!	  if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .EQ. totLength) then
+			!			!h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			!			d_h = 0
+			!	  else
+	    h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+	    !-- Here also I have the issue with the directiono of the cell. I am using TO_NODE here to
+	    !-- detect the cell in the downstream.
+	    !h_D_dn = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))+1) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+	    h_D_dn = y_w(TO_NODE(i)) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))  !!!!!TLE: I'm pretty sure we want channel slope here, but Reza is using ChSSlp
+
+	    !Change in hydraulic head per unit distance
+	    d_h = (h_D - h_D_dn) / dx
+			!	  end if
+
+			!		print *, "----dh----"
+			!		print *, "CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", CH_NETLNK(CHANXI(i),CHANYJ(i))
+			!		print *, "y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			!		print *, "h_D = ", h_D
+			!		print *, "h_D_dn = ", h_D_dn
+			!		print *, "y_w(TO_NODE(i)) = ", y_w(TO_NODE(i))
+			!		print *, "dx = ", dx
+			!		print *, "S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", S_0(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			!		print *, "dh = ", d_h
+			!		print *, "----------"
+
 			!h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-			d_h = 0
-	       else
-	       h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-	       !-- Here also I have the issue with the directiono of the cell. I am using TO_NODE here to
-	       !-- detect the cell in the downstream.
-	       !h_D_dn = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))+1) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-	       h_D_dn = y_w(TO_NODE(i)) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))  !!!!!TLE: I'm pretty sure we want channel slope here, but Reza is using ChSSlp
 
-	       !Change in hydraulic head per unit distance
-	       d_h = (h_D - h_D_dn) / dx
-	       end if
-		!h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			! Cross-Sectional Area of the Seepage Face (m2)
+			A_s = dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Pw_river(CH_NETLNK(CHANXI(i),CHANYJ(i))) !!!! TLE: Again, I think we want channel slope
+			! Darcy’s Law for Calculating for Hyporheic Flow (cms
+			!		Q_hyp(CHANXI(i),CHANYJ(i)) = A_s * k_s * d_h
+			Q_hyp(CHANXI(i),CHANYJ(i)) = 0
 
-		! Cross-Sectional Area of the Seepage Face (m2)
-		A_s = dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Pw_river(CH_NETLNK(CHANXI(i),CHANYJ(i))) !!!! TLE: Again, I think we want channel slope
-		! Darcy’s Law for Calculating for Hyporheic Flow (cms
-		Q_hyp(CHANXI(i),CHANYJ(i)) = A_s * k_s * d_h
+			!		print *, "S_0 = ", S_0(i)
+			!		print *, "d_h = ", d_h
+			!		print *, "A_s = ", A_s
+			!		print *, "Q_hyp(i) = ", Q_hyp(CHANXI(i),CHANYJ(i))
 
-!		print *, "S_0 = ", S_0(i)
-!		print *, "d_h = ", d_h
-!		print *, "A_s = ", A_s
-!		print *, "Q_hyp(i) = ", Q_hyp(CHANXI(i),CHANYJ(i))
+      ! Calculating dispersion coefficient
+			! Calculate dispersion using equations adapted from SubMcCormick1 - HeatSourceModel source code
+			! (Martin and McCutcheon 1999)
+			! To enable simulating the cooling/warming effect of riffle-pool
+			SlopeWS = d_h
+			if (SlopeWS < 0.0) then
+			    ! For adverse slopes
+					Shear_Velocity = V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			else
+			    Shear_Velocity = sqrt(9.8 * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * SlopeWS)
+			end if
 
-        	! Calculating dispersion coefficient
-		! Calculate dispersion using equations adapted from SubMcCormick1 - HeatSourceModel source code
-		! (Martin and McCutcheon 1999)
-		! To enable simulating the cooling/warming effect of riffle-pool
-		SlopeWS = d_h
-		if (SlopeWS < 0.0) then
-			! For adverse slopes
-			Shear_Velocity = V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-		else
-			Shear_Velocity = sqrt(9.8 * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * SlopeWS)
-		end if
-		! Calculating wetted width for the river channel (top with - m)
-		!W_w = W_b(node) + 2.0 * Z(node) * y_w(node) => Will grab it from the routing module
+			!		print *, "-----Shear Velocity-----"
+			!		print *, "SlopeWS = ", SlopeWS
+			!		print *, "y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			!		print *, "------------------------"
 
-		! Physical Dispersion Coefficient (Fischer et. al. 1979)
-		! I Changed 0.011 to 0.06 in below eqn to account for natural (not straight) streams
+			! Calculating wetted width for the river channel (top with - m)
+			!W_w = W_b(node) + 2.0 * Z(node) * y_w(node) => Will grab it from the routing module
 
-        	Disp_coef(CHANXI(i),CHANYJ(i)) = (0.06 * (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0) * (W_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0))/ &
-						(y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Shear_Velocity)
+			! Physical Dispersion Coefficient (Fischer et. al. 1979)
+			! I Changed 0.011 to 0.06 in below eqn to account for natural (not straight) streams
+    	Disp_coef(CHANXI(i),CHANYJ(i)) = (0.06 * (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0) * (W_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0))/ &
+							(y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Shear_Velocity)
 
-		! A condition based on the adaptd methods from Martin & McCutcheon (1999) also considered with Boyd & Kasper (2003)
-		! 3600 is the assumed dt in sectonds
-		if ((Disp_coef(CHANXI(i),CHANYJ(i)) * ((3600.0 / dx) ** 2.0)) > 0.5) then
-			Disp_coef(CHANXI(i),CHANYJ(i)) = (0.45 * (dx ** 2.0)) / 3600.0
-		end if
+			! A condition based on the adaptd methods from Martin & McCutcheon (1999) also considered with Boyd & Kasper (2003)
+			! 3600 is the assumed dt in sectonds
+			if ((Disp_coef(CHANXI(i),CHANYJ(i)) * ((3600.0 / dx) ** 2.0)) > 0.5) then
+		      Disp_coef(CHANXI(i),CHANYJ(i)) = (0.45 * (dx ** 2.0)) / 3600.0
+		  end if
 
-		if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-		   Disp_coef(CHANXI(i),CHANYJ(i)) = 0.
-		end if
+		  if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+		      Disp_coef(CHANXI(i),CHANYJ(i)) = 0.
+		  end if
 	end Do
 
 
-	!-- I have this long if statement for determining the headwaters within the grid.
-	BC_Grid = 0
-	!-- WITH NEW UPDATE AND LOOKING DOWNSTREAM, WE REALLY DON'T NEED THIS IF AND UPDATING BC_GRID,
-	!-- BUT I KEEP THAT HERE FOR NOW!
+!	!-- I have this long if statement for determining the headwaters within the grid.
+!	BC_Grid = 0
+!	!-- WITH NEW UPDATE AND LOOKING DOWNSTREAM, WE REALLY DON'T NEED THIS IF AND UPDATING BC_GRID,
+!	!-- BUT I KEEP THAT HERE FOR NOW!
+!	if (first_time_step_DT) then	!-- To do this only one time!
+!	    neighbours = 0
+!	    DO i = 1,IXRT  !rows
+!			    DO j = 1,JXRT   !colsumns
+!				      if ( CH_NETRT(i,j) .EQ. 0) then
+!							    if ((i .gt. 1) .and. (i .lt. IXRT) .and. (j .gt. 1) .and. (j .lt. JXRT)) then
+!									    if (CH_NETRT(i-1,j-1) .NE. -9999) then
+!                  		    neighbours = neighbours + 1
+!              				end if
+!										  if (CH_NETRT(i-1,j) .NE. -9999) then
+!                  				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j+1) .NE. -9999) then
+!                  				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j-1) .NE. -9999) then
+!                  				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j+1) .NE. -9999) then
+!                  				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j-1) .NE. -9999) then
+!                  				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!             	 	      end if
+!								  else if ((i .ne. 1) .and. (i .ne. IXRT) .and. (j .eq. 1)) then
+!										  if (CH_NETRT(i-1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .eq. IXRT) .and. (j .ne. 1) .and. (j .ne. JXRT)) then
+!									    if (CH_NETRT(i,j-1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j-1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((j .ne. 1) .and. (j.ne. JXRT) .and. (i .eq. 1)) then
+!										  if (CH_NETRT(i,j-1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .ne. 1) .and. (i .ne. IXRT) .and. (j .eq. JXRT)) then
+!										if (CH_NETRT(i-1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j-1) .NE. -9999) then
+!				                 neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j-1) .NE. -9999) then
+!				                 neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .eq. 1) .and. (j .eq. 1)) then
+!										  if (CH_NETRT(i,j+1) .NE. -9999) then
+!											  neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .eq. IXRT) .and. (j .eq. 1)) then
+!										  if (CH_NETRT(i-1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j+1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .eq. 1) .and. (j .eq. JXRT)) then
+!										  if (CH_NETRT(i,j-1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!				        			end if
+!	      					    if (CH_NETRT(i+1,j-1) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i+1,j) .NE. -9999) then
+!                 				neighbours = neighbours + 1
+!              				end if
+!									else if ((i .eq. IXRT) .and. (j .eq. JXRT)) then
+!										  if (CH_NETRT(i-1,j-1) .NE. -9999) then
+!                				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i-1,j) .NE. -9999) then
+!                				neighbours = neighbours + 1
+!              				end if
+!											if (CH_NETRT(i,j-1) .NE. -9999) then
+!                				neighbours = neighbours + 1
+!              				end if
+!									end if
+!
+!									if ((neighbours .eq. 1) .and. (CH_NETLNK(i,j) .ne. totLength)) then
+!										  BC_Grid(CH_NETLNK(i,j)) = 1
+!									end if
+!
+!									neighbours = 0
+!          		end if
+!					end do
+!			end do
+!
+			!!!TLE: trying an alternative to Reza's monster 'if' block above. We need to establish FROM_NODE
+			!      in order to use the MacCormick solver Reza presumably originally intended to use. I can't
+			!      figure out where he got the alternative to the MacCormick solver, but whatever it is it
+			!      doesn't seem to be working that well.
+
+		  FROM_NODE = 0.
+	  	N_UPSTR = 0.
+  		node_order = 0.
+
+			!loop over TO_NODE, use it to construct FROM_NODE, N_UPSTR (number of upstream nodes)
+			! this should be enough info to construct a up->down order...?
+	    DO i = 1,totLength
+			    FROM_NODE(TO_NODE(i)) = FROM_NODE(TO_NODE(i)) + i
+					N_UPSTR(TO_NODE(i)) = N_UPSTR(TO_NODE(i)) + 1
+			end DO
+			print *, "FROM_NODE", FROM_NODE
+			print *, "TO_NODE", TO_NODE
+			print *, "N_UPSTR", N_UPSTR
+
+			!second loop to construct list of headwater nodes, list of branch nodes
+			c_hw = 1.
+			c_br = 1.
+			node_headwater = -1.
+			node_branch = -1.
+			DO i = 1, totLength
+
+					! check if headwater
+			    if (FROM_NODE(i) .eq. 0) then
+					    node_headwater(c_hw) = i
+					    c_hw = c_hw + 1
+					end if
+
+					!check if branch
+					if (N_UPSTR(i) .gt. 1) then
+					    node_branch(c_br) = i
+							c_br = c_br + 1
+					end if
+			end DO
+
+			print *, "node_branch = ", node_branch
+			print *, "node_headwater = ", node_headwater
+			!construct the up->downstream node order
+			loop_break = 0.
+			c_index = 1.
+			c_hw = 1.
+			c_br = 1.
+			node_current = node_headwater(c_hw)
+			DO WHILE (loop_break .eq. 0)
+			    if (c_index .eq. totLength) then
+						  node_order(c_index) = node_current
+					    loop_break = 1
+					end if
+					if (N_UPSTR(TO_NODE(node_current)) .eq. 1) then
+						  print *, "node_current = ", node_current
+							print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
+					    node_order(c_index) = node_current
+						  c_index = c_index + 1
+							node_current = TO_NODE(node_current)
+					else if (N_UPSTR(TO_NODE(node_current)) .gt. 1) then
+						  if (node_branch(c_br) .gt. 0) then                          !move to the next headwater
+								  print *, "node_current = ", node_current
+									print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
+							    node_order(c_index) = node_current
+									c_index = c_index + 1
+							    c_hw = c_hw + 1
+									c_br = c_br + 1
+							    node_current = node_headwater(c_hw)
+							else                                                        !continue to mainstem
+							    node_order(c_index) = node_current
+								  c_index = c_index + 1
+								  node_current = TO_NODE(node_current)
+							end if
+					end if
+			end DO
+			print *, "node_order = ", node_order
+
 	if (first_time_step_DT) then	!-- To do this only one time!
-		neighbours = 0
-		DO i = 1,IXRT  !rows
-			DO j = 1,JXRT   !colsumns
-				if ( CH_NETRT(i,j) .EQ. 0) then
-				if ((i .gt. 1) .and. (i .lt. IXRT) .and. (j .gt. 1) .and. (j .lt. JXRT)) then
-					if (CH_NETRT(i-1,j-1) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j+1) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j-1) .NE. -9999) then
-                  				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-             	 			end if
-				else if ((i .ne. 1) .and. (i .ne. IXRT) .and. (j .eq. 1)) then
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .eq. IXRT) .and. (j .ne. 1) .and. (j .ne. JXRT)) then
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j-1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((j .ne. 1) .and. (j.ne. JXRT) .and. (i .eq. 1)) then
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .ne. 1) .and. (i .ne. IXRT) .and. (j .eq. JXRT)) then
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j-1) .NE. -9999) then
-				                 neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-				                 neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .eq. 1) .and. (j .eq. 1)) then
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-						neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .eq. IXRT) .and. (j .eq. 1)) then
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j+1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .eq. 1) .and. (j .eq. JXRT)) then
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-				        end if
-	      				if (CH_NETRT(i+1,j-1) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i+1,j) .NE. -9999) then
-                 				neighbours = neighbours + 1
-              				end if
-				else if ((i .eq. IXRT) .and. (j .eq. JXRT)) then
-					if (CH_NETRT(i-1,j-1) .NE. -9999) then
-                				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i-1,j) .NE. -9999) then
-                				neighbours = neighbours + 1
-              				end if
-					if (CH_NETRT(i,j-1) .NE. -9999) then
-                				neighbours = neighbours + 1
-              				end if
-				end if
 
-				if ((neighbours .eq. 1) .and. (CH_NETLNK(i,j) .ne. totLength)) then
-					BC_Grid(CH_NETLNK(i,j)) = 1
-				end if
+			T_w_sim_temp = T_Trib - 273.2                                          !!! TLE: changed to T_a from T_trib
+			first_time_step_DT = .false.
 
-				neighbours = 0
-          			end if
-			end do
-		end do
-
-!		print *, "T_trib =", T_trib
-		!-- to convert to Deg C
-		T_w_sim_temp = T_Trib - 273.2
-
-		first_time_step_DT = .false.
 
       !-- Preparing the T_w_sim to be used in the first time step directly from the inputs from NoahMP
       !T_w_sim = 0.
@@ -463,42 +563,71 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       !T_w_sim_temp = T_Trib - 273.2
 
 
-      else
-	 !-- It's supposed to be in Deg C
-         T_w_sim_temp = T_QSUM_local
+  else
+	    !-- It's supposed to be in Deg C
+      T_w_sim_temp = T_QSUM_local
 
-      end if
-      !-- Converting two inflows to cms
-!      Q_Trib_cms = Q_Trib  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-!      Q_GW_cms = Q_GW  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-			!TLE: there was an error here. Previously, the block above worked for the first timestep but
-			!     just spit out zeros for all subsequent timesteps. It now loops over each channel grid cell,
-			!     and does the cms calculation based on the node area for that cell. Node area is the same for
-			!     all grid cells on the NWM grid, but in theory this should handle different sized grid cells
-			!     in the future
-			do i = 1, totLength
-			    Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-          Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_GW(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-		  end do
+  end if
+  !-- Converting two inflows to cms
+	!      Q_Trib_cms = Q_Trib  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+	!      Q_GW_cms = Q_GW  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+	!TLE: there was an error here. Previously, the block above worked for the first timestep but
+	!     just spit out zeros for all subsequent timesteps. It now loops over each channel grid cell,
+	!     and does the cms calculation based on the node area for that cell. Node area is the same for
+	!     all grid cells on the NWM grid, but in theory this should handle different sized grid cells
+	!     in the future
+	do i = 1, totLength
+	    Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+      Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_GW(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+	end do
 
-      ! Caclulating the temperature
-      Do i = 1 , totLength
-		! Calculate the heat fluxes
-		SW_rad = SW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), s_in, SF, albedo)
-		LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, T_a, H, C_L, viewSky)
-		LH     = LatentHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), SW_rad, LW_rad, T_w_sim_temp, T_a, H, V_wind, z_elv)
-		SH     = SensibleHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, LH, T_a, H, z_elv)
-		CH     = BedSediment_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)),  dx, T_w_sim_temp, P_s, C_E, Pw_river, T_bed)
-		! Net heat flux
-		Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = SW_rad + LW_rad + LH + SH + CH
-		! Calculate mixture temperature for each node and time step
-		if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-		   Advection = 0.
-		else
-		   Advection = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / (rho_water * c_water * &
-			    y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		end if
+  ! Caclulating the temperature
+	print *, "T_w_sim_temp = ", T_w_sim_temp
 
+  Do k = 1 , totLength
+			print *, "k = ", k
+			i = node_order(k)
+			print *, "i = ", i
+	    ! Calculate the heat fluxes
+			print *, "-----------ADVECTION-----------"
+			print *, "CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", CH_NETLNK(CHANXI(i),CHANYJ(i))
+
+			SW_rad = SW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), s_in, SF, albedo)
+			print *, "-----SW_rad-----"
+			print *, "SW_rad = ", SW_rad
+			print *, "-----LW_rad-----"
+			LW_rad = LW_RAD_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, T_a, H, sfcp, C_L, viewSky)
+			print *, "LW_rad = ", LW_rad
+			print *, "-----LH-----"
+			LH     = LatentHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), SW_rad, LW_rad, T_w_sim_temp, T_a, H, sfcp, V_wind, z_elv)
+			print *, "LH = ", LH
+			print *, "-----SH-----"
+			SH     = SensibleHeat_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)), T_w_sim_temp, LH, T_a, H, sfcp, z_elv)
+			print *, "SH = ", SH
+			!!!TLE: turning off channel bed sediment conduction for now.
+			!CH     = BedSediment_FLUX(CH_NETLNK(CHANXI(i),CHANYJ(i)),  dx, T_w_sim_temp, P_s, C_E, Pw_river, T_bed)
+			print *, "-----CH-----"
+			CH     = 0.0
+			print *, "CH = ", CH
+			print *, "------------"
+
+			! Net heat flux
+			Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = SW_rad + LW_rad + LH + SH + CH
+			! Calculate mixture temperature for each node and time step
+			print *, "Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+
+			!!!TLE: Incorporating the MacCormick (1969) finite difference approximation of
+			!      the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003))
+			 
+
+			if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+		      Advection = 0.
+		  else
+		      Advection = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / (rho_water * c_water * &
+			        y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		  end if
+
+			!!!TLE: a block Reza commented out but didn't delete
 		! For the first time step, where the temperature is not calculated for that time step yet:
 		! This is impprtant though! As, basically, here I am definig the upstream boundary condition.
 		! -- I think there is no need for the next "if" after my my new edits right after thif "if"
@@ -516,7 +645,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		!   end if
 		!end if
 		! -- ##### TO HERE #####
-
+		!
 		! For the very upstream grid where there is no information in the prior grid:
 		! Since I am looking downstream inplace of upstream now!
 		!if (BC_Grid(CH_NETLNK(CHANXI(i),CHANYJ(i))) .eq. 1) then
@@ -532,149 +661,156 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		!	   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 		!	   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 		!	end if
-
 		!-- Sooo, I had to update this code here because I don't know how to get access to the upper cell which is discharing to our target cell.
 		!-- I though the "FROM_NODE" would be the key but after printing the array, it turns out that the array is actually starts form 1 to the NLINKS.
 		!-- nothing speccific about the FROM_NODE
 		!-- To me, that means the model doesn't care about that FROM_NODE.
 		!-- Therefore, I updated the model's formulation to wotk with TO_NODE instead
 		!else
-		!-- Self
-                 if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
-		     self = 0.
-		 else
-		     self = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
-				(rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		 end if
-		 !-- looking downstream
-		 if ((y_w(TO_NODE(i)) .EQ. 0.) .OR. (V_w(TO_NODE(i)) .EQ. 0.)) then
-		     Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * -1. * self) / dx
-		 else
-		     Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(TO_NODE(i)) / &
-				 (rho_water * c_water * y_w(TO_NODE(i)) * V_w(TO_NODE(i)))) - self)) / dx
-		 end if
-		 !-- Putting everything together, for the advection and dispersion
-		 if (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-			   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-		 else
-			   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		 end if
 
-!		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-!		 print *, "Flux Temp = ", FluxTemp
-		!end if
+			!-- Self
+     	if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
+		      self = 0.
+		  else
+		      self = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
+				     (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		  end if
+		  !-- looking downstream
+		 	if ((y_w(TO_NODE(i)) .EQ. 0.) .OR. (V_w(TO_NODE(i)) .EQ. 0.)) then
+		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * -1. * self) / dx
+		  else
+		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(TO_NODE(i)) / &
+				    (rho_water * c_water * y_w(TO_NODE(i)) * V_w(TO_NODE(i)))) - self)) / dx
+		  end if
 
-		! -- We don't apply the lateral inflows to T_w_sim; They will be applied to the final porduct, T_QSUM later,
+		 	!-- Putting everything together, for the advection and dispersion
+		 	if (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+			    !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+				 	!!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) ! TLE: commented so I could track the change in temp separately
+			   	FluxDelta = 0.0
+	    else
+			    !!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+			 		!!!TLE: Changed so I could track the change in temperature as a separate variable instead of calc'ing flux temp in one step
+			  	FluxDelta = (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		 end if
+		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		 print *, "FluxDelta = ", FluxDelta
+		 FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + FluxDelta
+		 print *, "FluxTemp = ", FluxTemp
+
+		 !		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		 !end if
+
+	   ! -- We don't apply the lateral inflows to T_w_sim; They will be applied to the final porduct, T_QSUM later,
                 !-- Deg C to Deg K
-		T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
+		 T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
 
-		!-- getting a weighted average
-		if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .gt. 0) then
-		   if ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_hyp(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-		      TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.
-		   else
-		      !-- in Deg K
-		      TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_Trib(i)) + &
+	   !-- getting a weighted average
+	   if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .gt. 0) then
+		     if ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_hyp(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+		         TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.
+		     else
+		         !-- in Deg K
+		         TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_Trib(i)) + &
                                                             (Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_GW(i)) + &
 							    (Q_hyp(CHANXI(i),CHANYJ(i))*T_hyp(i))) / &
-							   (Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+ &
+							    (Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+ &
 							    Q_hyp(CHANXI(i),CHANYJ(i)))
-		   end if
+		     end if
 
-		!-- For now, I realized that we're dealing with 4 different discharge values: QSUM, QINFLOWBASE, QSTORMVOLRT, QLINK
-		!-- I am getting these values from module_channel_routing. Overall, it seems they all are in m3/s
-		!-- Okay, let's look at the units of these variables based on the code we have in module_channel_routing:
-		!-- L779:  QINFLOWBASE, QSTORMVOLRT: Based on the conversion here (Q/1000*node_area/Time), in code mm is going to be m3/s (I converted them before the DO)
-		!-- L1089: QLINK: Well, this one is based on the diffusion function and as we can see from L181 - L187,
-		!--  the diffusion function uses Manning's equation for calculating the answer. Therefore, it should also be on m3/s
-		!-- L1110: QSUM: Since it's a function of QLINK with no additional conversion, we can say, that one also is in m3/s
-                !-- Okay, based on what I learned from module_channel_routing, I am gonna remove the DT_STEPS from caluating the QLateral
+				 !-- For now, I realized that we're dealing with 4 different discharge values: QSUM, QINFLOWBASE, QSTORMVOLRT, QLINK
+				 !-- I am getting these values from module_channel_routing. Overall, it seems they all are in m3/s
+				 !-- Okay, let's look at the units of these variables based on the code we have in module_channel_routing:
+				 !-- L779:  QINFLOWBASE, QSTORMVOLRT: Based on the conversion here (Q/1000*node_area/Time), in code mm is going to be m3/s (I converted them before the DO)
+				 !-- L1089: QLINK: Well, this one is based on the diffusion function and as we can see from L181 - L187,
+				 !--  the diffusion function uses Manning's equation for calculating the answer. Therefore, it should also be on m3/s
+				 !-- L1110: QSUM: Since it's a function of QLINK with no additional conversion, we can say, that one also is in m3/s
+         !-- Okay, based on what I learned from module_channel_routing, I am gonna remove the DT_STEPS from caluating the QLateral
 
-	            QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_hyp(CHANXI(i),CHANYJ(i))
-	        end if
+	       QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_hyp(CHANXI(i),CHANYJ(i))
+	   end if
 
 
-	      !-- Here I wanna detect the cells/grids discharging to the current cell
-	      !-- Not very efficient though
-!	      Q_strTot = 0.
-!	      T_strTot = 0.
-!	      Do j = 1, totLength
-!	      	 if (TO_NODE(j) .eq. i) then
-!	      	     Q_strTot = Q_strTot + Q_str(j)
-!	      	     if ((Q_strTot +  Q_str(j)) .EQ. 0.) then
-!	      			     T_strTot = 0.
-!		           else
-!			             T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
-!				           (Q_strTot + Q_str(j))
-!		           end if
-!	      	 end if
-!
-!	      end do
-				! TLE: Re-writing the above loop. I see some potential double counting issues.
-				!      We are adding Q_str(j) to Q_strTot at the top of the 'if' statement,
-				!      Then adding it again in the denominator above. I don't think we want that.
-				Q_strTot = 0.
-	      T_strTot = 0.
-	      Do j = 1, totLength
-	      	 if (TO_NODE(j) .eq. i) then
-						   Q_strTmp = Q_strTot + Q_str(j)
-	      	     if (Q_strTmp .EQ. 0.) then
-	      			     T_strTot = 0.
-		           else
-			             T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
+	   !-- Here I wanna detect the cells/grids discharging to the current cell
+	   !-- Not very efficient though
+		 !	      Q_strTot = 0.
+		 !	      T_strTot = 0.
+		 !	      Do j = 1, totLength
+		 !	      	 if (TO_NODE(j) .eq. i) then
+		 !	      	     Q_strTot = Q_strTot + Q_str(j)
+		 !	      	     if ((Q_strTot +  Q_str(j)) .EQ. 0.) then
+		 !	      			     T_strTot = 0.
+		 !		           else
+		 !			             T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
+		 !				           (Q_strTot + Q_str(j))
+		 !		           end if
+		 !	      	 end if
+		 !
+		 !	      end do
+		 ! TLE: Re-writing the above loop. I see some potential double counting issues.
+		 !      We are adding Q_str(j) to Q_strTot at the top of the 'if' statement,
+		 !      Then adding it again in the denominator above. I don't think we want that.
+		 Q_strTot = 0.
+	   T_strTot = 0.
+	   Do j = 1, totLength
+	       if (TO_NODE(j) .eq. i) then
+				     Q_strTmp = Q_strTot + Q_str(j)
+	      	   if (Q_strTmp .EQ. 0.) then
+	      		     T_strTot = 0.
+		         else
+			           T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
 				           Q_strTmp
-									 Q_strTot = Q_strTmp
-		           end if
-	      	 end if
+								 Q_strTot = Q_strTmp
+		         end if
+	      end if
 
-	      end do
+	  end do
 
-              !-- to Deg K
-	      T_strTot = T_strTot + 273.2
+    !-- to Deg K
+	  T_strTot = T_strTot + 273.2
 
-	      !-- inflow to node across each face
-	      !if(TYPEL(i) .eq. 0) then                         ! -- If stream; only regular nodes have to attribute
-	      !-- in Deg K
-!	      T_QSUM_local(i) = ((ABS(Q_strTot) * T_strTot) + &
-!			   (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))*T_w_sim(i)) + &
-!			   (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))*TLateral(i))) / &
-!			   (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))))
-!       TLE: Looking at the output, Q_strTot (amount of flow entering current node from the upstream node/s) is
-!            usually negative. I think this is because it is calculated based on flow OUT of the upstream node/s,
-!            so it is logged as a loss of--or negative--Q. In that case, positive values of Q_strTot actually
-!            indicate a net flow upstream. So, making a change to the T_QSUM_local calculation. Instead of
-!            ABS(Q_strTot), we want Q_strTot*-1 to reflect that flow actually IS sometimes upstream, but usually
-!            downstream.
-	      T_QSUM_local(i) = (((Q_strTot*-1.) * T_strTot) + &
-			   (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i)) + &
-			   (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
-			   ((Q_strTot*-1.)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-
-
-				 !TLE TEMPORARY: calculate the relative contribution of each Q source (percentage of total Q)
-				percent_Q_LINK(i) = (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)) / &
-				 (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
-				percent_Q_strTot(i) = (ABS(Q_strTot) / &
- 				 (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
-				percent_Q_Lateral(i) = (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))) / &
- 				 (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
+	  !-- inflow to node across each face
+	  !if(TYPEL(i) .eq. 0) then                         ! -- If stream; only regular nodes have to attribute
+	  !-- in Deg K
+		!	      T_QSUM_local(i) = ((ABS(Q_strTot) * T_strTot) + &
+		!			   (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))*T_w_sim(i)) + &
+		!			   (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))*TLateral(i))) / &
+		!			   (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))))
+		!       TLE: Looking at the output, Q_strTot (amount of flow entering current node from the upstream node/s) is
+		!            usually negative. I think this is because it is calculated based on flow OUT of the upstream node/s,
+		!            so it is logged as a loss of--or negative--Q. In that case, positive values of Q_strTot actually
+		!            indicate a net flow upstream. So, making a change to the T_QSUM_local calculation. Instead of
+		!            ABS(Q_strTot), we want Q_strTot*-1 to reflect that flow actually IS sometimes upstream, but usually
+		!            downstream.
+	  T_QSUM_local(i) = (((Q_strTot*-1.) * T_strTot) + &
+		 (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i)) + &
+		 (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
+		 ((Q_strTot*-1.)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
 
-!				 print *,"---------------------------"
-!				 print *,"i=",i
-!				 print *,"totlength=",totlength
-!				 print *,"Q components"
-!				 print *,"Q_trib_csm:",Q_Trib_cms!(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-!				 print *,"Q_strtot:",Q_strTot
-!				 print *,"QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1):",QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
-!				 print *,"QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))):",QLateral!(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-!				 print *,"T components"
-!				 print *,"T_strTot:",T_strTot
-!				 print *,"T_w_sim(i)",T_w_sim(i)
-!				 print *,"TLateral(i)",TLateral(i)
-!				 print *,"---------------------------"
-!				if (i .eq. 25) then
+		!TLE TEMPORARY: calculate the relative contribution of each Q source (percentage of total Q)
+		percent_Q_LINK(i) = (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)) / &
+		  (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
+		percent_Q_strTot(i) = (ABS(Q_strTot) / &
+ 		  (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
+		percent_Q_Lateral(i) = (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))) / &
+ 		  (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
+
+
+		!				 print *,"---------------------------"
+		!				 print *,"i=",i
+		!				 print *,"totlength=",totlength
+		!				 print *,"Q components"
+		!				 print *,"Q_trib_csm:",Q_Trib_cms!(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		!				 print *,"Q_strtot:",Q_strTot
+		!				 print *,"QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1):",QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
+		!				 print *,"QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))):",QLateral!(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+		!				 print *,"T components"
+		!				 print *,"T_strTot:",T_strTot
+		!				 print *,"T_w_sim(i)",T_w_sim(i)
+		!				 print *,"TLateral(i)",TLateral(i)
+		!				 print *,"---------------------------"
+		!				if (i .eq. 25) then
 			   print *,"---------------------------"
 				 print *,"i=", i
 				 print *,"CHANXI(i)=",CHANXI(i)
@@ -720,7 +856,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 	      ! For now, the idea is to run the temperature module based on the time step we have for the hydraulics routing module but report the results only for every hour.
 
-     end DO
+  end DO
 
     !print *,"---------------------------"
     !print *,"QLINK(:,1)="
@@ -734,7 +870,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
     !print *,"T_QSUM_local:"
     !print *,T_QSUM_local
 
-    first_time_step_DTCT = .false.
+  first_time_step_DTCT = .false.
 
     !-- Updating the T_w_sim for the next timestep
     !T_w_sim(:,1) = T_w_sim(:,2)
@@ -766,7 +902,7 @@ end function SW_RAD_FLUX
 !   FUNCTION Longwave radiation flux
 ! ------------------------------------------------
 
-real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky)
+real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
 	! Longwav radiation flux for the desired time step and grid
 	implicit none
 
@@ -781,36 +917,59 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, C_L, viewSky)
         INTEGER :: space, spaceTemp        ! The node we are calculating the flux for that
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
-        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, C_L, viewSky
+        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, C_L, viewSky
 	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 
 	SBConst = 0.000000056696;	! Initializing the Stefan-Boltzman constant
 	StrTemp = T_w_sim(space)
 
 	! Saturation Vapor Pressure (modified from Chapra 1997 and Raudkivi 1979)
-	satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (T_a(space)-273.2))
+	!satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (T_a(space)-273.2))
+	!!!TLE: See my comment below in latent heat section. This is different in a significant way
+	!       from Raudkivi 1979. Changing to that equation (for kPa) until we can get Reza to weigh
+	!       in or some other form of closure
+	satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (237.3 + (T_a(space)-273.2)))
+
 	! Vapor Pressure (Bedient and Huber 1992)
-	VapPreReal = (H(space) / 100.0) * satVapPre
+	!VapPreReal = (H(space) / 100.0) * satVapPre
+	!!!TLE: Replacing Reza's relative-humidity based calculation with the Noah-MP one.
+	!       See latent heat subroutine for additional details
+	VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+
 	! Atmospheric Emissivity (Dingman 2002, Kustas et al. 1994)
-	emis = 1.72 * (((VapPreReal) / (T_a(space)-273.2))**(1.0 / 7.0)) * &
-		(1.0 + ((0.22 * C_L(space)) ** 2.0))		! See Dingman (2002) p 282
+	!emis = 1.72 * (((VapPreReal) / (T_a(space)-273.2))**(1.0 / 7.0)) * &
+	!	(1.0 + ((0.22 * C_L(space)) ** 2.0))		! See Dingman (2002) p 282
+	!!!TLE: Dingman (2002) is a textbook I don't have access to, so can't check that precisely.
+	!       Kustas et al. (1994) emissivity equation is as follows:
+	!       emis = 0.642 * ((VapPreReal / T_a(space))**(1.0/7.0))
+	!       Found an equation very similar to Reza's on CSDMS website. Trying that for now.
+	!       Note that T_a should be in Kelvin in both equations.
+	emis = 1.72 * ((VapPreReal / T_a(space))**(1.0/7.0)) * (1.0 + (0.22 * (C_L(space)**2.0)))
+	print *, "emis = ", emis
 
         ! Put a control here
 	if (emis > 0.96) then
-            emis = 0.96
-        end if
-
+    emis = 0.96
+  end if
+	print *, "StrTemp = ", (StrTemp+273.2)
+	print *, "T_a = ", T_a(space)
 	! Atmospheric Longwave Radiation Flux Attenuated in Water Column
 	! (Benyahya et al.,2010; Boyd and Kasper, 2003; Westhoff et al., 2007, 2011)
 	LW_Atm = 0.96 * emis * SBConst * ((T_a(space))**4.0) * viewSky(space)
+	print *, "LW_Atm = ", LW_Atm
+
 	! Land cover longwave radiation (Boyd and Kasper, 2003; Westhoff et al., 2007)
 	LW_LC = 0.96 * (1.0 - viewSky(space)) * 0.96 * SBConst * ((T_a(space)) ** 4.0)
+	print *, "LW_LC = ", LW_LC
+
 	! Back radiation
 	! (Boyd and Kasper, 2003; Evans et al., 1998; Kim and Chapra, 1997; Ouellet et al., 2014; Westhoff et al., 2007)
 	LW_Back = -0.96 * SBConst * ((StrTemp + 273.2) ** 4.0)
+	print *, "LW_Back = ", LW_Back
 
 	! Atmospheric, back, and landcover longwave radiation
 	LW_RAD_FLUX = LW_Atm + LW_LC + LW_Back
+!	print *, "LW_RAD_FLUX = ", LW_RAD_FLUX
 
 end function LW_RAD_FLUX
 
@@ -818,10 +977,10 @@ end function LW_RAD_FLUX
 ! ------------------------------------------------
 !   FUNCTION Latent heat flux
 ! ------------------------------------------------
-real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_elv)
+real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wind, z_elv)
 
 	implicit none
-	REAL    :: c_air = 1004.	! Heat capacity of air (J/kg deg C)
+	REAL    :: c_air = 1004.6	! Heat capacity of air (J/kg deg C)
 	REAL    :: rho_air = 1.2041	! Density of air at 20 deg C (kg/m^3)
 	REAL    :: StrTemp		! simulated water temperature at the previous location
 	REAL    :: L_e			! Latent Heat of Vaporization
@@ -829,46 +988,88 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, V_wind, z_
 	REAL    :: VapPreReal		! Real vapor pressure (mbar)
 	REAL    :: s			! Slope of the saturation vapor pressure curve (kPa/C)
 	REAL    :: r_a			! Aerodynamic resistance (s/m)
-	REAL    :: Pa_air		! Air pressure (mbar)
+	REAL    :: Pa_air		! Air pressure (kPa)
 	REAL    :: psy			! psychrometric constant(kPa/C)
 	REAL    :: E			! Penman open water evaporation
 	INTEGER :: space         	! The node we are calculating the flux for that
         REAL    :: SW_rad, LW_rad
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
-        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, V_wind, z_elv
+        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, V_wind, z_elv
 	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 	StrTemp = T_w_sim(space)
 
 	! <<<<<<<<< Evaporation section >>>>>>>>
 	! Calculate the latent heat of vaporization J/kg ((Maidment, 1993)
 	L_e = 1000000 * (2.501 - (0.002361 * StrTemp))
+!	print *, "L_e = ", L_e
+	!!!TLE: checked, looks ok...?
+
 	! Calculate the slope of the saturation vapor pressure curve at a given air temperature
 	! (modified from Chapra 1997 and Raudkivi 1979)
-	satVapPreLat = 0.611 * exp((17.27 * T_a(space)-273.2) / (T_a(space)-273.2))
+	!satVapPreLat = 0.611 * exp((17.27 * T_a(space)-273.2) / (T_a(space)-273.2))
+
+	!!!TLE: As written, the equation above spits out infinity. I have not been able to find this exact equation
+	!       (couldn't read Chapra 1997, and not sure where the 'modifications' come in). Trying the
+	!       Raudkivi (1979) formulation, which seems to be 611*exp((17.27*(T_a(space)-273.2))/(237.2+(T_a(space)-273.2)))--answer in Pa
+	satVapPreLat = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (237.3 + (T_a(space)-273.2))) !0.611 to get answer in kPa
+
 	! Vapor Pressure Based on Saturation Vapor Pressure Using Stream Temperature
 	! (Bedient and Huber 1992)
-	VapPreReal = (H(space) / 100.0) * satVapPreLat
+	!VapPreReal = (H(space) / 100.0) * satVapPreLat
+  !!!TLE: This method for calculating vapor pressure doesn't work, because H is specific humidity,
+	!       not relative humidity as Reza thought. Replacing the above calculation with the method used
+	!       in Noah-MP, which calculates vapor pressure based on surface pressure and spec. humidity.
+	VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+
 	! Slope of the saturation vapor pressure curve (kPa/C) is calculated as
 	! (Maidment, 1993)
-	s = (4100.0 * satVapPreLat) / ((T_a(space)-273.2) ** 2.0)
+	!s = (4100.0 * satVapPreLat) / ((T_a(space)-273.2) ** 2.0)
+	!!!TLE: Finding a slightly different equation...we'll try the one I found.
+	s = (4100.0 * satVapPreLat) / ((237.3 + (T_a(space)-273.2)) ** 2.0)
+
 	! Calculate the aerodynamic resistance (s/m)
 	! (Westhoff et al., 2007)
 	r_a = 245.0 / ((0.54 * V_wind(space)) + 0.5)
+	!!!TLE: looks good, check the value of wind speed (should be ~sqrt2?)
+
 	! Calculate air pressure
-	Pa_air = 101.3 - (0.0105 * z_elv(space))
+	!Pa_air = 101.3 - (0.01055 * z_elv(space))
+	!!!TLE: this also comes from Westhoff et al. (2007), but now we're passing in surface pressure so just use that
+	Pa_air = sfcp(space)
+
 	! Calculate psychrometric constant(kPa / deg C) (based on air pressure(Pa),
 	! (value should be adjusted for different site elevations)
 	! Ratio of water to dry air = .622, and the latent heat of water vaporization = 2.45E6 (J/kgC)
 	! (Cuenca 1989)
 	psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+	print *, "psy = ", psy
+	!!!TLE: equation looks good but...should we be using the latent heat of vaporization that is calculated above...?
+
 	! Calculate the Penman open water evaporation
 	! (Maidment, 1993; Westhoff et al., 2007)
-	E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) &
-		+ ((c_air * rho_air * psy * (satVapPreLat - VapPreReal)) / (1000.0 * L_e * r_a * (s + psy)))
+	!E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) &
+	!	+ ((c_air * rho_air * psy * (satVapPreLat - VapPreReal)) / (1000.0 * L_e * r_a * (s + psy)))
+	!!!TLE: This is slightly different from what's in Westhoff et al. (2007). There's an extra psychrometric constant in here.
+	E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) + &
+	((c_air * rho_air * (satVapPreLat - VapPreReal)) / (rho_water * L_e * r_a * (s + psy)))
 
 	LatentHeat_FLUX = -rho_water * L_e * E
 
+!  print *, "-----LATENTHEAT_FLUX-----"
+	print *, "L_e = ", L_e
+	print *, "E = ", E
+!  print *, "s = ", s
+!	print *, "SW_rad = ", SW_rad
+!	print *, "LW_rad = ", LW_rad
+!	print *, "L_e = ", L_e
+!	print *, "psy = ", psy
+!	print *, "c_air = ", c_air
+!	print *, "rho_air = ", rho_air
+!	print *, "satVapPreLat = ", satVapPreLat
+!	print *, "VapPreReal = ", VapPreReal
+!	print *, "r_a = ", r_a
+!	print *, "-----end-----"
 
 end function LatentHeat_FLUX
 
@@ -876,45 +1077,70 @@ end function LatentHeat_FLUX
 ! ------------------------------------------------
 !   FUNCTION Sensible heat flux
 ! ------------------------------------------------
-real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, z_elv)
+real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
 
 	implicit none
-	REAL    :: c_air = 1004.	! Heat capacity of air (J/kgC)
+	REAL    :: c_air = 1004.6	! Heat capacity of air (J/kg deg C)
 	REAL    :: rho_air = 1.2041	! Density of air at 20 deg C (kg/m3)
 	REAL    :: ews			! Saturation vapor pressure of the evaporating surface (KPa)
 	REAL    :: ewa			! Actual vapor pressure of the evaporation surface (KPa)
 	REAL    :: StrTemp		! Simulated water temperature at the previous location
 	REAL    :: Pa_air		! Air pressure (mbar)
-	REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
+	!REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
 	REAL    :: B_r			! Bowen's ratio
+	REAL    :: psy      ! psychrometric constant
 	INTEGER :: space
         REAL    :: LH
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
-        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, z_elv
+        REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, z_elv
 	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 
 	StrTemp = T_w_sim(space)
 
 	! Saturation vapor pressure of the evaporating surface (KPa)
 	! (Dingman, 1994; Maidment, 1993)
-	ews = 0.61275 * exp((17.27 * StrTemp) / (StrTemp))
+	!ews = 0.61275 * exp((17.27 * StrTemp) / (StrTemp))
+	!!!TLE: The above is a slightly different equation from what is elsewhere.
+	!      Putting in the Raudkivi formulation for now while I work on aligning
+	!      the pressure calculations with Noah-MP's version
+	ews = 0.611 * exp((17.27 * StrTemp)/(237.3 + StrTemp))
+
 	! Actual vapor pressure of the evaporation surface (KPa)
 	! To handle the infinte problem in B_r equation, consider the umidity of 100 as 99
-	H_tmp = H(space)
-        if (H(space) .EQ. 100.0) then
-            H_tmp = 99.0
-        endif
-	ewa = (H_tmp / 100.0) * ews
+	!H_tmp = H(space)
+  !      if (H(space) .EQ. 100.0) then
+  !          H_tmp = 99.0
+  !      endif
+	!ewa = (H_tmp / 100.0) * ews
+	!!!TLE: replacing vapor pressure formulation. See latent heat subroutine for more info.
+	ewa = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+
 	! Adiabatic atmospheric pressure adjusted for elevation above sea level
 	! (Westhoff et al., 2007)
-	Pa_air = 101.3 * (((293 - (0.0065 * z_elv(space))) / 293)**5.256)
+	!Pa_air = 101.3 * (((293 - (0.0065 * z_elv(space))) / 293)**5.256)
+	!!!TLE: The above is NOT the equation in Westhoff et al. (2007). I don't know where it
+	!       came from, but going to change it to be consistent with the air pressure
+	!       calculation in Westhoff, which is also what is used in the psychrometric
+	!       constant calculation in the latent heat module
+	!Pa_air = 101.3 - (0.01055 * z_elv(space))
+  !!!TLE: Update 2. We are now reading in surface pressure, so don't need to calculate
+	Pa_air = sfcp(space)
+
+	psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+
 	! Bowen ratio
 	! (Evans et al.,1998; Magnusson et al., 2012; Webb and Zhang, 1997; Westhoff et al., 2007)
 	! (modified for units from Bedient and Huber 1992)
-	B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
+	!B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
+	!!!TLE: modified B_r to use the psychrometric constant we calculate
+	B_r = psy * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
 
 	SensibleHeat_FLUX = B_r * LH
+	print *, "B_r = ", B_r
+  print *, "Pa_air = ", Pa_air
+	print *, "ews = ", ews
+	print *, "ewa = ", ewa
 
 end function SensibleHeat_FLUX
 
@@ -950,10 +1176,11 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
 	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 	StrTemp = T_w_sim(space)
 	! Assigning the numbers
+	!!!TLE: from where?!?!
 	Sed_ThermalDiffuse = 0.0000045
-	H2O_ThermalDiffuse = 0.00000014331
-	Sed_Density = 1600.0
-	Sed_HeatCapacity = 2219.0
+	H2O_ThermalDiffuse = 0.00000014331 !this looks right (in m2/s)
+	Sed_Density = 1600.0      ! google agrees with this
+	Sed_HeatCapacity = 2219.0 !from Google, spec. heat capacity of sand is ~2900 J/kgC
 
 	! ======================================================
 	! Calculate Volumetric Ratio of Water and Substrate
@@ -961,17 +1188,30 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
 	! First, calculating the porosity
 	! Ratio Size of dominant substrate
 	Dummy1 = P_s(space) * (1.0 - C_E(space))
+	!!!TLE: from CHANPARM: P_s = 50 mm; C_E = 0.5
+	!      So, Dummy1 always = 25 mm
+
 	! Ratio Conductivity of sand - low range
 	Dummy2 = 0.062 * C_E(space)
+	!!!TLE: Dummy2 always = 0.031 [units?]
+
 	! Estimated Porosity
 	! (adopted from Bedient and Huber 1992)
 	P = (0.3683 * ((Dummy1 + Dummy2)**(-0.0641)))
+	print *, "Porosity = ", P
+	!!!TLE: haven't been able to locate this equation...
+	!      According to this and the above,
+	!      P always = 0.2994
+	!      This seems ~reasonable, depending on substrate
+
 	! ======================================================
 	! Variables used in bed conduction
 	! Calculate the sediment depth (conduction layer)
 	! (Assumes 100 Particles Thickness)
 	! 0.1m < particleSize < 0.3m
+	!!!TLE: confused by the above, since particle size is set to 50 mm = 0.05 m
 	Sed_Depth = 10.0 * P_s(space) / 1000.0;
+	!!!TLE: so, sed_depth always = 0.5
 	if (Sed_Depth > 1.0) then
 		Sed_Depth = 1.0;
 	else if (Sed_Depth < 0.1) then
@@ -996,12 +1236,25 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
 	   Ratio_H2O = Volume_H2O / Volume_cl
 	end if
 
+	!!!TLE: As written, porosity is constant at ~0.3, so we should have a
+	!      ~70:30 ratio of sediment to water
+	print *, "Ratio_H2O = ", Ratio_H2O
+	print *, "Ratio_Sediment = ", Ratio_Sediment
+
 	ThermalDiffuse = (Sed_ThermalDiffuse * Ratio_Sediment) + (H2O_ThermalDiffuse * Ratio_H2O)
 	Density = (Sed_Density * Ratio_Sediment) + (rho_water * Ratio_H2O)
 	HeatCapacity = (Sed_HeatCapacity * Ratio_Sediment) + (c_water * Ratio_H2O)
 
-	BedSediment_FLUX = ThermalDiffuse * Density * HeatCapacity * ((T_bed(space)-273.) - StrTemp) / (Sed_Depth / 2.0)
+	BedSediment_FLUX = ThermalDiffuse * Density * HeatCapacity * ((T_bed(space)-273.2) - StrTemp) / (Sed_Depth / 2.0)
 
+	print *, "-----BedSediment_FLUX-----"
+	print *, "c_water = ", c_water
+	print *, "ThermalDiffuse = ", ThermalDiffuse
+	print *, "Density = ", Density
+	print *, "HeatCapacity = ", HeatCapacity
+	print *, "Sed_Depth = ", Sed_Depth
+	print *, "(T_bed(space)-273.2) - StrTemp = ", (T_bed(space)-273.2) - StrTemp
+	print *, "----------"
 
 end function BedSediment_FLUX
 

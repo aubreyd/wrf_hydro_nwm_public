@@ -1341,6 +1341,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
 	  ! Run the subroutine to diaggregate
           rt_domain(did)%QSUM = QSUM
           print *, "calling rivertemp_run"
+          print *, "counter = ", KRT
           call riverTempRuns%riverTemp_run(did)
 
           end do crnt   !--- DTCT timestep of DT_STEPS

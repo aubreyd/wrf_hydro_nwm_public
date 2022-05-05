@@ -34,11 +34,11 @@ type :: NoahMP_vectorizing_tools
 	INTEGER :: ims,ime, jms,jme, nsoil
 	REAL,DIMENSION( :,:), allocatable      ::  TMN   ! deep soil temperature [K]
 	REAL,DIMENSION( :,:), allocatable      ::  TSK   ! surface radiative temperature [K]
-	REAL,DIMENSION( :,:,:), allocatable    ::  TSLB  ! soil temperature [K]   
+	REAL,DIMENSION( :,:,:), allocatable    ::  TSLB  ! soil temperature [K]
 
 	contains
 	procedure :: init => NoahMP_vectorizing_tools_init
-	procedure :: destroy => NoahMP_vectorizing_tools_destroy  
+	procedure :: destroy => NoahMP_vectorizing_tools_destroy
 
 end type NoahMP_vectorizing_tools
 
@@ -53,7 +53,7 @@ subroutine NoahMP_vectorizing_tools_init(this, ims,ime, jms,jme, TMN, TSK, TSLB,
 	REAL,DIMENSION( ims:ime,jms:jme), INTENT(IN)         ::  TMN
 	REAL,DIMENSION( ims:ime,jms:jme), INTENT(IN)         ::  TSK
 	REAL,DIMENSION( ims:ime,1:nsoil,jms:jme), INTENT(IN) ::  TSLB
-		
+
 	this%ims = ims
 	this%ime = ime
 	this%jms = jms
@@ -62,7 +62,7 @@ subroutine NoahMP_vectorizing_tools_init(this, ims,ime, jms,jme, TMN, TSK, TSLB,
 	this%TSK = TSK
 	this%TSLB = TSLB
 	this%nsoil = nsoil
-		
+
 end subroutine NoahMP_vectorizing_tools_init
 
 
@@ -70,7 +70,7 @@ subroutine NoahMP_vectorizing_tools_destroy(this)
 
 	implicit none
 	! the type object being destroyed
-	class(NoahMP_vectorizing_tools), intent(inout) :: this 
+	class(NoahMP_vectorizing_tools), intent(inout) :: this
 
 end subroutine NoahMP_vectorizing_tools_destroy
 

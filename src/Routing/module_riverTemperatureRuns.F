@@ -55,9 +55,10 @@ subroutine riverTemperature_run(this, did)
 						rt_domain(did)%JXRT,       &
 						!weather2d,                &
 						weather2d%T2,              &
-						weather2d%v,               &
+						weather2d%short,           &
 						weather2d%q2x,	           &
-						weather2d%u,	           &
+						weather2d%wind,	           &
+            weather2d%sfcp,            &
 						rt_domain(did)%NLINKS,	   &
 						rt_domain(did)%overland%streams_and_lakes%CH_NETRT,    &
 						rt_domain(did)%CHANXI,	                               &
@@ -67,22 +68,34 @@ subroutine riverTemperature_run(this, did)
 						!module_NoahMP_hrldas_driver%TSK,                      &
 						!module_NoahMP_hrldas_driver%TSLB,                     &
 						rt_domain(did)%TMN_temp,                               &
-                                                rt_domain(did)%TSK_temp,                               &
-                                                rt_domain(did)%TSLB_temp,                              &
-                                                noah_lsm%nsoil,                                        &
+            rt_domain(did)%TSK_temp,                               &
+            rt_domain(did)%TSLB_temp,                              &
+            noah_lsm%nsoil,                                        &
 						nlst(did)%AGGFACTRT,                                   &
-                                                rt_domain(did)%Tair_fine_1D,     &
+            rt_domain(did)%Tair_fine_1D,     &
 						rt_domain(did)%SolarRad_fine_1D, &
-						rt_domain(did)%RelH_fine_1D,     &
+						rt_domain(did)%RelH_fine_1D,     &  !To do: change this name to spec. humidity, since that's what it actually is  --TLE
 						rt_domain(did)%windSpd_fine_1D,  &
 						rt_domain(did)%TMN_1D_fine,      &
 						rt_domain(did)%TSK_1D_fine,      &
-						rt_domain(did)%TSLB_1D_fine      &
+						rt_domain(did)%TSLB_1D_fine,     &
+            rt_domain(did)%SFCP_1D           &
 						)
-
-
-	print *, "calling river temperature module"
-  print *, "So = ", rt_domain(did)%So
+!  print *, "weather disaggregation"
+!  print *, "weather2d%short = ", weather2d%short
+!  print *, "weather2d%q2x = ", weather2d%q2x
+!  print *, "weather2d%wind = ", weather2d%wind
+!  print *, "weather2d%T2 = ", weather2d%T2
+!  print *, "weather2d%sfcp = ", rt_domain(did)%SFCP_1D
+!  print *, "----------------------"
+!
+!	print *, "calling river temperature module"
+!  print *, "So = ", rt_domain(did)%So
+!  rt_domain(did)%RelH_fine_1D = 30.0
+!  print *, "V_w = ", rt_domain(did)%velocity
+!  print *, "y_w = ", rt_domain(did)%HLINK
+!  print *, "W_w = ", rt_domain(did)%Tw
+!  print *, "T_bed = ", rt_domain(did)%TSLB_1D_fine
   call riverTemp%runRiverTempModel(     nlst(did)%dxrt0,                &
 					nlst(did)%DT,                   &
 					nlst(did)%DTCT,	                &
@@ -90,6 +103,7 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%JXRT,            &
 					rt_domain(did)%Tair_fine_1D,    &
 					rt_domain(did)%RelH_fine_1D,    &
+          rt_domain(did)%SFCP_1D,         &
 					rt_domain(did)%windSpd_fine_1D, &
 					rt_domain(did)%C_Cloud,         &
 					rt_domain(did)%TSLB_1D_fine,    &

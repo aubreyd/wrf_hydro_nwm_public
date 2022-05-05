@@ -1734,6 +1734,7 @@ end subroutine land_driver_ini
 	       P8W(:,1,:), GLW       ,SWDOWN      ,RAINBL_tmp, VEGFRA, update_veg, LAI, update_lai)
      else
         if(olddate == forcDate) then
+          print *, "calling HYDRO_frocing_drv"
            CALL HYDRO_frocing_drv(trim(noah_lsm%indir), forc_typ, wrf_hydro%snow_assim,olddate,                      &
                xstart, xend, ystart, yend,    &
                T_PHY(:,1,:),QV_CURR(:,1,:),U_PHY(:,1,:),V_PHY(:,1,:),P8W(:,1,:),    &
