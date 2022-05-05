@@ -30,7 +30,7 @@ implicit none
 #include <netcdf.inc>
     integer :: i_forcing
 character(len=19) out_date
- 
+
 
 interface read_hydro_forcing
 #ifdef MPP_LAND
@@ -48,13 +48,18 @@ type :: weather_2D_inputs
       !INTEGER :: IX, JX
       REAL, allocatable, dimension(:,:)   :: T2 	! Air temperature
       REAL, allocatable, dimension(:,:)   :: q2x	! Humidity
-      REAL, allocatable, dimension(:,:)   :: u  	! Near surface wind in the u-component
-      REAL, allocatable, dimension(:,:)   :: v  	! Shortwave radiation.
-
+!      REAL, allocatable, dimension(:,:)   :: u  	! Near surface wind in the u-component
+!      REAL, allocatable, dimension(:,:)   :: v  	! Shortwave radiation.
+!!!!!TLE: changing this. we want wind (sqrt(u^2+v^2)), not just u component wind and,
+!        more importantly, we want shortwave radiation (short) not v--which is wind.
+      REAL, allocatable, dimension(:,:)   :: wind  	! Near surface wind
+      REAL, allocatable, dimension(:,:)   :: short   	! Shortwave radiation.
+!!!!!TLE: adding pressure--rewriting a few of the equations in the water temperature section
+      REAL, allocatable, dimension (:,:)  :: sfcp   ! surface pressure
       contains
       !procedure :: init => weather_2D_inputs_init
       procedure :: destroy => weather_2D_inputs_destroy
-                
+
 end type weather_2D_inputs
 type(weather_2D_inputs) :: weather2d
 logical ::  first_timestep = .true.
@@ -62,7 +67,7 @@ logical ::  first_timestep = .true.
 Contains
 
 !subroutine weather_2D_inputs_init(this, IX, JX, T2, q2x, u, short)
-        
+
 	!implicit none
 	!class(weather_2D_inputs), intent(inout) :: this         ! the type object being initialized
 	!INTEGER, INTENT(in)                 :: IX,JX            ! IXRT, JXRT
@@ -1055,8 +1060,11 @@ end subroutine weather_2D_inputs_destroy
 
      end if
 
+     print *, "K = ", K
+
 !!!DJG CONSTant, idealized forcing...
      if(FORC_TYP.eq.4) then
+       print *, "TLE test"
 ! Impose a fixed diurnal cycle...
 ! assumes model timestep is 1 hr
 ! assumes K=1 is 12z (Ks or ~ sunrise)
@@ -1078,8 +1086,8 @@ end subroutine weather_2D_inputs_destroy
        V = 1.0
        PRES = 100000.0
        XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-
+!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+       SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
 !      print *, "PCP", PRCP1
 
     end if
@@ -1788,7 +1796,7 @@ end subroutine weather_2D_inputs_destroy
              g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old, g_fpar
    integer flag
 
-
+   print *, "TLE CHECK"
 
      call write_io_real(T2,g_T2)
      call write_io_real(Q2X,g_Q2X)
@@ -2324,6 +2332,8 @@ inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
          ".LDASIN_DOMAIN"//hgrid
 
+print *, "TLE check read_hydro_forcing_mpp1"
+print *, "FORC_TYP = ", FORC_TYP
 !!!DJG... Call READFORC_(variable) Subroutine for forcing data...
 !!!DJG HRLDAS Format Forcing with hour format filename (NOTE: precip must be in mm/s!!!)
 
@@ -2456,7 +2466,9 @@ if(FORC_TYP.eq.4) then
    V = 1.0
    PRES = 100000.0
    XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
+  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)))
 end if
 
 
@@ -2775,19 +2787,21 @@ print*,'PRECIP DOUBLE'
 PRCP1 = PRCP1 * 2.0
 #endif
 
-!-- For grabbing the desired arguments for the weather_disaggregate 
+!-- For grabbing the desired arguments for the weather_disaggregate
 if (first_timestep) then
       allocate(weather2D%T2(ix,jx))
       allocate(weather2D%q2x(ix,jx))
-      allocate(weather2D%u(ix,jx))
-      allocate(weather2D%v(ix,jx))
+      allocate(weather2D%wind(ix,jx))
+      allocate(weather2D%short(ix,jx))
+      allocate(weather2D%sfcp(ix,jx))
       first_timestep = .false.
 end if
 
 weather2D%T2 = T2
 weather2D%q2x = q2x
-weather2D%u = u
-weather2D%v = v
+weather2D%wind = sqrt(u**2 + v**2 )
+weather2D%short = short
+weather2D%sfcp = pres
 
 
 end subroutine read_hydro_forcing_mpp1
@@ -3373,4 +3387,3 @@ end module module_lsm_forcing
       real, dimension(ix,jx):: infxsrt,soldrain
       call read_ldasout_seq(olddate,hgrid, indir, dt,ix,jx,infxsrt,soldrain)
     end subroutine read_forc_ldasout_seq
-

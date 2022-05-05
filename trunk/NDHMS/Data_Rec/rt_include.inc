@@ -152,7 +152,7 @@
   REAL, allocatable, DIMENSION(:)      :: F_Shade   ! Shading factor (0 to 1)
   REAL, allocatable, DIMENSION(:)      :: S_Albedo  ! Surface albedo (0-1)
   REAL, allocatable, DIMENSION(:)      :: C_Cloud   ! Cloudiness (0-1)
-  REAL, allocatable, DIMENSION(:)      :: G_Chann_K ! Dominant Substrate Hydraulic Conductivity (m/s)  
+  REAL, allocatable, DIMENSION(:)      :: G_Chann_K ! Dominant Substrate Hydraulic Conductivity (m/s)
   REAL, allocatable, DIMENSION(:,:)    :: QLINK      !flow in link
   integer, allocatable, DIMENSION(:)   :: ascendIndex !sorting of routelink
 #ifdef WRF_HYDRO_NUDGING
@@ -270,15 +270,16 @@
    REAL,    allocatable, DIMENSION(:)   :: TMN_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: TSK_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: TSLB_1D_fine
+   REAL,    allocatable, DIMENSION(:)   :: SFCP_1D
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
    ! NEW FOR module_channel_routing.F
-   REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter 
-   
+   REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter
+
    !-- to get the temperature data from NoahMP
    REAL,    allocatable, DIMENSION(:,:)   :: TMN_temp
    REAL,    allocatable, DIMENSION(:,:)   :: TSK_temp
    REAL,    allocatable, DIMENSION(:,:,:) :: TSLB_temp
    REAL,    allocatable, DIMENSION(:)     :: QSUM     !--mass bal of node
 
-   
+
    END TYPE RT_FIELD
