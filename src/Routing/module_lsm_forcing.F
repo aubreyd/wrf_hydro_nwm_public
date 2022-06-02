@@ -1089,8 +1089,8 @@ end subroutine weather_2D_inputs_destroy
        V = 1.0
        PRES = 100000.0
        XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-       SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
+       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
 !      print *, "PCP", PRCP1
 
     end if
@@ -2335,8 +2335,6 @@ inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
          ".LDASIN_DOMAIN"//hgrid
 
-print *, "TLE check read_hydro_forcing_mpp1"
-print *, "FORC_TYP = ", FORC_TYP
 !!!DJG... Call READFORC_(variable) Subroutine for forcing data...
 !!!DJG HRLDAS Format Forcing with hour format filename (NOTE: precip must be in mm/s!!!)
 
@@ -2469,9 +2467,9 @@ if(FORC_TYP.eq.4) then
    V = 1.0
    PRES = 100000.0
    XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
 !  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
-  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)))
+!  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)))
 end if
 
 

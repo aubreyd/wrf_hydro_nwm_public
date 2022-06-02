@@ -609,7 +609,6 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 
    ! step 1) disaggregate specific fields from LSM to Hydro grid
    if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
-
       RT_DOMAIN(did)%overland%streams_and_lakes%surface_water_to_channel = zeroFlt
       RT_DOMAIN(did)%LAKE_INFLORT_DUM = rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake
 
@@ -689,7 +688,6 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
       write(78,*) "Timing: Overland Routing  accumulated time--", timeOr
 #endif
 #endif
-
       RT_DOMAIN(did)%QSTRMVOLRT_TS = rt_domain(did)%overland%streams_and_lakes%surface_water_to_channel
       RT_DOMAIN(did)%QSTRMVOLRT_ACC = RT_DOMAIN(did)%QSTRMVOLRT_ACC + RT_DOMAIN(did)%QSTRMVOLRT_TS
 

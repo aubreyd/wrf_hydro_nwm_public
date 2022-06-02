@@ -51,11 +51,14 @@ contains
 !            Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, T_QSUM)
 
 
-subroutine river_temperature_init(this, T_QSUM)
+subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev)
 
 	implicit none
 	class(river_temperature_type), INTENT(inout)       :: this              ! the type object being initialize
         REAL, INTENT(inout), DIMENSION(:)             :: T_QSUM
+				REAL, INTENT(inout), DIMENSION(:)             :: T_QSUM_prev
+				REAL, INTENT(inout), DIMENSION(:)             :: NetRad
+				REAL, INTENT(inout), DIMENSION(:)             :: NetRad_prev
 
 end subroutine river_temperature_init
 ! --------------------------------------------------------------------------
@@ -129,7 +132,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	      T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
 				V_w, W_w, Q_str, Q_GW, Q_Trib, T_GW, T_hyp, T_Trib, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
-				node_area, TO_NODE, TYPEL, T_QSUM_local, totLength)
+				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, totLength)
 
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
@@ -169,7 +172,6 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL                              :: LH		        ! Latent heat energy flux (W/m2)
 	REAL                              :: SH		        ! Sensible heat energy flux (W/m2)
 	REAL                              :: CH		        ! Conduction flux (W/m2)
-	REAL,  DIMENSION(totLength)       :: Net_HeatFlux	! Net heat flux from 5 sources (W/m2)
 	! For hyporheic exchange incflow calculation & Porosity of the conduction layer (unitless)
 	REAL, DIMENSION(IXRT,JXRT)        :: Q_hyp		! Darcy’s Law for Calculating for Hyporheic Flow (Domenico and Schwartz 1990)
 	REAL, DIMENSION(IXRT,JXRT)        :: Disp_coef
@@ -207,14 +209,17 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
+	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_prev  ! from previous timestep
+	REAL,    INTENT(INOUT), DIMENSION(totLength)          :: NetRad, NetRad_prev	! Net heat flux from 5 sources (W/m2)
 	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
 	INTEGER,                DIMENSION(totLength)          :: FROM_NODE, N_UPSTR, node_order, node_headwater, node_branch
-	INTEGER                                               :: neighbours, i, j, k, loop_break, c_index, node_current, c_hw, c_br
+	INTEGER                                               :: neighbours, i, j, k, loop_break, c_index
+	INTEGER                                               :: node_current, c_hw, c_br, denom
         ! Simulated water temeprature (C)
-	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulatd water temperature for the reach in space & time (C)
-        REAL                                                  :: Q_strTot, T_strTot, Q_strTmp
+	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulated water temperature for the reach in space & time (C)
+  REAL                                                  :: Q_strTot, T_strTot, Q_strTmp, T_up, T_down, branch1_temp
 	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)
-	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp
+	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t
 
         !REAL                                                  :: DT_STEPS               !-- number of timestep in routing
 	REAL,                   DIMENSION(totLength)                :: Q_GW_cms
@@ -231,6 +236,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!-- Setting everything to zero first.
 	Disp_coef = 0.
   Q_hyp = 0.
+	s1t = 0.
+	s2t = 0.
 
 	! Calculating hyporheic fluxes
 	Do i = 1, totLength
@@ -308,7 +315,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			!W_w = W_b(node) + 2.0 * Z(node) * y_w(node) => Will grab it from the routing module
 
 			! Physical Dispersion Coefficient (Fischer et. al. 1979)
-			! I Changed 0.011 to 0.06 in below eqn to account for natural (not straight) streams
+			! Reza: Changed 0.011 to 0.06 in below eqn to account for natural (not straight) streams
     	Disp_coef(CHANXI(i),CHANYJ(i)) = (0.06 * (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0) * (W_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) ** 2.0))/ &
 							(y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Shear_Velocity)
 
@@ -322,7 +329,6 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		      Disp_coef(CHANXI(i),CHANYJ(i)) = 0.
 		  end if
 	end Do
-
 
 !	!-- I have this long if statement for determining the headwaters within the grid.
 !	BC_Grid = 0
@@ -526,15 +532,15 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 					    loop_break = 1
 					end if
 					if (N_UPSTR(TO_NODE(node_current)) .eq. 1) then
-						  print *, "node_current = ", node_current
-							print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
+!						  print *, "node_current = ", node_current
+!							print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
 					    node_order(c_index) = node_current
 						  c_index = c_index + 1
 							node_current = TO_NODE(node_current)
 					else if (N_UPSTR(TO_NODE(node_current)) .gt. 1) then
 						  if (node_branch(c_br) .gt. 0) then                          !move to the next headwater
-								  print *, "node_current = ", node_current
-									print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
+!								  print *, "node_current = ", node_current
+!									print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
 							    node_order(c_index) = node_current
 									c_index = c_index + 1
 							    c_hw = c_hw + 1
@@ -551,17 +557,14 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 	if (first_time_step_DT) then	!-- To do this only one time!
 
-			T_w_sim_temp = T_Trib - 273.2                                          !!! TLE: changed to T_a from T_trib
+			!initialize homogeneous stream channel temperature
+			T_w_sim_temp = T_Trib - 273.2
+			T_QSUM_prev = T_Trib - 273.2
+
+			!starting off with no rad in previous timestep (not sure if that's a big deal or not)
+			NetRad_prev = 0.
+
 			first_time_step_DT = .false.
-
-
-      !-- Preparing the T_w_sim to be used in the first time step directly from the inputs from NoahMP
-      !T_w_sim = 0.
-      !print *,"T_trib:"
-      !print *,T_Trib
-      !T_w_sim(:,1) =  T_Trib - 273.2
-      !T_w_sim_temp = T_Trib - 273.2
-
 
   else
 	    !-- It's supposed to be in Deg C
@@ -581,9 +584,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_GW(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
 	end do
 
-  ! Caclulating the temperature
-	print *, "T_w_sim_temp = ", T_w_sim_temp
-
+  ! Calculate net radiation in this time step for all nodes
   Do k = 1 , totLength
 			print *, "k = ", k
 			i = node_order(k)
@@ -611,21 +612,147 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			print *, "CH = ", CH
 			print *, "------------"
 
-			! Net heat flux
-			Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = SW_rad + LW_rad + LH + SH + CH
+			! Net radiation -> Heat Flux
+			NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) = (SW_rad + LW_rad + LH + SH + CH) / &
+			    (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+
 			! Calculate mixture temperature for each node and time step
-			print *, "Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			print *, "NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 
-			!!!TLE: Incorporating the MacCormick (1969) finite difference approximation of
-			!      the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003))
-			 
+  end do
 
-			if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-		      Advection = 0.
-		  else
-		      Advection = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / (rho_water * c_water * &
-			        y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		  end if
+
+	print *, "T_w_sim_temp = ", T_w_sim_temp
+	print *, "T_QSUM_prev = ", T_QSUM_prev
+	print *, "NetRad_prev = ", NetRad_prev
+	print *, "NetRad = ", NetRad
+	print *, "DT = ", DT
+	!!!TLE: Incorporating the MacCormick (1969) finite difference approximation of
+	!      the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003), p.68, Eq. 2-119 -- 2-122)
+	!MACCORMICK STEP 1
+	branch1_temp = 0.
+	denom = 0.
+  Do k = 1,totLength
+			!converter to keep node order correct
+      i = node_order(k)
+			print *, "k = ", k
+			print *, "i = ", i
+			print *, "CH_NETLNK(CHANXI(i),CHANYJ(i) = ", CH_NETLNK(CHANXI(i),CHANYJ(i))
+			print *, "TO_NODE(i) = ", TO_NODE(i)
+			print *, "node_order(k+1) = ", node_order(k+1)
+			print *, "N_UPSTR(i) = ", N_UPSTR(i)
+
+			if (TO_NODE(i) .ne. node_order(k+1)) then
+				 branch1_temp = branch1_temp + T_QSUM_prev(i)
+				 denom = denom + 1
+			end if
+
+			!set up and downstream T's
+			if (N_UPSTR(i) .eq. 0) then
+			    T_up = (T_trib(i)-273.2)
+					print *, "UP1"
+			else if (N_UPSTR(i) .gt. 1) then
+					T_up = (branch1_temp + T_QSUM_prev(node_order(k-1))) / (denom + 1)
+					print *, "UP2"
+	    else
+			    T_up = T_QSUM_prev(node_order(k-1))
+					print *, "UP3"
+			end if
+			print *, "T_up = ", T_up
+
+			if (TO_NODE(i) .lt. 0) then
+			    T_down = (T_trib(i)-273.2)
+					print *, "DOWN1"
+			else
+				  if (TO_NODE(i) .ne. node_order(k+1)) then
+						  T_down = T_QSUM_prev(TO_NODE(i))
+							print *, "DOWN2"
+				else
+			    	  T_down = T_QSUM_prev(node_order(k+1))
+							print *, "DOWN3"
+				end if
+			end if
+			print *, "T_down = ", T_down
+
+			!calculate s1t
+			s1t(i) = (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx)) + &
+			      (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.))) + &
+						(NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+
+			print *, "term1 = ", (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx))
+			print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.)))
+			print *, "term3 = ", (NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+
+			!first approximation of T_w
+			T_w_sim_temp(i) = T_QSUM_prev(i) + (s1t(i) * DT)
+			print *, "T_w_sim_temp(i) = ", T_W_sim_temp(i)
+
+	end Do
+	print *, "s1t = ", s1t
+
+	!MACCORMICK STEP 2
+	branch1_temp = 0.
+	denom = 0.
+	Do k = 1,totLength
+			!converter to keep node order correct
+			i = node_order(k)
+			print *, "i = ", i
+
+			if (TO_NODE(i) .ne. node_order(k+1)) then
+				 branch1_temp = branch1_temp + T_w_sim_temp(i)
+				 denom = denom + 1
+			end if
+
+			!set up and downstream T's
+			if (N_UPSTR(i) .eq. 0) then
+					T_up = (T_trib(i) - 273.2)
+			else if (N_UPSTR(i) .gt. 1) then
+					T_up = (branch1_temp + T_w_sim_temp(node_order(k-1))) / (denom + 1)
+			else
+					T_up = T_w_sim_temp(node_order(k-1))
+			end if
+			print *, "T_up = ", T_up
+			if (TO_NODE(i) .lt. 0) then
+					T_down = (T_trib(i) - 273.2)
+			else
+					if (TO_NODE(i) .ne. node_order(k+1)) then
+							T_down = T_w_sim_temp(TO_NODE(i))
+					else
+							T_down = T_w_sim_temp(node_order(k+1))
+					end if
+			end if
+			print *, "T_down = ", t_down
+
+			!calculate s2t
+			s2t(i) = (-1. * V_w(i) * ((T_w_sim_temp(i) - T_up)/dx)) + &
+			      (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down - (2.*T_w_sim_temp(i)) + T_up)/(dx**2.))) + &
+						(NetRad(i))
+
+			print *, "term1"
+			print *, "v_w(i) = ", V_w(i)
+			print *, "(T_w_sim_temp(i) - T_up) = ", (T_w_sim_temp(i) - T_up)
+			print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down - (2.*T_w_sim_temp(i)) + T_up)/(dx**2.)))
+			print *, "term3 = ", (NetRad(i))
+
+			!final T_w estimate
+			T_w_sim_temp(i) = T_QSUM_prev(i) + (((s1t(i) + s2t(i))/2.)*DT)
+
+			print *, "T_w_sim_temp(i) = ", T_w_sim_temp(i)
+
+			!convert back to Kelvin
+			T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = T_w_sim_temp(i) + 273.2
+ end Do
+
+ print *, "s2t = ", s2t
+ print *, "T_w_sim = ", T_w_sim
+
+!			!!!TLE: Reza's advection section. Off for now as we work on MacCormick solver
+!			if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+!		      Advection = 0.
+!		  else
+!		      Advection = NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) / (rho_water * c_water * &
+!			        y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+!		  end if
 
 			!!!TLE: a block Reza commented out but didn't delete
 		! For the first time step, where the temperature is not calculated for that time step yet:
@@ -655,7 +782,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
  		!	   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
 		!	   FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 		!	else
-		!	   Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
+		!	   Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
 		!				 (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * &
 		!				  V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))) - self)) / dx
 		!	   !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i)),1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
@@ -668,42 +795,45 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		!-- Therefore, I updated the model's formulation to wotk with TO_NODE instead
 		!else
 
-			!-- Self
-     	if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
-		      self = 0.
-		  else
-		      self = Net_HeatFlux(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
-				     (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		  end if
-		  !-- looking downstream
-		 	if ((y_w(TO_NODE(i)) .EQ. 0.) .OR. (V_w(TO_NODE(i)) .EQ. 0.)) then
-		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * -1. * self) / dx
-		  else
-		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((Net_HeatFlux(TO_NODE(i)) / &
-				    (rho_water * c_water * y_w(TO_NODE(i)) * V_w(TO_NODE(i)))) - self)) / dx
-		  end if
+!			!!!TLE: Reza's dispersion section. Off for now as we work on MacCormick solver
+!			!-- Self
+!     	if ((y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) .OR. (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.)) then
+!		      self = 0.
+!		  else
+!		      self = NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) / &
+!				     (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+!		  end if
+!		  !-- looking downstream
+!		 	if ((y_w(TO_NODE(i)) .EQ. 0.) .OR. (V_w(TO_NODE(i)) .EQ. 0.)) then
+!		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * -1. * self) / dx
+!		  else
+!		      Dispersion = (-1.0 * Disp_coef(CHANXI(i),CHANYJ(i)) * ((NetRad(TO_NODE(i)) / &
+!				    (rho_water * c_water * y_w(TO_NODE(i)) * V_w(TO_NODE(i)))) - self)) / dx
+!		  end if
 
-		 	!-- Putting everything together, for the advection and dispersion
-		 	if (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
-			    !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-				 	!!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) ! TLE: commented so I could track the change in temp separately
-			   	FluxDelta = 0.0
-	    else
-			    !!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-			 		!!!TLE: Changed so I could track the change in temperature as a separate variable instead of calc'ing flux temp in one step
-			  	FluxDelta = (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-		 end if
-		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-		 print *, "FluxDelta = ", FluxDelta
-		 FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + FluxDelta
-		 print *, "FluxTemp = ", FluxTemp
+!			!!!TLE: Reza's temperature aggregation section. Off for now as we work on Maccormick Solver.
+!		 	!-- Putting everything together, for the advection and dispersion
+!		 	if (V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
+!			    !FluxTemp = T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))-1,1) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+!				 	!!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) ! TLE: commented so I could track the change in temp separately
+!			   	FluxDelta = 0.0
+!	    else
+!			    !!!FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+!			 		!!!TLE: Changed so I could track the change in temperature as a separate variable instead of calc'ing flux temp in one step
+!			  	FluxDelta = (Advection + Dispersion) * (dx/V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+!		 end if
+!		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+!		 print *, "FluxDelta = ", FluxDelta
+!		 FluxTemp = T_w_sim_temp(CH_NETLNK(CHANXI(i),CHANYJ(i))) + FluxDelta
+!		 print *, "FluxTemp = ", FluxTemp
 
 		 !		 print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 		 !end if
 
 	   ! -- We don't apply the lateral inflows to T_w_sim; They will be applied to the final porduct, T_QSUM later,
                 !-- Deg C to Deg K
-		 T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
+!		 T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
+  Do i = 1,totLength
 
 	   !-- getting a weighted average
 	   if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .gt. 0) then
@@ -728,6 +858,16 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
          !-- Okay, based on what I learned from module_channel_routing, I am gonna remove the DT_STEPS from caluating the QLateral
 
 	       QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) + Q_hyp(CHANXI(i),CHANYJ(i))
+				 !!!TLE Hack: we need non-zero flow in the outlet node for the first time step or it goes to NaN. set Qlateral to an arbitrary non-zero value
+				 if (first_time_step_DTCT) then
+				     if (TO_NODE(i) .le. 0) then
+						     if (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) .le. 0.) then
+								     QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.01
+										 Tlateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 290.
+										 print *, "TLE hack"
+								 end if
+						 end if
+				 end if
 	   end if
 
 
@@ -858,6 +998,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
   end DO
 
+	print *, "T_QSUM_local = ", T_QSUM_local
     !print *,"---------------------------"
     !print *,"QLINK(:,1)="
     !print *,QLINK(:,1)
@@ -869,6 +1010,10 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
     !print *,TLateral
     !print *,"T_QSUM_local:"
     !print *,T_QSUM_local
+
+	!increment stuff
+	NetRad_prev = NetRad
+	T_QSUM_prev = T_QSUM_local
 
   first_time_step_DTCT = .false.
 
@@ -1127,14 +1272,28 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
   !!!TLE: Update 2. We are now reading in surface pressure, so don't need to calculate
 	Pa_air = sfcp(space)
 
-	psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+	!psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+
+	!!! TLE temporary hack
+	! as formulated, sometimes ewa is greater than ews, which messes up the sign on the Bowen ratio
+	! adding an if statement to ensure ewa is always less than ews
+	if (ewa .ge. ews) then
+	    ewa = ews * 0.95
+	end if
 
 	! Bowen ratio
 	! (Evans et al.,1998; Magnusson et al., 2012; Webb and Zhang, 1997; Westhoff et al., 2007)
 	! (modified for units from Bedient and Huber 1992)
-	!B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
+	B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
+
+	!!!TLE temporary hack
+	! seeing bowen ratio values as low as -25. This seems very high, so just testing a temporary lower threshold
+	if (B_r .lt. -1.) then
+	    B_r = -1.
+	end if 
+
 	!!!TLE: modified B_r to use the psychrometric constant we calculate
-	B_r = psy * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
+	!B_r = psy * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
 
 	SensibleHeat_FLUX = B_r * LH
 	print *, "B_r = ", B_r

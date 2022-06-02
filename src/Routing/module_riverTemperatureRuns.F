@@ -90,14 +90,16 @@ subroutine riverTemperature_run(this, did)
 !  print *, "----------------------"
 !
 !	print *, "calling river temperature module"
-!  print *, "So = ", rt_domain(did)%So
+  print *, "So = ", rt_domain(did)%So
 !  rt_domain(did)%RelH_fine_1D = 30.0
-!  print *, "V_w = ", rt_domain(did)%velocity
+  print *, "V_w = ", rt_domain(did)%velocity
+  print *, "QLINK = ", rt_domain(did)%QLINK
 !  print *, "y_w = ", rt_domain(did)%HLINK
 !  print *, "W_w = ", rt_domain(did)%Tw
 !  print *, "T_bed = ", rt_domain(did)%TSLB_1D_fine
+
   call riverTemp%runRiverTempModel(     nlst(did)%dxrt0,                &
-					nlst(did)%DT,                   &
+					nlst(did)%DTRT_CH,              &
 					nlst(did)%DTCT,	                &
 					rt_domain(did)%IXRT,            &
 					rt_domain(did)%JXRT,            &
@@ -136,6 +138,9 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%TO_NODE,	        &
 					rt_domain(did)%TYPEL,	        &
 					rt_domain(did)%T_QSUM,	        &
+          rt_domain(did)%T_QSUM_prev,      &
+          rt_domain(did)%NetRad,          &
+          rt_domain(did)%NetRad_prev,     &
 					rt_domain(did)%NLINKS           &
 					)
 

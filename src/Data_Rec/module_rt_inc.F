@@ -274,7 +274,7 @@ module module_rt_inc
     REAL,    allocatable, DIMENSION(:,:)   :: lat_lsm, lon_lsm
     REAL,    allocatable, DIMENSION(:,:,:) :: dist_lsm
 
-! added for the river temeprature module
+! added for the river temperature module
    REAL,    allocatable, DIMENSION(:)   :: Tair_fine_1D
    REAL,    allocatable, DIMENSION(:)   :: RelH_fine_1D
    REAL,    allocatable, DIMENSION(:)   :: windSpd_fine_1D
@@ -284,6 +284,10 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: TSLB_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: SFCP_1D
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
+   REAL,    allocatable, DIMENSION(:)   :: NetRad
+   REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
+   REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
+
    ! NEW FOR module_channel_routing.F
    REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter
 

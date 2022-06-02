@@ -163,7 +163,7 @@ endif
 !         Sf = ((z1-z2)+(h1-h2))/dx  !-- compute the friction slope
 !endif
 
-!modifieed by Wei Yu for false geography data
+!modified by Wei Yu for false geography data
 if(abs(z1-z2) .gt. 1.0E5) then
 #ifdef HYDRO_D
    print*, "WARNING: huge slope rest to 0 for channel grid.", z1,z2
@@ -185,11 +185,16 @@ Ku = (1.0/n)*(R**(2./3.))*AREA     !-- convenyance
 
 R = ((Bw + z*h2)*h2)/(Bw + 2.0*h2*sqrt(1.0 + z*z)) !-- Hyd Radius
 AREA = (Bw + z*h2)*h2        !-- Flow area
-Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- convenyance
+Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- conveyance
 
 Kf =  (1.0-w)*Kd + w*Ku      !-- conveyance
 DIFFUSION = Kf * sqrt(abs(Sf))*sgn
 vel = DIFFUSION / AREA
+
+!!!TLE HACK
+if (vel .gt. 3.) then
+    vel = 3.
+endif
 
 100 format('z1,z2,h1,h2,kf,Dif, Sf, sgn  ',f8.3,2x,f8.3,2x,f8.4,2x,f8.4,2x,f8.3,2x,f8.3,2x,f8.3,2x,f8.0)
 
@@ -1091,8 +1096,18 @@ gwOption:   if(gwBaseSwCRT == 3) then
             else !--  we are just computing critical depth for outflow points
                QLINK(i,1) =0.
             endif
+!              print *, "i = ", i
+!              print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
+!              print *, "ZELEV(TO_NODE(i)) = ", ZELEV(TO_NODE(i))
+!              print *, "HLINKTMP(FROM_NODE(i)) = ", HLINKTMP(FROM_NODE(i))
+!              print *, "HLINKTMP(TO_NODE(i)) = ", HLINKTMP(TO_NODE(i))
+!              print *, "CHANLEN(i) = ", CHANLEN(i)
+!              print *, "MannN(i) = ", MannN(i)
+!              print *, "Bw(i) = ", Bw(i)
+!              print *, "ChSSlp(i) = ", ChSSlp(i)
+!              print *, "velocity(i) = ", velocity(i)
           ENDDO
-
+!          print *, "velocity = ", velocity
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
@@ -1254,6 +1269,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
           endif
 
         END DO  !--- done processing all the links
+!        print *, "rt_domain(did)%velocity = ", rt_domain(did)%velocity
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,CVOLTMP,NLINKS,99)
@@ -1326,6 +1342,16 @@ gwOption:   if(gwBaseSwCRT == 3) then
                       XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
 	                                            sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
             endif
+!            print *, "i = ", i
+!            print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
+!            print *, "ZELEV(TO_NODE(i)) = ", ZELEV(TO_NODE(i))
+!            print *, "HLINKTMP(FROM_NODE(i)) = ", HLINKTMP(FROM_NODE(i))
+!            print *, "HLINKTMP(TO_NODE(i)) = ", HLINKTMP(TO_NODE(i))
+!            print *, "CHANLEN(i) = ", CHANLEN(i)
+!            print *, "MannN(i) = ", MannN(i)
+!            print *, "Bw(i) = ", Bw(i)
+!            print *, "ChSSlp(i) = ", ChSSlp(i)
+!            print *, "velocity(i) = ", velocity(i)
          enddo
 
 #ifdef MPP_LAND
@@ -1341,7 +1367,6 @@ gwOption:   if(gwBaseSwCRT == 3) then
 	  ! Run the subroutine to diaggregate
           rt_domain(did)%QSUM = QSUM
           print *, "calling rivertemp_run"
-          print *, "counter = ", KRT
           call riverTempRuns%riverTemp_run(did)
 
           end do crnt   !--- DTCT timestep of DT_STEPS

@@ -468,6 +468,9 @@ CONTAINS
         allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
         allocate( rt_domain(did)%SFCP_1D(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
+        allocate( rt_domain(did)%T_QSUM_prev(nsizes) )
+        allocate( rt_domain(did)%NetRad(nsizes) )
+        allocate( rt_domain(did)%NetRad_prev(nsizes) )
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
         allocate( rt_domain(did)%QSUM(nsizes) )
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
@@ -484,6 +487,9 @@ CONTAINS
         rt_domain(did)%TSLB_1D_fine       = 0.
         rt_domain(did)%SFCP_1D            = 0.
         rt_domain(did)%T_QSUM             = 0.
+        rt_domain(did)%T_QSUM_prev        = 0.
+        rt_domain(did)%NetRad             = 0.
+        rt_domain(did)%NetRad_prev        = 0.
         rt_domain(did)%XS_Peremeter       = 0.
         rt_domain(did)%QSUM               = 0.
         rt_domain(did)%TMN_temp           = 0.
@@ -960,7 +966,11 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%TSLB_1D_fine,     &
        rt_domain(did)%SFCP_1D           &
 		   )
-   call riverTemp%init(rt_domain(did)%T_QSUM)
+   call riverTemp%init(rt_domain(did)%T_QSUM,      &
+                       rt_domain(did)%T_QSUM_prev, &
+                       rt_domain(did)%NetRad,      &
+                       rt_domain(did)%NetRad_prev  &
+                       )
 
    !ADCHANGE: Add lake reach output
 #ifdef HYDRO_D
@@ -1527,9 +1537,6 @@ subroutine LandRT_ini(did)
                 !--  put condition within the if/then structure, which will assign a value if something is missing in hi res
         print *, "setting channel widths for diffusion scheme"
         do j=1,rt_domain(did)%NLINKS
-          print *, "rt_domain(did)%Tw(j) = ", rt_domain(did)%Tw(j)
-          print *, "rt_domain(did)%ORDER(j) = ", rt_domain(did)%ORDER(j)
-          print *, "TOPWID(rt_domain(did)%ORDER(j)) = ", TOPWID(rt_domain(did)%ORDER(j))
            if (rt_domain(did)%ORDER(j) .eq. 1) then    !-- smallest stream reach
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1857,7 +1864,7 @@ subroutine LandRT_ini(did)
 
   if(nlst(did)%channel_only       .eq. 0 .and. &
        nlst(did)%channelBucket_only .eq. 0        ) then
-
+       print *, "TLE check channel 2"
      rt_domain(did)%INFXSWGT = 1./(nlst(did)%AGGFACTRT*nlst(did)%AGGFACTRT)
      rt_domain(did)%SH2OWGT = 1.
      rt_domain(did)%subsurface%properties%soldeprt = -1.0 * nlst(did)%ZSOIL8(nlst(did)%NSOIL)
