@@ -1460,10 +1460,10 @@ endif
 !#endif
 #endif
 
-
   !-- added by Reza to be used in the river temperature modules
   RT_DOMAIN(did)%TMN_temp = TMN
   RT_DOMAIN(did)%TSK_temp = TSK
+  RT_DOMAIN(did)%TG_temp = TGXY
   RT_DOMAIN(did)%TSLB_temp = TSLB
 
 end subroutine land_driver_ini
@@ -1471,10 +1471,13 @@ end subroutine land_driver_ini
 !===============================================================================
   subroutine land_driver_exe(itime, state)
     use module_hydro_io, only: read_channel_only
+    use module_rt_data, only: rt_domain !TLE: added to transmit ground temperature to water temp. model
     use state_module, only: state_type
     implicit  none
     type(state_type) :: state
     integer :: itime          ! timestep loop
+    integer, parameter :: did=1         !TLE: added to transmit ground temperature to water temp. model
+
 
 !---------------------------------------------------------------------------------
 ! Read the forcing data.
@@ -1527,8 +1530,14 @@ end subroutine land_driver_ini
      ! Build a filename template
      inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//hgrid
 
-
 #ifdef WRF_HYDRO
+
+
+!!-- added by Reza to be used in the river temperature modules
+RT_DOMAIN(did)%TMN_temp = TMN
+RT_DOMAIN(did)%TSK_temp = TSK
+RT_DOMAIN(did)%TG_temp = TGXY
+RT_DOMAIN(did)%TSLB_temp = TSLB
 
      if(wrf_hydro%finemesh .ne. 0) goto 991
 

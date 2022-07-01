@@ -27,7 +27,8 @@ IMPLICIT NONE
 type  :: fineWeatherData_type
 	    !INTEGER                                  :: NLINKS
             REAL, DIMENSION(:), allocatable          :: TAIR_FINE_1D, RELH_FINE_1D, WINDSPD_FINE_1D, SOLARRAD_FINE_1D
-            REAL, DIMENSION(:), allocatable          :: TMN_1D_FINE, TSLB_1D_FINE, TSK_1D_FINE, SFCP_1D
+!            REAL, DIMENSION(:), allocatable          :: TMN_1D_FINE, TSLB_1D_FINE, TSK_1D_FINE, SFCP_1D
+            REAL, DIMENSION(:), allocatable          :: TMN_1D_FINE, TSLB_1D_FINE, TG_1D_FINE, SFCP_1D
 
 	    !type (weather_2D_inputs), pointer        :: weather_2D => null()
 	    !type (vectorizing_tools), pointer        :: vectorizer => null()
@@ -50,13 +51,15 @@ type(fineWeatherData_type) :: fineWeathData
 contains
 
 subroutine fineWeatherData_init(this, Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, &
-				SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, SFCP_1D)
+         !SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, SFCP_1D)
+          SolarRad_fine_1D, TMN_1D_fine, TG_1D_fine,TSLB_1D_fine, SFCP_1D)
 	implicit none
 	class(fineWeatherData_type), intent(inout)       :: this                   ! the type object being initialized
 	!character(len=20)                           :: Reach_number_string
 
 	REAL,    INTENT(inout), DIMENSION(:)        :: Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D
-  REAL,    INTENT(inout), DIMENSION(:)        :: SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine
+!  REAL,    INTENT(inout), DIMENSION(:)        :: SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine
+  REAL,    INTENT(inout), DIMENSION(:)        :: SolarRad_fine_1D, TMN_1D_fine, TG_1D_fine,TSLB_1D_fine
   REAL,    INTENT(inout), DIMENSION(:)        :: SFCP_1D
 
 
@@ -197,7 +200,7 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
 					TMN_1D_fine(i) = TMN_fine(CHANXI(i),CHANYJ(i))
 					TSK_1D_fine(i) = TSK_fine(CHANXI(i),CHANYJ(i))
 					TSLB_1D_fine(i) = TSLB_fine(CHANXI(i),CHANYJ(i))
-          SFCP_1D(i) = (SFCP_fine(CHANXI(i),CHANYJ(i))/1000.0) !conversion from Pa to kPa 
+          SFCP_1D(i) = (SFCP_fine(CHANXI(i),CHANYJ(i))/1000.0) !conversion from Pa to kPa
 
 
 

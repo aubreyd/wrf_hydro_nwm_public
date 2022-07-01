@@ -269,6 +269,7 @@
    REAL,    allocatable, DIMENSION(:)   :: SolarRad_fine_1D
    REAL,    allocatable, DIMENSION(:)   :: TMN_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: TSK_1D_fine
+   REAL,    allocatable, DIMENSION(:)   :: TG_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: TSLB_1D_fine
    REAL,    allocatable, DIMENSION(:)   :: SFCP_1D
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
@@ -282,6 +283,7 @@
    !-- to get the temperature data from NoahMP
    REAL,    allocatable, DIMENSION(:,:)   :: TMN_temp
    REAL,    allocatable, DIMENSION(:,:)   :: TSK_temp
+   REAL,    allocatable, DIMENSION(:,:)   :: TG_temp
    REAL,    allocatable, DIMENSION(:,:,:) :: TSLB_temp
    REAL,    allocatable, DIMENSION(:)     :: QSUM     !--mass bal of node
 
