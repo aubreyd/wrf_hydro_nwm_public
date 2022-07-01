@@ -191,9 +191,9 @@ Kf =  (1.0-w)*Kd + w*Ku      !-- conveyance
 DIFFUSION = Kf * sqrt(abs(Sf))*sgn
 vel = DIFFUSION / AREA
 
-!!!TLE HACK
-if (vel .gt. 3.) then
-    vel = 3.
+!!!TLE hack
+if (vel .gt. 1.0) then
+    vel = 1.0
 endif
 
 100 format('z1,z2,h1,h2,kf,Dif, Sf, sgn  ',f8.3,2x,f8.3,2x,f8.4,2x,f8.4,2x,f8.3,2x,f8.3,2x,f8.3,2x,f8.0)

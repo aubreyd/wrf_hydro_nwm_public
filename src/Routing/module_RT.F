@@ -465,6 +465,7 @@ CONTAINS
         allocate( rt_domain(did)%SolarRad_fine_1D(nsizes) )
         allocate( rt_domain(did)%TMN_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSK_1D_fine(nsizes) )
+        allocate( rt_domain(did)%TG_1D_fine(nsizes) )
         allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
         allocate( rt_domain(did)%SFCP_1D(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
@@ -475,6 +476,7 @@ CONTAINS
         allocate( rt_domain(did)%QSUM(nsizes) )
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
         allocate( rt_domain(did)%TSK_temp(IX,JX) )
+        allocate( rt_domain(did)%TG_temp(IX,JX) )
         allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
 
 
@@ -484,6 +486,7 @@ CONTAINS
         rt_domain(did)%SolarRad_fine_1D   = 0.
         rt_domain(did)%TMN_1D_fine        = 0.
         rt_domain(did)%TSK_1D_fine        = 0.
+        rt_domain(did)%TG_1D_fine         = 0.
         rt_domain(did)%TSLB_1D_fine       = 0.
         rt_domain(did)%SFCP_1D            = 0.
         rt_domain(did)%T_QSUM             = 0.
@@ -494,6 +497,7 @@ CONTAINS
         rt_domain(did)%QSUM               = 0.
         rt_domain(did)%TMN_temp           = 0.
         rt_domain(did)%TSK_temp           = 0.
+        rt_domain(did)%TG_temp            = 0.
         rt_domain(did)%TSLB_temp          = 0.
 
 
@@ -962,7 +966,8 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%windSpd_fine_1D,  &
 		   rt_domain(did)%SolarRad_fine_1D, &
 		   rt_domain(did)%TMN_1D_fine,      &
-		   rt_domain(did)%TSK_1D_fine,      &
+!       rt_domain(did)%TSK_1D_fine,      &
+       rt_domain(did)%TG_1D_fine,       &
 		   rt_domain(did)%TSLB_1D_fine,     &
        rt_domain(did)%SFCP_1D           &
 		   )
@@ -1864,7 +1869,6 @@ subroutine LandRT_ini(did)
 
   if(nlst(did)%channel_only       .eq. 0 .and. &
        nlst(did)%channelBucket_only .eq. 0        ) then
-       print *, "TLE check channel 2"
      rt_domain(did)%INFXSWGT = 1./(nlst(did)%AGGFACTRT*nlst(did)%AGGFACTRT)
      rt_domain(did)%SH2OWGT = 1.
      rt_domain(did)%subsurface%properties%soldeprt = -1.0 * nlst(did)%ZSOIL8(nlst(did)%NSOIL)

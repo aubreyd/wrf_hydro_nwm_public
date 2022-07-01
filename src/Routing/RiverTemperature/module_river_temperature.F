@@ -219,7 +219,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulated water temperature for the reach in space & time (C)
   REAL                                                  :: Q_strTot, T_strTot, Q_strTmp, T_up, T_down, branch1_temp
 	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)
-	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t
+	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t, branch_sum
 
         !REAL                                                  :: DT_STEPS               !-- number of timestep in routing
 	REAL,                   DIMENSION(totLength)                :: Q_GW_cms
@@ -305,7 +305,6 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			else
 			    Shear_Velocity = sqrt(9.8 * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * SlopeWS)
 			end if
-
 			!		print *, "-----Shear Velocity-----"
 			!		print *, "SlopeWS = ", SlopeWS
 			!		print *, "y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
@@ -527,9 +526,19 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			c_br = 1.
 			node_current = node_headwater(c_hw)
 			DO WHILE (loop_break .eq. 0)
+					!print *, "c_index =", c_index
+					!print *, "node_current =", node_current
+					!print *, "N_UPSTR(TO_NODE(node_current)) = ", N_UPSTR(TO_NODE(node_current))
 			    if (c_index .eq. totLength) then
 						  node_order(c_index) = node_current
 					    loop_break = 1
+					end if
+					if (TO_NODE(node_current) .lt. 0) then
+						  c_hw = c_hw + 1
+							node_order(c_index) = node_current
+						  node_current = node_headwater(c_hw)
+						  c_index = c_index + 1
+							cycle
 					end if
 					if (N_UPSTR(TO_NODE(node_current)) .eq. 1) then
 !						  print *, "node_current = ", node_current
@@ -554,12 +563,13 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 					end if
 			end DO
 			print *, "node_order = ", node_order
-
 	if (first_time_step_DT) then	!-- To do this only one time!
 
 			!initialize homogeneous stream channel temperature
 			T_w_sim_temp = T_Trib - 273.2
 			T_QSUM_prev = T_Trib - 273.2
+			!T_w_sim_temp = T_a - 273.2
+			!T_QSUM_prev = T_a - 273.2
 
 			!starting off with no rad in previous timestep (not sure if that's a big deal or not)
 			NetRad_prev = 0.
@@ -630,6 +640,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!!!TLE: Incorporating the MacCormick (1969) finite difference approximation of
 	!      the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003), p.68, Eq. 2-119 -- 2-122)
 	!MACCORMICK STEP 1
+	branch_sum = 0.
 	branch1_temp = 0.
 	denom = 0.
   Do k = 1,totLength
@@ -643,16 +654,18 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			print *, "N_UPSTR(i) = ", N_UPSTR(i)
 
 			if (TO_NODE(i) .ne. node_order(k+1)) then
-				 branch1_temp = branch1_temp + T_QSUM_prev(i)
-				 denom = denom + 1
+				 branch_sum(TO_NODE(i)) = branch_sum(TO_NODE(i)) + T_QSUM_prev(i)
+				! branch1_temp = branch1_temp + T_QSUM_prev(i)
+				! denom = denom + 1
 			end if
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
-			    T_up = (T_trib(i)-273.2)
+				  T_up = (T_trib(i)-273.2)
 					print *, "UP1"
 			else if (N_UPSTR(i) .gt. 1) then
-					T_up = (branch1_temp + T_QSUM_prev(node_order(k-1))) / (denom + 1)
+				  T_up = (branch_sum(i) + T_QSUM_prev(node_order(k-1))) / N_UPSTR(i)
+			!		T_up = (branch1_temp + T_QSUM_prev(node_order(k-1))) / (denom + 1)
 					print *, "UP2"
 	    else
 			    T_up = T_QSUM_prev(node_order(k-1))
@@ -672,7 +685,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 							print *, "DOWN3"
 				end if
 			end if
-			print *, "T_down = ", T_down
+		!	print *, "T_down = ", T_down
 
 			!calculate s1t
 			s1t(i) = (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx)) + &
@@ -680,6 +693,9 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 						(NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
 			print *, "term1 = ", (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx))
+			print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) =", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+			print *, "T_QSUM_prev(i) =", T_QSUM_prev(i)
+			print *, "T_down =", T_down
 			print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.)))
 			print *, "term3 = ", (NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
@@ -688,9 +704,11 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			print *, "T_w_sim_temp(i) = ", T_W_sim_temp(i)
 
 	end Do
+	print *, "branch_sum =", branch_sum
 	print *, "s1t = ", s1t
 
 	!MACCORMICK STEP 2
+	branch_sum = 0.
 	branch1_temp = 0.
 	denom = 0.
 	Do k = 1,totLength
@@ -699,21 +717,23 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			print *, "i = ", i
 
 			if (TO_NODE(i) .ne. node_order(k+1)) then
-				 branch1_temp = branch1_temp + T_w_sim_temp(i)
-				 denom = denom + 1
+				 branch_sum(TO_NODE(i)) = branch_sum(TO_NODE(i)) + T_w_sim_temp(i)
+				 !branch1_temp = branch1_temp + T_w_sim_temp(i)
+				 !denom = denom + 1
 			end if
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
-					T_up = (T_trib(i) - 273.2)
+				  T_up = (T_trib(i)-273.2)
 			else if (N_UPSTR(i) .gt. 1) then
-					T_up = (branch1_temp + T_w_sim_temp(node_order(k-1))) / (denom + 1)
+				  T_up = (branch_sum(i) + T_w_sim_temp(node_order(k-1))) / N_UPSTR(i)
+					!T_up = (branch1_temp + T_w_sim_temp(node_order(k-1))) / (denom + 1)
 			else
 					T_up = T_w_sim_temp(node_order(k-1))
 			end if
 			print *, "T_up = ", T_up
 			if (TO_NODE(i) .lt. 0) then
-					T_down = (T_trib(i) - 273.2)
+				  T_down = (T_trib(i)-273.2)
 			else
 					if (TO_NODE(i) .ne. node_order(k+1)) then
 							T_down = T_w_sim_temp(TO_NODE(i))
@@ -721,7 +741,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 							T_down = T_w_sim_temp(node_order(k+1))
 					end if
 			end if
-			print *, "T_down = ", t_down
+			print *, "T_down = ", T_down
 
 			!calculate s2t
 			s2t(i) = (-1. * V_w(i) * ((T_w_sim_temp(i) - T_up)/dx)) + &
@@ -863,7 +883,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 				     if (TO_NODE(i) .le. 0) then
 						     if (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) .le. 0.) then
 								     QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.01
-										 Tlateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 290.
+										 Tlateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = T_Trib(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 										 print *, "TLE hack"
 								 end if
 						 end if
@@ -1059,7 +1079,8 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
 	REAL    :: LW_Atm	! Atmospheric longwave radiation
 	REAL    :: LW_LC	! Landcover radiation
 	REAL    :: LW_Back	! Back radiation
-        INTEGER :: space, spaceTemp        ! The node we are calculating the flux for that
+	REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
+      INTEGER :: space, spaceTemp        ! The node we are calculating the flux for that
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, C_L, viewSky
@@ -1076,10 +1097,14 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
 	satVapPre = 0.611 * exp((17.27 * (T_a(space)-273.2)) / (237.3 + (T_a(space)-273.2)))
 
 	! Vapor Pressure (Bedient and Huber 1992)
-	!VapPreReal = (H(space) / 100.0) * satVapPre
+	H_tmp = H(space)
+	if (H_tmp .EQ. 100.0) then
+			H_tmp = 99.0
+	endif
+  VapPreReal = (H_tmp / 100.0) * satVapPre
 	!!!TLE: Replacing Reza's relative-humidity based calculation with the Noah-MP one.
 	!       See latent heat subroutine for additional details
-	VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+	!VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
 
 	! Atmospheric Emissivity (Dingman 2002, Kustas et al. 1994)
 	!emis = 1.72 * (((VapPreReal) / (T_a(space)-273.2))**(1.0 / 7.0)) * &
@@ -1087,9 +1112,8 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
 	!!!TLE: Dingman (2002) is a textbook I don't have access to, so can't check that precisely.
 	!       Kustas et al. (1994) emissivity equation is as follows:
 	!       emis = 0.642 * ((VapPreReal / T_a(space))**(1.0/7.0))
-	!       Found an equation very similar to Reza's on CSDMS website. Trying that for now.
-	!       Note that T_a should be in Kelvin in both equations.
-	emis = 1.72 * ((VapPreReal / T_a(space))**(1.0/7.0)) * (1.0 + (0.22 * (C_L(space)**2.0)))
+	!       Trying atmospheric emissivity from Boyd and Kasper
+	emis = 1.72 * ( ( (0.1*VapPreReal)/(T_a(space)) )**(1.0/7.0) ) * ( 1.22 + (C_L(space)**2.0) )
 	print *, "emis = ", emis
 
         ! Put a control here
@@ -1097,10 +1121,10 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
     emis = 0.96
   end if
 	print *, "StrTemp = ", (StrTemp+273.2)
-	print *, "T_a = ", T_a(space)
+	print *, "T_a(node) = ", T_a(space)
 	! Atmospheric Longwave Radiation Flux Attenuated in Water Column
 	! (Benyahya et al.,2010; Boyd and Kasper, 2003; Westhoff et al., 2007, 2011)
-	LW_Atm = 0.96 * emis * SBConst * ((T_a(space))**4.0) * viewSky(space)
+	LW_Atm = 0.96 * viewSky(space) * emis * SBConst * ((T_a(space))**4.0)
 	print *, "LW_Atm = ", LW_Atm
 
 	! Land cover longwave radiation (Boyd and Kasper, 2003; Westhoff et al., 2007)
@@ -1136,7 +1160,8 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wi
 	REAL    :: Pa_air		! Air pressure (kPa)
 	REAL    :: psy			! psychrometric constant(kPa/C)
 	REAL    :: E			! Penman open water evaporation
-	INTEGER :: space         	! The node we are calculating the flux for that
+	REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
+  INTEGER :: space         	! The node we are calculating the flux for that
         REAL    :: SW_rad, LW_rad
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
@@ -1146,9 +1171,11 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wi
 
 	! <<<<<<<<< Evaporation section >>>>>>>>
 	! Calculate the latent heat of vaporization J/kg ((Maidment, 1993)
-	L_e = 1000000 * (2.501 - (0.002361 * StrTemp))
+	!L_e = 1000000 * (2.501 - (0.002361 * StrTemp))
+	!L_e = 1000.0 * (2501.4 + StrTemp)  ! this version is from Westhoff (2007) in J/kg
 !	print *, "L_e = ", L_e
-	!!!TLE: checked, looks ok...?
+	!!!TLE: trying Boyd and Kasper version
+	L_e = 1000.0 * ( 2501.4 + (1.83 + StrTemp) )
 
 	! Calculate the slope of the saturation vapor pressure curve at a given air temperature
 	! (modified from Chapra 1997 and Raudkivi 1979)
@@ -1161,22 +1188,30 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wi
 
 	! Vapor Pressure Based on Saturation Vapor Pressure Using Stream Temperature
 	! (Bedient and Huber 1992)
-	!VapPreReal = (H(space) / 100.0) * satVapPreLat
+	H_tmp = H(space)
+	if (H(space) .EQ. 100.0) then
+			H_tmp = 99.0
+	endif
+  VapPreReal = (H_tmp / 100.0) * satVapPreLat
   !!!TLE: This method for calculating vapor pressure doesn't work, because H is specific humidity,
-	!       not relative humidity as Reza thought. Replacing the above calculation with the method used
+	!       not relative humidity as Reza assumed. Replacing the above calculation with the method used
 	!       in Noah-MP, which calculates vapor pressure based on surface pressure and spec. humidity.
-	VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+	!VapPreReal = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
 
 	! Slope of the saturation vapor pressure curve (kPa/C) is calculated as
 	! (Maidment, 1993)
 	!s = (4100.0 * satVapPreLat) / ((T_a(space)-273.2) ** 2.0)
 	!!!TLE: Finding a slightly different equation...we'll try the one I found.
-	s = (4100.0 * satVapPreLat) / ((237.3 + (T_a(space)-273.2)) ** 2.0)
+	!s = (4100.0 * satVapPreLat) / ((237.3 + (T_a(space)-273.2)) ** 2.0)
+	!!!TLE: re-writing to try the pure formulation from the Oregon manual
+	s = satVapPreLat - 0.611 * exp((17.27 * (T_a(space)-273.2-1.0)) / (237.3 + (T_a(space)-273.2-1.0)))
 
 	! Calculate the aerodynamic resistance (s/m)
 	! (Westhoff et al., 2007)
-	r_a = 245.0 / ((0.54 * V_wind(space)) + 0.5)
-	!!!TLE: looks good, check the value of wind speed (should be ~sqrt2?)
+	!r_a = 245.0 / ((0.54 * V_wind(space)) + 0.5)
+	!!!TLE: repurposing this variable to Boyd and Kasper's aerodynamic evaporation
+	!!!    For their wind function (fW = a+b*V_wind), assuming a = 3e-9 and b = 1e-9
+  r_a = (0.000000003 + 0.000000001 * V_wind(space)) * (satVapPreLat - VapPreReal)
 
 	! Calculate air pressure
 	!Pa_air = 101.3 - (0.01055 * z_elv(space))
@@ -1187,17 +1222,20 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wi
 	! (value should be adjusted for different site elevations)
 	! Ratio of water to dry air = .622, and the latent heat of water vaporization = 2.45E6 (J/kgC)
 	! (Cuenca 1989)
-	psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+	!psy = (c_air * Pa_air) / (0.622 * 2450000.0)
+	!!!TLE: trying Boyd and Kasper (basically the same, but with our own calculated latent heat)
+	psy = (c_air * Pa_air) / (0.622 * L_e)
 	print *, "psy = ", psy
-	!!!TLE: equation looks good but...should we be using the latent heat of vaporization that is calculated above...?
 
 	! Calculate the Penman open water evaporation
 	! (Maidment, 1993; Westhoff et al., 2007)
 	!E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) &
 	!	+ ((c_air * rho_air * psy * (satVapPreLat - VapPreReal)) / (1000.0 * L_e * r_a * (s + psy)))
 	!!!TLE: This is slightly different from what's in Westhoff et al. (2007). There's an extra psychrometric constant in here.
-	E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) + &
-	((c_air * rho_air * (satVapPreLat - VapPreReal)) / (rho_water * L_e * r_a * (s + psy)))
+	!E = ((s * (SW_rad + LW_rad)) / (1000.0 * L_e * (s + psy))) + &
+	!((c_air * rho_air * (satVapPreLat - VapPreReal)) / (rho_water * L_e * r_a * (s + psy)))
+	!!!TLE: trying the Boyd and Kasper version
+	E = (((s * (SW_rad + LW_rad)) / (rho_water * L_e))+( r_a * psy )) / (s + psy)
 
 	LatentHeat_FLUX = -rho_water * L_e * E
 
@@ -1231,7 +1269,7 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
 	REAL    :: ewa			! Actual vapor pressure of the evaporation surface (KPa)
 	REAL    :: StrTemp		! Simulated water temperature at the previous location
 	REAL    :: Pa_air		! Air pressure (mbar)
-	!REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
+	REAL    :: H_tmp		! Temporary value for assigning the humidity from the input
 	REAL    :: B_r			! Bowen's ratio
 	REAL    :: psy      ! psychrometric constant
 	INTEGER :: space
@@ -1253,13 +1291,14 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
 
 	! Actual vapor pressure of the evaporation surface (KPa)
 	! To handle the infinte problem in B_r equation, consider the umidity of 100 as 99
-	!H_tmp = H(space)
-  !      if (H(space) .EQ. 100.0) then
-  !          H_tmp = 99.0
-  !      endif
-	!ewa = (H_tmp / 100.0) * ews
+	H_tmp = H(space)
+        if (H(space) .EQ. 100.0) then
+            H_tmp = 99.0
+        endif
+	ewa = (H_tmp / 100.0) * ews
+
 	!!!TLE: replacing vapor pressure formulation. See latent heat subroutine for more info.
-	ewa = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
+	!ewa = (H(space)*sfcp(space)) / (0.622+(0.378*H(space)))
 
 	! Adiabatic atmospheric pressure adjusted for elevation above sea level
 	! (Westhoff et al., 2007)
@@ -1274,23 +1313,24 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
 
 	!psy = (c_air * Pa_air) / (0.622 * 2450000.0)
 
+	!!! For now, switching back to Reza's method (relative humidity based) with RH hard coded at 30%
 	!!! TLE temporary hack
 	! as formulated, sometimes ewa is greater than ews, which messes up the sign on the Bowen ratio
 	! adding an if statement to ensure ewa is always less than ews
-	if (ewa .ge. ews) then
-	    ewa = ews * 0.95
-	end if
+	!if (ewa .ge. ews) then
+	!    ewa = ews * 0.95
+	!end if
 
 	! Bowen ratio
 	! (Evans et al.,1998; Magnusson et al., 2012; Webb and Zhang, 1997; Westhoff et al., 2007)
 	! (modified for units from Bedient and Huber 1992)
 	B_r = 0.00061 * Pa_air * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
 
-	!!!TLE temporary hack
-	! seeing bowen ratio values as low as -25. This seems very high, so just testing a temporary lower threshold
-	if (B_r .lt. -1.) then
-	    B_r = -1.
-	end if 
+	!!!!TLE temporary hack
+	!! seeing bowen ratio values as low as -25. This seems very high, so just testing a temporary lower threshold
+	!if (B_r .lt. -1.) then
+	!    B_r = -1.
+	!end if
 
 	!!!TLE: modified B_r to use the psychrometric constant we calculate
 	!B_r = psy * ((StrTemp - (T_a(space)-273.2)) / (ews - ewa))
