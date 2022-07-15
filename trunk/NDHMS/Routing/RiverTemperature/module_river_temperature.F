@@ -910,21 +910,39 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		 ! TLE: Re-writing the above loop. I see some potential double counting issues.
 		 !      We are adding Q_str(j) to Q_strTot at the top of the 'if' statement,
 		 !      Then adding it again in the denominator above. I don't think we want that.
-		 Q_strTot = 0.
-	   T_strTot = 0.
-	   Do j = 1, totLength
-	       if (TO_NODE(j) .eq. i) then
-				     Q_strTmp = Q_strTot + Q_str(j)
-	      	   if (Q_strTmp .EQ. 0.) then
-	      		     T_strTot = 0.
-		         else
-			           T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
-				           Q_strTmp
-								 Q_strTot = Q_strTmp
-		         end if
-	      end if
+		 !Q_strTot = 0.
+	   !T_strTot = 0.
+	  ! Do j = 1, totLength
+	  !     if (TO_NODE(j) .eq. i) then
+		!		     Q_strTmp = Q_strTot + Q_str(j)
+	  !    	   if (Q_strTmp .EQ. 0.) then
+	  !    		     T_strTot = 0.
+		!         else
+		!	           T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / &
+		!		           Q_strTmp
+		!						 Q_strTot = Q_strTmp
+		!         end if
+	  !    end if
+    !
+	  !end do
+		! TLE: Doing a second round of re-writing to try to handle backwatering better.
+		!      If Q_str(j) > 0, that means water is backing up into an (the) upstream node.
+		!      For the moment, we're going to assume that backwatered Q is handled elsewhere
+		!      in the code, so we don't need to subtract it from total Q in the current node.
+		!      Talk to Aubrey about this, but at least temporarily I will make Q_strTot
+		!      unidirectional (into the channel only.)
+		Q_strTot = 0.
+		T_strTot = 0.
+		Do j = 1, totLength
+				if (TO_NODE(j) .eq. i) then
+					  if (Q_str(j) .lt. 0) then
+						    Q_strTmp = Q_strTot + Q_str(j)
+								T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / Q_strTmp
+								Q_strTot = Q_strTmp
+						end if
+			 end if
 
-	  end do
+	 end do
 
     !-- to Deg K
 	  T_strTot = T_strTot + 273.2
