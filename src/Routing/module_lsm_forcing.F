@@ -50,7 +50,7 @@ type :: weather_2D_inputs
       REAL, allocatable, dimension(:,:)   :: q2x	! Humidity
 !      REAL, allocatable, dimension(:,:)   :: u  	! Near surface wind in the u-component
 !      REAL, allocatable, dimension(:,:)   :: v  	! Shortwave radiation.
-!!!!!TLE: changing this. we want wind (sqrt(u^2+v^2)), not just u component wind and,
+!!!!!TLE: changing this. we want wind=(sqrt(u^2+v^2)), not just u component wind and,
 !        more importantly, we want shortwave radiation (short) not v--which is wind.
       REAL, allocatable, dimension(:,:)   :: wind  	! Near surface wind
       REAL, allocatable, dimension(:,:)   :: short   	! Shortwave radiation.
@@ -2461,11 +2461,11 @@ if(FORC_TYP.eq.4) then
 !      PRCP1 = 0.
 !   end if
 
-   if (K.le.20) then
-      PRCP1 =2.54/3600.0
-   elseif (K.gt.1) then
-      PRCP1 = 0.
-   end if
+  ! if (K.le.20) then
+      PRCP1 =10/3600.0
+   !elseif (K.gt.1) then
+  !    PRCP1 = 0.
+  ! end if
 
    ! Other Met. Vars...
    T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
