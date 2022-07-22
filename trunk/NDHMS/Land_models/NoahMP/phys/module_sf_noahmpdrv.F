@@ -830,6 +830,12 @@ CONTAINS
 
    ENDIF ! glacial split ends 
 
+  do k=1,nsoil
+    if ( smc(k) < 0.0 ) then
+       print *, "HELPIJ i j k smc", i, j, k, smc(k)
+    endif
+  end do
+
 #ifdef WRF_HYDRO
 
 !---LPR Attention: lpr added this part 2013-09-04 below to avoid restart NaN values----

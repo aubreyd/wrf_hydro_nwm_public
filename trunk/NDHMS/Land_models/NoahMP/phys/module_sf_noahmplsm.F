@@ -5825,6 +5825,16 @@ ENDIF   ! CROPTYPE == 0
 
 ! lake/soil water balances
 
+    print *, "ADCHECK: QINSUR", QINSUR
+    print *, "ADCHECK: ETRANI", ETRANI
+    print *, "ADCHECK: SICE", SICE
+    print *, "ADCHECK: SH2O", SH2O
+    print *, "ADCHECK: SMC", SMC
+    print *, "ADCHECK: RUNSRF", RUNSRF
+    print *, "ADCHECK: QDRAIN", QDRAIN
+    print *, "ADCHECK: RUNSUB", RUNSUB
+    print *, "ADCHECK: WCND", WCND
+
     IF (IST == 2) THEN                                        ! lake
        RUNSRF = 0.
        IF(WSLAKE >= WSLMAX) RUNSRF = QINSUR*1000.             !mm/s
@@ -5835,6 +5845,13 @@ ENDIF   ! CROPTYPE == 0
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
                            SMCWTD, DEEPRECH                       , & !inout
                             RUNSRF ,QDRAIN ,RUNSUB ,WCND   ,FCRMAX )   !out
+
+    print *, "ADCHECK_after_sw: RUNSRF", RUNSRF
+    print *, "ADCHECK_after_sw: QDRAIN", QDRAIN
+    print *, "ADCHECK_after_sw: RUNSUB", RUNSUB
+    print *, "ADCHECK_after_sw: WCND", WCND
+    print *, "ADCHECK_after_sw: SH2O", SH2O
+    print *, "ADCHECK_after_sw: SMC", SMC
  
        IF(OPT_RUN == 1) THEN 
           CALL GROUNDWATER (parameters,NSNOW  ,NSOIL  ,DT     ,SICE   ,ZSOIL  , & !in
@@ -6910,6 +6927,9 @@ ENDIF   ! CROPTYPE == 0
 
 ! for the case when snowmelt water is too large
 
+    print *, "ADCHECK_sw_ini: FCR", FCR
+    print *, "ADCHECK_sw_ini: SH2O", SH2O
+
     DO K = 1,NSOIL
        EPORE   = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
        RSAT    = RSAT + MAX(0.,SH2O(K)-EPORE)*DZSNSO(K)  
@@ -6935,6 +6955,10 @@ ENDIF   ! CROPTYPE == 0
        IF (SH2O(K) < SH2OMIN) SH2OMIN = SH2O(K)
     END DO
 
+    print *, "ADCHECK_aft_minmax: FCR", FCR
+    print *, "ADCHECK_aft_minmax: SH2O", SH2O
+    print *, "ADCHECK_aft_minmax: RUNSRF", RUNSRF   
+ 
 !subsurface runoff for runoff scheme option 2
 
     IF(OPT_RUN == 2) THEN 
@@ -7001,6 +7025,12 @@ ENDIF   ! CROPTYPE == 0
     IF (OPT_RUN == 7) THEN
       CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DT,FCR,NSOIL,SMC,ZSOIL,QINSUR,RUNSRF,PDDUM)
     END IF
+
+    print *, "ADCHECK_aft_xaj1: SMC", SMC
+    print *, "ADCHECK_aft_xaj1: QINSUR", QINSUR
+    print *, "ADCHECK_aft_xaj1: RUNSRF", RUNSRF
+    print *, "ADCHECK_aft_xaj1: PDDUM", PDDUM
+
 ! determine iteration times and finer time step
 
     NITER = 1
@@ -7025,10 +7055,22 @@ ENDIF   ! CROPTYPE == 0
                       PDDUM  ,RUNSRF )                           !out
        END IF
 
+       print *, "ADCHECK_pre_xaj2: ITER", ITER
+       print *, "ADCHECK_pre_xaj2: SMC", SMC
+       print *, "ADCHECK_pre_xaj2: QINSUR", QINSUR
+       print *, "ADCHECK_pre_xaj2: PDDUM", PDDUM
+       print *, "ADCHECK_pre_xaj2: RUNSRF", RUNSRF
+
        IF (QINSUR > 0. .AND. OPT_RUN == 7) THEN
           CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DTFINE,FCR,NSOIL,SMC,ZSOIL,QINSUR,& ! in
                                       RUNSRF,PDDUM)                                  ! out
        END IF
+
+       print *, "ADCHECK_aft_xaj2: PDDUM", PDDUM
+       print *, "ADCHECK_aft_xaj2: RUNSRF", RUNSRF
+       print *, "ADCHECK_aft_xaj2: SH2O", SH2O
+       print *, "ADCHECK_aft_xaj2: SMC", SMC
+       print *, "ADCHECK_aft_xaj2: SH2O", SH2O
 
        CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM  ,ETRANI , & !in
                    QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
@@ -7036,6 +7078,13 @@ ENDIF   ! CROPTYPE == 0
                    RHSTT  ,AI     ,BI     ,CI     ,QDRAIN , & !out
                    WCND   )                                   !out
   
+       print *, "ADCHECK_aft_srt: RHSTT", RHSTT
+       print *, "ADCHECK_aft_srt: AI", AI
+       print *, "ADCHECK_aft_srt: BI", BI
+       print *, "ADCHECK_aft_srt: CI", CI
+       print *, "ADCHECK_aft_srt: QDRAIN", QDRAIN
+       print *, "ADCHECK_aft_srt: WCND", WCND
+
        CALL SSTEP (parameters,NSOIL  ,NSNOW  ,DTFINE ,ZSOIL  ,DZSNSO , & !in
                    SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
                    SH2O   ,SMC    ,AI     ,BI     ,CI     , & !inout
@@ -7044,6 +7093,13 @@ ENDIF   ! CROPTYPE == 0
        RSAT =  RSAT + WPLUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
        RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+
+       print *, "ADCHECK_aft_sstep: SH2O", SH2O
+       print *, "ADCHECK_aft_sstep: SMC", SMC
+       print *, "ADCHECK_aft_sstep: QDRAIN", QDRAIN
+       print *, "ADCHECK_aft_sstep: WCND", WCND
+       print *, "ADCHECK_aft_sstep: WPLUS", WPLUS
+
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
@@ -7051,6 +7107,10 @@ ENDIF   ! CROPTYPE == 0
 
     RUNSRF = RUNSRF * 1000. + RSAT * 1000./DT  ! m/s -> mm/s
     QDRAIN = QDRAIN * 1000.
+
+       print *, "ADCHECK_aft_niter: PDDUM", PDDUM
+       print *, "ADCHECK_aft_niter: RUNSRF", RUNSRF
+
 
 !WRF_HYDRO_DJG...
 !yw    INFXSRT = RUNSRF * DT   !mm/s -> mm
@@ -7102,6 +7162,9 @@ ENDIF   ! CROPTYPE == 0
         SH2O(IZ)     = MLIQ(IZ) / (DZSNSO(IZ)*1000.)
       END DO
    END IF
+
+  print *, "ADCHECK_end_sw: SH2O", SH2O
+  print *, "ADCHECK_end_sw: SMC", SMC
 
   END SUBROUTINE SOILWATER
 
@@ -7464,6 +7527,9 @@ ENDIF   ! CROPTYPE == 0
 
     DO K = 1,NSOIL
         SH2O(K) = SH2O(K) + CI(K)
+        if ( SH2O(K) .lt. 0.0 ) then
+         print *, "HELP1 K SH2O(K)", K, SH2O(K)
+        endif
     ENDDO
 
 !  excessive water above saturation in a layer is moved to
@@ -7497,6 +7563,11 @@ ENDIF   ! CROPTYPE == 0
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
       SH2O(K-1)    = SH2O(K-1) + WPLUS/DZSNSO(K-1)
+
+        if ( SH2O(K) .lt. 0.0 ) then
+         print *, "HELP2 K SH2O(K)", K, SH2O(K)
+        endif
+
     END DO
 
     EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(1) - SICE(1) ) )
@@ -7510,6 +7581,11 @@ ENDIF   ! CROPTYPE == 0
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
       SH2O(K+1)    = SH2O(K+1) + WPLUS/DZSNSO(K+1)
+
+        if ( SH2O(K) .lt. 0.0 ) then
+         print *, "HELP3 K SH2O(K)", K, SH2O(K)
+        endif
+
     END DO
 
     EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(NSOIL) - SICE(NSOIL) ) )
@@ -7566,12 +7642,21 @@ ENDIF   ! CROPTYPE == 0
        ELSE
           WM     = WM + (SMC(IZ)*-1*ZSOIL(IZ))
        END IF
+       print *, "ADCHECK_xaj0: IZ SM", IZ, SM
+       print *, "ADCHECK_xaj0: SMC SMCREF ZSOIL", SMC(IZ), parameters%SMCREF(IZ), ZSOIL(IZ)
+       print *, "ADCHECK_xaj0: WM", WM
        WM_MAX = WM_MAX + (parameters%SMCREF(IZ)*-1*ZSOIL(IZ))
+       print *, "ADCHECK_xaj0: WM_MAX", WM_MAX
        SM_MAX = SM_MAX + (parameters%SMCMAX(IZ) - parameters%SMCREF(IZ))*-1*ZSOIL(IZ)
     END DO
 
     WM = MIN(WM,WM_MAX) ! tension water (m) 
     SM = MIN(SM,SM_MAX) ! free water (m)
+
+    print *, "ADCHECK_xaj1: WM", WM
+    print *, "ADCHECK_xaj1: SM", SM
+    print *, "ADCHECK_xaj1: SM_MAX", SM_MAX
+    print *, "ADCHECK_xaj1: WM_MAX", WM_MAX
 
 ! impervious surface runoff R_IMP    
     IRUNOFF = FCR(1)*QINSUR*DT
@@ -7583,16 +7668,30 @@ ENDIF   ! CROPTYPE == 0
        PRUNOFF = (1-FCR(1))*QINSUR*DT*(1-(((0.5+parameters%AXAJ)**(1-parameters%BXAJ))*((1-(WM/WM_MAX))**parameters%BXAJ)))
     END IF
 
+    print *, "ADCHECK_xaj2: FCR(1)", FCR(1)
+    print *, "ADCHECK_xaj2: QINSUR", QINSUR
+    print *, "ADCHECK_xaj2: AXAJ", parameters%AXAJ
+    print *, "ADCHECK_xaj2: BXAJ", parameters%BXAJ
+    print *, "ADCHECK_xaj2: IRUNOFF", IRUNOFF
+    print *, "ADCHECK_xaj2: PRUNOFF", PRUNOFF
+
 ! estimate surface runoff based on Eq. (313)
     IF(QINSUR .EQ. 0.0) THEN
       RUNSRF  = 0.0
     ELSE
       RUNSRF = PRUNOFF*(1-((1-(SM/SM_MAX))**parameters%XXAJ))+IRUNOFF
     END IF
+
+    print *, "ADCHECK_xaj3: RUNSRF", RUNSRF
+
     RUNSRF = RUNSRF/DT !m/s
     RUNSRF = MAX(0.0,    RUNSRF)
     RUNSRF = MIN(QINSUR, RUNSRF)
     PDDUM  = QINSUR - RUNSRF
+
+    print *, "ADCHECK_xaj4: RUNSRF", RUNSRF
+    print *, "ADCHECK_xaj4: QINSUR", QINSUR
+    print *, "ADCHECK_xaj4: PDDUM", PDDUM
 
   END SUBROUTINE COMPUTE_XAJ_SURFRUNOFF
 !== end xinanjiag ==================================================================================
