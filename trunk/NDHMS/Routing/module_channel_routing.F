@@ -688,7 +688,13 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: gwHead            !DJG !!! groundwater head from Fersch-2d gw implementation...units (m ASL)
         REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: qgw_chanrt         !DJG !!! Channel-gw flux as used in Fersch 2d gw implementation...units (m^3/s)...Change 'INTENT' to 'OUT' when ready to update groundwater state...
 
-
+!-- Channel temperature variables
+        real, dimension(nlinks)   :: Inflow               ! total inflow from upstream reaches (m3/s)
+        real, dimension(nlinks)   :: Outflow              ! total outflow to downstream reaches (m3/s)
+        real, dimension(nlinks)   :: InflowWeightedTemp   ! flow-weighted temperature (K * m3/s)
+        real, dimension(nlinks)   :: InflowTemp           ! volume-mean inflow temperature (K)
+        real, dimension(nlinks)   :: LateralTemp           ! lateral inflow temperature (K)
+        real, dimension(nlinks)   :: ReachTemp            ! current reach temperature (K)
 
         !-- lake params
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: RESHT    !-- reservoir height (m)
@@ -754,6 +760,12 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QLateral = 0
         QSUM     = 0
         QLLAKE   = 0
+
+        ! Initialize local channel temperature variables
+        Inflow = 0.0
+        Outflow = 0.0
+        InflowWeightedTemp = 0.0
+        InflowTemp = 0.0
 
 
 !yw      print *, "DRIVE_channel,option,nlinkl,nlinks!!", channel_option,NLINKSL,NLINKS
@@ -1120,8 +1132,14 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #endif
            if(TYPEL(i) .eq. 0) then                                       !-- only regular nodes have to attribute
               QSUM8(TO_NODE(i)) = QSUM8(TO_NODE(i)) + QLINK(i,1)
+              if (QLINK(i,1) > 0) then
+                InflowWeightedTemp(TO_NODE(i)) = InflowWeightedTemp(TO_NODE(i)) + InflowWeightedTemp(i) * QLINK(i,1)
+                Inflow(TO_NODE(i)) = Inflow(TO_NODE(i)) + QLINK(i,1)
+              endif
            endif
           END DO
+
+          InflowTemp = InflowWeightedTemp / Inflow
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL8(Link_location,ixrt,jxrt,qsum8,NLINKS,0)
@@ -1137,6 +1155,8 @@ gwOption:   if(gwBaseSwCRT == 3) then
          do i = 1,NLINKS                                                 !-- outflow from node across each face
 #endif
             QSUM(FROM_NODE(i)) = QSUM(FROM_NODE(i)) - QLINK(i,1)
+            Outflow(FROM_NODE(i)) = Outflow(FROM_NODE(i)) + QLINK(i,1)
+
          end do
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,qsum,NLINKS,99)
@@ -1213,6 +1233,12 @@ gwOption:   if(gwBaseSwCRT == 3) then
 
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
               CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
+              ! Volume-weighted temperature
+              ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
+                             InflowTemp(i) * (Inflow(i) * DTCT) + &                         ! inflow from upstream tribs
+                             LateralTemp(i) * (QLateral(i) * DTCT) ) / &                    ! inflow from lateral
+                             ( CVOLTMP(i) + (Inflow(i) + QLateral(i) - Outflow(i)) * DTCT ) ! total volume
+
               if((CVOLTMP(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                 print *, "WARNING! channel volume less than 0:i,CVOL,QSUM,QLat", &
