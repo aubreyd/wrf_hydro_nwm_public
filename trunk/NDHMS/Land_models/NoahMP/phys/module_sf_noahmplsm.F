@@ -6920,6 +6920,19 @@ ENDIF   ! CROPTYPE == 0
   REAL                                    :: SMCTOT !2-m averaged soil moisture (m3/m3)
   REAL                                    :: DZTOT  !2-m soil depth (m)
   REAL, PARAMETER :: A = 4.0
+
+  INTEGER                                 :: NITER_MULT
+  REAL                                    :: PDDUM_new
+  REAL                                    :: RUNSRF_new
+  REAL, DIMENSION(1:NSOIL)                :: SH2O_new
+  REAL, DIMENSION(1:NSOIL)                :: SMC_new
+  REAL                                    :: QDRAIN_new
+  REAL, DIMENSION(1:NSOIL)                :: WCND_new
+  REAL                                    :: RSAT_new
+  REAL                                    :: DEEPRECH_new
+  REAL                                    :: WPLUS_new
+  REAL                                    :: SMCWTD_new
+
 ! ----------------------------------------------------------------------
     RUNSRF = 0.0
     PDDUM  = 0.0
@@ -7039,66 +7052,111 @@ ENDIF   ! CROPTYPE == 0
        NITER = 3
        IF (PDDUM*DT>DZSNSO(1)*parameters%SMCMAX(1) ) THEN
           NITER = NITER*2
+          print *, "ADCHECK_niter_pos: NITER", NITER
        END IF
 !    END IF                 
 
+! Add a potential second loop if we get negative soil moistures after loop 1
+    DO NITER_MULT = 1, 2
+       
+       NITER = NITER * NITER_MULT
+
+       print *, "ADCHECK_outloop: NITER_MULT NITER", NITER_MULT, NITER
+       if (NITER_MULT == 2) then
+         print *, "ADCHECK_extraloop!"
+       end if
     DTFINE  = DT / NITER
 
 ! solve soil moisture
 
     QDRAIN_SAVE = 0.0
     RUNSRF_SAVE = 0.0
+
+    ! Setup temp variables for updating - will check values before replacing
+    PDDUM_new = PDDUM
+    RUNSRF_new = RUNSRF
+    SH2O_new = SH2O
+    SMC_new = SMC
+    QDRAIN_new = QDRAIN
+    WCND_new = WCND
+    RSAT_new = RSAT
+    DEEPRECH_new = DEEPRECH
+    WPLUS_new = WPLUS
+    SMCWTD_new = SMCWTD
+
     DO ITER = 1, NITER
        IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
-          CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
+          CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O_new   ,SICE   , & !in
                       SICEMAX,QINSUR ,                         & !in
-                      PDDUM  ,RUNSRF )                           !out
+                      PDDUM_new  ,RUNSRF_new )                           !out
        END IF
 
        print *, "ADCHECK_pre_xaj2: ITER", ITER
-       print *, "ADCHECK_pre_xaj2: SMC", SMC
+       print *, "ADCHECK_pre_xaj2: SMC", SMC_new
        print *, "ADCHECK_pre_xaj2: QINSUR", QINSUR
-       print *, "ADCHECK_pre_xaj2: PDDUM", PDDUM
-       print *, "ADCHECK_pre_xaj2: RUNSRF", RUNSRF
+       print *, "ADCHECK_pre_xaj2: PDDUM", PDDUM_new
+       print *, "ADCHECK_pre_xaj2: RUNSRF", RUNSRF_new
 
        IF (QINSUR > 0. .AND. OPT_RUN == 7) THEN
-          CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DTFINE,FCR,NSOIL,SMC,ZSOIL,QINSUR,& ! in
-                                      RUNSRF,PDDUM)                                  ! out
+          CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DTFINE,FCR,NSOIL,SMC_new,ZSOIL,QINSUR,& ! in
+                                      RUNSRF_new,PDDUM_new)                                  ! out
        END IF
 
-       print *, "ADCHECK_aft_xaj2: PDDUM", PDDUM
-       print *, "ADCHECK_aft_xaj2: RUNSRF", RUNSRF
-       print *, "ADCHECK_aft_xaj2: SH2O", SH2O
-       print *, "ADCHECK_aft_xaj2: SMC", SMC
-       print *, "ADCHECK_aft_xaj2: SH2O", SH2O
+       print *, "ADCHECK_aft_xaj2: PDDUM", PDDUM_new
+       print *, "ADCHECK_aft_xaj2: RUNSRF", RUNSRF_new
+       print *, "ADCHECK_aft_xaj2: SH2O", SH2O_new
+       print *, "ADCHECK_aft_xaj2: SMC", SMC_new
 
-       CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM  ,ETRANI , & !in
-                   QSEVA  ,SH2O   ,SMC    ,ZWT    ,FCR    , & !in
-                   SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD ,         & !in
-                   RHSTT  ,AI     ,BI     ,CI     ,QDRAIN , & !out
-                   WCND   )                                   !out
+       CALL SRT   (parameters,NSOIL  ,ZSOIL  ,DTFINE ,PDDUM_new  ,ETRANI , & !in
+                   QSEVA  ,SH2O_new   ,SMC_new    ,ZWT    ,FCR    , & !in
+                   SICEMAX,FCRMAX ,ILOC   ,JLOC   ,SMCWTD_new ,         & !in
+                   RHSTT  ,AI     ,BI     ,CI     ,QDRAIN_new , & !out
+                   WCND_new   )                                   !out
   
        print *, "ADCHECK_aft_srt: RHSTT", RHSTT
        print *, "ADCHECK_aft_srt: AI", AI
        print *, "ADCHECK_aft_srt: BI", BI
        print *, "ADCHECK_aft_srt: CI", CI
-       print *, "ADCHECK_aft_srt: QDRAIN", QDRAIN
-       print *, "ADCHECK_aft_srt: WCND", WCND
+       print *, "ADCHECK_aft_srt: QDRAIN", QDRAIN_new
+       print *, "ADCHECK_aft_srt: WCND", WCND_new
 
        CALL SSTEP (parameters,NSOIL  ,NSNOW  ,DTFINE ,ZSOIL  ,DZSNSO , & !in
                    SICE   ,ILOC   ,JLOC   ,ZWT            ,                 & !in
-                   SH2O   ,SMC    ,AI     ,BI     ,CI     , & !inout
-                   RHSTT  ,SMCWTD ,QDRAIN ,DEEPRECH,                                 & !inout
-                   WPLUS)                                     !out
-       RSAT =  RSAT + WPLUS
-       QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
-       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+                   SH2O_new   ,SMC_new    ,AI     ,BI     ,CI     , & !inout
+                   RHSTT  ,SMCWTD_new ,QDRAIN_new ,DEEPRECH_new,                                 & !inout
+                   WPLUS_new)                                     !out
 
-       print *, "ADCHECK_aft_sstep: SH2O", SH2O
-       print *, "ADCHECK_aft_sstep: SMC", SMC
-       print *, "ADCHECK_aft_sstep: QDRAIN", QDRAIN
-       print *, "ADCHECK_aft_sstep: WCND", WCND
-       print *, "ADCHECK_aft_sstep: WPLUS", WPLUS
+       RSAT_new =  RSAT_new + WPLUS_new
+       QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN_new
+       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF_new
+
+       print *, "ADCHECK_aft_sstep: SH2O", SH2O_new
+       print *, "ADCHECK_aft_sstep: SMC", SMC_new
+       print *, "ADCHECK_aft_sstep: QDRAIN", QDRAIN_new
+       print *, "ADCHECK_aft_sstep: WCND", WCND_new
+       print *, "ADCHECK_aft_sstep: WPLUS", WPLUS_new
+
+    END DO
+
+! If all soil moisture values are non-negative, skip 2nd loop.
+! Do not do more than 1 extra loop.
+    IF ( ALL(SH2O_new >= 0.0) ) THEN
+       print *, "Skipping second loop"
+       PDDUM = PDDUM_new
+       RUNSRF = RUNSRF_new
+       SH2O = SH2O_new
+       SMC = SMC_new
+       QDRAIN = QDRAIN_new
+       WCND = WCND_new
+       RSAT = RSAT_new
+       DEEPRECH = DEEPRECH_new
+       WPLUS = WPLUS_new
+       SMCWTD = SMCWTD_new
+       EXIT
+    ELSE IF (NITER_MULT == 2) THEN
+       write(*,'("ERROR: Negative soil moisture")')
+       call wrf_error_fatal("STOP in Noah-MP soilwater")
+    END IF
 
     END DO
 
@@ -7558,22 +7616,20 @@ ENDIF   ! CROPTYPE == 0
 
   ENDIF
 
+! Oversaturation check from bottom up
     DO K = NSOIL,2,-1
       EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
       SH2O(K-1)    = SH2O(K-1) + WPLUS/DZSNSO(K-1)
-
-        if ( SH2O(K) .lt. 0.0 ) then
-         print *, "HELP2 K SH2O(K)", K, SH2O(K)
-        endif
-
     END DO
 
+! Check top layer to see if there is still excess water
     EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(1) - SICE(1) ) )
     WPLUS        = MAX((SH2O(1)-EPORE), 0.0) * DZSNSO(1) 
     SH2O(1)      = MIN(EPORE,SH2O(1))
 
+! If excess water, redistribute from top down
    IF(WPLUS > 0.0) THEN
     SH2O(2)      = SH2O(2) + WPLUS/DZSNSO(2)
     DO K = 2,NSOIL-1
@@ -7581,18 +7637,30 @@ ENDIF   ! CROPTYPE == 0
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
       SH2O(K+1)    = SH2O(K+1) + WPLUS/DZSNSO(K+1)
-
-        if ( SH2O(K) .lt. 0.0 ) then
-         print *, "HELP3 K SH2O(K)", K, SH2O(K)
-        endif
-
     END DO
-
+    ! Check bottom layer and output any remaining excess water (wplus)
     EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(NSOIL) - SICE(NSOIL) ) )
     WPLUS        = MAX((SH2O(NSOIL)-EPORE), 0.0) * DZSNSO(NSOIL) 
     SH2O(NSOIL)  = MIN(EPORE,SH2O(NSOIL))
    END IF
-   
+  
+!! Negative soil moisture check
+!   WATMIN = parameters%SMCDRY ! originally this was fixed value of 0.01 mm
+!   DO K = 1,NSOIL-1
+!     ! Amount of water below residual soil water content
+!     WMINUS    = MAX ((WATMIN(K)-SH2O(K))*DZSNSO(K), 0.0 )
+!     ! Remove from lower layer and add to current layer
+!     SH2O(K)   = MAX(WATMIN(K), SH2O(K))
+!     SH2O(K+1) = SH2O(K+1) + WMINUS/DZSNSO(K+1)
+!   END DO
+!   ! Check bottom layer to see if deficit still exists
+!   WMINUS      = MAX ((WATMIN(NSOIL)-SH2O(NSOIL))*DZSNSO(NSOIL), 0.0 )
+!   SH2O(NSOIL) = MAX(WATMIN(NSOIL), SH2O(NSOIL))
+!
+!   ! Remove this water from WPLUS tracking
+!   WPLUS = WPLUS - WMINUS
+!   END IF
+
     SMC = SH2O + SICE
 
   END SUBROUTINE SSTEP
