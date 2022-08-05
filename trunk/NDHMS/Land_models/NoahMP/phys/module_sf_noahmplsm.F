@@ -7057,7 +7057,7 @@ ENDIF   ! CROPTYPE == 0
 !    END IF                 
 
 ! Add a potential second loop if we get negative soil moistures after loop 1
-    DO NITER_MULT = 1, 2
+    DO NITER_MULT = 1, 3
        
        NITER = NITER * NITER_MULT
 
@@ -7153,7 +7153,7 @@ ENDIF   ! CROPTYPE == 0
        WPLUS = WPLUS_new
        SMCWTD = SMCWTD_new
        EXIT
-    ELSE IF (NITER_MULT == 2) THEN
+    ELSE IF (NITER_MULT == 3) THEN
        write(*,'("ERROR: Negative soil moisture")')
        call wrf_error_fatal("STOP in Noah-MP soilwater")
     END IF
