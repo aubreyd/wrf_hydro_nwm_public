@@ -7057,7 +7057,7 @@ ENDIF   ! CROPTYPE == 0
 !    END IF                 
 
 ! Add a potential second loop if we get negative soil moistures after loop 1
-    DO NITER_MULT = 1, 3
+    DO NITER_MULT = 1, 1
        
        NITER = NITER * NITER_MULT
 
@@ -7562,8 +7562,11 @@ ENDIF   ! CROPTYPE == 0
     REAL                                    :: STOT
     REAL                                    :: EPORE
     REAL                                    :: WMINUS
+    REAL, DIMENSION(1:NSOIL)                :: WATMIN
+
 ! ----------------------------------------------------------------------
     WPLUS = 0.0
+    WMINUS = 0.0
 
     DO K = 1,NSOIL
        RHSTT (K) =   RHSTT(K) * DT
@@ -7645,21 +7648,23 @@ ENDIF   ! CROPTYPE == 0
    END IF
   
 !! Negative soil moisture check
-!   WATMIN = parameters%SMCDRY ! originally this was fixed value of 0.01 mm
-!   DO K = 1,NSOIL-1
-!     ! Amount of water below residual soil water content
-!     WMINUS    = MAX ((WATMIN(K)-SH2O(K))*DZSNSO(K), 0.0 )
-!     ! Remove from lower layer and add to current layer
-!     SH2O(K)   = MAX(WATMIN(K), SH2O(K))
-!     SH2O(K+1) = SH2O(K+1) + WMINUS/DZSNSO(K+1)
-!   END DO
-!   ! Check bottom layer to see if deficit still exists
-!   WMINUS      = MAX ((WATMIN(NSOIL)-SH2O(NSOIL))*DZSNSO(NSOIL), 0.0 )
-!   SH2O(NSOIL) = MAX(WATMIN(NSOIL), SH2O(NSOIL))
-!
-!   ! Remove this water from WPLUS tracking
-!   WPLUS = WPLUS - WMINUS
-!   END IF
+   IF ( ANY(SH2O < 0.0) ) THEN
+     print *, "WARNING: Negative smc adjustment"
+     WATMIN = 0.0  ! parameters%SMCDRY ! originally this was fixed value of 0.01 mm
+     DO K = 1,NSOIL-1
+       ! Amount of water below residual soil water content
+       WMINUS    = MAX ((WATMIN(K)-SH2O(K))*DZSNSO(K), 0.0 )
+       ! Remove from lower layer and add to current layer
+       SH2O(K)   = MAX(WATMIN(K), SH2O(K))
+       SH2O(K+1) = SH2O(K+1) - WMINUS/DZSNSO(K+1)
+     END DO
+     ! Check bottom layer to see if deficit still exists
+     WMINUS      = MAX ((WATMIN(NSOIL)-SH2O(NSOIL))*DZSNSO(NSOIL), 0.0 )
+     SH2O(NSOIL) = MAX(WATMIN(NSOIL), SH2O(NSOIL))
+
+     ! Remove this water from WPLUS tracking
+     WPLUS = WPLUS - WMINUS
+   END IF
 
     SMC = SH2O + SICE
 
