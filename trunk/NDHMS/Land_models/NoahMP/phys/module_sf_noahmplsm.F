@@ -7484,8 +7484,11 @@ ENDIF   ! CROPTYPE == 0
     REAL                                    :: STOT
     REAL                                    :: EPORE
     REAL                                    :: WMINUS
+    REAL, DIMENSION(1:NSOIL)                :: WATMIN
+
 ! ----------------------------------------------------------------------
     WPLUS = 0.0
+    WMINUS = 0.0
 
     DO K = 1,NSOIL
        RHSTT (K) =   RHSTT(K) * DT
@@ -7559,7 +7562,26 @@ ENDIF   ! CROPTYPE == 0
     WPLUS        = MAX((SH2O(NSOIL)-EPORE), 0.0) * DZSNSO(NSOIL) 
     SH2O(NSOIL)  = MIN(EPORE,SH2O(NSOIL))
    END IF
-   
+  
+!! Negative soil moisture check
+   IF ( ANY(SH2O < 0.0) ) THEN
+     print *, "WARNING: Negative smc adjustment"
+     WATMIN = 0.0  ! in soilwater check this is a fixed value of 0.01 mm; why not smcdry?
+     DO K = 1,NSOIL-1
+       ! Amount of water below residual soil water content
+       WMINUS    = MAX ((WATMIN(K)-SH2O(K))*DZSNSO(K), 0.0 )
+       ! Remove from lower layer and add to current layer
+       SH2O(K)   = MAX(WATMIN(K), SH2O(K))
+       SH2O(K+1) = SH2O(K+1) - WMINUS/DZSNSO(K+1)
+     END DO
+     ! Check bottom layer to see if deficit still exists
+     WMINUS      = MAX ((WATMIN(NSOIL)-SH2O(NSOIL))*DZSNSO(NSOIL), 0.0 )
+     SH2O(NSOIL) = MAX(WATMIN(NSOIL), SH2O(NSOIL))
+
+     ! Remove this water from WPLUS tracking
+     WPLUS = WPLUS - WMINUS
+   END IF
+ 
     SMC = SH2O + SICE
 
   END SUBROUTINE SSTEP
