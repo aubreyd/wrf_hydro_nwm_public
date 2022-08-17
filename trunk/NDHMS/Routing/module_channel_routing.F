@@ -1049,6 +1049,9 @@ gwOption:   if(gwBaseSwCRT == 3) then
                 ((QSTRMVOLRT(CHANXI(i),CHANYJ(i))+&
                  QINFLOWBASE(CHANXI(i),CHANYJ(i))) &
                    /DT_STEPS*node_area(i)/1000/DTCT)
+
+ !!AD: Add QLateral temperature calculation
+
 	       if((QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))).lt.0.) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                print*, "i, CHANXI(i),CHANYJ(i) = ", i, CHANXI(i),CHANYJ(i)
@@ -1232,12 +1235,14 @@ gwOption:   if(gwBaseSwCRT == 3) then
 #endif
 
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
-              CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
               ! Volume-weighted temperature
               ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
                              InflowTemp(i) * (Inflow(i) * DTCT) + &                         ! inflow from upstream tribs
                              LateralTemp(i) * (QLateral(i) * DTCT) ) / &                    ! inflow from lateral
                              ( CVOLTMP(i) + (Inflow(i) + QLateral(i) - Outflow(i)) * DTCT ) ! total volume
+              ! Add to rt_domain: CVOLTMP (previous), Outflow, Inflow, QLateral, InflowTemp, LateralTemp
+              ! Already have: LateralTemp, ReachTemp, DTCT
+              CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
 
               if((CVOLTMP(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
