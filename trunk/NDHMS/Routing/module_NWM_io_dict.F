@@ -123,7 +123,11 @@ type ldasMeta
    integer :: numSnowLayers = 3
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: numSpectrumBands = 2
+#ifndef EXTRALAKELAYERS
    integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -424,7 +428,11 @@ type lsmMeta
    integer :: numVars = numLsmVars
    integer :: numSnowLayers = 3
    integer :: numSoilLayers                       ! Fill from Namelist
+#ifndef EXTRALAKELAYERS
    integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -1251,6 +1259,7 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                   1,1,1,1,1,1,1,1,1,1, & !81-90
                                   1,1,1,1,1,1,1,1,1,1, & !91-100
                                   1,1,1]                 !101-103
+#ifndef EXTRALAKELAYERS
    ldasOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1, &  !1-10
                             1,1,1,1,1,1,1,1,1,1, &  !11-20
                             1,1,1,1,1,1,1,1,1,1, &  !21-30
@@ -1262,6 +1271,19 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             1,1,1,1,1,1,1,1,1,1, &  !81-90
                             1,1,1,1,1,2,2,1,1,1, &  !91-100
                             1,10,10]                !101-103 (numLakeLayers = 10)
+#else
+   ldasOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1, &  !1-10
+                            1,1,1,1,1,1,1,1,1,1, &  !11-20
+                            1,1,1,1,1,1,1,1,1,1, &  !21-30
+                            1,1,1,1,1,1,1,1,1,1, &  !31-40
+                            1,1,1,1,1,1,1,1,1,1, &  !41-50
+                            1,1,1,1,1,1,3,3,3,4, &  !51-60
+                            4,3,4,1,1,1,1,1,1,1, &  !61-70
+                            1,1,1,1,1,1,1,1,1,1, &  !71-80
+                            1,1,1,1,1,1,1,1,1,1, &  !81-90
+                            1,1,1,1,1,2,2,1,1,1, &  !91-100
+                            1,25,25]                !101-103 (numLakeLayers = 25) why is this not defined using num lake layer parameter?
+#endif
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !11-15

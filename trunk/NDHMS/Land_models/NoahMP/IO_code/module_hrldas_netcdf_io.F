@@ -2307,8 +2307,11 @@ contains
        !iret = nf90_def_dim(ncid, "south_north_stag", jxfull+1, dimid_dum)
        iret = nf90_def_dim(ncid, "soil_layers_stag", nsoil, dimid_layers)
        iret = nf90_def_dim(ncid, "snow_layers", nsnow, dimid_snow_layers)
+#ifndef EXTRALAKELAYERS
        iret = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
-
+#else
+       iret = nf90_def_dim(ncid, "lake_layers", 25, dimid_lake_layers)
+#endif
        iret = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "OUTPUT FROM HRLDAS "//version)
        iret = nf90_put_att(ncid, NF90_GLOBAL, "missing_value", -1.E33)
 
@@ -2953,7 +2956,11 @@ contains
     ierr = nf90_def_dim(ncid, "soil_layers_stag", nsoil, dimid_layers)
     ierr = nf90_def_dim(ncid, "snow_layers", nsnow, dimid_snow_layers)
     ierr = nf90_def_dim(ncid, "sosn_layers", nsnow+nsoil, dimid_sosn_layers)
+#ifndef EXTRALAKELAYERS 
     ierr = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
+#else
+    ierr = nf90_def_dim(ncid, "lake_layers", 25, dimid_lake_layers)
+#endif
     ierr = nf90_def_dim(ncid, "lakesoilsnow_layers", nlevsnow+nlevsoil, dimid_lakesoilsnow_layers)
     ierr = nf90_def_dim(ncid, "lakesoilsnow_layers2", nlevsnow+nlevsoil+1, dimid_lakesoilsnow_layers2)
     ierr = nf90_def_dim(ncid, "lakesoil_layers", nlevsoil, dimid_lakesoil_layers)

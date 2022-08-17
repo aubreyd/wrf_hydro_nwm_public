@@ -24,7 +24,11 @@ MODULE module_sf_lake
     integer, parameter ::      r8 = selected_real_kind(12) 
 
     integer, parameter :: nlevsoil     =  10   ! number of soil layers
+#ifndef EXTRALAKELAYERS 
     integer, parameter :: nlevlake     =  10   ! number of lake layers
+#else
+    integer, parameter :: nlevlake     =  25   ! number of lake layers
+#endif
     integer, parameter :: nlevsnow     =   5   ! maximum number of snow layers
 
     integer,parameter  ::     lbp = 1                        ! pft-index bounds
