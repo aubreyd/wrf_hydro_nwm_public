@@ -127,7 +127,11 @@ type ldasMeta
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
    integer :: numSpectrumBands = 2
+#ifndef EXTRALAKELAYERS
    integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -429,7 +433,11 @@ type lsmMeta
    integer :: numSnowLayers = 3
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
+#ifndef EXTRALAKELAYERS
    integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -1333,13 +1341,20 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             1,1,1,1,1,1,1,1,1,1, &  !71-80
                             1,1,1,1,1,1,1,1,1,1, &  !81-90
                             1,1,1,1,1,2,2,1, &      !91-98
-                            1,1,1,10,10, &          !99-103 (WRF-Lake)
+                            1,1,1,10,10, &          !99-103 (WRF-Lake) can we use num lake levels?
                             1,1,1, &                !104-106 (Crocus)
                             1,1,1, &                !107-109 (Crocus)
                             40,40,40, &             !110-112 (Crocus)
                             40,40,40, &             !113-115 (Crocus)
                             40,40,40, &             !116-118 (Crocus)
                             40,1,1]                 !119-121 (Crocus)
+! Set WRF-Lake layers
+#ifndef EXTRALAKELAYERS
+   ldasOutDict%numLev(102:103) = 10
+#else
+   ldasOutDict%numLev(102:103) = 25
+#endif
+! Set Crocus layers
    ldasOutDict%numLev(110:119) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
