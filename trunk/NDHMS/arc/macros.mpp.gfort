@@ -53,6 +53,11 @@ else
 PRECIP_DOUBLE = 
 endif
 
+ifeq ($(EXTRALAKELAYERS),1)
+EXTRALAKELAYERS = -DEXTRALAKELAYERS
+else
+EXTRALAKELAYERS =
+endif
 
 RMD		=	rm -f
 COMPILER90=	mpif90  
@@ -60,7 +65,7 @@ F90FLAGS  =       -w -c -ffree-form -ffree-line-length-none -fconvert=big-endian
 MODFLAG	=	-I"./" -I"../../MPP" -I"../MPP" -I"../mod"
 LDFLAGS	=	
 CPPINVOKE	=   -cpp
-CPPFLAGS	=   -DMPP_LAND -I"../Data_Rec" $(HYDRO_D) $(SPATIAL_SOIL) $(NWM_META) $(WRF_HYDRO_NUDGING) $(OUTPUT_CHAN_CONN) $(PRECIP_DOUBLE)
+CPPFLAGS	=   -DMPP_LAND -I"../Data_Rec" $(HYDRO_D) $(SPATIAL_SOIL) $(NWM_META) $(WRF_HYDRO_NUDGING) $(OUTPUT_CHAN_CONN) $(PRECIP_DOUBLE) $(EXTRALAKELAYERS)
 
 LIBS 	=	
 NETCDFINC       =       $(NETCDF_INC)
