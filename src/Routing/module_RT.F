@@ -478,7 +478,11 @@ CONTAINS
         allocate( rt_domain(did)%TSK_temp(IX,JX) )
         allocate( rt_domain(did)%TG_temp(IX,JX) )
         allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
-
+        allocate( rt_domain(did)%InflowUpstream(nsizes) )
+        allocate( rt_domain(did)%InflowLand(nsizes) )
+        allocate( rt_domain(did)%InflowGw(nsizes) )
+        allocate( rt_domain(did)%InflowUpstreamTemp(nsizes) )
+        allocate( rt_domain(did)%Outflow(nsizes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
         rt_domain(did)%RelH_fine_1D       = 0.
@@ -499,7 +503,11 @@ CONTAINS
         rt_domain(did)%TSK_temp           = 0.
         rt_domain(did)%TG_temp            = 0.
         rt_domain(did)%TSLB_temp          = 0.
-
+        rt_domain(did)%InflowUpstream     = 0.
+        rt_domain(did)%InflowLand         = 0.
+        rt_domain(did)%InflowGw           = 0.
+        rt_domain(did)%InflowUpstreamTemp = -9999.
+        rt_domain(did)%Outflow            = 0.
 
 
         if( nlst(did)%channel_option .eq. 2 ) then

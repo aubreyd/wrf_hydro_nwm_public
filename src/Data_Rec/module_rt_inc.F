@@ -288,6 +288,11 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: NetRad
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
    REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
+   REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
+   REAL,    allocatable, DIMENSION(:)   :: InflowLand
+   REAL,    allocatable, DIMENSION(:)   :: InflowGw
+   REAL,    allocatable, DIMENSION(:)   :: InflowUpstreamTemp
+   REAL,    allocatable, DIMENSION(:)   :: Outflow
 
    ! NEW FOR module_channel_routing.F
    REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter

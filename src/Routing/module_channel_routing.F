@@ -633,7 +633,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
        ,gwBaseSwCRT, gwHead, qgw_chanrt, gwChanCondSw, gwChanCondConstIn, &
        gwChanCondConstOut, velocity, qloss, XS_Peremeter)
 
-
        IMPLICIT NONE
 
         ! -------- DECLARATIONS ------------------------
@@ -641,10 +640,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         INTEGER, INTENT(IN) :: NLINKS,NLAKES, NLINKSL
         integer, INTENT(INOUT) :: KT   ! flag of cold start (1) or continue run.
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSUBRT
-        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSTRMVOLRT
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSTRMVOLRT   ! mm?
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: LAKEINFLORT
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: ELRT
-        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QINFLOWBASE
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QINFLOWBASE  ! mm?
         INTEGER(kind=int64), INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETLNK
 
         INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
@@ -669,17 +668,17 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL , INTENT(INOUT), DIMENSION(:,:) :: QLINK
         REAL ,  DIMENSION(NLINKS,2) :: tmpQLINK
         REAL , INTENT(INOUT), DIMENSION(NLINKS)   :: HLINK
-        REAL, dimension(NLINKS), intent(inout)    :: QLateral !--lateral flow
+        REAL, dimension(NLINKS), intent(inout)    :: QLateral !--lateral flow  ! m3/sec?
         REAL, INTENT(IN)                          :: DT    !-- model timestep
         REAL, INTENT(IN)                          :: DTRT_CH  !-- routing timestep
-        REAL, INTENT(INOUT)                       :: DTCT
+        REAL, INTENT(INOUT)                       :: DTCT    ! sec?
         real                                      :: minDTCT !BF minimum routing timestep
         REAL                                      :: dist(ixrt,jxrt,9)
         REAL                                      :: RETDEP_CHAN
         INTEGER, INTENT(IN)                       :: MAXORDER, SUBRTSWCRT, &
                                                      gwBaseSwCRT, gwChanCondSw
         real, intent(in)                          :: gwChanCondConstIn, gwChanCondConstOut ! aquifer-channel conductivity constant from namelist
-        REAL , INTENT(IN), DIMENSION(NLINKS)      :: node_area
+        REAL , INTENT(IN), DIMENSION(NLINKS)      :: node_area  ! m2?
         real, dimension(:), INTENT(inout)         :: velocity, qloss
 
 
@@ -691,12 +690,13 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: qgw_chanrt         !DJG !!! Channel-gw flux as used in Fersch 2d gw implementation...units (m^3/s)...Change 'INTENT' to 'OUT' when ready to update groundwater state...
 
 !-- Channel temperature variables
-        real, dimension(nlinks)   :: Inflow               ! total inflow from upstream reaches (m3/s)
-        real, dimension(nlinks)   :: Outflow              ! total outflow to downstream reaches (m3/s)
-        real, dimension(nlinks)   :: InflowWeightedTemp   ! flow-weighted temperature (K * m3/s)
-        real, dimension(nlinks)   :: InflowTemp           ! volume-mean inflow temperature (K)
-        real, dimension(nlinks)   :: LateralTemp           ! lateral inflow temperature (K)
-        real, dimension(nlinks)   :: ReachTemp            ! current reach temperature (K)
+        real, dimension(nlinks)                :: InflowUpstream          ! total inflow to reach from upstream reaches (m3/s)
+        real, dimension(nlinks)                :: InflowLand              ! inflow to reach from land (m3/s)
+        real, dimension(nlinks)                :: InflowGw                ! inflow to reach from groundwater (m3/s)
+        real, dimension(nlinks)                :: Outflow                 ! total outflow to downstream reaches (m3/s)
+        real, dimension(nlinks)                :: InflowUpstreamSumTemp   ! reach inflow volume-sum temperature (K * m3/s)
+        real, dimension(nlinks)                :: InflowUpstreamTemp      ! reach inflow volume-mean temperature (K)
+        !real, dimension(nlinks), intent(out)   :: ReachTemp               ! current reach temperature (K)
 
         !-- lake params
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: RESHT    !-- reservoir height (m)
@@ -764,10 +764,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QLLAKE   = 0
 
         ! Initialize local channel temperature variables
-        Inflow = 0.0
-        Outflow = 0.0
-        InflowWeightedTemp = 0.0
-        InflowTemp = 0.0
+        InflowUpstream = 0.0 ! accumulator variable
+        Outflow = 0.0 ! accumulator variable
+        InflowUpstreamSumTemp = 0.0 ! accumulator variable
+        InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 
 !yw      print *, "DRIVE_channel,option,nlinkl,nlinks!!", channel_option,NLINKSL,NLINKS
@@ -1051,9 +1051,9 @@ gwOption:   if(gwBaseSwCRT == 3) then
                 ((QSTRMVOLRT(CHANXI(i),CHANYJ(i))+&
                  QINFLOWBASE(CHANXI(i),CHANYJ(i))) &
                    /DT_STEPS*node_area(i)/1000/DTCT)
-
- !!AD: Add QLateral temperature calculation
-
+!!AD: Adding new lateral flow components for export to channel temperature routine
+              InflowLand(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QSTRMVOLRT(CHANXI(i),CHANYJ(i)) / DT_STEPS * node_area(i) / 1000 / DTCT
+              InflowGw(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QINFLOWBASE(CHANXI(i),CHANYJ(i)) / DT_STEPS * node_area(i) / 1000 / DTCT
 	       if((QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))).lt.0.) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                print*, "i, CHANXI(i),CHANYJ(i) = ", i, CHANXI(i),CHANYJ(i)
@@ -1138,13 +1138,19 @@ gwOption:   if(gwBaseSwCRT == 3) then
            if(TYPEL(i) .eq. 0) then                                       !-- only regular nodes have to attribute
               QSUM8(TO_NODE(i)) = QSUM8(TO_NODE(i)) + QLINK(i,1)
               if (QLINK(i,1) > 0) then
-                InflowWeightedTemp(TO_NODE(i)) = InflowWeightedTemp(TO_NODE(i)) + InflowWeightedTemp(i) * QLINK(i,1)
-                Inflow(TO_NODE(i)) = Inflow(TO_NODE(i)) + QLINK(i,1)
+                ! Numerator for volume-weighted temperature
+                InflowUpstreamSumTemp(TO_NODE(i)) = InflowUpstreamSumTemp(TO_NODE(i)) + rt_domain(did)%T_QSUM(i) * QLINK(i,1)
+                ! Denominator for volume-weighted temperature
+                InflowUpstream(TO_NODE(i)) = InflowUpstream(TO_NODE(i)) + QLINK(i,1)
               endif
            endif
           END DO
 
-          InflowTemp = InflowWeightedTemp / Inflow
+          ! Final calculation for volume-weighted temperature
+          ! e.g., (Inflow1 * Temperature1 + Inflow2 * Temperature2) / (Inflow1 + Inflow2) 
+          where (InflowUpstream > 0)
+             InflowUpstreamTemp = InflowUpstreamSumTemp / InflowUpstream
+          end where
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL8(Link_location,ixrt,jxrt,qsum8,NLINKS,0)
@@ -1238,11 +1244,12 @@ gwOption:   if(gwBaseSwCRT == 3) then
 
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
               ! Volume-weighted temperature
-              ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
-                             InflowTemp(i) * (Inflow(i) * DTCT) + &                         ! inflow from upstream tribs
-                             LateralTemp(i) * (QLateral(i) * DTCT) ) / &                    ! inflow from lateral
-                             ( CVOLTMP(i) + (Inflow(i) + QLateral(i) - Outflow(i)) * DTCT ) ! total volume
-              ! Add to rt_domain: CVOLTMP (previous), Outflow, Inflow, QLateral, InflowTemp, LateralTemp
+              !ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
+              !               InflowUpstreamTemp(i) * (InflowUpstream(i) * DTCT) + &         ! inflow from upstream reaches
+              !               InflowLandTemp(i) * (InflowLand(i) * DTCT) + &                 ! inflow from land
+              !               InflowGwTemp(i) * (InflowGw(i) * DTCT) ) / &                   ! inflow from gw
+              !               ( CVOLTMP(i) + (InflowUpstream(i) + InflowLand(i) + InflowGw(i) - Outflow(i)) * DTCT ) ! total volume
+              ! Add to rt_domain: CVOLTMP (previous), Outflow, InflowUpstream, InflowLand, InflowGw, InflowUpstreamTemp
               ! Already have: LateralTemp, ReachTemp, DTCT
               CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
 
@@ -1396,8 +1403,27 @@ gwOption:   if(gwBaseSwCRT == 3) then
           !-- Reza's update goes in here:
           !-- The RUN function should be called here.
 	  ! Run the subroutine to diaggregate
+
+          ! Variable mapping to rt_domain before the channel temperature call.
+          ! Note that CVOL is still from previous timestep so we can use as-is.
+          ! CVOLTMP stores new values including lateral and upstream inflows,
+          ! which gets mapped to CVOL below this channel temperature call.
           rt_domain(did)%QSUM = QSUM
+          rt_domain(did)%InflowUpstream = InflowUpstream  ! total inflow from upstream reaches (m3/s)
+          rt_domain(did)%InflowLand = InflowLand  ! lateral inflow from land (might be duplicate) (m3/s)
+          rt_domain(did)%InflowGw = InflowGw  ! inflow from groundwater (might be duplicate) (m3/s)
+          rt_domain(did)%InflowUpstreamTemp = InflowUpstreamTemp  ! average temperature of inflow from upstream reaches (m3/s)
+          rt_domain(did)%Outflow = Outflow ! outflow from reach (might be duplicate) (m3/s)
           print *, "calling rivertemp_run"
+          print *, "ADCHECK QSUM", rt_domain(did)%QSUM
+          print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
+          print *, "        InflowLand", rt_domain(did)%InflowLand
+          print *, "        InflowGw", rt_domain(did)%InflowGw
+          print *, "        QLateral", QLateral
+          print *, "        T_QSUM", rt_domain(did)%T_QSUM
+          print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
+          print *, "        Outflow", rt_domain(did)%Outflow
+          print *, "        QLINK", QLINK(:,1)
           call riverTempRuns%riverTemp_run(did)
 
           end do crnt   !--- DTCT timestep of DT_STEPS
