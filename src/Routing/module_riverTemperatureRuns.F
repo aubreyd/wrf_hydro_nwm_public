@@ -125,9 +125,12 @@ subroutine riverTemperature_run(this, did)
 					rt_domain(did)%ZELEV,	           &
 					rt_domain(did)%velocity,         &
 					rt_domain(did)%Tw,        	     &
-					rt_domain(did)%QSUM,	           &
-					rt_domain(did)%QINFLOWBASE,      &
-					rt_domain(did)%QSTRMVOLRT_TS,    &
+!					rt_domain(did)%QSUM,	           &
+!					rt_domain(did)%QINFLOWBASE,      &
+!          rt_domain(did)%QSTRMVOLRT_TS,    &
+          rt_domain(did)%InflowUpstream,   &
+          rt_domain(did)%InflowGw,         &
+          rt_domain(did)%InflowLand,       &
 					rt_domain(did)%TMN_1D_fine,      &
 					rt_domain(did)%TSLB_1D_fine,     &
 !					rt_domain(did)%TSK_1D_fine,      &
