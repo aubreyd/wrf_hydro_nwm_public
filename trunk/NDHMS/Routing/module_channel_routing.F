@@ -762,6 +762,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QLLAKE   = 0
 
         ! Initialize local channel temperature variables
+        ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
         InflowUpstream = 0.0 ! accumulator variable
         Outflow = 0.0 ! accumulator variable
         InflowUpstreamSumTemp = 0.0 ! accumulator variable
@@ -974,6 +975,12 @@ END SUBROUTINE SUBMUSKINGCUNGE
 	  Q_GW_CHAN_FLUX = 0.
 	  qgw_chanrt     = 0.
           end if
+
+        ! Initialize local channel temperature variables
+        InflowUpstream = 0.0 ! accumulator variable
+        Outflow = 0.0 ! accumulator variable
+        InflowUpstreamSumTemp = 0.0 ! accumulator variable
+        InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
 
