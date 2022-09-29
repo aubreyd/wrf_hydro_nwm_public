@@ -130,7 +130,7 @@ subroutine river_temperature_destroy(this)
 ! ------------------------------------------------
 Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	      T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
-				V_w, W_w, Q_str, Q_GW, Q_Trib, T_GW, T_hyp, T_Trib, albedo, &
+				V_w, W_w, Q_str, Q_GW_cms, Q_Trib_cms, T_GW, T_hyp, T_Trib, T_upstream, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
 				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, totLength)
 
@@ -158,11 +158,15 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL, INTENT(IN), DIMENSION(:)	  :: W_w		! Wetted width (Top; m)								=====> Tw
 	! Discharge data, instream, groundwatr flow, triburaty
 	REAL, INTENT(IN), DIMENSION(:)	  :: Q_str		! Instream flow in the river channel - from sll sources (csm)                   =====> QSUM
-	REAL, INTENT(IN), DIMENSION(:,:)  :: Q_GW		! Groundwater flow in the gridded based (cms)					=====> QINFLOWBASE
-	REAL, INTENT(IN), DIMENSION(:,:)  :: Q_Trib		! Tributarty surface inflow in the gridded based (cms)			        =====> QSTRMVOLRT
+!	REAL, INTENT(IN), DIMENSION(:,:)  :: Q_GW		! Groundwater flow in the gridded based (cms)					=====> QINFLOWBASE
+!	REAL, INTENT(IN), DIMENSION(:,:)  :: Q_Trib		! Tributarty surface inflow in the gridded based (cms)			        =====> QSTRMVOLRT
+	REAL, INTENT(IN), DIMENSION(:)  :: Q_GW_cms		! Groundwater flow in the gridded based (cms)					=====> InflowGw
+	REAL, INTENT(IN), DIMENSION(:)  :: Q_Trib_cms		! Tributarty surface inflow in the gridded based (cms)			        =====> InflowLand
+
 	REAL, INTENT(IN), DIMENSION(:)	  :: T_GW		! Groundwater flow temperature in the gridded based (C)		         	- As an input
 	REAL, INTENT(IN), DIMENSION(:)	  :: T_hyp		! Hyporheic Flow temperature in the gridded based (C)		         	- As an input
-	REAL, INTENT(IN), DIMENSION(:)	  :: T_Trib		! Tributarty surface inflow temperature (C)					- As an input
+	REAL, INTENT(IN), DIMENSION(:)	  :: T_Trib		! Tributary surface inflow temperature (C)					- As an input
+	REAL, INTENT(IN), DIMENSION(:)	  :: T_upstream		! Temperature of flow from upstream node (C)					- As an input
 	! Shading related parameters
 	REAL, INTENT(IN), DIMENSION(:)    :: albedo		! albedo at the stream surface (0 to 1)						- ???
 	REAL, INTENT(IN), DIMENSION(:)    :: SF			! Shading factor for each grid of the reach					- ???
@@ -222,8 +226,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t, branch_sum
 
         !REAL                                                  :: DT_STEPS               !-- number of timestep in routing
-	REAL,                   DIMENSION(totLength)                :: Q_GW_cms
-	REAL,                   DIMENSION(totLength)                :: Q_Trib_cms
+	!REAL,                   DIMENSION(totLength)                :: Q_GW_cms
+	!REAL,                   DIMENSION(totLength)                :: Q_Trib_cms
 	REAL,                   DIMENSION(totLength)                :: percent_Q_LINK, percent_Q_strTot, percent_Q_Lateral !TLE: temporary to look at flow fractions
 
 	logical :: first_time_step_DT = .true.
@@ -238,6 +242,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
   Q_hyp = 0.
 	s1t = 0.
 	s2t = 0.
+
+	print *, "DTCT = ", DTCT
 
 	! Calculating hyporheic fluxes
 	Do i = 1, totLength
@@ -589,10 +595,10 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!     and does the cms calculation based on the node area for that cell. Node area is the same for
 	!     all grid cells on the NWM grid, but in theory this should handle different sized grid cells
 	!     in the future
-	do i = 1, totLength
-	    Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-      Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_GW(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
-	end do
+	!do i = 1, totLength
+	!    Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_Trib(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+  !    Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i))) = Q_GW(CHANXI(i),CHANYJ(i))  / 1000 * node_area(CH_NETLNK(CHANXI(i),CHANYJ(i)))/DT
+	!end do
 
   ! Calculate net radiation in this time step for all nodes
   Do k = 1 , totLength
@@ -661,7 +667,12 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
+				if (i==3) then
+					T_up = 2.0
+				else
 				  T_up = (T_trib(i)-273.2)
+				end if
+	!	      T_up = 2.0
 					print *, "UP1"
 			else if (N_UPSTR(i) .gt. 1) then
 				  T_up = (branch_sum(i) + T_QSUM_prev(node_order(k-1))) / N_UPSTR(i)
@@ -724,7 +735,12 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
+				if (i==3) then
+					T_up = 2.0
+				else
 				  T_up = (T_trib(i)-273.2)
+				end if 
+					!T_up = 2.0
 			else if (N_UPSTR(i) .gt. 1) then
 				  T_up = (branch_sum(i) + T_w_sim_temp(node_order(k-1))) / N_UPSTR(i)
 					!T_up = (branch1_temp + T_w_sim_temp(node_order(k-1))) / (denom + 1)
@@ -931,18 +947,31 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		!      in the code, so we don't need to subtract it from total Q in the current node.
 		!      Talk to Aubrey about this, but at least temporarily I will make Q_strTot
 		!      unidirectional (into the channel only.)
-		Q_strTot = 0.
-		T_strTot = 0.
-		Do j = 1, totLength
-				if (TO_NODE(j) .eq. i) then
-					  if (Q_str(j) .lt. 0) then
-						    Q_strTmp = Q_strTot + Q_str(j)
-								T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / Q_strTmp
-								Q_strTot = Q_strTmp
-						end if
-			 end if
+!		Q_strTot = 0.
+!		T_strTot = 0.
+!		Do j = 1, totLength
+!				if (TO_NODE(j) .eq. i) then
+!					  if (Q_str(j) .lt. 0) then
+!						    Q_strTmp = Q_strTot + Q_str(j)
+!								T_strTot = ((Q_strTot * T_strTot)+(Q_str(j)*T_w_sim_temp(j))) / Q_strTmp
+!								Q_strTot = Q_strTmp
+!						end if
+!			 end if
+!
+!	 end do
+	  ! TLE: Final round of re-writing (hopefully). We now have an explicit 'inflow from upstream'
+		!      variable courtesy of Aubrey, so no more finageling with negatives. Can also get
+		!      rid of the loops since that is now taken care of in module_channel_routing
+		!      TODO: check in about the backwatering thing
 
-	 end do
+		Q_strTot = Q_str(i)
+		T_strTot = T_upstream(i)
+		print *, "TLE CHECK ON NEW UPSTREAM"
+		print *, "i = ", i
+		print *, "Q_strTot = ", Q_strTot
+		print *, "T_strTot = ", T_strTot
+		!print *, "T_QSUM_local = ", T_QSUM_local(i)
+
 
     !-- to Deg K
 	  T_strTot = T_strTot + 273.2
@@ -960,10 +989,13 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		!            indicate a net flow upstream. So, making a change to the T_QSUM_local calculation. Instead of
 		!            ABS(Q_strTot), we want Q_strTot*-1 to reflect that flow actually IS sometimes upstream, but usually
 		!            downstream.
-	  T_QSUM_local(i) = (((Q_strTot*-1.) * T_strTot) + &
+		!!!TLE: minor rewrite. getting rid of the -1 in the Q_strTot calculation since Q_strTot is now calculated off
+		!       Aubrey's new inflows.
+!		TLateral(3) = 275.0
+	  T_QSUM_local(i) = (((Q_strTot) * T_strTot) + & !(((Q_strTot*-1.) * T_strTot) + &
 		 (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i)) + &
 		 (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
-		 ((Q_strTot*-1.)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+		 ((Q_strTot)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
 
 		!TLE TEMPORARY: calculate the relative contribution of each Q source (percentage of total Q)
@@ -1001,9 +1033,9 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			   print *,"T_w_sim(i,2)=", T_w_sim(i)
 			   print *,"T_QSUM_local(i)", T_QSUM_local(i)
 				 print *,"Q_hyp(i)", Q_hyp(CHANXI(i),CHANYJ(i))
-				 print *,"Q_GW(i)", Q_GW(CHANXI(i),CHANYJ(i))
+	!			 print *,"Q_GW(i)", Q_GW(CHANXI(i),CHANYJ(i))
 				 print *,"Q_GW_cms(i)", Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-				 print *,"Q_trib(i)", Q_trib(CHANXI(i),CHANYJ(i))
+!				 print *,"Q_trib(i)", Q_trib(CHANXI(i),CHANYJ(i))
 				 print *,"Q_Trib_cms(i)", Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 				 print *,"QLateral=", QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))
 				 print *,"TLateral=", TLateral(i)

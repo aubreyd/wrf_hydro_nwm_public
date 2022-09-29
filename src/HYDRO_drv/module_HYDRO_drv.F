@@ -682,6 +682,7 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 #ifdef HYDRO_D
       call system_clock(count=clock_count_2, count_rate=clock_rate)
       timeOr = timeOr     + float(clock_count_2-clock_count_1)/float(clock_rate)
+  !    print *, "timeOr = ", timeOr
 #ifndef NCEP_WCOSS
       write(6,*) "Timing: Overland Routing  accumulated time--", timeOr
 #else

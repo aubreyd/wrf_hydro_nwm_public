@@ -763,6 +763,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
+        
         ! Initialize local channel temperature variables
         ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
         InflowUpstream = 0.0 ! accumulator variable
@@ -1138,8 +1139,6 @@ gwOption:   if(gwBaseSwCRT == 3) then
           !-- compute total flow across face, into node
 #ifdef MPP_LAND
          DO iyw = 1,yw_mpp_nlinks
-           print *, "TLE check"
-           print *, "iyw = ", iyw
          i = nlinks_index(iyw)
 #else
           DO i = 1,NLINKS                                                 !-- inflow to node across each face
@@ -1425,15 +1424,15 @@ gwOption:   if(gwBaseSwCRT == 3) then
           rt_domain(did)%InflowUpstreamTemp = InflowUpstreamTemp  ! average temperature of inflow from upstream reaches (m3/s)
           rt_domain(did)%Outflow = Outflow ! outflow from reach (might be duplicate) (m3/s)
           print *, "calling rivertemp_run"
-          print *, "ADCHECK QSUM", rt_domain(did)%QSUM
-          print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
-          print *, "   X     InflowLand", rt_domain(did)%InflowLand
-          print *, "   X     InflowGw", rt_domain(did)%InflowGw
-          print *, "   -     QLateral", QLateral
-          print *, "        T_QSUM", rt_domain(did)%T_QSUM
-          print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
-          print *, "   -     Outflow", rt_domain(did)%Outflow
-          print *, "   -     QLINK", QLINK(:,1)
+!          print *, "ADCHECK QSUM", rt_domain(did)%QSUM
+!          print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
+!          print *, "   X     InflowLand", rt_domain(did)%InflowLand
+!          print *, "   X     InflowGw", rt_domain(did)%InflowGw
+!          print *, "   -     QLateral", QLateral
+!          print *, "        T_QSUM", rt_domain(did)%T_QSUM
+!          print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
+!          print *, "   -     Outflow", rt_domain(did)%Outflow
+!          print *, "   -     QLINK", QLINK(:,1)
           call riverTempRuns%riverTemp_run(did)
 
           end do crnt   !--- DTCT timestep of DT_STEPS
