@@ -490,6 +490,7 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     REAL, INTENT(IN), DIMENSION(XX,YY,8) :: SO8RT
     REAL*8, DIMENSION(XX,YY) :: QBDRY_tmp, DH
     REAL*8, DIMENSION(XX,YY) :: DH_tmp
+    REAL, DIMENSION(XX,YY) :: edge_adjust ! mm
 
     !!! Declare Local Variables
 
@@ -675,7 +676,8 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
 #endif
 
 !!! Scrape the outermost edges
-do j=1,YY
+edge_adjust = 0.0
+do j=1,YY,YY-1
    do i=1,XX
 #ifdef MPP_LAND
       if( ((i.eq.XX).and.(right_id .lt. 0)) .or. &
@@ -687,34 +689,51 @@ do j=1,YY
                .or.(j.eq.YY )) then
 #endif
               if (h(i,j) .GT. retent_dep(i,j)) then
-                 QBDRY_tmp(i,j) = QBDRY_tmp(i,j) - (h(i,j) - retent_dep(i,j)) ! increase negative mm
-                 DH_tmp(i,j) = DH_tmp(i,j) - (h(i,j) - retent_dep(i,j)) ! decrease positive mm
+                 edge_adjust(i,j) = h(i,j) - retent_dep(i,j) ! positive mm
               end if
 
 #ifdef HYDRO_D
               if ( i .eq. iprint .and. j .eq. jprint) then
-                 print *, "ADCHECK8 QBDRY_tmp QBDRYT", QBDRY_tmp(I,J), QBDRYT
-                 print *, "ADCHECK8 DH_tmp", DH_tmp(I,J)
+                 print *, "ADCHECK8 retent_depth h", retent_dep(i,j), h(i,j)
+                 print *, "ADCHECK8 edge_adjust", edge_adjust(i,j)
               endif
 #endif
           end if
    end do
 end do
 
+do i=1,XX,XX-1
+   do j=1,YY
+#ifdef MPP_LAND
+      if( ((i.eq.XX).and.(right_id .lt. 0)) .or. &
+          ((i.eq.1) .and.(left_id  .lt. 0)) .or. &
+          ((j.eq.1) .and.(down_id  .lt. 0)) .or. &
+          ((j.eq.YY).and.(up_id    .lt. 0)) ) then
+#else
+          if ((i.eq.XX).or.(i.eq.1).or.(j.eq.1)   &
+               .or.(j.eq.YY )) then
+#endif
+              if (h(i,j) .GT. retent_dep(i,j)) then
+                 edge_adjust(i,j) = h(i,j) - retent_dep(i,j) ! positive mm
+              end if
+
+#ifdef HYDRO_D
+              if ( i .eq. iprint .and. j .eq. jprint) then
+                 print *, "ADCHECK8 retent_depth h", retent_dep(i,j), h(i,j)
+                 print *, "ADCHECK8 edge_adjust", edge_adjust(i,j)
+              endif
+#endif
+          end if
+   end do
+end do
+
+
 #ifdef MPP_LAND
     ! use double precision to solve the underflow problem.
-    call MPP_LAND_COM_REAL8(DH_tmp,XX,YY,1)
-    call MPP_LAND_COM_REAL8(QBDRY_tmp,XX,YY,1)
+    call MPP_LAND_COM_REAL(edge_adjust,XX,YY,99)
 #endif
-    QBDRY = QBDRY + QBDRY_tmp
-    DH = DH+DH_tmp
-
-#ifdef MPP_LAND
-    call MPP_LAND_COM_REAL8(DH,XX,YY,99)
-    call MPP_LAND_COM_REAL(QBDRY,XX,YY,99)
-#endif
-
-    H = H + DH
+    QBDRY = QBDRY - edge_adjust ! making this negative term more negative
+    H = H - edge_adjust ! making this positive term less positive
 !!! End outermost edge scrape
 
 #ifdef HYDRO_D
