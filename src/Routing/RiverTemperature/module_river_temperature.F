@@ -51,7 +51,7 @@ contains
 !            Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, T_QSUM)
 
 
-subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev)
+subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev, water_temp_counter)
 
 	implicit none
 	class(river_temperature_type), INTENT(inout)       :: this              ! the type object being initialize
@@ -59,6 +59,7 @@ subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev
 				REAL, INTENT(inout), DIMENSION(:)             :: T_QSUM_prev
 				REAL, INTENT(inout), DIMENSION(:)             :: NetRad
 				REAL, INTENT(inout), DIMENSION(:)             :: NetRad_prev
+				INTEGER, INTENT(inout)                        :: water_temp_counter
 
 end subroutine river_temperature_init
 ! --------------------------------------------------------------------------
@@ -132,7 +133,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	      T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
 				V_w, W_w, Q_str, Q_GW_cms, Q_Trib_cms, T_GW, T_hyp, T_Trib, T_upstream, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
-				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, totLength)
+				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, water_temp_counter, totLength)
 
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
@@ -215,6 +216,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_prev  ! from previous timestep
 	REAL,    INTENT(INOUT), DIMENSION(totLength)          :: NetRad, NetRad_prev	! Net heat flux from 5 sources (W/m2)
+	INTEGER, INTENT(INOUT)                                :: water_temp_counter   !!!TLE: counter to keep track of how many routing time steps have elapsed
 	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
 	INTEGER,                DIMENSION(totLength)          :: FROM_NODE, N_UPSTR, node_order, node_headwater, node_branch
 	INTEGER                                               :: neighbours, i, j, k, loop_break, c_index
@@ -667,11 +669,11 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
-				if (i==3) then
-					T_up = 2.0
-				else
+	!			if (i==3) then
+	!				T_up = 2.0
+	!			else
 				  T_up = (T_trib(i)-273.2)
-				end if
+	!			end if
 	!	      T_up = 2.0
 					print *, "UP1"
 			else if (N_UPSTR(i) .gt. 1) then
@@ -735,11 +737,11 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 			!set up and downstream T's
 			if (N_UPSTR(i) .eq. 0) then
-				if (i==3) then
-					T_up = 2.0
-				else
+	!			if (i==3) then
+	!				T_up = 2.0
+	!			else
 				  T_up = (T_trib(i)-273.2)
-				end if 
+	!			end if
 					!T_up = 2.0
 			else if (N_UPSTR(i) .gt. 1) then
 				  T_up = (branch_sum(i) + T_w_sim_temp(node_order(k-1))) / N_UPSTR(i)
@@ -871,17 +873,26 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 !		 T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = FluxTemp + 273.2
   Do i = 1,totLength
 
+
 	   !-- getting a weighted average
 	   if (CH_NETLNK(CHANXI(i),CHANYJ(i)) .gt. 0) then
 		     if ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_hyp(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
 		         TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.
 		     else
 		         !-- in Deg K
-		         TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_Trib(i)) + &
+						 if ((water_temp_counter .gt. 250) .and. (water_temp_counter .lt. 350)) then
+							 if (N_UPSTR(i) .eq. 0) then
+								 print *, "cold pulse"
+							 	 TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 280.0
+							 end if
+						 else
+		           TLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ((Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_Trib(i)) + &
                                                             (Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))*T_GW(i)) + &
 							    (Q_hyp(CHANXI(i),CHANYJ(i))*T_hyp(i))) / &
 							    (Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))+ &
 							    Q_hyp(CHANXI(i),CHANYJ(i)))
+						 end if
+
 		     end if
 
 				 !-- For now, I realized that we're dealing with 4 different discharge values: QSUM, QINFLOWBASE, QSTORMVOLRT, QLINK
@@ -1084,7 +1095,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!increment stuff
 	NetRad_prev = NetRad
 	T_QSUM_prev = T_QSUM_local
-
+	water_temp_counter = water_temp_counter + 1
+	print *, "water_temp_counter = ", water_temp_counter
   first_time_step_DTCT = .false.
 
     !-- Updating the T_w_sim for the next timestep

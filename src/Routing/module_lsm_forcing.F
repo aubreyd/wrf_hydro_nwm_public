@@ -1083,13 +1083,22 @@ end subroutine weather_2D_inputs_destroy
 !       PRCP1 = 0.
 !       PRCP1 =10./3600.0      !units mm/s
 ! Other Met. Vars...
-       T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-       Q2X = 0.01
-       U = 1.0
-       V = 1.0
-       PRES = 100000.0
-       XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+      !!!TLE: this is for hourly
+!       T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!       Q2X = 0.01
+!       U = 1.0
+!       V = 1.0
+!       PRES = 100000.0
+!       XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+       !!!TLE: change this version for a different model time step
+        T2=290.0 + 3.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
+        Q2X = 0.01
+        U = 1.0
+        V = 1.0
+        PRES = 100000.0
+        XLONG=400.0 + 25.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
+        SHORT=450.0 + 450.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
 !       SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
 !      print *, "PCP", PRCP1
 
@@ -2455,28 +2464,37 @@ if(FORC_TYP.eq.4) then
    ! assumes K=1 is 12z (Ks or ~ sunrise)
    ! First Precip...
    !       IF (K.GE.1 .and. K.LE.2) THEN
-!   if (K.eq.1) then
-!      PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
-!   elseif (K.gt.1) then
-!      PRCP1 = 0.
-!   end if
+   if (K.eq.1) then
+      PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
+   elseif (K.gt.1) then
+      PRCP1 = 0.
+   end if
 
   ! if (K.le.20) then
-      PRCP1 =10/3600.0
+  !    PRCP1 =10/3600.0
    !elseif (K.gt.1) then
   !    PRCP1 = 0.
   ! end if
 
    ! Other Met. Vars...
-   T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-   Q2X = 0.01
-   U = 1.0
-   V = 1.0
-   PRES = 100000.0
-   XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!   T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!   Q2X = 0.01
+!   U = 1.0
+!   V = 1.0
+!   PRES = 100000.0
+!   XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+!   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
 !  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0)) !TLE
 !  SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)))                     !TLE
+!!!TLE: change this version for a different model time step
+    T2=290.0 + 3.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
+    Q2X = 0.01
+    U = 1.0
+    V = 1.0
+    PRES = 100000.0
+    XLONG=400.0 + 25.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
+    SHORT=450.0 + 450.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
+
 end if
 
 
