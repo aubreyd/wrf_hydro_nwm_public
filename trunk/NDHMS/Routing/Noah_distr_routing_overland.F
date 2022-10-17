@@ -693,10 +693,12 @@ do j=1,YY,YY-1
               end if
 
 #ifdef HYDRO_D
-              if ( i .eq. iprint .and. j .eq. jprint) then
-                 print *, "ADCHECK8 retent_depth h", retent_dep(i,j), h(i,j)
-                 print *, "ADCHECK8 edge_adjust", edge_adjust(i,j)
-              endif
+              !if ( i .eq. iprint .and. j .eq. jprint) then
+                 print *, "ADCHECK8a i j", i, j
+!                 print *, "ADCHECK8a r l d u", right_id, left_id, down_id, up_id
+!                 print *, "ADCHECK8a retent_depth h", retent_dep(i,j), h(i,j)
+!                 print *, "ADCHECK8a edge_adjust", edge_adjust(i,j)
+              !endif
 #endif
           end if
    end do
@@ -718,10 +720,12 @@ do i=1,XX,XX-1
               end if
 
 #ifdef HYDRO_D
-              if ( i .eq. iprint .and. j .eq. jprint) then
-                 print *, "ADCHECK8 retent_depth h", retent_dep(i,j), h(i,j)
-                 print *, "ADCHECK8 edge_adjust", edge_adjust(i,j)
-              endif
+              !if ( i .eq. iprint .and. j .eq. jprint) then
+                 print *, "ADCHECK8b i j", i, j
+!                 print *, "ADCHECK8b r l d u", right_id, left_id, down_id, up_id
+!                 print *, "ADCHECK8b retent_depth h", retent_dep(i,j), h(i,j)
+!                 print *, "ADCHECK8b edge_adjust", edge_adjust(i,j)
+              !endif
 #endif
           end if
    end do
