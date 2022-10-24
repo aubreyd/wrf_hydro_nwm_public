@@ -256,11 +256,6 @@ subroutine ov_rtng( &
     REAL	:: DT_FRAC,SUM_INFXS,sum_head
     !INTEGER SO8RT_D(IXRT,JXRT,3), rt_option
 
-    INTEGER :: iprint, jprint
-
-    iprint = 10
-    jprint = 56
-
     !DJG ----------------------------------------------------------------------
     ! DJG BEGIN 1-D or 2-D OVERLAND FLOW ROUTING LOOP
     !DJG ---------------------------------------------------------------------
@@ -282,11 +277,6 @@ subroutine ov_rtng( &
 
     !DJG Assign all infiltration excess to surface head...
     ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
-
-#ifdef HYDRO_D
-    print *, "ADCHECK_pre1 swhr", ovrt_data%control%surface_water_head_routing(iprint, jprint)
-    print *, "ADCHECK_pre1 swhr_up", ovrt_data%control%surface_water_head_routing(iprint, jprint-1)
-#endif
 
     !DJG Divide infiltration excess over all routing time-steps
     !	     INFXS_FRAC=INFXSUBRT/(DT/DTRT_TER)
@@ -353,11 +343,6 @@ subroutine ov_rtng( &
                         !  endif
 
                         ovrt_data%control%surface_water_head_routing(I,J) = ovrt_data%properties%retention_depth(I,J)
-#ifdef HYDRO_D
-                        if (i .eq. iprint .and. j .eq. jprint) then
-                          print *, "ADCHECK_pre_chan swhr", ovrt_data%control%surface_water_head_routing(I,J)
-                        endif
-#endif
                     END IF
                 END IF
 
@@ -371,11 +356,6 @@ subroutine ov_rtng( &
                         ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) = ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) + &
                             (ovrt_data%control%surface_water_head_routing(I,J)- ovrt_data%properties%retention_depth(I,J))
                         ovrt_data%control%surface_water_head_routing(I,J) = ovrt_data%properties%retention_depth(I,J)
-#ifdef HYDRO_D
-                        if (i .eq. iprint .and. j .eq. jprint) then
-                          print *, "ADCHECK_pre_lake swhr", ovrt_data%control%surface_water_head_routing(I,J)
-                        endif
-#endif
                     END IF
                 END IF
 
@@ -503,7 +483,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     REAL IXX8,IYY8
     INTEGER  IXX0,JYY0,index, SO8RT_D(XX,YY,3)
     REAL :: tmp_gsize, hsum, tmp_gsize_arr(9)
-    INTEGER :: iprint, jprint
 
     !!! Initialize variables
 
@@ -515,22 +494,9 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     DH_tmp=0.
     QBDRY_tmp =0.
 
-    iprint = 10
-    jprint = 56
-
-#ifdef HYDRO_D
-    print *, "ADCHECK1 h qsfc ", h(iprint,jprint), qsfc(iprint,jprint)
-    print *, "ADCHECK1 sox soy ", sox(iprint,jprint), soy(iprint,jprint)
-    print *, "ADCHECK1 retent_dep dist_rough ", retent_dep(iprint,jprint), dist_rough(iprint,jprint)
-    print *, "ADCHECK1 QBDRY ", QBDRY(iprint,jprint)
-    print *, "ADCHECK1 q_sfcflx_x q_sfcflx_y ", q_sfcflx_x(iprint,jprint), q_sfcflx_y(iprint,jprint)
-#endif
-
     !!! Loop to route water
     do j=2,YY-1
         do i=2,XX-1
-!    do j=1,YY
-!        do i=1,XX
             if (h(I,J).GT.retent_dep(I,J)) then
                 IXX0 = SO8RT_D(i,j,1)
                 JYY0 = SO8RT_D(i,j,2)
@@ -542,12 +508,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     tmp_gsize_arr = gsize(i,j,:)
                     call GETMAX8DIR(IXX0,JYY0,I,J,H,RETENT_DEP,so8rt,tmp_gsize_arr,sfx,XX,YY)
                 end if
-#ifdef HYDRO_D
-                if ( i .eq. iprint .and. j .eq. jprint) then
-                  print *, "ADCHECK2 IXX0 JYY0 ", IXX0, JYY0
-                  print *, "ADCHECK2 sfx hmax ", sfx, hmax
-                endif
-#endif
                 if(IXX0 > 0) then  ! do the rest if the lowest grid can be found.
                     if(sfx .lt. 1E-20) then
 #ifdef HYDRO_D
@@ -565,12 +525,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     ! Calculate q-flux...
                     qqsfc = alfax*hh53*dt * tmp_gsize
 
-#ifdef HYDRO_D
-                    if ( i .eq. iprint .and. j .eq. jprint) then
-                      print *, "ADCHECK3 alfax hh ", alfax, hh
-                      print *, "ADCHECK3 hh53, qqsfc ", hh53, qqsfc
-                    endif
-#endif
                     !Courant check (simple mass limit on overland flow)...
                     if (qqsfc.ge.(hmax*dt*tmp_gsize)) qqsfc = hmax*dt*tmp_gsize
 
@@ -599,12 +553,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     !yw changed as following:
                     tmp_adjust=qqsfc*1000
 
-#ifdef HYDRO_D
-                    if ( i .eq. iprint .and. j .eq. jprint) then
-                      print *, "ADCHECK4 q_sfcflx_x q_sfcflx_y ", q_sfcflx_x(i,j), q_sfcflx_y(i,j)
-                      print *, "ADCHECK4 tmp_adjust ", tmp_adjust
-                    endif
-#endif
                     if((h(i,j) - tmp_adjust) <0 )  then
 #ifdef HYDRO_D
                         print*, "Error Warning: surface head is negative:  ",i,j,ixx0,jyy0, &
@@ -615,12 +563,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                     DH(i,j) = DH(i,j)-tmp_adjust
                     DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
                     !yw end change
-
-#ifdef HYDRO_D
-                    if ( i .eq. iprint .and. j .eq. jprint) then
-                      print *, "ADCHECK5 DH DH_tmp ", DH(i,j), DH_tmp(ixx0,jyy0)
-                    endif
-#endif
 
                     !DG Boundary adjustments here
                     !DG Constant Flux Condition
@@ -638,13 +580,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                             QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
                             QBDRYT=QBDRYT - qqsfc
                             DH_tmp(IXX0,JYY0)= DH_tmp(IXX0,JYY0)-tmp_adjust
-
-#ifdef HYDRO_D
-                            if ( i .eq. iprint .and. j .eq. jprint) then
-                              print *, "ADCHECK6a QBDRY_tmp QBDRYT", QBDRY_tmp(IXX0,JYY0), QBDRYT
-                              print *, "ADCHECK6a DH_tmp", DH_tmp(IXX0,JYY0)
-                            endif
-#endif
 
                         end if
                     end if
@@ -670,11 +605,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
 
     H = H + DH
 
-#ifdef HYDRO_D
-    print *, "ADCHECK7 QBDRY DH", QBDRY(iprint,jprint), DH(iprint,jprint)
-    print *, "ADCHECK7 H ", H(iprint,jprint)
-#endif
-
 !!! Scrape the outermost edges
 edge_adjust = 0.0
 do j=1,YY,YY-1
@@ -692,14 +622,6 @@ do j=1,YY,YY-1
                  edge_adjust(i,j) = h(i,j) - retent_dep(i,j) ! positive mm
               end if
 
-#ifdef HYDRO_D
-              !if ( i .eq. iprint .and. j .eq. jprint) then
-                 print *, "ADCHECK8a i j", i, j
-!                 print *, "ADCHECK8a r l d u", right_id, left_id, down_id, up_id
-!                 print *, "ADCHECK8a retent_depth h", retent_dep(i,j), h(i,j)
-!                 print *, "ADCHECK8a edge_adjust", edge_adjust(i,j)
-              !endif
-#endif
           end if
    end do
 end do
@@ -719,14 +641,6 @@ do i=1,XX,XX-1
                  edge_adjust(i,j) = h(i,j) - retent_dep(i,j) ! positive mm
               end if
 
-#ifdef HYDRO_D
-              !if ( i .eq. iprint .and. j .eq. jprint) then
-                 print *, "ADCHECK8b i j", i, j
-!                 print *, "ADCHECK8b r l d u", right_id, left_id, down_id, up_id
-!                 print *, "ADCHECK8b retent_depth h", retent_dep(i,j), h(i,j)
-!                 print *, "ADCHECK8b edge_adjust", edge_adjust(i,j)
-              !endif
-#endif
           end if
    end do
 end do
@@ -739,11 +653,6 @@ end do
     QBDRY = QBDRY - edge_adjust ! making this negative term more negative
     H = H - edge_adjust ! making this positive term less positive
 !!! End outermost edge scrape
-
-#ifdef HYDRO_D
-    print *, "ADCHECK9 QBDRY DH", QBDRY(iprint,jprint), DH(iprint,jprint)
-    print *, "ADCHECK9 H ", H(iprint,jprint)
-#endif
 
     return
 

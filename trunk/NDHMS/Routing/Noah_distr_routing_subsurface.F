@@ -156,11 +156,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     real   :: sumqsubrt1, sumqsubrt2
 #endif
 
-    integer :: iprint, jprint
-
-    iprint = 10
-    jprint = 56
-
     !DJG -----------------------------------------------------------------
     !DJG  SUBSURFACE ROUTING LOOP
     !DJG    - SUBSURFACE ROUTING RUN ON NOAH TIMESTEP
@@ -268,11 +263,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     write(6,*) "finish calling ROUTE_SUBSURFACE ", subrt_static%rt_option
 #endif
 
-#ifdef HYDRO_D
-    print *, "ADCHECK_sub1 infil_excess", subrt_input%infiltration_excess(iprint,jprint)
-    print *, "ADCHECK_sub1 infil_excess_up", subrt_input%infiltration_excess(iprint, jprint-1)
-    print *, "ADCHECK_sub1 ixrt jxrt", subrt_static%IXRT, subrt_static%JXRT
-#endif
 
     !!!! Update soil moisture fields with subsurface flow...
 
@@ -394,11 +384,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
         END DO        ! END DO X dim
     END DO          ! END DO Y dim
     !!!! End loop through subsurface routing domain...
-
-#ifdef HYDRO_D
-    print *, "ADCHECK_sub2 infil_excess", subrt_input%infiltration_excess(iprint,jprint)
-    print *, "ADCHECK_sub2 infil_excess_up", subrt_input%infiltration_excess(iprint, jprint-1)
-#endif
 
 #ifdef MPP_LAND
     do i = 1, subrt_static%nsoil

@@ -1009,10 +1009,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real    :: suminfxs1,suminfxsrt2 ! total infiltration excess, start and finish
 #endif
 
-   integer :: iprint, jprint
-   iprint = 10
-   jprint = 56
-
    ! Initialize variables
    SICE = SMC - SH2OX
    SMCREFRT = 0.0
@@ -1052,10 +1048,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    sicetot1 = sicetot1/float(numprocs)
 #endif
    ! END Initial water balance variables
-#endif
-
-#ifdef HYDRO_D
-   print *, "ADCHECK_disag1 infil_excess", INFXSUBRT(iprint,jprint)
 #endif
 
    !DJG Weighting alg. alteration...(prescribe wghts if time = 1)
@@ -1215,10 +1207,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
       end do ! end coarse grid i loop
    end do ! end coarse fine grid j loop
-
-#ifdef HYDRO_D
-   print *, "ADCHECK_disag2 infil_excess", INFXSUBRT(iprint,jprint)
-#endif
 
    ! AD: Add new zeroing out of -9999 elevation cells which are ocean
    where (ELRT .lt. -9998)
