@@ -1929,7 +1929,7 @@ end subroutine land_driver_ini
            ! lake_precip units converted from mm/s to m
            ! lake_evap units converted from kg/m2/s to m
            ! dtbl is time step in seconds
-           lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600.)*dtbl/3600./1000.
+	   lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600.)*dtbl/3600./1000./lake_grids(ilake)
            where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
          end do
 
