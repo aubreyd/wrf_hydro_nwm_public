@@ -2384,6 +2384,9 @@ end if
 !!!DJG HRLDAS Forcing with minute format filename (NOTE: precip must be in mm/s!!!)
 if(FORC_TYP.eq.2) then
 
+#ifdef HYDRO_D
+  print *, "HYDRO DEBUG TEST TLE"
+#endif 
 !!Create forcing data filename...
    call geth_newdate(out_date,olddate,nint(dt))
    inflnm = trim(indir)//"/"//&

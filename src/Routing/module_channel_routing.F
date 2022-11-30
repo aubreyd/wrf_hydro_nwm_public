@@ -763,7 +763,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
-        
+
         ! Initialize local channel temperature variables
         ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
         InflowUpstream = 0.0 ! accumulator variable
