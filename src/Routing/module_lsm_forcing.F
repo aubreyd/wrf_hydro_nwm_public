@@ -1067,7 +1067,6 @@ end subroutine weather_2D_inputs_destroy
 
 !!!DJG CONSTant, idealized forcing...
      if(FORC_TYP.eq.4) then
-       print *, "TLE test"
 ! Impose a fixed diurnal cycle...
 ! assumes model timestep is 1 hr
 ! assumes K=1 is 12z (Ks or ~ sunrise)
@@ -1808,7 +1807,6 @@ end subroutine weather_2D_inputs_destroy
              g_SHORT,g_PRCP1,g_PRES,g_lai,g_snodep,g_prcp_old, g_fpar
    integer flag
 
-   print *, "TLE CHECK"
 
      call write_io_real(T2,g_T2)
      call write_io_real(Q2X,g_Q2X)
@@ -2386,7 +2384,7 @@ if(FORC_TYP.eq.2) then
 
 #ifdef HYDRO_D
   print *, "HYDRO DEBUG TEST TLE"
-#endif 
+#endif
 !!Create forcing data filename...
    call geth_newdate(out_date,olddate,nint(dt))
    inflnm = trim(indir)//"/"//&
@@ -2476,8 +2474,6 @@ if(FORC_TYP.eq.4) then
   ! end if
   !!! TLE edit: changed everything to automatically vary based on time step
   !!!           (default is hourly (3600s))
-  print *, "lsm dt = ", lsm_dt
-  print *, "forcing check: ",  (24.0*(3600.0/lsm_dt))
   ! if (K.le.20) then
   !    PRCP1 =10/3600.0
       PRCP1 = 10/DT

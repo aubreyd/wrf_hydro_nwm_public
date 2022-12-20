@@ -10,7 +10,7 @@ OBJS := weather_disaggrgate.o module_river_temperature.o
 CPPHRLDAS = -D_HRLDAS_OFFLINE_
 
 %.o : %.F
-	$(COMPILER90) $(F90FLAGS) $(LDFLAGS) $(MODFLAG) -I$(NETCDFINC) $<
+	$(COMPILER90) $(F90FLAGS) $(LDFLAGS) $(CPPFLAGS) $(MODFLAG) -I$(NETCDFINC) $<
 
 .PHONY: all mod test
 

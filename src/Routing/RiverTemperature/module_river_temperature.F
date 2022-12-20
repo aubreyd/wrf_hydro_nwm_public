@@ -245,6 +245,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	s1t = 0.
 	s2t = 0.
 
+
 	!print *, "DTCT = ", DTCT
 
 	! Calculating hyporheic fluxes
@@ -353,8 +354,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			end DO
 
 #ifdef HYDRO_D
-			print *, "node_branch = ", node_branch
-			print *, "node_headwater = ", node_headwater
+	print *, "node_branch = ", node_branch
+	print *, "node_headwater = ", node_headwater
 #endif
 
 			!construct the up->downstream node order

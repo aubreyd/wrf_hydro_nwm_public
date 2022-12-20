@@ -180,7 +180,6 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
 			end do
 		end do
 
-
 		DO i = 1,NLINKS
 
 			if((CH_NETRT(CHANXI(i), CHANYJ(i) ) .eq. 0) .and. &
