@@ -5,6 +5,7 @@ module module_rt_inc
    use module_subsurface_input
    use module_subsurface_output
    use module_reservoir, only: reservoir_container
+   use module_river_temperature, only:river_temperature_type
    use iso_fortran_env, only: int64
    implicit none
 

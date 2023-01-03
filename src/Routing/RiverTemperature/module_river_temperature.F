@@ -16,11 +16,12 @@
 MODULE module_river_temperature
 
 
-	!use module_channel_routing, only: temperature_sim_H_inputs
-	!use disaggregateWeatherModule,  only: fineWeatherData
-	!use module_RT_data, only: rt_domain
-	!use config_base, only: nlst
-	IMPLICIT NONE
+!use module_channel_routing, only: temperature_sim_H_inputs
+!use disaggregateWeatherModule,  only: fineWeatherData
+!use module_RT_data, only: rt_domain
+!use config_base, only: nlst
+use iso_fortran_env, only: int64
+IMPLICIT NONE
 
 
 type  :: river_temperature_type
@@ -206,12 +207,12 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!REAL, INTENT(IN), DIMENSION(totLength)	  :: Z			                    ! Side slope (fraction)
 	REAL,                   DIMENSION(totLength)          :: TLateral
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: CHANXI, CHANYJ
-	INTEGER, INTENT(IN),    DIMENSION(:,:)                :: CH_NETLNK
+	INTEGER(kind=int64), INTENT(IN),    DIMENSION(:,:)    :: CH_NETLNK
         INTEGER, INTENT(IN),    DIMENSION(:,:)                :: CH_NETRT
 	REAL,                   DIMENSION(totLength)          :: QLateral
 	REAL,    INTENT(IN),    DIMENSION(totLength,2)        :: QLINK
 	REAL,    INTENT(in),    DIMENSION(:)                   :: node_area
-	INTEGER, INTENT(in),    DIMENSION(:)                  :: TO_NODE
+	INTEGER(kind=int64), INTENT(in),    DIMENSION(:)      :: TO_NODE
 	INTEGER, INTENT(IN),    DIMENSION(:)                  :: TYPEL
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_prev  ! from previous timestep
