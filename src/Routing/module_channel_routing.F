@@ -631,12 +631,12 @@ END SUBROUTINE SUBMUSKINGCUNGE
 #endif
        , CH_LNKRT_SL &
        ,gwBaseSwCRT, gwHead, qgw_chanrt, gwChanCondSw, gwChanCondConstIn, &
-       gwChanCondConstOut, velocity, qloss, XS_Peremeter)
+       gwChanCondConstOut, velocity, qloss, XS_Peremeter, water_temperature_option)
 
        IMPLICIT NONE
 
         ! -------- DECLARATIONS ------------------------
-        INTEGER, INTENT(IN) :: did, IXRT,JXRT,channel_option
+        INTEGER, INTENT(IN) :: did, IXRT,JXRT,channel_option, water_temperature_option
         INTEGER, INTENT(IN) :: NLINKS,NLAKES, NLINKSL
         integer, INTENT(INOUT) :: KT   ! flag of cold start (1) or continue run.
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSUBRT
@@ -1423,17 +1423,19 @@ gwOption:   if(gwBaseSwCRT == 3) then
           rt_domain(did)%InflowGw = InflowGw  ! inflow from groundwater (might be duplicate) (m3/s)
           rt_domain(did)%InflowUpstreamTemp = InflowUpstreamTemp  ! average temperature of inflow from upstream reaches (m3/s)
           rt_domain(did)%Outflow = Outflow ! outflow from reach (might be duplicate) (m3/s)
-          print *, "calling rivertemp_run"
-!          print *, "ADCHECK QSUM", rt_domain(did)%QSUM
-!          print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
-!          print *, "   X     InflowLand", rt_domain(did)%InflowLand
-!          print *, "   X     InflowGw", rt_domain(did)%InflowGw
-!          print *, "   -     QLateral", QLateral
-!          print *, "        T_QSUM", rt_domain(did)%T_QSUM
-!          print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
-!          print *, "   -     Outflow", rt_domain(did)%Outflow
-!          print *, "   -     QLINK", QLINK(:,1)
-          call riverTempRuns%riverTemp_run(did)
+          if (water_temperature_option .eq. 1) then
+            print *, "calling rivertemp_run"
+!           print *, "ADCHECK QSUM", rt_domain(did)%QSUM
+!           print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
+!           print *, "   X     InflowLand", rt_domain(did)%InflowLand
+!           print *, "   X     InflowGw", rt_domain(did)%InflowGw
+!           print *, "   -     QLateral", QLateral
+!           print *, "        T_QSUM", rt_domain(did)%T_QSUM
+!           print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
+!           print *, "   -     Outflow", rt_domain(did)%Outflow
+!           print *, "   -     QLINK", QLINK(:,1)
+           call riverTempRuns%riverTemp_run(did)
+          endif
 
           end do crnt   !--- DTCT timestep of DT_STEPS
 

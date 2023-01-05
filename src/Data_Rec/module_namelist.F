@@ -44,7 +44,7 @@ contains
                     GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                     sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
                     gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj
+                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, water_temperature
           real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
           character(len=256) :: route_topo_f=""
           character(len=256) :: route_chan_f=""
@@ -136,7 +136,7 @@ contains
                     CHRTOUT_DOMAIN,CHANOBS_DOMAIN,CHRTOUT_GRID,LSMOUT_DOMAIN,&
                     RTOUT_DOMAIN, output_gw, outlake, &
                     frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
-                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj
+                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, water_temperature
 
 #ifdef WRF_HYDRO_NUDGING
    namelist /NUDGING_nlist/ nudgingParamFile,       netwkReExFile,          &
@@ -172,6 +172,7 @@ contains
    reservoir_rfc_forecasts_lookback_hours = 24
    reservoir_type_specified = .FALSE.
    imperv_adj = 0
+   water_temperature = 0
 
 #ifdef WRF_HYDRO_NUDGING
    ! Default values for NUDGING_nlist
@@ -359,6 +360,7 @@ contains
   call mpp_land_bcast_int1(UDMP_OPT)
   call mpp_land_bcast_int1(reservoir_data_ingest)
   call mpp_land_bcast_int1(imperv_adj)
+  call mpp_land_bcast_int1(water_temperature)
 #ifdef WRF_HYDRO_NUDGING
   call mpp_land_bcast_char(256, nudgingParamFile  )
   call mpp_land_bcast_char(256, netwkReExFile     )
@@ -451,6 +453,7 @@ contains
     nlst%order_to_write = order_to_write
     nlst%compound_channel = compound_channel
     nlst%imperv_adj = imperv_adj
+    nlst%water_temperature = water_temperature
 
 ! files
     nlst%route_topo_f   =  route_topo_f
@@ -535,6 +538,7 @@ contains
     write(6,*) " nlst%geo_finegrid_flnm ",  geo_finegrid_flnm
     write(6,*) " nlst%reservoir_data_ingest ", reservoir_data_ingest
     write(6,*) " nlst%imperv_adj ", imperv_adj
+    write(6,*) " nlst%water_temperature ", water_temperature
 #ifdef WRF_HYDRO_NUDGING
     write(6,*) " nlst%nudgingParamFile      ",  trim(nudgingParamFile)
     write(6,*) " nlst%netWkReExFile         ",  trim(netWkReExFile)
@@ -788,6 +792,9 @@ subroutine rt_nlst_check(nlst)
    endif
    if( (nlst%imperv_adj .lt. 0 ) .or. (nlst%imperv_adj .gt. 1) ) then
       call hydro_stop('hydro.namelist ERROR: Invalid imperv_adj specified')
+   endif
+   if( (nlst%water_temperature .lt. 0 ) .or. (nlst%water_temperature .gt. 1) ) then
+      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified')
    endif
    ! Only allow lakes to be ran with gridded routing or NWM routing
    if(len(trim(nlst%route_lake_f)) .ne. 0) then

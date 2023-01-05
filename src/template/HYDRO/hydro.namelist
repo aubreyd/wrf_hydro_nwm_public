@@ -212,6 +212,9 @@ UDMP_OPT = 0
 ! If on, specify the user-defined mapping file (e.g.: "spatialweights.nc")
 !udmap_file = "./DOMAIN/spatialweights.nc"
 
+! Activate water temperature module? 0=no (default), 1=yes
+water_temperature = 0
+
 /
 
 &NUDGING_nlist
