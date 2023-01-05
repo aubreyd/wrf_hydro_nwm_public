@@ -289,6 +289,8 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: NetRad
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
    REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
+   INTEGER, allocatable, DIMENSION(:)   :: node_order
+   INTEGER, allocatable, DIMENSION(:)   :: N_UPSTR
    INTEGER, allocatable                 :: water_temp_counter
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
    REAL,    allocatable, DIMENSION(:)   :: InflowLand
