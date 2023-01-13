@@ -436,10 +436,14 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       !set water temperature equal to ground temperature (unless frozen ground)
       if (y_w(i) .le. 0.02) then
         if ((T_Trib(i)-273.2) .gt. 0) then
+#ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; t_water = t_ground = ", (T_Trib(i)-273.2)
+#endif
           T_w_sim_temp(i) = (T_Trib(i)-273.2)
         else
+#ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; frozen ground; t_water = 0"
+#endif
           T_w_sim_temp(i) = 0.
         end if
 
@@ -542,10 +546,14 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       !low flow check
       if (y_w(i) .le. 0.02) then
         if ((T_Trib(i)-273.2) .gt. 0) then
+#ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; t_water = t_ground = ", (T_Trib(i)-273.2)
+#endif
           T_w_sim_temp(i) = (T_Trib(i)-273.2)
         else
+#ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; frozen ground; t_water = 0"
+#endif
           T_w_sim_temp(i) = 0.
         end if
       else
