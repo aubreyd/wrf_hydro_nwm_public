@@ -110,7 +110,6 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  ISURBAN   ! land cover category for urban
   INTEGER                                 ::  ISLAKE    ! land cover category for lake
   INTEGER                                 ::  ISWATER   ! land cover category for water
-  INTEGER                                 ::  ISLAKE    ! land cover category for lake
   INTEGER                                 ::  IDVEG     ! dynamic vegetation (1 -> off ; 2 -> on) with opt_crs = 1   
   INTEGER                                 ::  IOPT_CRS  ! canopy stomatal resistance (1-> Ball-Berry; 2->Jarvis)
   INTEGER                                 ::  IOPT_BTR  ! soil moisture factor for stomatal resistance (1-> Noah; 2-> CLM; 3-> SSiB)
