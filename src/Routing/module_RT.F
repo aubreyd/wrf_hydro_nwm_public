@@ -473,6 +473,7 @@ CONTAINS
         allocate( rt_domain(did)%NetRad(nsizes) )
         allocate( rt_domain(did)%NetRad_prev(nsizes) )
         allocate( rt_domain(did)%node_order(nsizes) )
+        allocate( rt_domain(did)%from_node_array(2,nsizes) )
         allocate( rt_domain(did)%N_UPSTR(nsizes) )
         allocate( rt_domain(did)%water_temp_counter)
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
@@ -501,6 +502,7 @@ CONTAINS
         rt_domain(did)%NetRad             = 0.
         rt_domain(did)%NetRad_prev        = 0.
         rt_domain(did)%node_order         = 0.
+        rt_domain(did)%from_node_array    = 0.
         rt_domain(did)%N_UPSTR            = 0.
         rt_domain(did)%water_temp_counter = 0.
         rt_domain(did)%XS_Peremeter       = 0.
@@ -990,6 +992,7 @@ subroutine LandRT_ini(did)
                        rt_domain(did)%NetRad,            &
                        rt_domain(did)%NetRad_prev,       &
                        rt_domain(did)%node_order,        &
+                       rt_domain(did)%from_node_array,   &
                        rt_domain(did)%N_UPSTR,           &
                        rt_domain(did)%water_temp_counter &
                        )

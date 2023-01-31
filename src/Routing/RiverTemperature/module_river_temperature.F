@@ -52,7 +52,7 @@ contains
 !            Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, T_QSUM)
 
 
-subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev, node_order, N_UPSTR, water_temp_counter)
+subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev, node_order, from_node_array, N_UPSTR, water_temp_counter)
 
 	implicit none
 	class(river_temperature_type), INTENT(inout)        :: this              ! the type object being initialize
@@ -61,6 +61,7 @@ subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev
         REAL, INTENT(inout), DIMENSION(:)             :: NetRad
 				REAL, INTENT(inout), DIMENSION(:)             :: NetRad_prev
         INTEGER, INTENT(inout), DIMENSION(:)          :: node_order
+        INTEGER, INTENT(inout), DIMENSION(:,:)        :: from_node_array
 				INTEGER, INTENT(inout), DIMENSION(:)          :: N_UPSTR
 				INTEGER, INTENT(inout)                        :: water_temp_counter
 
@@ -137,7 +138,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 				V_w, W_w, Q_str, Q_GW_cms, Q_Trib_cms, T_GW, T_hyp, T_Trib, T_upstream, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
 				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, &
-        node_order, N_UPSTR, water_temp_counter, totLength)
+        node_order, from_node_array, N_UPSTR, water_temp_counter, totLength)
 
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
@@ -221,6 +222,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_prev  ! from previous timestep
 	REAL,    INTENT(INOUT), DIMENSION(totLength)          :: NetRad, NetRad_prev	! Net heat flux from 5 sources (W/m2)
   INTEGER, INTENT(INOUT), DIMENSION(totLength)          :: node_order, N_UPSTR  !!!TLE: estblishes a sequence of nodes for MacCormick solver
+  INTEGER, INTENT(INOUT), DIMENSION(2,totLength)        :: from_node_array      !!!TLE: testing a new way of keeping track of branch points
 	INTEGER, INTENT(INOUT)                                :: water_temp_counter   !!!TLE: counter to keep track of how many routing time steps have elapsed
 	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
 	INTEGER,                DIMENSION(totLength)          :: FROM_NODE, node_headwater, node_branch
@@ -252,7 +254,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 
 	!print *, "DTCT = ", DTCT
-
+  print *, "totLength = ", totLength
 	! Calculating hyporheic fluxes
 	Do i = 1, totLength
 	    ! Find hyporheic fluxes
@@ -327,9 +329,19 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			!loop over TO_NODE, use it to construct FROM_NODE, N_UPSTR (number of upstream nodes)
 			! this should be enough info to construct a up->down order...?
 	    DO i = 1,totLength
+          print *, "i = ", i
 			    FROM_NODE(TO_NODE(i)) = FROM_NODE(TO_NODE(i)) + i
+!          print *, "TO_NODE(i) = ", TO_NODE(i)
+          if (from_node_array(1,TO_NODE(i)) .gt. 0) then
+            from_node_array(2,TO_NODE(i)) = i
+          else
+            from_node_array(1,TO_NODE(i)) = i
+          end if
 					N_UPSTR(TO_NODE(i)) = N_UPSTR(TO_NODE(i)) + 1
 			end DO
+
+      print *, "from_node_array(1,:) = ", from_node_array(1,:)
+      print *, "from_node_array(2,:) = ", from_node_array(2,:)
 
 #ifdef HYDRO_D
 			print *, "FROM_NODE", FROM_NODE
