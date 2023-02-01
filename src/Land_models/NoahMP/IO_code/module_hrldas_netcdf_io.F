@@ -731,10 +731,10 @@ contains
     ! Make sure vegtyp and soltyp are consistent when it comes to water points,
     ! by setting soil category to water when vegetation category is water, and
     ! vice-versa.
-    where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
-    where (soltyp == 14) vegtyp = ISWATER
-    !where (vegtyp == ISWATER) soltyp = 14
-    !where (soltyp == 14 .and. vegtyp /= ISWATER) soltyp = 8
+    !where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
+    !where (soltyp == 14) vegtyp = ISWATER
+    where (vegtyp == ISWATER) soltyp = 14
+    where (soltyp == 14 .and. vegtyp /= ISWATER) soltyp = 8
 
   end subroutine readland_hrldas
 
