@@ -591,7 +591,7 @@ contains
        ystart, yend,                                                   &
        iswater, islake, vegtyp, soltyp, terrain, tbot_2d, latitude,    &
        longitude, xland, seaice, msftx, msfty, &
-       local_crocus_opt, glacinfo, glact, vis_icealb)
+       local_crocus_opt, glacinfo, glact, vis_icealb, local_lake_opt)
     implicit none
     character(len=*),          intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -599,6 +599,7 @@ contains
     integer,                   intent(in)  :: islake
     integer, dimension(xstart:xend,ystart:yend), intent(out) :: vegtyp, soltyp
     integer,                                     intent(in)  :: local_crocus_opt
+    integer,                                     intent(in)  :: local_lake_opt
     integer, dimension(xstart:xend,ystart:yend), intent(out), optional :: glacinfo
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: terrain
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: tbot_2d
@@ -731,10 +732,13 @@ contains
     ! Make sure vegtyp and soltyp are consistent when it comes to water points,
     ! by setting soil category to water when vegetation category is water, and
     ! vice-versa.
-    !where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
-    !where (soltyp == 14) vegtyp = ISWATER
-    where (vegtyp == ISWATER) soltyp = 14
-    where (soltyp == 14 .and. vegtyp /= ISWATER) soltyp = 8
+    if (local_lake_opt == 1) then
+      where (vegtyp == ISWATER) soltyp = 14
+      where (soltyp == 14 .and. vegtyp /= ISWATER) soltyp = 8
+    else 
+      where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
+      where (soltyp == 14) vegtyp = ISWATER
+    endif
 
   end subroutine readland_hrldas
 

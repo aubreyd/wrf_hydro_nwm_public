@@ -1264,7 +1264,7 @@ module module_NoahMP_hrldas_driver
                        ISLTYP, TERRAIN,    TMN,      XLAT_URB2D, &
                        XLONIN, XLAND,      SEAICE,   MSFTX, &
                        MSFTY,  crocus_opt, GLACINFO, GLACT, &
-                       VIS_ICEALB)
+                       VIS_ICEALB, noah_lsm%sf_lake_physics)
 
   WHERE(SEAICE > 0.0) XICE = 1.0
 

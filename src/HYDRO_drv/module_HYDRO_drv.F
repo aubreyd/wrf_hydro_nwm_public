@@ -1679,19 +1679,25 @@ end subroutine HYDRO_ini
          call get2d_lsm_vegtyp(RT_DOMAIN(did)%VEGTYP,RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx,trim(nlst(did)%geo_static_flnm))
 
 
-            if(nlst(did)%sys_cpl .eq. 2 ) then
-              ! coupling with WRF
-                if(present(soltyp0) ) then
-                  !where(VEGTYP0 == rt_domain(did)%iswater .or. VEGTYP0 == rt_domain(did)%islake) soltyp0 = rt_domain(did)%isoilwater
+         if(nlst(did)%sys_cpl .eq. 2 ) then
+            ! coupling with WRF
+            if(present(soltyp0) ) then
+               if (noah_lsm%sf_lake_physics == 1) then
                   where(VEGTYP0 == rt_domain(did)%iswater ) soltyp0 = rt_domain(did)%isoilwater
-                  where(soltyp0 == rt_domain(did)%isoilwater) VEGTYP0 = rt_domain(did)%iswater
-                   soltyp = soltyp0
-                   RT_DOMAIN(did)%VEGTYP = VEGTYP0
-                endif
+               else
+                  where(VEGTYP0 == rt_domain(did)%iswater .or. VEGTYP0 == rt_domain(did)%islake) soltyp0 = rt_domain(did)%isoilwater
+               endif
+               where(soltyp0 == rt_domain(did)%isoilwater) VEGTYP0 = rt_domain(did)%iswater
+               soltyp = soltyp0
+               RT_DOMAIN(did)%VEGTYP = VEGTYP0
             endif
+         endif
 
-         !where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
-         where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater ) soltyp = rt_domain(did)%isoilwater
+         if (noah_lsm%sf_lake_physics == 1) then
+            where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater ) soltyp = rt_domain(did)%isoilwater
+         else
+            where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
+         endif
          where(soltyp == rt_domain(did)%isoilwater) RT_DOMAIN(did)%VEGTYP = rt_domain(did)%iswater
 
 ! LKSAT,
