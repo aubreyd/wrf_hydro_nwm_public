@@ -696,6 +696,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         real, dimension(nlinks)                :: Outflow                 ! total outflow to downstream reaches (m3/s)
         real, dimension(nlinks)                :: InflowUpstreamSumTemp   ! reach inflow volume-sum temperature (K * m3/s)
         real, dimension(nlinks)                :: InflowUpstreamTemp      ! reach inflow volume-mean temperature (K)
+        real, dimension(nlakes)                :: LakeInflowUpstream          ! total inflow to lake from upstream reaches (m3/s)
+        real, dimension(nlakes)                :: LakeOutflow                 ! total outflow from lake from upstream reaches (m3/s)
+        real, dimension(nlakes)                :: LakeInflowUpstreamSumTemp   ! lake inflow volume-sum temperature (K * m3/s)
+        real, dimension(nlakes)                :: LakeInflowUpstreamTemp      ! lake inflow volume-mean temperature (K)
         !real, dimension(nlinks), intent(out)   :: ReachTemp               ! current reach temperature (K)
 
         !-- lake params
@@ -770,6 +774,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         Outflow = 0.0 ! accumulator variable
         InflowUpstreamSumTemp = 0.0 ! accumulator variable
         InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
+        LakeInflowUpstream = 0.0 ! accumulator variable
+        LakeOutflow = 0.0 ! accumulator variable
+        LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
+        LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 
 !yw      print *, "DRIVE_channel,option,nlinkl,nlinks!!", channel_option,NLINKSL,NLINKS
@@ -984,6 +992,10 @@ END SUBROUTINE SUBMUSKINGCUNGE
         Outflow = 0.0 ! accumulator variable
         InflowUpstreamSumTemp = 0.0 ! accumulator variable
         InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
+        LakeInflowUpstream = 0.0 ! accumulator variable
+        LakeOutflow = 0.0 ! accumulator variable
+        LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
+        LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
 
@@ -1087,6 +1099,10 @@ gwOption:   if(gwBaseSwCRT == 3) then
          elseif(CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then  !pour out of lake
                  QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) =  &
                    QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))  !-- previous timestep
+!!AD: Zeroing lateral flow components for lake pourpoint for channel temperature routine
+                 InflowLand(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.0
+                 InflowGw(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.0
+                 InflowUpstream(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))
          endif nodeType
 
         ENDDO
@@ -1117,6 +1133,7 @@ gwOption:   if(gwBaseSwCRT == 3) then
                      HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i))
             else !--  we are just computing critical depth for outflow points
+!!AD: Check this boundary condition for stability in water temperature calculations
                QLINK(i,1) =0.
             endif
 !              print *, "i = ", i
@@ -1312,11 +1329,21 @@ gwOption:   if(gwBaseSwCRT == 3) then
           if(TO_NODE(i) .gt. 0) then
              if(LAKENODE(TO_NODE(i)) .gt. 0) then
                   QLAKEI8(LAKENODE(TO_NODE(i))) = QLAKEI8(LAKENODE(TO_NODE(i))) + QLINK(i,1)
+                  ! Numerator for volume-weighted temperature
+                  LakeInflowUpstreamSumTemp(LAKENODE(TO_NODE(i))) = LakeInflowUpstreamSumTemp(LAKENODE(TO_NODE(i))) + rt_domain(did)%T_QSUM(i) * QLINK(i,1)
+                  ! Denominator for volume-weighted temperature
+                  LakeInflowUpstream(LAKENODE(TO_NODE(i))) = LakeInflowUpstream(LAKENODE(TO_NODE(i))) + QLINK(i,1)
              endif
           endif
 
         END DO  !--- done processing all the links
 !        print *, "rt_domain(did)%velocity = ", rt_domain(did)%velocity
+
+        ! Final calculation for volume-weighted temperature for lakes
+        ! e.g., (Inflow1 * Temperature1 + Inflow2 * Temperature2) / (Inflow1 + Inflow2)
+        where (LakeInflowUpstream > 0)
+           LakeInflowUpstreamTemp = LakeInflowUpstreamSumTemp / LakeInflowUpstream
+        end where
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,CVOLTMP,NLINKS,99)
@@ -1351,7 +1378,8 @@ gwOption:   if(gwBaseSwCRT == 3) then
               !       MPI communication model.
 
               QLAKEIP(i) = QLAKEI(i)  !-- store total lake inflow for this timestep
-
+              !!AD: For now we hardcode lakes to have same outflow temperature as what is coming in 
+              LakeOutflowTemp(i) = LakeInflowUpstreamTemp(i)
 
 #ifdef MPP_LAND
             endif
