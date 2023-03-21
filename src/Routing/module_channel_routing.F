@@ -700,6 +700,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         real, dimension(nlakes)                :: LakeOutflow                 ! total outflow from lake from upstream reaches (m3/s)
         real, dimension(nlakes)                :: LakeInflowUpstreamSumTemp   ! lake inflow volume-sum temperature (K * m3/s)
         real, dimension(nlakes)                :: LakeInflowUpstreamTemp      ! lake inflow volume-mean temperature (K)
+        real, dimension(nlakes)                :: LakeOutflowTemp             ! lake outflow temperature (K)
         !real, dimension(nlinks), intent(out)   :: ReachTemp               ! current reach temperature (K)
 
         !-- lake params
@@ -778,7 +779,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         LakeOutflow = 0.0 ! accumulator variable
         LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
         LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-
+        LakeOutflowTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !yw      print *, "DRIVE_channel,option,nlinkl,nlinks!!", channel_option,NLINKSL,NLINKS
 !      print *, "DRIVE_channel, RESHT", RESHT
@@ -996,6 +997,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         LakeOutflow = 0.0 ! accumulator variable
         LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
         LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
+        LakeOutflowTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
 
