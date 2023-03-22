@@ -136,10 +136,6 @@ subroutine riverTemperature_run(this, did)
           rt_domain(did)%T_QSUM_prev,      &
           rt_domain(did)%NetRad,           &
           rt_domain(did)%NetRad_prev,      &
-          rt_domain(did)%node_order,       &
-          rt_domain(did)%from_node_array,  &
-          rt_domain(did)%N_UPSTR,          &
-          rt_domain(did)%water_temp_counter, &
 					rt_domain(did)%NLINKS            &
 					)
 

@@ -52,7 +52,7 @@ contains
 !            Tair_fine_1D, RelH_fine_1D, windSpd_fine_1D, SolarRad_fine_1D, TMN_1D_fine, TSK_1D_fine,TSLB_1D_fine, T_QSUM)
 
 
-subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev, node_order, from_node_array, N_UPSTR, water_temp_counter)
+subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev)
 
 	implicit none
 	class(river_temperature_type), INTENT(inout)        :: this              ! the type object being initialize
@@ -60,10 +60,6 @@ subroutine river_temperature_init(this, T_QSUM, T_QSUM_prev, NetRad, NetRad_prev
 				REAL, INTENT(inout), DIMENSION(:)             :: T_QSUM_prev
         REAL, INTENT(inout), DIMENSION(:)             :: NetRad
 				REAL, INTENT(inout), DIMENSION(:)             :: NetRad_prev
-        INTEGER, INTENT(inout), DIMENSION(:)          :: node_order
-        INTEGER, INTENT(inout), DIMENSION(:,:)        :: from_node_array
-				INTEGER, INTENT(inout), DIMENSION(:)          :: N_UPSTR
-				INTEGER, INTENT(inout)                        :: water_temp_counter
 
 end subroutine river_temperature_init
 ! --------------------------------------------------------------------------
@@ -73,62 +69,6 @@ subroutine river_temperature_destroy(this)
         class(river_temperature_type), intent(inout) :: this ! object being destroyed
  end subroutine river_temperature_destroy
 
-! --------------------------------------------------------------------------
-!subroutine river_temperature_run(this, did)
-
-!	implicit none
-!  class(river_temperature), INTENT(inout)             :: this
-
-  ! Embeddedness and Substrate particle size (mm) respectively
-!	REAL,    DIMENSION(:), allocatable                  :: C_Em, P_size
-!	REAL,    DIMENSION(:), allocatable                  :: shadeF, sur_albedo, viewToSky, cloud   ! Shading factor and surface albedo for the reach
-	!REAL,    INTENT(INOUT), DIMENSION(:)                :: T_QSUM
-
-! INTEGER                                             ::  did  ! for the rt_domain
-
-
-!  call river_TEMPERATURE_SOLVER(nlst(did)%dxrt0,      	        &
-!				rt_domain(did)%DT_STEPS,        &
-!                                rt_domain(did)%IXRT,            &
-!                                rt_domain(did)%JXRT,            &
-!                                rt_domain(did)%Tair_fine_1D,    &
-!				rt_domain(did)%RelH_fine_1D,    &
-!				rt_domain(did)%windSpd_fine_1D, &
-!				rt_domain(did)%C_Cloud,         &
-!				rt_domain(did)%TSLB_1D_fine,    &
-!				rt_domain(did)%SolarRad_fine_1D,&
-!				rt_domain(did)%XS_Peremeter,    &
-!				rt_domain(did)%HLINK,	        &
-!				rt_domain(did)%ChSSlp,	        &
-!				rt_domain(did)%ZELEV,	        &
-!                                rt_domain(did)%velocity,        &
-!				rt_domain(did)%Tw,	        &
-!				rt_domain(did)%QSUM,	        &
-!				rt_domain(did)%QINFLOWBASE,     &
-!				rt_domain(did)%QSTRMVOLRT,      &
-!				rt_domain(did)%TMN_1D_fine,     &
-!				rt_domain(did)%TSLB_1D_fine,    &
-!				rt_domain(did)%TSK_1D_fine,     &
-!                                rt_domain(did)%S_Albedo,        &
-!                		rt_domain(did)%F_Shade,         &
-!				rt_domain(did)%ChanCondConst,   &
-!                                rt_domain(did)%C_Emb,	        &
-!	                	rt_domain(did)%P_Size,          &
-!				rt_domain(did)%CHANXI,          &
-!				rt_domain(did)%CHANYJ,	        &
-!				rt_domain(did)%CH_NETLNK,       &
-!                                rt_domain(did)%CH_NETRT,        &
-!                                rt_domain(did)%QLINK,	        &
-!				rt_domain(did)%DT_STEPS,        &
-!				rt_domain(did)%DTCT,	        &
-!				rt_domain(did)%node_area,       &
-!				rt_domain(did)%TO_NODE,	        &
-!				rt_domain(did)%TYPEL,	        &
-!				rt_domain(did)%T_QSUM,	        &
-!                               rt_domain(did)%NLINKS           &
-!                 		)
-
-!end subroutine river_temperature_run
 
 ! ------------------------------------------------
 !   SUBROUTINE RIVER_TEMPERATURE_SOLVER
@@ -137,8 +77,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	      T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
 				V_w, W_w, Q_str, Q_GW_cms, Q_Trib_cms, T_GW, T_hyp, T_Trib, T_upstream, albedo, &
 				SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
-				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, &
-        node_order, from_node_array, N_UPSTR, water_temp_counter, totLength)
+				node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, totLength)
 
 	implicit none
         class(river_temperature_type), INTENT(inout)             :: this
@@ -185,8 +124,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	! For hyporheic exchange incflow calculation & Porosity of the conduction layer (unitless)
 	REAL, DIMENSION(IXRT,JXRT)        :: Q_hyp		! Darcy’s Law for Calculating for Hyporheic Flow (Domenico and Schwartz 1990)
 	REAL, DIMENSION(IXRT,JXRT)        :: Disp_coef
-        REAL		          	  :: A_s		! Cross-Sectional Across Seepage Face (m2)
-	REAL			          :: k_s		! Composite Substrate Hydraulic Conductivity (m/s)
+        REAL		          	        :: A_s		! Cross-Sectional Across Seepage Face (m2)
+	REAL			                        :: k_s		! Composite Substrate Hydraulic Conductivity (m/s)
 	REAL, INTENT(IN), DIMENSION(:)    :: C_E		! Embeddedness                                                          - As an input
 	REAL, INTENT(IN), DIMENSION(:)    :: P_s		! Substrate particle size (mm)
 	REAL, INTENT(IN), DIMENSION(:)    :: k_s_0              ! Dominant Substrate Hydraulic Conductivity (m/s)                       ===========> ChanCondConst
@@ -221,18 +160,12 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_local	            ! -- FINAL PRODUCT
 	REAL,    INTENT(INOUT), DIMENSION(:)                  :: T_QSUM_prev  ! from previous timestep
 	REAL,    INTENT(INOUT), DIMENSION(totLength)          :: NetRad, NetRad_prev	! Net heat flux from 5 sources (W/m2)
-  INTEGER, INTENT(INOUT), DIMENSION(totLength)          :: node_order, N_UPSTR  !!!TLE: estblishes a sequence of nodes for MacCormick solver
-  INTEGER, INTENT(INOUT), DIMENSION(2,totLength)        :: from_node_array      !!!TLE: testing a new way of keeping track of branch points
-	INTEGER, INTENT(INOUT)                                :: water_temp_counter   !!!TLE: counter to keep track of how many routing time steps have elapsed
-	INTEGER,                DIMENSION(totLength)          :: BC_Grid		    ! -- This is the new way I am thinking of to detec the upstream grids
-	INTEGER,                DIMENSION(totLength)          :: FROM_NODE, node_headwater, node_branch
-	INTEGER                                               :: neighbours, i, j, k, loop_break, c_index
-	INTEGER                                               :: node_current, c_hw, c_br, denom
+	INTEGER                                               :: i, j, k
         ! Simulated water temeprature (C)
 	REAL,                   DIMENSION(totLength)          :: T_w_sim	! Simulated water temperature for the reach in space & time (C)
-  REAL                                                  :: Q_strTot, T_strTot, Q_strTmp, T_up, T_down, branch1_temp
+  REAL                                                  :: Q_strTot, T_strTot, Q_strTmp, T_up, T_down
 	REAL,                   DIMENSION(totLength)          :: viewSky 		! View to sky factor (1-SF)
-	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t, branch_sum
+	REAL,                   DIMENSION(totLength)          :: T_w_sim_temp, s1t, s2t
 
         !REAL                                                  :: DT_STEPS               !-- number of timestep in routing
 	!REAL,                   DIMENSION(totLength)                :: Q_GW_cms
@@ -245,7 +178,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	viewSky = 1. - SF
         !DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
         ! ++++++++++++++++++++++++++++update this part
-	! Assigning the upstream water temeprature boundary condition to the main matrix
+	! Assigning the upstream water temperature boundary condition to the main matrix
 	!-- Setting everything to zero first.
 	Disp_coef = 0.
   Q_hyp = 0.
@@ -254,7 +187,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 
 	!print *, "DTCT = ", DTCT
-  print *, "totLength = ", totLength
+
 	! Calculating hyporheic fluxes
 	Do i = 1, totLength
 	    ! Find hyporheic fluxes
@@ -318,109 +251,7 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 		  end if
 	end Do
 
-			!!!TLE: trying an alternative to Reza's monster 'if' block. We need to establish FROM_NODE
-			!      in order to use the MacCormick solver Reza presumably originally intended to use. I can't
-			!      figure out where he got the alternative to the MacCormick solver, but whatever it is it
-			!      doesn't seem to be working that well.
     if (first_time_step_DT) then	!-- To do this only one time!
-
-		  FROM_NODE = 0.
-
-			!loop over TO_NODE, use it to construct FROM_NODE, N_UPSTR (number of upstream nodes)
-			! this should be enough info to construct a up->down order...?
-	    DO i = 1,totLength
-          print *, "i = ", i
-			    FROM_NODE(TO_NODE(i)) = FROM_NODE(TO_NODE(i)) + i
-!          print *, "TO_NODE(i) = ", TO_NODE(i)
-          if (from_node_array(1,TO_NODE(i)) .gt. 0) then
-            from_node_array(2,TO_NODE(i)) = i
-          else
-            from_node_array(1,TO_NODE(i)) = i
-          end if
-					N_UPSTR(TO_NODE(i)) = N_UPSTR(TO_NODE(i)) + 1
-			end DO
-
-      print *, "from_node_array(1,:) = ", from_node_array(1,:)
-      print *, "from_node_array(2,:) = ", from_node_array(2,:)
-
-#ifdef HYDRO_D
-			print *, "FROM_NODE", FROM_NODE
-			print *, "TO_NODE", TO_NODE
-			print *, "N_UPSTR", N_UPSTR
-#endif
-
-			!second loop to construct list of headwater nodes, list of branch nodes
-			c_hw = 1.
-			c_br = 1.
-			node_headwater = -1.
-			node_branch = -1.
-			DO i = 1, totLength
-
-					! check if headwater
-			    if (FROM_NODE(i) .eq. 0) then
-					    node_headwater(c_hw) = i
-					    c_hw = c_hw + 1
-					end if
-
-					!check if branch
-					if (N_UPSTR(i) .gt. 1) then
-					    node_branch(c_br) = i
-							c_br = c_br + 1
-					end if
-			end DO
-
-#ifdef HYDRO_D
-	print *, "node_branch = ", node_branch
-	print *, "node_headwater = ", node_headwater
-#endif
-
-			!construct the up->downstream node order
-			loop_break = 0.
-			c_index = 1.
-			c_hw = 1.
-			c_br = 1.
-			node_current = node_headwater(c_hw)
-			DO WHILE (loop_break .eq. 0)
-					!print *, "c_index =", c_index
-					!print *, "node_current =", node_current
-					!print *, "N_UPSTR(TO_NODE(node_current)) = ", N_UPSTR(TO_NODE(node_current))
-			    if (c_index .eq. totLength) then
-						  node_order(c_index) = node_current
-					    loop_break = 1
-					end if
-					if (TO_NODE(node_current) .lt. 0) then
-						  c_hw = c_hw + 1
-							node_order(c_index) = node_current
-						  node_current = node_headwater(c_hw)
-						  c_index = c_index + 1
-							cycle
-					end if
-					if (N_UPSTR(TO_NODE(node_current)) .eq. 1) then
-!						  print *, "node_current = ", node_current
-!							print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
-					    node_order(c_index) = node_current
-						  c_index = c_index + 1
-							node_current = TO_NODE(node_current)
-					else if (N_UPSTR(TO_NODE(node_current)) .gt. 1) then
-						  if (node_branch(c_br) .gt. 0) then                          !move to the next headwater
-!								  print *, "node_current = ", node_current
-!									print *, "TO_NODE(node_current) = ", TO_NODE(node_current)
-							    node_order(c_index) = node_current
-									c_index = c_index + 1
-							    c_hw = c_hw + 1
-									c_br = c_br + 1
-							    node_current = node_headwater(c_hw)
-							else                                                        !continue to mainstem
-							    node_order(c_index) = node_current
-								  c_index = c_index + 1
-								  node_current = TO_NODE(node_current)
-							end if
-					end if
-			end DO
-#ifdef HYDRO_D
-			print *, "node_order = ", node_order
-#endif
-
 
 			!initialize homogeneous stream channel temperature
 			T_w_sim_temp = T_Trib - 273.2
@@ -440,13 +271,13 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
   end if
 
   ! net radiation and maccormick step1
-  branch_sum = 0.
   Do k = 1 , totLength
-			i = node_order(k)
+      i = k
 
       !low flow checkpoint; if there is insufficient flow in node i, skip MacCormick and
       !set water temperature equal to ground temperature (unless frozen ground)
       if (y_w(i) .le. 0.02) then
+!      if (QLINK(i,1) .le. 0.0071) then            ! this is the low-flow threshold in Boyd and Kasper
         if ((T_Trib(i)-273.2) .gt. 0) then
 #ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; t_water = t_ground = ", (T_Trib(i)-273.2)
@@ -498,27 +329,17 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!      the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003), p.68, Eq. 2-119 -- 2-122)
 	!MACCORMICK STEP 1
 
-			if (TO_NODE(i) .ne. node_order(k+1)) then
-				 branch_sum(TO_NODE(i)) = branch_sum(TO_NODE(i)) + T_QSUM_prev(i)
-			end if
-
 			!set up and downstream T's
-			if (N_UPSTR(i) .eq. 0) then
+      if (T_upstream(i) .lt. 0) then
 				  T_up = (T_trib(i)-273.2)
-			else if (N_UPSTR(i) .gt. 1) then
-				  T_up = (branch_sum(i) + T_QSUM_prev(node_order(k-1))) / N_UPSTR(i)
 	    else
-			    T_up = T_QSUM_prev(node_order(k-1))
+         T_up = T_upstream(i)
 			end if
 
 			if (TO_NODE(i) .lt. 0) then
 			    T_down = (T_trib(i)-273.2)
 			else
-				  if (TO_NODE(i) .ne. node_order(k+1)) then
 						  T_down = T_QSUM_prev(TO_NODE(i))
-				else
-			    	  T_down = T_QSUM_prev(node_order(k+1))
-				end if
 			end if
 
 			!calculate s1t
@@ -544,19 +365,21 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       if (T_w_sim_temp(i) .lt. 0) then
         T_w_sim_temp(i) = 0.
       end if
+#ifdef HYDRO_D
       print *, "node ", i, "; T_water = ", T_w_sim_temp(i)
+#endif
     end if
 
 	end Do
 
 	!MACCORMICK STEP 2
-	branch_sum = 0.
 	Do k = 1,totLength
 			!converter to keep node order correct
-			i = node_order(k)
+      i = k
 
       !low flow check
       if (y_w(i) .le. 0.02) then
+!      if (QLINK(i,1) .le. 0.0071) then            ! this is the low-flow threshold in Boyd and Kasper
         if ((T_Trib(i)-273.2) .gt. 0) then
 #ifdef HYDRO_D
           print *, "low flow conditions in node ", i, "; t_water = t_ground = ", (T_Trib(i)-273.2)
@@ -570,26 +393,17 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
         end if
       else
 
-			  if (TO_NODE(i) .ne. node_order(k+1)) then
-				  branch_sum(TO_NODE(i)) = branch_sum(TO_NODE(i)) + T_w_sim_temp(i)
+			  !set up and downstream T's
+        if (T_upstream(i) .lt. 0) then
+				  T_up = (T_trib(i)-273.2)
+			  else
+          T_up = T_upstream(i)
 			  end if
 
-			  !set up and downstream T's
-			  if (N_UPSTR(i) .eq. 0) then
-				  T_up = (T_trib(i)-273.2)
-			  else if (N_UPSTR(i) .gt. 1) then
-				  T_up = (branch_sum(i) + T_w_sim_temp(node_order(k-1))) / N_UPSTR(i)
-			  else
-					T_up = T_w_sim_temp(node_order(k-1))
-			  end if
 			  if (TO_NODE(i) .lt. 0) then
 				  T_down = (T_trib(i)-273.2)
 			  else
-					if (TO_NODE(i) .ne. node_order(k+1)) then
 							T_down = T_w_sim_temp(TO_NODE(i))
-					else
-							T_down = T_w_sim_temp(node_order(k+1))
-					end if
 			  end if
 
 			!calculate s2t
@@ -625,7 +439,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
  	print *, "T_w_sim_temp = ", T_w_sim_temp
  	print *, "shortwave = ", s_in
  	print *, "NetRad = ", NetRad
-   print *, "T_ground = ", (T_Trib - 273.2)
+  print *, "T_ground_all = ", (T_Trib - 273.2)
+  print *, "T_groundwater = ", (T_GW - 273.2)
  #endif
 
   Do i = 1,totLength
@@ -719,6 +534,8 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 
 #ifdef HYDRO_D
 	print *, "T_QSUM_local = ", T_QSUM_local
+  print *, "T_upstream = ", T_upstream
+  print *, "Q_str = ", Q_str
 	print *, "QLINK = ", QLINK(:,1)
 #endif
     !print *,"---------------------------"
@@ -736,7 +553,6 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 	!increment stuff
 	NetRad_prev = NetRad
 	T_QSUM_prev = T_QSUM_local
-	water_temp_counter = water_temp_counter + 1
   first_time_step_DTCT = .false.
 
 
@@ -783,7 +599,6 @@ real function LW_RAD_FLUX(space, T_w_sim, T_a, H, sfcp, C_L, viewSky)
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, C_L, viewSky
-	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 
 	SBConst = 0.000000056696;	! Initializing the Stefan-Boltzman constant
 	StrTemp = T_w_sim(space)
@@ -865,7 +680,6 @@ real function LatentHeat_FLUX(space, SW_rad, LW_rad, T_w_sim, T_a, H, sfcp, V_wi
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, V_wind, z_elv
-	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 	StrTemp = T_w_sim(space)
 
 	! <<<<<<<<< Evaporation section >>>>>>>>
@@ -976,7 +790,6 @@ real function SensibleHeat_FLUX(space, T_w_sim, LH, T_a, H, sfcp, z_elv)
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  T_a, H, sfcp, z_elv
-	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 
 	StrTemp = T_w_sim(space)
 
@@ -1071,7 +884,6 @@ real function BedSediment_FLUX(space, dx, T_w_sim, P_s, C_E, Pw_river, T_bed)
         !REAL,    INTENT(IN),  DIMENSION(:,:)  ::  T_w_sim
 	REAL,    INTENT(IN),  DIMENSION(:)    ::  T_w_sim
         REAL,    INTENT(IN),  DIMENSION(:)    ::  P_s, C_E, Pw_river, T_bed
-	!INTEGER, INTENT(IN),  DIMENSION(:)    ::  BC_Grid, FROM_NODE
 	StrTemp = T_w_sim(space)
 	! Assigning the numbers
 	!!!TLE: from where?!?!

@@ -472,10 +472,6 @@ CONTAINS
         allocate( rt_domain(did)%T_QSUM_prev(nsizes) )
         allocate( rt_domain(did)%NetRad(nsizes) )
         allocate( rt_domain(did)%NetRad_prev(nsizes) )
-        allocate( rt_domain(did)%node_order(nsizes) )
-        allocate( rt_domain(did)%from_node_array(2,nsizes) )
-        allocate( rt_domain(did)%N_UPSTR(nsizes) )
-        allocate( rt_domain(did)%water_temp_counter)
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
         allocate( rt_domain(did)%QSUM(nsizes) )
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
@@ -501,10 +497,6 @@ CONTAINS
         rt_domain(did)%T_QSUM_prev        = 0.
         rt_domain(did)%NetRad             = 0.
         rt_domain(did)%NetRad_prev        = 0.
-        rt_domain(did)%node_order         = 0.
-        rt_domain(did)%from_node_array    = 0.
-        rt_domain(did)%N_UPSTR            = 0.
-        rt_domain(did)%water_temp_counter = 0.
         rt_domain(did)%XS_Peremeter       = 0.
         rt_domain(did)%QSUM               = 0.
         rt_domain(did)%TMN_temp           = 0.
@@ -990,11 +982,7 @@ subroutine LandRT_ini(did)
    call riverTemp%init(rt_domain(did)%T_QSUM,            &
                        rt_domain(did)%T_QSUM_prev,       &
                        rt_domain(did)%NetRad,            &
-                       rt_domain(did)%NetRad_prev,       &
-                       rt_domain(did)%node_order,        &
-                       rt_domain(did)%from_node_array,   &
-                       rt_domain(did)%N_UPSTR,           &
-                       rt_domain(did)%water_temp_counter &
+                       rt_domain(did)%NetRad_prev       &
                        )
 
    !ADCHANGE: Add lake reach output
