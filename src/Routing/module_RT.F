@@ -472,7 +472,6 @@ CONTAINS
         allocate( rt_domain(did)%T_QSUM_prev(nsizes) )
         allocate( rt_domain(did)%NetRad(nsizes) )
         allocate( rt_domain(did)%NetRad_prev(nsizes) )
-        allocate( rt_domain(did)%water_temp_counter)
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
         allocate( rt_domain(did)%QSUM(nsizes) )
         allocate( rt_domain(did)%TMN_temp(IX,JX) )
@@ -498,7 +497,6 @@ CONTAINS
         rt_domain(did)%T_QSUM_prev        = 0.
         rt_domain(did)%NetRad             = 0.
         rt_domain(did)%NetRad_prev        = 0.
-        rt_domain(did)%water_temp_counter = 0.
         rt_domain(did)%XS_Peremeter       = 0.
         rt_domain(did)%QSUM               = 0.
         rt_domain(did)%TMN_temp           = 0.
@@ -981,11 +979,10 @@ subroutine LandRT_ini(did)
 		   rt_domain(did)%TSLB_1D_fine,     &
        rt_domain(did)%SFCP_1D           &
 		   )
-   call riverTemp%init(rt_domain(did)%T_QSUM,      &
-                       rt_domain(did)%T_QSUM_prev, &
-                       rt_domain(did)%NetRad,      &
-                       rt_domain(did)%NetRad_prev,  &
-                       rt_domain(did)%water_temp_counter &
+   call riverTemp%init(rt_domain(did)%T_QSUM,            &
+                       rt_domain(did)%T_QSUM_prev,       &
+                       rt_domain(did)%NetRad,            &
+                       rt_domain(did)%NetRad_prev       &
                        )
 
    !ADCHANGE: Add lake reach output

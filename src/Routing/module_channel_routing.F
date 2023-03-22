@@ -360,7 +360,7 @@ use module_RT_data, only: rt_domain  !! JLM: this is only used in a c3 paramter 
             Km = dt
           endif
 
-          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then 
+          if ( (h_0 .gt. bfd) .and. (TwCC .gt. 0.0) .and. (nCC .gt. 0.0) .and. (Ck .gt. 0.0) ) then
           !water outside of defined channel
              X = min(0.5,max(0.0,0.5*(1-(Qj_0/(2.0*TwCC*So*Ck*dx)))))
           else
