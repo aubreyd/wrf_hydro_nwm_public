@@ -483,6 +483,7 @@ CONTAINS
         allocate( rt_domain(did)%InflowGw(nsizes) )
         allocate( rt_domain(did)%InflowUpstreamTemp(nsizes) )
         allocate( rt_domain(did)%Outflow(nsizes) )
+        allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
         rt_domain(did)%RelH_fine_1D       = 0.
@@ -493,8 +494,8 @@ CONTAINS
         rt_domain(did)%TG_1D_fine         = 0.
         rt_domain(did)%TSLB_1D_fine       = 0.
         rt_domain(did)%SFCP_1D            = 0.
-        rt_domain(did)%T_QSUM             = 0.
-        rt_domain(did)%T_QSUM_prev        = 0.
+        rt_domain(did)%T_QSUM             = 10.
+        rt_domain(did)%T_QSUM_prev        = 10.
         rt_domain(did)%NetRad             = 0.
         rt_domain(did)%NetRad_prev        = 0.
         rt_domain(did)%XS_Peremeter       = 0.
@@ -506,9 +507,9 @@ CONTAINS
         rt_domain(did)%InflowUpstream     = 0.
         rt_domain(did)%InflowLand         = 0.
         rt_domain(did)%InflowGw           = 0.
-        rt_domain(did)%InflowUpstreamTemp = -9999.
+        rt_domain(did)%InflowUpstreamTemp = 10.
         rt_domain(did)%Outflow            = 0.
-
+        rt_domain(did)%LakeOutflowTemp    = 10.
 
         if( nlst(did)%channel_option .eq. 2 ) then
            allocate( rt_domain(did)%qloss(nsizes) )

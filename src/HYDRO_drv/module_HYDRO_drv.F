@@ -997,7 +997,7 @@ else
        ,nlst(did)%GwBaseSwCRT, gw2d(did)%ho, gw2d(did)%qgw_chanrt, &
        nlst(did)%gwChanCondSw, nlst(did)%gwChanCondConstIn, &
        nlst(did)%gwChanCondConstOut, rt_domain(did)%velocity, rt_domain(did)%qloss, &
-       rt_domain(did)%XS_Peremeter, nlst(did)%water_temperature)
+       rt_domain(did)%XS_Peremeter, nlst(did)%water_temperature, rt_domain(did)%LakeOutflowTemp)
 endif
 
     if((nlst(did)%gwBaseSwCRT == 3) .and. (nlst(did)%gwChanCondSw .eq. 1)) then

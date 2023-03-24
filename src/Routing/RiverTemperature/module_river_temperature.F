@@ -434,14 +434,14 @@ Subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
 			T_w_sim(CH_NETLNK(CHANXI(i),CHANYJ(i))) = T_w_sim_temp(i) + 273.2
  end Do
 
- #ifdef HYDRO_D
+#ifdef HYDRO_D
  	print *, "QLINK = ", QLINK(:,1)
  	print *, "T_w_sim_temp = ", T_w_sim_temp
  	print *, "shortwave = ", s_in
  	print *, "NetRad = ", NetRad
   print *, "T_ground_all = ", (T_Trib - 273.2)
   print *, "T_groundwater = ", (T_GW - 273.2)
- #endif
+#endif
 
   Do i = 1,totLength
 
