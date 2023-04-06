@@ -770,7 +770,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
-        localprint = .false.
+        localprint = .true.
 
         ! Initialize local channel temperature variables
         ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
@@ -992,14 +992,14 @@ END SUBROUTINE SUBMUSKINGCUNGE
           end if
 
         ! Initialize local channel temperature variables
-        InflowUpstream = 0.0 ! accumulator variable
-        Outflow = 0.0 ! accumulator variable
-        InflowUpstreamSumTemp = 0.0 ! accumulator variable
-        InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-        LakeInflowUpstream = 0.0 ! accumulator variable
-        LakeOutflow = 0.0 ! accumulator variable
-        LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
-        LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
+        !InflowUpstream = 0.0 ! accumulator variable
+        !Outflow = 0.0 ! accumulator variable
+        !InflowUpstreamSumTemp = 0.0 ! accumulator variable
+        !InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
+        !LakeInflowUpstream = 0.0 ! accumulator variable
+        !LakeOutflow = 0.0 ! accumulator variable
+        !LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
+        !LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
         !LakeOutflowTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
@@ -1126,6 +1126,7 @@ print *, "ADCHECK1A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK1A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK1A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47)) 
 print *, "ADCHECK1A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK1A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
 #ifdef MPP_LAND
@@ -1177,6 +1178,7 @@ print *, "ADCHECK1AA: After qlink calcs."
 print *, "ADCHECK1AA: 408 QLINK", QLINK(CH_NETLNK(67,48),1)
 print *, "ADCHECK1AA: 400 QLINK", QLINK(CH_NETLNK(66,47),1)
 print *, "ADCHECK1AA: 713 QLINK", QLINK(713,1)
+print *, "ADCHECK1AA: 1107 QLINK", QLINK(1107,1)
 end if
 
           !-- compute total flow across face, into node
@@ -1218,6 +1220,17 @@ end if
               print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
               print *, "  Outflow", Outflow(i)
             endif
+            if(CHANXI(i)==55 .and. CHANYJ(i)==126) then
+              print *, "ADCHECK1B: After InflowUpstreamSumTemp calcs."
+              print *, "ADCHECK1B 55,126 i TONODE TYPEL", i, TO_NODE(i), TYPEL(i)
+              print *, "  QSUM QLINK TQSUM", QSUM(i), QLINK(i,1), rt_domain(did)%T_QSUM(i)
+              print *, "  InflowUpstream", InflowUpstream(i)
+              print *, "  InflowLand", InflowLand(i)
+              print *, "  InflowGw", InflowGw(i)
+              print *, "  InflowUpstreamSumTemp", InflowUpstreamSumTemp(i)
+              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
+              print *, "  Outflow", Outflow(i)
+            endif
            end if
 
           END DO
@@ -1228,6 +1241,7 @@ print *, "ADCHECK1C: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK1C: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK1C: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK1C: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK1C: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
           ! Final calculation for volume-weighted temperature
@@ -1242,6 +1256,7 @@ print *, "ADCHECK1D: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK1D: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK1D: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK1D: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK1D: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
 #ifdef MPP_LAND
@@ -1250,6 +1265,10 @@ end if
 #else
           DO i = 1,NLINKS                                                 !-- inflow to node across each face
 #endif
+          if (InflowUpstreamTemp(i) .lt. -20) then
+            print *, "ADWARNING1: InflowUpstreamTemp < -20", i, CHANXI(i), CHANYJ(i)
+            print *, "            CH_NETRT Temp", CH_NETRT(CHANXI(i),CHANYJ(i)), InflowUpstreamTemp(i)
+          endif
           if (CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then
              InflowUpstream(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))
              InflowUpstreamTemp(CH_NETLNK(CHANXI(i),CHANYJ(i))) = LakeOutflowTemp(CH_NETRT(CHANXI(i),CHANYJ(i)))
@@ -1267,6 +1286,7 @@ print *, "ADCHECK1E: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK1E: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK1E: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK1E: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK1E: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
 #ifdef MPP_LAND
@@ -1431,13 +1451,14 @@ end if
             if (localprint) then
             if(CHANXI(i)==67 .and. CHANYJ(i)==48) then
               print *, "ADCHECK2A: After LakeInflowUpstreamSumTemp interim calcs."
-              print *, "ADCHECK2A 67,48 i TYPEL", i, TYPEL(i)
+              print *, "ADCHECK2A 67,48 i TYPEL KRT", i, TYPEL(i), KRT
               print *, "  QSUM", QSUM(i)
               print *, "  InflowUpstream", InflowUpstream(i)
               print *, "  InflowLand", InflowLand(i)
               print *, "  InflowGw", InflowGw(i)
               print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
               print *, "  Outflow", Outflow(i)
+              print *, "  CVOLTMP", CVOLTMP(i)
             endif
             end if
 
@@ -1452,6 +1473,7 @@ print *, "ADCHECK2B: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK2B: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK2B: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK2B: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK2B: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
         ! Final calculation for volume-weighted temperature for lakes
@@ -1519,6 +1541,7 @@ print *, "ADCHECK3A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK3A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK3A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK3A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK3A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
 #ifdef MPP_LAND
@@ -1584,16 +1607,27 @@ if (localprint) then
               print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
               print *, "  Outflow", Outflow(i)
             endif
+            if(CHANXI(i)==55 .and. CHANYJ(i)==126) then
+              print *, "ADCHECK4: After qlink final calc."
+              print *, "ADCHECK4 55,126 i TYPEL", i, TYPEL(i)
+              print *, "  QSUM", QSUM(i)
+              print *, "  InflowUpstream", InflowUpstream(i)
+              print *, "  InflowLand", InflowLand(i)
+              print *, "  InflowGw", InflowGw(i)
+              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
+              print *, "  Outflow", Outflow(i)
+            endif
 end if
 
          enddo
 
 if (localprint) then
-print *, "ADCHECK4A: After qlink final calc loop."
+print *, "ADCHECK4A: After qlink final calc loop. KRT", KRT
 print *, "ADCHECK4A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
 print *, "ADCHECK4A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
 print *, "ADCHECK4A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
 print *, "ADCHECK4A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
+print *, "ADCHECK4A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
 end if
 
 #ifdef MPP_LAND
@@ -1654,6 +1688,7 @@ print *, "ADCHECK5A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
 print *, "ADCHECK5A: 408 T_QSUM", rt_domain(did)%T_QSUM(CH_NETLNK(67,48))
 print *, "ADCHECK5A: 400 T_QSUM", rt_domain(did)%T_QSUM(CH_NETLNK(66,47))
 print *, "ADCHECK5A: 713 T_QSUM", rt_domain(did)%T_QSUM(713)
+print *, "ADCHECK5A: 1107 T_QSUM", rt_domain(did)%T_QSUM(1107)
 end if
 
           endif
