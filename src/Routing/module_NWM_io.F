@@ -3215,12 +3215,26 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    ! Allocatable array to hold temporary streamflow for checking
    real, allocatable, dimension(:) :: strFlowLocal
    ! Allocatable array to hold global qlink values
+   integer, allocatable, dimension(:) :: g_typel
    real, allocatable, dimension(:,:) :: g_qlink
+   real, allocatable, dimension(:) :: g_head
+   real, allocatable, dimension(:) :: g_velocity
+   real, allocatable, dimension(:) :: g_volume
+   real, allocatable, dimension(:) :: g_rivtemp
    ! Allocatable array to hold streamflow index values
    integer(kind=int64), allocatable, dimension(:,:) :: CH_NETLNK
    ! allocatable global array to hold grid of output streamflow values
+   integer, allocatable, dimension(:,:) :: tmpTypel
    integer, allocatable, dimension(:,:) :: tmpFlow
    real, allocatable, dimension(:,:) :: tmpFlowReal
+   integer, allocatable, dimension(:,:) :: tmpHeadInt
+   real, allocatable, dimension(:,:) :: tmpHeadReal
+   integer, allocatable, dimension(:,:) :: tmpVelInt
+   real, allocatable, dimension(:,:) :: tmpVelReal
+   integer, allocatable, dimension(:,:) :: tmpVolInt
+   real, allocatable, dimension(:,:) :: tmpVolReal
+   integer, allocatable, dimension(:,:) :: tmpRivTempInt
+   real, allocatable, dimension(:,:) :: tmpRivTempReal
    ! allocatable arrays to hold coordinate values
    real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
 
@@ -3273,16 +3287,46 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    if(myId .eq. 0) then
       ! Channel index values
       allocate(CH_NETLNK(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
-      ! Global qlink values
+      ! Reach type - this is static so should be removed after diagnostics
+      ! Do we actually need these extra global variables?
+      allocate(g_typel(gNumLnks) )
+      ! Global reach variables
       allocate(g_qlink(gNumLnks,2) )
+      allocate(g_head(gNumLnks) )
+      allocate(g_velocity(gNumLnks) )
+      allocate(g_volume(gNumLnks) )
+      allocate(g_rivtemp(gNumLnks) )
       ! Grid of global streamflow values via scale_factor/add_offset
+      allocate(tmpTypel(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
       allocate(tmpFlow(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
       allocate(tmpFlowReal(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpHeadInt(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpHeadReal(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpVelInt(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpVelReal(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpVolInt(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpVolReal(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpRivTempInt(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
+      allocate(tmpRivTempReal(RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt))
    else
       allocate(CH_NETLNK(1,1))
+      allocate(g_typel(1))
       allocate(g_qlink(1,2) )
+      allocate(g_head(1))
+      allocate(g_velocity(1))
+      allocate(g_volume(1))
+      allocate(g_rivtemp(1))
+      allocate(tmpTypel(1,1))
       allocate(tmpFlow(1,1))
       allocate(tmpFlowReal(1,1))
+      allocate(tmpHeadInt(1,1))
+      allocate(tmpHeadReal(1,1))
+      allocate(tmpVelInt(1,1))
+      allocate(tmpVelReal(1,1))
+      allocate(tmpVolInt(1,1))
+      allocate(tmpVolReal(1,1))
+      allocate(tmpRivTempInt(1,1))
+      allocate(tmpRivTempReal(1,1))
    endif
    ! Allocate local streamflow array. We need to do a check to
    ! for lake_type 2. However, we cannot set the values in the global array
@@ -3302,6 +3346,11 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    if(nlst(domainId)%channel_option .eq. 3) then
       call write_chanel_real(strFlowLocal,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_qlink(:,1))
       call write_chanel_real(RT_DOMAIN(domainId)%qlink(:,2),RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_qlink(:,2))
+      call write_chanel_real(RT_DOMAIN(domainId)%hlink,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_head(:))
+      call write_chanel_real(RT_DOMAIN(domainId)%velocity,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_velocity(:))
+      call write_chanel_real(RT_DOMAIN(domainId)%cvol,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_volume(:))
+      call write_chanel_real(RT_DOMAIN(domainId)%T_QSUM,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_rivtemp(:))
+      call write_chanel_int(RT_DOMAIN(domainId)%TYPEL,RT_DOMAIN(domainId)%map_l2g,gNumLnks,lNumLnks,g_typel(:))
    endif
    call write_IO_rt_int8(RT_DOMAIN(domainId)%GCH_NETLNK, CH_NETLNK)
 
@@ -3310,7 +3359,7 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    call initChrtGrdDict(fileMeta,myId,diagFlag)
 
    ! For now, we will default to outputting all variables until further notice.
-   fileMeta%outFlag(:) = [1]
+   fileMeta%outFlag(:) = [1, 1, 1, 1, 1, 1]
 
    ! Calculate datetime information.
    ! First compose strings of EPOCH and simulation start date.
@@ -3630,14 +3679,38 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
       do jTmp=1,RT_DOMAIN(domainId)%g_jxrt
          do iTmp=1,RT_DOMAIN(domainId)%g_ixrt
             if(CH_NETLNK(iTmp,jTmp).GE.0) then
+               tmpTypel(iTmp,jTmp) = g_typel(CH_NETLNK(iTmp,jTmp))
                tmpFlow(iTmp,jTmp) = NINT((g_qlink(CH_NETLNK(iTmp,jTmp),1)-fileMeta%addOffset(1))/fileMeta%scaleFactor(1))
                tmpFlowReal(iTmp,jTmp) = g_qlink(CH_NETLNK(iTmp,jTmp),1)
+               tmpHeadInt(iTmp,jTmp) = NINT((g_head(CH_NETLNK(iTmp,jTmp))-fileMeta%addOffset(1))/fileMeta%scaleFactor(1))
+               tmpHeadReal(iTmp,jTmp) = g_head(CH_NETLNK(iTmp,jTmp))
+               tmpVelInt(iTmp,jTmp) = NINT((g_velocity(CH_NETLNK(iTmp,jTmp))-fileMeta%addOffset(1))/fileMeta%scaleFactor(1))
+               tmpVelReal(iTmp,jTmp) = g_velocity(CH_NETLNK(iTmp,jTmp))
+               tmpVolInt(iTmp,jTmp) = NINT((g_volume(CH_NETLNK(iTmp,jTmp))-fileMeta%addOffset(1))/fileMeta%scaleFactor(1))
+               tmpVolReal(iTmp,jTmp) = g_volume(CH_NETLNK(iTmp,jTmp))
+               tmpRivTempInt(iTmp,jTmp) = NINT((g_rivtemp(CH_NETLNK(iTmp,jTmp))-fileMeta%addOffset(1))/fileMeta%scaleFactor(1))
+               tmpRivTempReal(iTmp,jTmp) = g_rivtemp(CH_NETLNK(iTmp,jTmp))
             else
+                tmpTypel(iTmp,jTmp) = fileMeta%fillComp(1)
                 tmpFlow(iTmp,jTmp) = fileMeta%fillComp(1)
                 tmpFlowReal(iTmp,jTmp) = fileMeta%fillReal(1)
+                tmpHeadInt(iTmp,jTmp) = fileMeta%fillComp(1)
+                tmpHeadReal(iTmp,jTmp) = fileMeta%fillReal(1)
+                tmpVelInt(iTmp,jTmp) = fileMeta%fillComp(1)
+                tmpVelReal(iTmp,jTmp) = fileMeta%fillReal(1)
+                tmpVolInt(iTmp,jTmp) = fileMeta%fillComp(1)
+                tmpVolReal(iTmp,jTmp) = fileMeta%fillReal(1)
+                tmpRivTempInt(iTmp,jTmp) = fileMeta%fillComp(1)
+                tmpRivTempReal(iTmp,jTmp) = fileMeta%fillReal(1)
             endif
          enddo
       enddo
+
+      ! Place TYPEL grid into output file.
+      iret = nf90_inq_varid(ftn,'typel',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate streamflow variable.')
+      iret = nf90_put_var(ftn,varId,tmpTypel,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place TYPEL values into CHRTOUT_GRID')
 
       ! Place streamflow grid into output file.
       iret = nf90_inq_varid(ftn,'streamflow',varId)
@@ -3648,6 +3721,46 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
          iret = nf90_put_var(ftn,varId,tmpFlowReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
       endif
       call nwmCheck(diagFlag,iret,'ERROR: Unable to place streamflow values into CHRTOUT_GRID')
+
+      ! Place head grid into output file.
+      iret = nf90_inq_varid(ftn,'head',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate head variable.')
+      if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
+         iret = nf90_put_var(ftn,varId,tmpHeadInt,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      else
+         iret = nf90_put_var(ftn,varId,tmpHeadReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      endif
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place head values into CHRTOUT_GRID')
+
+      ! Place velocity grid into output file.
+      iret = nf90_inq_varid(ftn,'velocity',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate velocity variable.')
+      if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
+         iret = nf90_put_var(ftn,varId,tmpVelInt,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      else
+         iret = nf90_put_var(ftn,varId,tmpVelReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      endif
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place velocity values into CHRTOUT_GRID')
+
+      ! Place volume grid into output file.
+      iret = nf90_inq_varid(ftn,'volume',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate volume variable.')
+      if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
+         iret = nf90_put_var(ftn,varId,tmpVolInt,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      else
+         iret = nf90_put_var(ftn,varId,tmpVolReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      endif
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place volume values into CHRTOUT_GRID')
+
+      ! Place river temperature grid into output file.
+      iret = nf90_inq_varid(ftn,'stream_temperature',varId)
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to locate stream_temperature variable.')
+      if((nlst(1)%io_form_outputs .eq. 1) .or. (nlst(1)%io_form_outputs .eq. 2)) then
+         iret = nf90_put_var(ftn,varId,tmpRivTempInt,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      else
+         iret = nf90_put_var(ftn,varId,tmpRivTempReal,(/1,1,1/),(/RT_DOMAIN(domainId)%g_ixrt,RT_DOMAIN(domainId)%g_jxrt,1/))
+      endif
+      call nwmCheck(diagFlag,iret,'ERROR: Unable to place stream temperature values into CHRTOUT_GRID')
 
    endif ! End if statement if on I/O ID
 
@@ -3665,7 +3778,10 @@ subroutine output_chrtout_grd_NWM(domainId,iGrid)
    endif
 
    ! Deallocate memory as needed
-   deallocate(g_qlink, CH_NETLNK, tmpFlow, tmpFlowReal, strFlowLocal)
+   deallocate(g_qlink, g_head, g_velocity, g_volume, g_rivtemp, &
+              CH_NETLNK, tmpFlow, tmpFlowReal, tmpHeadInt, tmpHeadReal, &
+              tmpVelInt, tmpVelReal, tmpVolInt, tmpVolReal, &
+              tmpRivTempInt, tmpRivTempReal, strFlowLocal)
 
 end subroutine output_chrtout_grd_NWM
 

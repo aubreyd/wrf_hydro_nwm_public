@@ -25,7 +25,7 @@ integer, parameter :: numLdasVars = 116
 integer, parameter :: numLdasVars_crocus_off = 98
 integer, parameter :: numRtDomainVars = 5
 integer, parameter :: numLakeVars = 2
-integer, parameter :: numChGrdVars = 1
+integer, parameter :: numChGrdVars = 6
 integer, parameter :: numLsmVars = 14
 integer, parameter :: numChObsVars = 1
 integer, parameter :: numGwVars = 4
@@ -2229,17 +2229,17 @@ subroutine initChrtGrdDict(chrtGrdDict,procId,diagFlag)
 
    endif
 
-   chrtGrdDict%varNames(:) = [character(len=64) :: "streamflow"]
-   chrtGrdDict%longName(:) = [character(len=64) :: "River Flow"]
-   chrtGrdDict%units(:) = [character(len=64) :: "m3 s-1"]
-   chrtGrdDict%scaleFactor(:) = [0.1]
-   chrtGrdDict%addOffset(:) = [0.0]
-   chrtGrdDict%outFlag(:) = [0]
-   chrtGrdDict%timeZeroFlag(:) = [1]
-   chrtGrdDict%missingReal(:) = [-9999.0]
-   chrtGrdDict%fillReal(:) = [-9999.0]
-   chrtGrdDict%validMinDbl(:) = [0.0d0]
-   chrtGrdDict%validMaxDbl(:) = [50000.0d0]
+   chrtGrdDict%varNames(:) = [character(len=64) :: "typel", "streamflow", "head", "velocity", "volume", "stream_temperature"]
+   chrtGrdDict%longName(:) = [character(len=64) :: "TYPEL", "River Flow", "River Head", "River Velocity", "River Volume", "River Temperature"]
+   chrtGrdDict%units(:) = [character(len=64) :: "cat", "m3 s-1", "m", "m s-1", "m3", "degrees C"]
+   chrtGrdDict%scaleFactor(:) = [0.0, 0.1, 0.1, 0.1, 0.1, 0.1]
+   chrtGrdDict%addOffset(:) = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+   chrtGrdDict%outFlag(:) = [0, 0, 0, 0, 0, 0]
+   chrtGrdDict%timeZeroFlag(:) = [1, 1, 1, 1, 1, 1]
+   chrtGrdDict%missingReal(:) = [-9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -9999.0]
+   chrtGrdDict%fillReal(:) = [-9999.0, -9999.0, -9999.0, -9999.0, -9999.0, -9999.0]
+   chrtGrdDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, -100.0d0]
+   chrtGrdDict%validMaxDbl(:) = [10.0d0, 50000.0d0, 1000.0d0, 50000.0d0, 100000000.0d0, 200.0d0]
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
