@@ -1634,10 +1634,6 @@ end if
           call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-
-           KRT = KRT + 1                     !-- iterate on the timestep
-           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
-
           !-- Reza's update goes in here:
           !-- The RUN function should be called here.
 	  ! Run the subroutine to diaggregate
@@ -1691,7 +1687,10 @@ print *, "ADCHECK5A: 713 T_QSUM", rt_domain(did)%T_QSUM(713)
 print *, "ADCHECK5A: 1107 T_QSUM", rt_domain(did)%T_QSUM(1107)
 end if
 
-          endif
+          endif ! temperature module active check
+
+          KRT = KRT + 1                     !-- iterate on the timestep
+          if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
 
           end do crnt   !--- DTCT timestep of DT_STEPS
 
