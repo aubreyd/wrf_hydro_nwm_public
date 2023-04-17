@@ -8329,6 +8329,7 @@ if (channel_option .eq. 3) then
   do i = 1,NLINKS
     if (CHANLEN(i) < 0) then ! edge
       So(i) = 0.00001
+      CHANLEN(i) = 250.0
     else
       So(i) = ( ZELEV(FROM_NODE(i)) - ZELEV(TO_NODE(i)) ) / CHANLEN(i)
       !TLE: added this if statement to force non-zero slopes

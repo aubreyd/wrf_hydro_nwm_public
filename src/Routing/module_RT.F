@@ -1862,6 +1862,10 @@ subroutine LandRT_ini(did)
            endif
 
            rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j))*rt_domain(did)%HLINK(j)*rt_domain(did)%CHANLEN(j) !-- initalize channel volume
+           if (rt_domain(did)%CVOL(j) .lt. 0) then
+             print *, "ADCHECK_INIT CVOL H LEN:", rt_domain(did)%CVOL(j), rt_domain(did)%HLINK(j), rt_domain(did)%CHANLEN(j)
+             rt_domain(did)%CVOL(j) = 10.0
+           endif
         end do
 
      endif  !End if channel option eq 3; else;

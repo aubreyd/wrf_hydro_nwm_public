@@ -1403,8 +1403,15 @@ end if
 
                ! change in volume is inflow, lateral flow, and outflow
                !yw DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*DXRT),HLINKTMP(i), &
+                   !if (i .eq. 1798) then
+                     print *, "ADCHECK_TYPEL1: i, H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
+                     print *, "    QSUM QLateral", QSUM(i), QLateral(i) 
+                   !endif
+                   !CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
+                   !    DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                   !    CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
                    CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
-                       DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                       DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
                        CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
           elseif (TYPEL(i) .eq. 2) then              !--- into a reservoir, assume critical depth
               if ((QSUM(i)+QLateral(i) .lt. 0) .and. (gwChanCondSw == 0)) then
@@ -1417,8 +1424,13 @@ end if
              endif
 
               !-- compute volume in reach (m^3)
+                   !if (i .eq. 1819) then
+                     print *, "ADCHECK_TYPEL2: i H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
+                     print *, "    QSUM QLateral", QSUM(i), QLateral(i)
+                  !endif
                    CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
-                          DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                          !DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                          DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
                              CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
           else
               print *, "FATAL ERROR: This node does not have a type.. error TYPEL =", TYPEL(i)
