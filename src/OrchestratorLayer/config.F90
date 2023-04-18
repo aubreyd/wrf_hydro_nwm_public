@@ -5,7 +5,7 @@ module config_base
 
   implicit none
 
-  integer, PARAMETER    :: MAX_SOIL_LEVELS = 20   ! maximum soil levels in namelist
+  integer, PARAMETER    :: MAX_SOIL_LEVELS = 100   ! maximum soil levels in namelist
   !REAL                  ::  DTBL      ! timestep [s]
 
   type NOAHLSM_OFFLINE_
