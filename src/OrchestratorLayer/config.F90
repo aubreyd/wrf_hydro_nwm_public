@@ -5,7 +5,7 @@ module config_base
 
   implicit none
 
-  integer, PARAMETER    :: MAX_SOIL_LEVELS = 10   ! maximum soil levels in namelist
+  integer, PARAMETER    :: MAX_SOIL_LEVELS = 20   ! maximum soil levels in namelist
   !REAL                  ::  DTBL      ! timestep [s]
 
   type NOAHLSM_OFFLINE_
@@ -542,7 +542,7 @@ contains
 
 !!! add the following two dummy variables
     integer  :: NSOIL
-    real :: ZSOIL8(8)
+    real :: ZSOIL8(MAX_SOIL_LEVELS)
     type(crocus_options) :: crocus_opts
 
     logical            :: dir_e
