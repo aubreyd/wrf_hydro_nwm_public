@@ -1405,6 +1405,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
   else  ! for none restart
 
@@ -1503,6 +1506,9 @@ module module_NoahMP_hrldas_driver
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+#ifdef SPATIAL_SOIL
+                  , SMCMAX_3D, BEXP_3D, PSISAT_3D       &
+#endif
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
