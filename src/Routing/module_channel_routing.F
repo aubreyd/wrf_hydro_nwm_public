@@ -118,27 +118,30 @@ end function MUSKING
 ! ------------------------------------------------
 !   FUNCTION Diffusive wave
 ! ------------------------------------------------
-real function DIFFUSION(nod,z1,z20,h1,h2,dx,n, &
-     Bw, Cs, vel)
+subroutine DIFFUSION(nod,z1,z20,h1,h2,dx,n, &
+     Bw, Cs, q, vel)
 implicit none
 !-- channel geometry and characteristics
-real    :: Bw         !-bottom width (meters)
-real    :: Cs         !-Channel side slope slope
-real    :: dx         !-channel lngth (m)
+integer,intent(in) :: nod         !- node
+real,intent(in)    :: z1,z20      !-z1 is 'from', z2 is 'to' elevations
+real,intent(in)    :: h1,h2      !-tmp height variables
+real,intent(in)    :: dx         !-channel lngth (m)
 real,intent(in)    :: n          !-mannings coefficient
+real,intent(in)    :: Bw         !-bottom width (meters)
+real,intent(in)    :: Cs         !-Channel side slope slope
+! Outputs
+real, intent(out) :: q  ! flowrate (m3/s)
+real, intent(out) :: vel  ! velocity (m/s)
+! Local variables
 real    :: R          !-Hydraulic radius
 real    :: AREA       !- wetted area
-real    :: h1,h2      !-tmp height variables
-real    :: z1,z2      !-z1 is 'from', z2 is 'to' elevations
 real    :: z          !-channel side distance
 real    :: w          !-upstream weight
 real    :: Ku,Kd      !-upstream and downstream conveyance
 real    :: Kf         !-final face conveyance
 real    :: Sf         !-friction slope
 real    :: sgn        !-0 or 1
-integer :: nod         !- node
-real ::  z20, dzx
-real, intent(inout) :: vel  ! velocity (m/s)
+real ::  z2, dzx
 
 ! added by Wei Yu for bad data.
 
@@ -188,17 +191,18 @@ AREA = (Bw + z*h2)*h2        !-- Flow area
 Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- conveyance
 
 Kf =  (1.0-w)*Kd + w*Ku      !-- conveyance
-DIFFUSION = Kf * sqrt(abs(Sf))*sgn
-vel = DIFFUSION / AREA
+q = Kf * sqrt(abs(Sf))*sgn
+vel = q / AREA
 
 !!!TLE hack
-if (vel .gt. 1.0) then
-    vel = 1.0
-endif
+!if (vel .gt. 1.0) then
+!    vel = 1.0
+!endif
 
 100 format('z1,z2,h1,h2,kf,Dif, Sf, sgn  ',f8.3,2x,f8.3,2x,f8.4,2x,f8.4,2x,f8.3,2x,f8.3,2x,f8.3,2x,f8.0)
 
-end function DIFFUSION
+end subroutine DIFFUSION
+
 ! ----------------------------------------------------------------
 
 subroutine SUBMUSKINGCUNGE(    &
@@ -1019,6 +1023,9 @@ END SUBROUTINE SUBMUSKINGCUNGE
                call hydro_stop("In drive_CHANNEL() - Error node_area")
            endif
 
+           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
+              print *, "ADCHECK_DRIVE1 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
+           endif
 
 
 nodeType:if((CH_NETRT(CHANXI(i), CHANYJ(i) ) .eq. 0) .and. &
@@ -1150,9 +1157,9 @@ end if
 #endif
            if (TYPEL(i) .eq. 0 .AND. HLINKTMP(FROM_NODE(i)) .gt. RETDEP_CHAN) then
                if(from_node(i) .ne. to_node(i) .and. (to_node(i) .gt. 0) .and.(from_node(i) .gt. 0) ) &  ! added by Wei Yu
-                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
+                   call DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                      HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i))
+                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
             else !--  we are just computing critical depth for outflow points
 !!AD: Check this boundary condition for stability in water temperature calculations
                QLINK(i,1) =0.
@@ -1314,6 +1321,10 @@ end if
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
 
+           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
+              print *, "ADCHECK_DRIVE2 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
+           endif
+
            if( TYPEL(i).eq.0 .and. CVOLTMP(i) .ge. 0.001 .and.(CVOLTMP(i)-QSUM(i)*DTCT)/CVOLTMP(i) .le. -0.01 ) then
             flag = -99
 #ifdef HYDRO_D
@@ -1373,6 +1384,10 @@ end if
         do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
 
+           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
+              print *, "ADCHECK_DRIVE3 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
+           endif
+
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
               ! Volume-weighted temperature
               !ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
@@ -1403,16 +1418,14 @@ end if
 
                ! change in volume is inflow, lateral flow, and outflow
                !yw DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*DXRT),HLINKTMP(i), &
-                   !if (i .eq. 1798) then
+                   if (localprint) then
                      print *, "ADCHECK_TYPEL1: i, H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
                      print *, "    QSUM QLateral", QSUM(i), QLateral(i) 
-                   !endif
-                   !CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
-                   !    DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                   !    CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
-                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
-                       DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
-                       CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
+                   endif
+                   !call DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                   call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
+                          CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
+                   CVOLTMP(i) = CVOLTMP(i) + ( QSUM(i) + QLateral(i) - QLINK(i,1) ) * DTCT
           elseif (TYPEL(i) .eq. 2) then              !--- into a reservoir, assume critical depth
               if ((QSUM(i)+QLateral(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
@@ -1424,14 +1437,21 @@ end if
              endif
 
               !-- compute volume in reach (m^3)
-                   !if (i .eq. 1819) then
+                   if (localprint) then
                      print *, "ADCHECK_TYPEL2: i H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
                      print *, "    QSUM QLateral", QSUM(i), QLateral(i)
-                  !endif
-                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
-                          !DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                          DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
-                             CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i)) ) * DTCT
+                   endif
+                  !call DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                  call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
+                          CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
+                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - QLINK(i,1)) * DTCT
+                   if (CVOLTMP(i) < 0) then
+                     print *, "ADCHECK_TYPEL2_NEGCVOL: i H CVOL", i, HLINKTMP(i), CVOLTMP(i)
+                     print *, "    QSUM QLateral", QSUM(i), QLateral(i)
+                     print *, "    MannN Bw ChSSlp", MannN(i), Bw(i), ChSSlp(i)
+                     print *, "    So CHANLEN vel", So(i), CHANLEN(i), velocity(i)
+                     print *, "    Diffusion", QLINK(i,1)
+                   endif
           else
               print *, "FATAL ERROR: This node does not have a type.. error TYPEL =", TYPEL(i)
               call hydro_stop("In drive_CHANNEL() - error TYPEL")
@@ -1581,9 +1601,9 @@ end if
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
             if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
-                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
+                   call DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                       HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), velocity(i))
+                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
 		      !--Reza-------------------------------------------------------
                       XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
 	                                            sqrt(1.0 + ChSSlp(i)*ChSSlp(i))

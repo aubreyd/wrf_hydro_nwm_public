@@ -1861,15 +1861,20 @@ subroutine LandRT_ini(did)
               endif
            endif
 
-           rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j))*rt_domain(did)%HLINK(j)*rt_domain(did)%CHANLEN(j) !-- initalize channel volume
-           if (rt_domain(did)%CVOL(j) .lt. 0) then
-             print *, "ADCHECK_INIT CVOL H LEN:", rt_domain(did)%CVOL(j), rt_domain(did)%HLINK(j), rt_domain(did)%CHANLEN(j)
-             rt_domain(did)%CVOL(j) = 10.0
+           ! Edge cells have CHANLEN < 0 but we do not want negative CVOLs
+           if (rt_domain(did)%CHANLEN(j) > 0) then
+             rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j))*rt_domain(did)%HLINK(j)*rt_domain(did)%CHANLEN(j) !-- initalize channel volume
+           !else ! Picking an arbitrary channel length... need to fix
+           !  rt_domain(did)%CVOL(j) = (rt_domain(did)%Bw(j)+ 1/rt_domain(did)%ChSSLP(j)*rt_domain(did)%HLINK(j))*rt_domain(did)%HLINK(j)*250.0
            endif
+           if (rt_domain(did)%CVOL(j) < 0 .or. rt_domain(did)%CVOL(j) > 1000000.0) then
+              print *, "ADCHECK_INIT j cvol hlink", j, rt_domain(did)%CVOL(j), rt_domain(did)%HLINK(j)
+              print *, "   Bw ChSSLP CHANLEN", rt_domain(did)%Bw(j), rt_domain(did)%ChSSLP(j), rt_domain(did)%CHANLEN(j)
+           endif
+             
         end do
 
      endif  !End if channel option eq 3; else;
-
 
      ! Initialize Lake Elevations for Gridded and NWM routing.
      do j=1,rt_domain(did)%NLAKES
