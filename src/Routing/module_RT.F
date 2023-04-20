@@ -484,6 +484,7 @@ CONTAINS
         allocate( rt_domain(did)%InflowUpstreamTemp(nsizes) )
         allocate( rt_domain(did)%Outflow(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
+        allocate( rt_domain(did)%CVOLTMP(nsizes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
         rt_domain(did)%RelH_fine_1D       = 0.
@@ -510,6 +511,7 @@ CONTAINS
         rt_domain(did)%InflowUpstreamTemp = 10.
         rt_domain(did)%Outflow            = 0.
         rt_domain(did)%LakeOutflowTemp    = 10.
+        rt_domain(did)%CVOLTMP            = 0.
 
         if( nlst(did)%channel_option .eq. 2 ) then
            allocate( rt_domain(did)%qloss(nsizes) )
@@ -613,7 +615,7 @@ subroutine getChanDim(did)
   implicit none
 
   integer ixrt,jxrt, ix,jx, did, i,j
-  integer, allocatable,dimension(:,:) :: CH_NETLNK, GCH_NETLNK
+  integer(kind=int64), allocatable,dimension(:,:) :: CH_NETLNK, GCH_NETLNK
   !INTEGER, dimension( rt_domain(did)%ixrt,GCH_NETLNK(ixrt,jxrt)) :: GCH_NETLNK, CH_NETLNK
 
   real :: Vmax

@@ -722,7 +722,7 @@ end subroutine get_albedo12m_netcdf
         INTEGER, INTENT(IN)                          :: IXRT,JXRT
         INTEGER                                      :: CHNID,cnt
         INTEGER, DIMENSION(IXRT,JXRT)                :: CH_NETRT   !- binary channel mask
-        INTEGER, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: CH_NETLNK  !- each node gets unique id
+        INTEGER(kind=int64), INTENT(INOUT), DIMENSION(IXRT,JXRT) :: CH_NETLNK  !- each node gets unique id
         INTEGER, DIMENSION(IXRT,JXRT)                :: DIRECTION  !- flow direction
         INTEGER, DIMENSION(IXRT,JXRT)                :: LAKE_MSKRT
         REAL, DIMENSION(IXRT,JXRT)                   :: LAT, LON
@@ -5565,10 +5565,10 @@ end subroutine mpp_output_chrt
         INTEGER, INTENT(IN)                          :: IXRT,JXRT
         INTEGER                                      :: CHNID,cnt
         INTEGER, DIMENSION(IXRT,JXRT)                :: CH_NETRT   !- binary channel mask
-        INTEGER, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: CH_NETLNK  !- each node gets unique id
-        INTEGER, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: GCH_NETLNK  !- each node gets unique id based on global domain
+        INTEGER(kind=int64), INTENT(INOUT), DIMENSION(IXRT,JXRT) :: CH_NETLNK  !- each node gets unique id
+        INTEGER(kind=int64), INTENT(INOUT), DIMENSION(IXRT,JXRT) :: GCH_NETLNK  !- each node gets unique id based on global domain
         ! INTEGER, DIMENSION(g_IXRT,g_JXRT) :: g_CH_NETLNK  ! temp array
-        INTEGER, allocatable,DIMENSION(:,:) :: g_CH_NETLNK  ! temp array
+        INTEGER(kind=int64), allocatable,DIMENSION(:,:) :: g_CH_NETLNK  ! temp array
         INTEGER, DIMENSION(IXRT,JXRT)                :: DIRECTION  !- flow direction
         INTEGER, DIMENSION(IXRT,JXRT)                :: LAKE_MSKRT
         REAL, DIMENSION(IXRT,JXRT)                   :: LAT, LON
@@ -5600,7 +5600,7 @@ end subroutine mpp_output_chrt
         call mpp_land_bcast_int1(NLAKES)
 
 
-        call decompose_RT_int(g_CH_NETLNK,GCH_NETLNK,g_IXRT,g_JXRT,ixrt,jxrt)
+        call decompose_RT_int8(g_CH_NETLNK,GCH_NETLNK,g_IXRT,g_JXRT,ixrt,jxrt)
         if(allocated(g_CH_NETLNK)) deallocate(g_CH_NETLNK)
         ywcount = 0
         CH_NETLNK = -9999

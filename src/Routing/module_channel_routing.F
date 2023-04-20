@@ -774,7 +774,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
-        localprint = .false.
+        localprint = .true.
 
         ! Initialize local channel temperature variables
         ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
@@ -1008,6 +1008,16 @@ END SUBROUTINE SUBMUSKINGCUNGE
 
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
 
+if (localprint) then
+  print *, "ADCHECK_ORIENT_DRIVE: 67,48"
+  print *, "  CH_NETLNK FROM TO", CH_NETLNK(67,48), FROM_NODE(CH_NETLNK(67,48)), TO_NODE(CH_NETLNK(67,48))
+  print *, "  ZELEV FROM TO", ZELEV(FROM_NODE(CH_NETLNK(67,48))), ZELEV(TO_NODE(CH_NETLNK(67,48)))
+  print *, "  CH_NETRT LAKE_MSKRT", CH_NETRT(67,48), LAKE_MSKRT(67,48)
+  print *, "ADCHECK_ORIENT_DRIVE: 151,49"
+  print *, "  CH_NETLNK FROM TO", CH_NETLNK(151,49), FROM_NODE(CH_NETLNK(151,49)), TO_NODE(CH_NETLNK(151,49))
+  print *, "  ZELEV FROM TO", ZELEV(FROM_NODE(CH_NETLNK(151,49))), ZELEV(TO_NODE(CH_NETLNK(151,49)))
+  print *, "  CH_NETRT LAKE_MSKRT", CH_NETRT(151,49), LAKE_MSKRT(151,49)
+endif
 
 !-- vectorize
 !---------------------
@@ -1129,11 +1139,13 @@ gwOption:   if(gwBaseSwCRT == 3) then
 
 if (localprint) then
 print *, "ADCHECK1A: After qlateral and inflow land & gw calcs."
-print *, "ADCHECK1A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK1A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK1A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47)) 
-print *, "ADCHECK1A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK1A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
+print *, "ADCHECK1A: 67,48 LakeOutflowTemp", CH_NETLNK(67,48), LakeOutflowTemp(CH_NETRT(67,48))
+print *, "ADCHECK1A: 67,48 InflowUpstreamTemp", CH_NETLNK(67,48), InflowUpstreamTemp(CH_NETLNK(67,48))
+print *, "ADCHECK1A: 66,47 InflowUpstreamTemp", CH_NETLNK(66,47), InflowUpstreamTemp(CH_NETLNK(66,47)) 
+print *, "ADCHECK1A: 151,49 InflowUpstreamTemp", CH_NETLNK(151,49), InflowUpstreamTemp(CH_NETLNK(151,49))
+print *, "ADCHECK1A: 713 InflowUpstreamTemp", CHANXI(713), CHANYJ(713), InflowUpstreamTemp(713)
+print *, "ADCHECK1A: 1107 InflowUpstreamTemp", CHANXI(1107), CHANYJ(1107), InflowUpstreamTemp(1107)
+print *, "ADCHECK1A: 408 InflowUpstreamTemp", CHANXI(408), CHANYJ(408), InflowUpstreamTemp(408)
 end if
 
 #ifdef MPP_LAND
@@ -1162,7 +1174,9 @@ end if
                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
             else !--  we are just computing critical depth for outflow points
 !!AD: Check this boundary condition for stability in water temperature calculations
-               QLINK(i,1) =0.
+               !QLINK(i,1) =0.
+               call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
+                         CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
             endif
 !              print *, "i = ", i
 !              print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
@@ -1182,10 +1196,12 @@ end if
 
 if (localprint) then
 print *, "ADCHECK1AA: After qlink calcs."
-print *, "ADCHECK1AA: 408 QLINK", QLINK(CH_NETLNK(67,48),1)
-print *, "ADCHECK1AA: 400 QLINK", QLINK(CH_NETLNK(66,47),1)
+print *, "ADCHECK1AA: 67,48 QLINK", QLINK(CH_NETLNK(67,48),1)
+print *, "ADCHECK1AA: 66,47 QLINK", QLINK(CH_NETLNK(66,47),1)
+print *, "ADCHECK1AA: 151,49 QLINK", QLINK(CH_NETLNK(151,49),1)
 print *, "ADCHECK1AA: 713 QLINK", QLINK(713,1)
 print *, "ADCHECK1AA: 1107 QLINK", QLINK(1107,1)
+print *, "ADCHECK1AA: 408 QLINK", QLINK(408,1)
 end if
 
           !-- compute total flow across face, into node
@@ -1460,7 +1476,8 @@ end if
           if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
               HLINKTMP(i) = HEAD(i, CVOLTMP(i)/CHANLEN(i),Bw(i),1/ChSSlp(i))  !--updated depth
           else
-              HLINKTMP(i) = CD(i)  !!!   CRITICALDEPTH(i,QSUM(i)+QLateral(i), Bw(i), 1./ChSSlp(i)) !--critical depth is head
+              !HLINKTMP(i) = CD(i)  !!!   CRITICALDEPTH(i,QSUM(i)+QLateral(i), Bw(i), 1./ChSSlp(i)) !--critical depth is head
+              HLINKTMP(i) = HEAD(i, CVOLTMP(i)/CHANLEN(i),Bw(i),1/ChSSlp(i))
           endif
 
           if(TO_NODE(i) .gt. 0) then
@@ -1605,8 +1622,9 @@ end if
                       HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
                       CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
 		      !--Reza-------------------------------------------------------
-                      XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
-	                                            sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
+                      !XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
+	              !                              sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
+                      XS_Peremeter(i) = Bw(i) + 2.0 * HLINKTMP(i) * sqrt(1.0 + (1./(ChSSlp(i)*ChSSlp(i)))) ! should be (1/ChSSlp)^2
             endif
 !            print *, "i = ", i
 !            print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
@@ -1675,6 +1693,7 @@ end if
           ! CVOLTMP stores new values including lateral and upstream inflows,
           ! which gets mapped to CVOL below this channel temperature call.
           rt_domain(did)%QSUM = QSUM
+          rt_domain(did)%CVOLTMP = CVOLTMP
           rt_domain(did)%InflowUpstream = InflowUpstream  ! total inflow from upstream reaches (m3/s)
           rt_domain(did)%InflowLand = InflowLand  ! lateral inflow from land (might be duplicate) (m3/s)
           rt_domain(did)%InflowGw = InflowGw  ! inflow from groundwater (might be duplicate) (m3/s)

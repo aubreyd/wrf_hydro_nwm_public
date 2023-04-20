@@ -295,6 +295,7 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstreamTemp
    REAL,    allocatable, DIMENSION(:)   :: Outflow
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
+   REAL,    allocatable, DIMENSION(:)   :: CVOLTMP
 
    ! NEW FOR module_channel_routing.F
    REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter
