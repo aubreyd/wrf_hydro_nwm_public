@@ -136,7 +136,9 @@ module riverTemperatureExecutor
                   rt_domain(did)%T_QSUM_prev,       &
                   rt_domain(did)%NetRad,            &
                   rt_domain(did)%NetRad_prev,       &
-                  rt_domain(did)%NLINKS             &
+                  rt_domain(did)%NLINKS,            &
+                  rt_domain(did)%cvoltmp,           &
+                  rt_domain(did)%chanlen            &
                   )
 
    end subroutine riverTemperature_run

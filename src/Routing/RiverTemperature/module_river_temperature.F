@@ -84,7 +84,8 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
             T_a, H, sfcp, V_wind, C_L, T_bed, s_in, Pw_river, y_w, S_0, z_elv, &
             V_w, W_w, Q_str, Q_GW_cms, Q_Trib_cms, T_GW, T_hyp, T_Trib, T_upstream, albedo, &
             SF, k_s_0, C_E, P_s, CHANXI, CHANYJ, CH_NETLNK, CH_NETRT, QLINK, &
-            node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, totLength)
+            node_area, TO_NODE, TYPEL, T_QSUM_local, T_QSUM_prev, NetRad, NetRad_prev, &
+            totLength, cvoltmp, chanlen)
 
    implicit none
    class(river_temperature_type), intent(inout)  :: this
@@ -104,6 +105,7 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
    real,    intent(in), dimension(:)                :: node_area
    integer(kind=int64), intent(in), dimension(:)    :: TO_NODE
    integer, intent(IN), dimension(:)                :: TYPEL
+   real,    intent(IN), dimension(totLength)        :: chanlen
    ! Met variables
    real, intent(IN), dimension(:)     :: T_a        ! Air temperature                                  - As an input
    real, intent(IN), dimension(:)     :: H          ! Humidity (%) - Specific humidity                                - As an input
@@ -123,6 +125,7 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
    real, intent(IN), dimension(:)     :: Q_GW_cms   ! Groundwater flow in the gridded based (cms)               =====> InflowGw
    real, intent(IN), dimension(:)     :: Q_Trib_cms ! Tributarty surface inflow in the gridded based (cms)                 =====> InflowLand
    real, intent(IN), dimension(totLength,2)  :: QLINK
+   real, intent(IN), dimension(totLength)    :: cvoltmp
    ! Channel temperature inputs
    real, intent(IN), dimension(:)     :: T_GW       ! Groundwater flow temperature in the gridded based (C)                  - As an input
    real, intent(IN), dimension(:)     :: T_hyp      ! Hyporheic Flow temperature in the gridded based (C)                  - As an input
@@ -187,13 +190,16 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
    ! Internal logicals
    logical :: first_time_step_DT = .true.
    logical :: first_time_step_DTCT = .true.
+   ! Debug prints
+   logical :: localprint = .false.
+   integer, dimension(7) :: printids = (/ 1, 1795, 408, 409, 399, 1811, 507 /)
 
    !-------------- Initialization --------------
 
    viewSky = 1. - SF
 
    !DT_STEPS = INT(DT/DTCT)   !-- fix the timestep
-   !print *, "DTCT = ", DTCT
+   !print *, "DT DTCT", DT, DTCT
 
    ! update this part
    ! Assigning the upstream water temperature boundary condition to the main matrix
@@ -202,6 +208,17 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
    Q_hyp = 0.
    s1t = 0.
    s2t = 0.
+
+   if (localprint) then
+      print *, "ADCHECK_ORIENT_RIVTEMP: 67,48"
+      print *, "  CH_NETLNK TO", CH_NETLNK(67,48), TO_NODE(CH_NETLNK(67,48))
+      print *, "  ZELEV TO", z_elv(CH_NETLNK(67,48)), z_elv(TO_NODE(CH_NETLNK(67,48)))
+      print *, "  CH_NETRT", CH_NETRT(67,48)
+      print *, "ADCHECK_ORIENT_RIVTEMP: 151,49"
+      print *, "  CH_NETLNK TO", CH_NETLNK(151,49), TO_NODE(CH_NETLNK(151,49))
+      print *, "  ZELEV TO", z_elv(CH_NETLNK(151,49)), z_elv(TO_NODE(CH_NETLNK(151,49)))
+      print *, "  CH_NETRT", CH_NETRT(151,49)
+   endif
 
    !-------------- Hyporheic Solution --------------
 
@@ -219,22 +236,32 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       ! True cond. (m/s); Composite Substrate Hydraulic Conductivity
       k_s = Dummy1 + Dummy2
 
-      h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-      h_D_dn = y_w(TO_NODE(i)) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))  !!!!!TLE: I'm pretty sure we want channel slope here, but Reza is using ChSSlp
+      !ADNOTE: Don't we want total head here? Reza just had water surface height from channel bed. Added bed elevation.
+      !h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+      h_D = y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) + z_elv(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+      !ADNOTE: We already know the downstream reach total head - not sure why recalculating with slope?
+      if (TO_NODE(i) > 0) then
+         !h_D_dn = y_w(TO_NODE(i)) - (dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))  !!!!!TLE: I'm pretty sure we want channel slope here, but Reza is using ChSSlp
+         !h_D_dn = y_w(TO_NODE(i)) + z_elv(TO_NODE(i)) - (CHANLEN(i) * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+         h_D_dn = y_w(TO_NODE(i)) + z_elv(TO_NODE(i))
+      else
+         ! For edge cells, assume uniform water surface elevation and minimum prescribed slope
+         h_D_dn = h_D - (CHANLEN(i) * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+      endif
 
       !Change in hydraulic head per unit distance
-      d_h = (h_D - h_D_dn) / dx
+      !ADNOTE: This should be channel length not dx. Channel length can be diagonal.
+      !d_h = (h_D - h_D_dn) / dx
+      d_h = (h_D - h_D_dn) / CHANLEN(i)
 
       ! Cross-Sectional Area of the Seepage Face (m2)
-      A_s = dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Pw_river(CH_NETLNK(CHANXI(i),CHANYJ(i))) !!!! TLE: Again, I think we want channel slope
+      !ADNOTE: Not sure I understand what area this is supposed to be, but pretty sure dx should be chanlen
+      !A_s = dx * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Pw_river(CH_NETLNK(CHANXI(i),CHANYJ(i))) !!!! TLE: Again, I think we want channel slope
+      A_s = CHANLEN(i) * S_0(CH_NETLNK(CHANXI(i),CHANYJ(i))) * Pw_river(CH_NETLNK(CHANXI(i),CHANYJ(i))) !!!! TLE: Again, I think we want channel slope
+
       ! Darcy’s Law for Calculating for Hyporheic Flow (cms
       !      Q_hyp(CHANXI(i),CHANYJ(i)) = A_s * k_s * d_h
       Q_hyp(CHANXI(i),CHANYJ(i)) = 0
-
-      !print *, "S_0 = ", S_0(i)
-      !print *, "d_h = ", d_h
-      !print *, "A_s = ", A_s
-      !print *, "Q_hyp(i) = ", Q_hyp(CHANXI(i),CHANYJ(i))
 
       ! Calculating dispersion coefficient
       ! Calculate dispersion using equations adapted from SubMcCormick1 - HeatSourceModel source code
@@ -265,6 +292,25 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       if (y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) .EQ. 0.) then
          Disp_coef(CHANXI(i),CHANYJ(i)) = 0.
       end if
+
+      if ( localprint .and. any(printids == i) ) then
+         print *, "-LOOP1------------------------------------------"
+         print *, "i = ", i
+         print *, "S_0 = ", S_0(i)
+         print *, "h_D = ", h_D
+         print *, "h_D_dn = ", h_D_dn
+         print *, "d_h = ", d_h
+         print *, "A_s = ", A_s
+         print *, "chanlen = ", CHANLEN(i)
+         print *, "to node = ", TO_NODE(i)
+         print *, "Q_hyp(i) = ", Q_hyp(CHANXI(i),CHANYJ(i))
+         print *, "h_self h_dn", y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))), y_w(TO_NODE(i))
+         print *, "z_self z_dn", z_elv(CH_NETLNK(CHANXI(i),CHANYJ(i))), z_elv(TO_NODE(i))
+         print *, "vel = ", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         print *, "top width = ", W_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         print *, "shear vel =", Shear_Velocity
+         print *, "disp =", Disp_coef(CHANXI(i),CHANYJ(i))
+      endif
 
    end do hyporheicLoop
 
@@ -328,24 +374,34 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
              (rho_water * c_water * y_w(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
          ! Calculate mixture temperature for each node and time step
-#ifdef HYDRO_D
-         print *, "k = ", k
-         print *, "i = ", i
-         print *, "-----------ADVECTION-----------"
-         print *, "CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", CH_NETLNK(CHANXI(i),CHANYJ(i))
-         print *, "-----SW_rad-----"
-         print *, "SW_rad = ", SW_rad
-         print *, "-----LW_rad-----"
-         print *, "LW_rad = ", LW_rad
-         print *, "-----LH-----"
-         print *, "LH = ", LH
-         print *, "-----SH-----"
-         print *, "SH = ", SH
-         print *, "-----CH-----"
-         print *, "CH = ", CH
-         print *, "------------"
-         print *, "NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-#endif
+!#ifdef HYDRO_D
+         if ( localprint .and. any(printids == i) ) then
+            print *, "-LOOP2-----------------------------------------"
+            print *, "i = ", i
+            print *, "chanx chany", CHANXI(i),CHANYJ(i)
+            print *, "-----------ADVECTION-----------"
+            print *, "CH_NETLNK(CHANXI(i),CHANYJ(i)) = ", CH_NETLNK(CHANXI(i),CHANYJ(i))
+            print *, "TYPEL = ", TYPEL(i)
+            print *, "T_w_sim_temp = ", T_w_sim_temp(i)
+            print *, "T_a = ", T_a(i)
+            print *, "H = ", H(i)
+            print *, "sfcp = ", sfcp(i)
+            print *, "V_wind = ", V_wind(i)
+            print *, "z_elv = ", z_elv(i)
+            print *, "-----SW_rad-----"
+            print *, "SW_rad = ", SW_rad
+            print *, "-----LW_rad-----"
+            print *, "LW_rad = ", LW_rad
+            print *, "-----LH-----"
+            print *, "LH = ", LH
+            print *, "-----SH-----"
+            print *, "SH = ", SH
+            print *, "-----CH-----"
+            print *, "CH = ", CH
+            print *, "------------"
+            print *, "NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i))) = ", NetRad(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         endif
+!#endif
 
          !!!TLE: Incorporating the MacCormick (1969) finite difference approximation of
          ! the one-dimensional heat transfer equation (as documented in Boyd and Kasper (2003), p.68, Eq. 2-119 -- 2-122)
@@ -369,16 +425,21 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
                   (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.))) + &
                   (NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
 
-#ifdef HYDRO_D
-         print *, "---MacCormick Step 1---"
-         print *, "term1 = ", (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx))
-         print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) =", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-         print *, "T_QSUM_prev(i) =", T_QSUM_prev(i)
-         print *, "T_down =", T_down
-         print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.)))
-         print *, "term3 = ", (NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
-         print *, "s1t = ", s1t(i)
-#endif
+!#ifdef HYDRO_D
+         if ( localprint .and. any(printids == i) ) then
+            print *, "---MacCormick Step 1---"
+            print *, "i = ", i
+            print *, "term1 = ", (-1. * V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) * ((T_down - T_QSUM_prev(i))/dx))
+            print *, "V_w(CH_NETLNK(CHANXI(i),CHANYJ(i))) =", V_w(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+            print *, "T_QSUM_prev(i) =", T_QSUM_prev(i)
+            print *, "T_down =", T_down
+            print *, "T_up =", T_up
+            print *, "Disp =", Disp_coef(CHANXI(i),CHANYJ(i))
+            print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down-(2.*T_QSUM_prev(i))+T_up)/(dx**2.)))
+            print *, "term3 = ", (NetRad_prev(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+            print *, "s1t = ", s1t(i)
+         endif
+!#endif
 
          !first approximation of T_w
          T_w_sim_temp(i) = T_QSUM_prev(i) + (s1t(i) * DT)
@@ -436,15 +497,19 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
                   (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down - (2.*T_w_sim_temp(i)) + T_up)/(dx**2.))) + &
                   (NetRad(i))
 
-#ifdef HYDRO_D
-         print *, "---MacCormick Step 2---"
-         print *, "term1"
-         print *, "v_w(i) = ", V_w(i)
-         print *, "(T_w_sim_temp(i) - T_up) = ", (T_w_sim_temp(i) - T_up)
-         print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down - (2.*T_w_sim_temp(i)) + T_up)/(dx**2.)))
-         print *, "term3 = ", (NetRad(i))
-         print *, "s2t = ", s2t(i)
-#endif
+!#ifdef HYDRO_D
+         if ( localprint .and. any(printids == i) ) then
+            print *, "-LOOP3------------------------------------------"
+            print *, "---MacCormick Step 2---"
+            print *, "i = ", i
+            print *, "term1"
+            print *, "v_w(i) = ", V_w(i)
+            print *, "(T_w_sim_temp(i) - T_up) = ", (T_w_sim_temp(i) - T_up)
+            print *, "term2 = ", (Disp_coef(CHANXI(i),CHANYJ(i)) * ((T_down - (2.*T_w_sim_temp(i)) + T_up)/(dx**2.)))
+            print *, "term3 = ", (NetRad(i))
+            print *, "s2t = ", s2t(i)
+         endif
+!#endif
 
          !final T_w estimate
          T_w_sim_temp(i) = T_QSUM_prev(i) + (((s1t(i) + s2t(i))/2.)*DT)
@@ -509,12 +574,17 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
       !-- to Deg K
       T_strTot = T_strTot + 273.2
 
-      T_QSUM_local(i) = (((Q_strTot) * T_strTot) + & !(((Q_strTot*-1.) * T_strTot) + &
-          (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i)) + &
-          (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
-          ((Q_strTot)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+      ! ADNOTE: Changing from Q to volume-based weighting
+      !T_QSUM_local(i) = (((Q_strTot) * T_strTot) + & !(((Q_strTot*-1.) * T_strTot) + &
+      !    (QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)*T_w_sim(i)) + &
+      !    (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*TLateral(i))) / &
+      !    ((Q_strTot)+QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)+QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))
+      T_QSUM_local(i) = ((Q_strTot * T_strTot * DTCT) + &
+          (CVOLTMP(CH_NETLNK(CHANXI(i),CHANYJ(i))) * T_w_sim(i)) + &
+          (QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) * TLateral(i) * DTCT)) / &
+          ( Q_strTot*DTCT + CVOLTMP(CH_NETLNK(CHANXI(i),CHANYJ(i))) + QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))*DTCT )
 
-#ifdef HYDRO_D
+!#ifdef HYDRO_D
       !TLE TEMPORARY: calculate the relative contribution of each Q source (percentage of total Q)
       percent_Q_LINK(i) = (ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)) / &
            (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
@@ -522,30 +592,31 @@ subroutine river_TEMPERATURE_SOLVER(this, dx, DT, DTCT, IXRT, JXRT,  &
            (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
       percent_Q_Lateral(i) = (ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))) / &
            (ABS(Q_strTot)+ABS(QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1))+ABS(QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))))))*100
-      print *,"---------------------------"
-      print *,"i=", i
-      print *,"CHANXI(i)=",CHANXI(i)
-      print *,"CHANYJ(i)=",CHANYJ(i)
-      print *,"CH_NETLNK(CHANXI(i),CHANYJ(i))=", CH_NETLNK(CHANXI(i),CHANYJ(i))
-      print *,"Q_strTot=", Q_strTot
-      print *,"T_strTot=", T_strTot
-      print *,"QLINK(i,1)=", QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
-      !print *,"T_w_sim_temp=", T_w_sim_temp(i)
-      print *,"T_w_sim(i,2)=", T_w_sim(i)
-      print *,"T_QSUM_local(i)", T_QSUM_local(i)
-      print *,"Q_hyp(i)", Q_hyp(CHANXI(i),CHANYJ(i))
-      !print *,"Q_GW(i)", Q_GW(CHANXI(i),CHANYJ(i))
-      print *,"Q_GW_cms(i)", Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-      !print *,"Q_trib(i)", Q_trib(CHANXI(i),CHANYJ(i))
-      print *,"Q_Trib_cms(i)", Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-      print *,"QLateral=", QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-      print *,"TLateral=", TLateral(i)
-      print *,"% QLINK=", percent_Q_LINK(i)
-      print *,"% Qstr=", percent_Q_strTot(i)
-      print *,"% Qlat=", percent_Q_Lateral(i)
-      print *,"---------------------------"
-      !print *, "QLINK:", QLINK
-#endif
+      if ( localprint .and. any(printids == i) ) then
+         print *, "-LOOP4------------------------------------------"
+         print *,"i=", i
+         print *,"CHANXI(i)=",CHANXI(i)
+         print *,"CHANYJ(i)=",CHANYJ(i)
+         print *,"CH_NETLNK(CHANXI(i),CHANYJ(i))=", CH_NETLNK(CHANXI(i),CHANYJ(i))
+         print *,"Q_strTot=", Q_strTot
+         print *,"T_strTot=", T_strTot
+         print *,"QLINK(i,1)=", QLINK(CH_NETLNK(CHANXI(i),CHANYJ(i)),1)
+         !print *,"T_w_sim_temp=", T_w_sim_temp(i)
+         print *,"T_w_sim(i,2)=", T_w_sim(i)
+         print *,"T_QSUM_local(i)", T_QSUM_local(i)
+         print *,"Q_hyp(i)", Q_hyp(CHANXI(i),CHANYJ(i))
+         !print *,"Q_GW(i)", Q_GW(CHANXI(i),CHANYJ(i))
+         print *,"Q_GW_cms(i)", Q_GW_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         !print *,"Q_trib(i)", Q_trib(CHANXI(i),CHANYJ(i))
+         print *,"Q_Trib_cms(i)", Q_Trib_cms(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         print *,"QLateral=", QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i)))
+         print *,"TLateral=", TLateral(i)
+         print *,"% QLINK=", percent_Q_LINK(i)
+         print *,"% Qstr=", percent_Q_strTot(i)
+         print *,"% Qlat=", percent_Q_Lateral(i)
+         print *,"CVOLTMP:", CVOLTMP(i)
+      end if
+!#endif
 
       ! Deg K to Deg C for the output and energy balance
       T_QSUM_local(i) = T_QSUM_local(i) - 273.2

@@ -36,7 +36,7 @@ module module_channel_routing
       real, dimension(:),allocatable           :: node_area
       integer, dimension(:),allocatable        :: TO_NODE
       integer, dimension(:),allocatable        :: TYPEL
-      
+      real, dimension(:), allocatable          :: CVOLTMP      
       
       contains
       procedure :: init => temperature_sim_H_inputs_init
@@ -70,7 +70,8 @@ module module_channel_routing
 
    subroutine temperature_sim_H_inputs_init(this, NLINKS, IXRT, JXRT, ChanCondConst, QSTRMVOLRT,  &
                   QINFLOWBASE, QSUM,  XS_Peremeter, Bw, Tw, velocity, HLINK, ChSSlp, &
-                  CHANXI, CHANYJ, ZELEV, CHANLEN, CH_NETLNK, QLINK, DT_STEPS, DTCT, node_area, TO_NODE, TYPEL)
+                  CHANXI, CHANYJ, ZELEV, CHANLEN, CH_NETLNK, QLINK, DT_STEPS, DTCT, node_area, &
+                  TO_NODE, TYPEL, CVOLTMP)
 
       implicit none
       class(temperature_sim_H_inputs), intent(inout) :: this             ! the type object being initialized
@@ -97,7 +98,8 @@ module module_channel_routing
       real ,   intent(in), dimension(NLINKS)           :: node_area
       integer, intent(in), dimension(NLINKS)           :: TO_NODE
       integer, intent(IN), dimension(NLINKS)           :: TYPEL          !--link
-      
+      real, intent(in),  dimension(NLINKS)             :: CVOLTMP
+
       ! Assign the values passed in to a particular 
       this%NLINKS            = NLINKS
       this%IXRT              = IXRT
@@ -123,7 +125,8 @@ module module_channel_routing
       this%node_area         = node_area
       this%TO_NODE           = TO_NODE
       this%TYPEL             = TYPEL
-      
+      this%CVOLTMP           = CVOLTMP
+ 
    end subroutine temperature_sim_H_inputs_init
 
    ! --------------------------------------------------------------------------

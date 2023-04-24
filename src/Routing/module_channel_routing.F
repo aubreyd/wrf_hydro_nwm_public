@@ -774,7 +774,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
-        localprint = .true.
+        localprint = .false.
 
         ! Initialize local channel temperature variables
         ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.

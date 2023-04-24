@@ -119,8 +119,8 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
    end do ! end J
 
    do i = 1,NLINKS
-      if ((CH_NETRT(CHANXI(i), CHANYJ(i) ) .eq. 0) .and. &
-            (LAKE_MSKRT(CHANXI(i),CHANYJ(i)) .lt.0)) then
+      if ((CH_NETRT(CHANXI(i), CHANYJ(i) ) .ge. 0)) then !.and. &
+            !(LAKE_MSKRT(CHANXI(i),CHANYJ(i)) .lt.0)) then
          Tair_fine_1D(i) = Tair_fine(CHANXI(i),CHANYJ(i))
          SolarRad_fine_1D(i) = SolarRad_fine(CHANXI(i),CHANYJ(i))
          RelH_fine_1D(i) = RelH_fine(CHANXI(i),CHANYJ(i))
@@ -130,6 +130,11 @@ subroutine disaggregateWeather(this, IX, JX, IXRT, JXRT, Tair, SolarRad, RelH, w
          TSLB_1D_fine(i) = TSLB_fine(CHANXI(i),CHANYJ(i))
          SFCP_1D(i) = (SFCP_fine(CHANXI(i),CHANYJ(i))/1000.0) !conversion from Pa to kPa
       end if
+      !if ((CHANXI(i) .eq. 67 .and. CHANYJ(i) .eq. 48) .or. (CHANXI(i) .eq. 151 .and. CHANYJ(i) .eq. 49)) then
+      !   print *, "ADCHECK_ORIENT_WEATH: i CHANXI CHANYJ", i, CHANXI(i), CHANYJ(i)
+      !   print *, "  CH_NETRT, LAKE_MSKRT", CH_NETRT(CHANXI(i), CHANYJ(i) ), LAKE_MSKRT(CHANXI(i),CHANYJ(i))
+      !   print *, "  T_air H wind", Tair_fine_1D(i), RelH_fine_1D(i), windSpd_fine_1D(i)
+      !endif
    end do
 
 end subroutine disaggregateWeather
