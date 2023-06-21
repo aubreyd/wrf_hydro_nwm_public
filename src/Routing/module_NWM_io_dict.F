@@ -790,11 +790,11 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
                                  -9999.0,-9999.0,-9999.0,-9999.0]  ! tracers
    chrtOutDict%validMinDbl(:) = [0.0d0, -50000.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
                                  0.0d0, 0.0d0, 0.0d0,&
-                                 0.0,0.0,0.0,0.0]  ! tracers
+                                 0.0d0, 0.0d0 ,0.0d0 ,0.0d0]  ! tracers
    chrtOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, &
                                  20000.0d0, 20000.0d0, 20000.0d0, 50000.0d0, &
                                  50000.0d0, 50000.0d0,&
-                                 500000.0,500000.0,500000.0,500000.0]  ! tracers
+                                 500000.0d0,500000.0d0,500000.0d0,500000.0d0]  ! tracers
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numChVars

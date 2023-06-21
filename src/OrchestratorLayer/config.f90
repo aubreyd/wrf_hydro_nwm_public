@@ -59,6 +59,14 @@ module config_base
      REAL, DIMENSION(MAX_SOIL_LEVELS) :: soil_thick_input       ! depth to soil interfaces from namelist [m]
      integer :: rst_bi_out, rst_bi_in !0: default netcdf format. 1: binary write/read by each core.
      CHARACTER(LEN = 256) :: spatial_filename
+     ! water tracers
+     integer            :: water_tracer_option = 0
+     character(len=256) :: track_start = ""
+     character(len=256) :: track_end = ""
+     integer            :: partial_mixing_option = 0
+     integer            :: wvtflag = 0
+     integer, dimension(MAX_SOIL_LEVELS) :: tracer_sublayer ! number of sublayers for tracer
+
   end type NOAHLSM_OFFLINE_
 
   type WRF_HYDRO_OFFLINE_
@@ -164,6 +172,13 @@ module config_base
      integer            :: imperv_adj
 
      logical            :: channel_bypass = .FALSE.
+
+     ! water tracer
+     ! ADNOTE: Are these duplicated from hrldas namelist? Why repeat in hydro namelist?
+     integer                             :: NTRACER      ! sum of NSUB
+     integer, dimension(MAX_SOIL_LEVELS) :: NSUB         ! number of sublayer for tracer
+     integer                             :: PMOPT        ! partial mixing option
+     integer                             :: WVTFLAG
 
    contains
 
@@ -828,6 +843,12 @@ contains
     nlst(did)%noConstInterfBias      = noConstInterfBias
 #endif
 
+    ! water tracer
+    nlst(did)%NSUB       = -999
+    nlst(did)%NTRACER    = -999
+    nlst(did)%PMOPT      = -999
+    nlst(did)%WVTFLAG    = -999
+
     call nlst(did)%check()
 
     ! derive rtFlag
@@ -927,6 +948,20 @@ contains
     integer  :: finemesh, finemesh_factor
     integer  :: forc_typ, snow_assim
 
+    !------water tracer namelist variables----------------
+    integer                                 :: water_tracer_option = 0 ! 0-water tracer off, 1-water tracer on
+    character(len=256)                      :: track_start = " "   ! YYYY-MM-DD
+    character(len=256)                      :: track_end = " "     ! YYYY-MM-DD
+    integer                                 :: partial_mixing_option = 0 ! partial mixing option (0-complete mixing, 1-partial mixing)
+    integer, dimension(MAX_SOIL_LEVELS)     :: tracer_sublayer ! number of sublayers for tracer
+    !-----variables read fro namelist--------
+    !integer                                 :: OPT_WT       ! 0-water tracer off, 1-water tracer on
+    !character(len=19)                       :: wvtstart     ! YYYY-MM-DD_hh:mm:ss
+    !character(len=19)                       :: wvtend       ! YYYY-MM-DD_hh:mm:ss
+    !integer                                 :: IOPT_PM      ! partial mixing option (0-complete mixing, 1-partial mixing)
+    !integer                                 :: NTRACER      ! sum of NSUB
+    !integer, dimension(MAX_SOIL_LEVELS) :: NSUB         ! number of sublayer for tracer
+
     namelist / NOAHLSM_OFFLINE /    &
          indir, nsoil, soil_thick_input, forcing_timestep, noah_timestep, &
          start_year, start_month, start_day, start_hour, start_min, &
@@ -946,7 +981,8 @@ contains
          khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
          spatial_filename, &
          external_veg_filename_template, external_lai_filename_template, &
-         xstart, xend, ystart, yend, rst_bi_out, rst_bi_in
+         xstart, xend, ystart, yend, rst_bi_out, rst_bi_in, &
+         water_tracer_option, track_start, track_end, partial_mixing_option, tracer_sublayer
 
     namelist /WRF_HYDRO_OFFLINE/ &
          finemesh,finemesh_factor,forc_typ, snow_assim
@@ -967,10 +1003,10 @@ contains
     noah_lsm%output_timestep         = -999
     noah_lsm%restart_frequency_hours = -999
     noah_lsm%tracer_sublayer         = -999       ! water tracer sublayers
-    noah_lsm%wvtflag                 = -999       ! flag for water tracer
-    nlst_rt(did)%wvtflag    = -999
-    nlst_rt(did)%NTRACER    = -999
-    nlst_rt(did)%PMOPT      = -999
+    !noah_lsm%wvtflag                 = -999       ! flag for water tracer
+    !nlst_rt(did)%wvtflag    = -999
+    !nlst_rt(did)%NTRACER    = -999
+    !nlst_rt(did)%PMOPT      = -999
 
     write(*,*) 'Calling config noahlsm_offline'
 
@@ -1083,6 +1119,13 @@ contains
     noah_lsm%rst_bi_out = rst_bi_out
     noah_lsm%rst_bi_in = rst_bi_in
     noah_lsm%spatial_filename = spatial_filename
+
+    ! water tracers
+    noah_lsm%water_tracer_option = water_tracer_option
+    noah_lsm%track_start = track_start
+    noah_lsm%track_end = track_end
+    noah_lsm%partial_mixing_option = partial_mixing_option
+    noah_lsm%tracer_sublayer = tracer_sublayer
 
   end subroutine init_noah_lsm_and_wrf_hydro
 

@@ -178,7 +178,7 @@ CONTAINS
            RT_DOMAIN(did)%infxsrt = infxsrt
            RT_DOMAIN(did)%soldrain = soldrain
            if (present(WVTFLAG)) then
-             nlst_rt(did)%wvtflag       = WVTFLAG
+             nlst(did)%wvtflag       = WVTFLAG
              RT_DOMAIN(did)%SMC_SUB     = SMC_SUB
              RT_DOMAIN(did)%SH2OX_SUB   = SH2OX_SUB
              RT_DOMAIN(did)%SMC_TR      = SMC_TR
@@ -321,7 +321,7 @@ CONTAINS
             infxsrt_tr   = rt_domain(did)%infxsrt_tr
           end if
 !------------------------
-          if(nlst_rt(did)%rst_typ .eq. 1) then
+          if(nlst(did)%rst_typ .eq. 1) then
              STC = rt_domain(did)%STC
              SMC = rt_domain(did)%SMC
              SH2OX = rt_domain(did)%SH2OX

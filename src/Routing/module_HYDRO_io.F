@@ -5871,7 +5871,7 @@ end subroutine mpp_output_chrt
 
 ! define dimension for variables
           iret = nf90_def_dim(ncid, "depth", nlst(did)%nsoil, dimid_soil)  !-- 3-d soils
-          if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_dim(ncid, "ntracer", nlst_rt(did)%NTRACER, dimid_tracer)  !wt calc   
+          if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_dim(ncid, "ntracer", nlst(did)%NTRACER, dimid_tracer)  !wt calc   
 #ifdef MPP_LAND
           iret = nf90_def_dim(ncid, "ix", global_nx, dimid_ix)  !-- make a decimated grid
           iret = nf90_def_dim(ncid, "iy", global_ny, dimid_jx)
@@ -5921,14 +5921,14 @@ end subroutine mpp_output_chrt
                else
                   write(tmpStr, '(i2)') n
                endif
-               iret = nf_def_var(ncid,"smc_tr"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
-               iret = nf_def_var(ncid,"sh2ox_tr"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
-               iret = nf_def_var(ncid,"smc_sub"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
-               iret = nf_def_var(ncid,"sh2ox_sub"//trim(tmpStr),NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+               iret = nf90_def_var(ncid, "smc_tr"//trim(tmpStr), NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+               iret = nf90_def_var(ncid, "sh2ox_tr"//trim(tmpStr), NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+               iret = nf90_def_var(ncid, "smc_sub"//trim(tmpStr), NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+               iret = nf90_def_var(ncid, "sh2ox_sub"//trim(tmpStr), NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
             end do
-            iret = nf_def_var(ncid,"infxsrt_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
-            iret = nf_def_var(ncid,"soldrain_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
-            iret = nf_def_var(ncid,"sfcheadrt_tr",NF_FLOAT,2,(/dimid_ix,dimid_jx/),varid)
+            iret = nf90_def_var(ncid, "infxsrt_tr", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+            iret = nf90_def_var(ncid, "soldrain_tr", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
+            iret = nf90_def_var(ncid, "sfcheadrt_tr", NF90_FLOAT, (/dimid_ix,dimid_jx/), varid)
           end if
 !--------------------------------------------------------
 
@@ -5955,8 +5955,8 @@ end subroutine mpp_output_chrt
 ! Needed for water tracer capability
 !--------------------------------------------------------
           if (nlst(did)%NTRACER .gt. 1) then
-            iret = nf90_def_var(ncid,"QBDRYRT_TR",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)
-            iret = nf90_def_var(ncid,"sfcheadsubrt_tr",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)
+            iret = nf90_def_var(ncid, "QBDRYRT_TR", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
+            iret = nf90_def_var(ncid, "sfcheadsubrt_tr", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
           end if
 !--------------------------------------------------------
           do n = 1, nlst(did)%nsoil
@@ -5984,9 +5984,9 @@ end subroutine mpp_output_chrt
 ! Needed for water tracer capability
 !--------------------------------------------------------
           if (nlst(did)%NTRACER .gt. 1) then
-            iret = nf90_def_var(ncid,"hlink_tr",NF_FLOAT,1,(/dimid_links/),varid)
-            iret = nf90_def_var(ncid,"qlink1_tr",NF_FLOAT,1,(/dimid_links/),varid)
-            iret = nf90_def_var(ncid,"qlink2_tr",NF_FLOAT,1,(/dimid_links/),varid)
+            iret = nf90_def_var(ncid, "hlink_tr", NF90_FLOAT, (/dimid_links/), varid)
+            iret = nf90_def_var(ncid, "qlink1_tr", NF90_FLOAT, (/dimid_links/), varid)
+            iret = nf90_def_var(ncid, "qlink2_tr", NF90_FLOAT, (/dimid_links/), varid)
           end if
 !--------------------------------------------------------
          if(nlst(did)%channel_option .eq. 3) &
@@ -6000,7 +6000,7 @@ end subroutine mpp_output_chrt
          if( nlst(did)%channel_only       .eq. 0 .and. &
              nlst(did)%channelBucket_only .eq. 0         ) &
              iret = nf90_def_var(ncid, "lake_inflort", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)
-             if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid,"lake_inflort_tr",NF_FLOAT,2,(/dimid_ixrt,dimid_jxrt/),varid)      !wt calc
+             if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid, "lake_inflort_tr", NF90_FLOAT, (/dimid_ixrt,dimid_jxrt/), varid)      !wt calc
 
          !! JLM: who wants these? They can be put back if someone cares.
          !! But just calculate accQLateral locally so the redundant variable isnt held in
@@ -6020,14 +6020,14 @@ end subroutine mpp_output_chrt
 
             if(nlst(did)%UDMP_OPT .eq. 1) then
                iret = nf90_def_var(ncid, "z_gwsubbas", NF90_FLOAT, (/dimid_links/), varid)
-               if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid,"z_gwsubbas_tr",NF_FLOAT,1,(/dimid_links/),varid)     !wt calc
+               if (nlst(did)%NTRACER .gt. 1) iret = nf90_def_var(ncid, "z_gwsubbas_tr", NF90_FLOAT, (/dimid_links/), varid)     !wt calc
                !-----partial mixing in gw buckets-------------
                if (nlst(did)%PMOPT .gt. 10 .and. nlst(did)%PMOPT .lt. 20) then
-                 iret = nf90_def_var(ncid,"z_gwsubbas_passive",   NF_FLOAT,1,(/dimid_links/),varid)
-                 iret = nf90_def_var(ncid,"z_gwsubbas_active",    NF_FLOAT,1,(/dimid_links/),varid)
-                 iret = nf90_def_var(ncid,"z_gwsubbas_passive_tr",NF_FLOAT,1,(/dimid_links/),varid)
-                 iret = nf90_def_var(ncid,"z_gwsubbas_active_tr", NF_FLOAT,1,(/dimid_links/),varid)
-                 iret = nf90_def_var(ncid,"cm_gwsubbas",          NF_FLOAT,1,(/dimid_links/),varid)
+                 iret = nf90_def_var(ncid, "z_gwsubbas_passive",   NF90_FLOAT, (/dimid_links/), varid)
+                 iret = nf90_def_var(ncid, "z_gwsubbas_active",    NF90_FLOAT, (/dimid_links/), varid)
+                 iret = nf90_def_var(ncid, "z_gwsubbas_passive_tr",NF90_FLOAT, (/dimid_links/), varid)
+                 iret = nf90_def_var(ncid, "z_gwsubbas_active_tr", NF90_FLOAT, (/dimid_links/), varid)
+                 iret = nf90_def_var(ncid, "cm_gwsubbas",          NF90_FLOAT, (/dimid_links/), varid)
                end if
                !-----end for partial mixing in gw buckets-----
             else

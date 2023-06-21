@@ -330,12 +330,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  FLUXXY_TR    ! tracer flux at soil bottom [m]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SMOIS_SUB    ! volumetric soil moisture in sublayers [m3/m3]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  SH2OXY_SUB     ! volumetric liquid soil moisture in sublayers [m3/m3]
-  !------namelist variables----------------
-  integer                                 :: water_tracer_option ! 0-water tracer off, 1-water tracer on
-  character(len=256)                      :: track_start   ! YYYY-MM-DD
-  character(len=256)                      :: track_end     ! YYYY-MM-DD
-  integer                                 :: partial_mixing_option ! partial mixing option (0-complete mixing, 1-partial mixing)
-  !-----variables read fro namelist--------
+  !-----variables read from namelist--------
   integer                                 :: OPT_WT       ! 0-water tracer off, 1-water tracer on
   character(len=19)                       :: wvtstart     ! YYYY-MM-DD_hh:mm:ss
   character(len=19)                       :: wvtend       ! YYYY-MM-DD_hh:mm:ss
@@ -568,20 +563,20 @@ END INTERFACE
   khour = noah_lsm%khour
 
   !-----water tracer variables--------
-  OPT_WT   = water_tracer_option
+  OPT_WT   = noah_lsm%water_tracer_option
   NTRACER  = 1
   if (OPT_WT .eq. 1) then 
-    nlst_rt(did)%PMOPT   = partial_mixing_option
-    if (partial_mixing_option .eq. 1 .or. partial_mixing_option .eq. 3) then
+    nlst(did)%PMOPT   = noah_lsm%partial_mixing_option
+    if (noah_lsm%partial_mixing_option .eq. 1 .or. noah_lsm%partial_mixing_option .eq. 3) then
       IOPT_PM  = 1
     else
       IOPT_PM  = 0
     end if
-    NSUB     = tracer_sublayer
+    NSUB     = noah_lsm%tracer_sublayer
     NTRACER  = sum(NSUB(1:nsoil))
-    nlst_rt(did)%NTRACER = NTRACER
-    allocate(nlst_rt(did)%NSUB(MAX_SOIL_LEVELS))
-    nlst_rt(did)%NSUB    = NSUB
+    nlst(did)%NTRACER = NTRACER
+    allocate(nlst(did)%NSUB(MAX_SOIL_LEVELS))
+    nlst(did)%NSUB    = NSUB
   end if
   print *, "FLAG1"
   print *, "OPT_WT,IOPT_PM:", OPT_WT, IOPT_PM

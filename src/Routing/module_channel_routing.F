@@ -151,8 +151,7 @@ subroutine SUBMUSKINGCUNGE(    &
      qdc, vel, qloss, idx, qup,  quc, &
      qdp, ql,   dt,  So,   dx, &
      n,   Cs,   Bw,  Tw, TwCC, &
-     nCC, depth, ChannK,       &
-     nCC, depth                &
+     nCC, depth, ChannK       &
      , wvtflag_pass, qdc_tr    & !wt vars
      , qup_tr, quc_tr, qdp_tr  & !wt vars
      , ql_tr, depth_tr     )     !wt vars
@@ -1681,7 +1680,6 @@ end subroutine drive_CHANNEL
        , HLINK                                       &
        , nsize , OVRTSWCRT, SUBRTSWCRT, channel_only, channelBucket_only, &
        channel_bypass                                &
-       , nsize , OVRTSWCRT, SUBRTSWCRT, channel_only, channelBucket_only  &
        , wvtflag_pass, QSTRMVOLRT_TR_pass, QLINK_TR_pass, qout_gwsubbas_tr_pass               & !wt vars
        , landRunOff_tr_pass, QLateral_tr_pass, HLINK_tr_pass              & !wt vars
        )
@@ -2127,7 +2125,7 @@ do nt = 1, nsteps
 
        if (present(wvtflag_pass)) then
          call SUBMUSKINGCUNGE(&
-              tmpQLINK(k,2), velocity(k), LINKID(k),     Qup,        Quc, QLINK(k,1), &
+              tmpQLINK(k,2), velocity(k), qloss(k), LINKID(k),     Qup,        Quc, QLINK(k,1), &
               QLateral(k),   DTRT_CH,     So(k), CHANLEN(k),                  &
               MannN(k),      ChSSlp(k),   Bw(k), Tw(k), Tw_CC(k), n_CC(k), HLINK(k), ChannK(k)   &
               , wvtflag_pass=wvtflag_pass, qdc_tr=tmpQLINK_tr(k,2)              & !wt vars
