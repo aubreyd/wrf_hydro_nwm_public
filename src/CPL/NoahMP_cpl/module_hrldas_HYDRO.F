@@ -178,7 +178,7 @@ CONTAINS
            RT_DOMAIN(did)%infxsrt = infxsrt
            RT_DOMAIN(did)%soldrain = soldrain
            if (present(WVTFLAG)) then
-             nlst(did)%wvtflag       = WVTFLAG
+             nlst(did)%wvtflag_rt       = WVTFLAG
              RT_DOMAIN(did)%SMC_SUB     = SMC_SUB
              RT_DOMAIN(did)%SH2OX_SUB   = SH2OX_SUB
              RT_DOMAIN(did)%SMC_TR      = SMC_TR
@@ -287,6 +287,8 @@ CONTAINS
            allocate(nlst(did)%zsoil8(nlst(did)%nsoil))
            nlst(did)%zsoil8(1:nlst(did)%nsoil) = zsoil(1:nlst(did)%nsoil)
 
+           allocate(nlst(did)%NSUB_rt(nlst(did)%nsoil))
+           nlst(did)%NSUB_rt(1:nlst(did)%nsoil) = -999
 
            call HYDRO_ini(ntime,did,ix0=1,jx0=1)
 

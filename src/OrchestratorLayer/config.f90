@@ -176,9 +176,9 @@ module config_base
      ! water tracer
      ! ADNOTE: Are these duplicated from hrldas namelist? Why repeat in hydro namelist?
      integer                             :: NTRACER      ! sum of NSUB
-     integer, dimension(MAX_SOIL_LEVELS) :: NSUB         ! number of sublayer for tracer
+     integer, allocatable,dimension(:)   :: NSUB_rt         ! number of sublayer for tracer
      integer                             :: PMOPT        ! partial mixing option
-     integer                             :: WVTFLAG
+     integer                             :: WVTFLAG_rt
 
    contains
 
@@ -844,10 +844,10 @@ contains
 #endif
 
     ! water tracer
-    nlst(did)%NSUB       = -999
-    nlst(did)%NTRACER    = -999
-    nlst(did)%PMOPT      = -999
-    nlst(did)%WVTFLAG    = -999
+    !nlst(did)%NSUB       = -999
+    !nlst(did)%NTRACER    = -999
+    !nlst(did)%PMOPT      = -999
+    !nlst(did)%WVTFLAG    = -999
 
     call nlst(did)%check()
 
@@ -950,8 +950,8 @@ contains
 
     !------water tracer namelist variables----------------
     integer                                 :: water_tracer_option = 0 ! 0-water tracer off, 1-water tracer on
-    character(len=256)                      :: track_start = " "   ! YYYY-MM-DD
-    character(len=256)                      :: track_end = " "     ! YYYY-MM-DD
+    character(len=19)                      :: track_start = " "   ! YYYY-MM-DD
+    character(len=19)                      :: track_end = " "     ! YYYY-MM-DD
     integer                                 :: partial_mixing_option = 0 ! partial mixing option (0-complete mixing, 1-partial mixing)
     integer, dimension(MAX_SOIL_LEVELS)     :: tracer_sublayer ! number of sublayers for tracer
     !-----variables read fro namelist--------
@@ -1002,11 +1002,10 @@ contains
     noah_lsm%noah_timestep           = -999
     noah_lsm%output_timestep         = -999
     noah_lsm%restart_frequency_hours = -999
-    noah_lsm%tracer_sublayer         = -999       ! water tracer sublayers
-    !noah_lsm%wvtflag                 = -999       ! flag for water tracer
-    !nlst_rt(did)%wvtflag    = -999
-    !nlst_rt(did)%NTRACER    = -999
-    !nlst_rt(did)%PMOPT      = -999
+    ! water tracers
+    noah_lsm%water_tracer_option     = -999
+    noah_lsm%partial_mixing_option   = -999
+    noah_lsm%tracer_sublayer         = -999
 
     write(*,*) 'Calling config noahlsm_offline'
 

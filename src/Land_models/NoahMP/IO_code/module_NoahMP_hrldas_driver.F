@@ -336,6 +336,7 @@ module module_NoahMP_hrldas_driver
   character(len=19)                       :: wvtend       ! YYYY-MM-DD_hh:mm:ss
   integer                                 :: IOPT_PM      ! partial mixing option (0-complete mixing, 1-partial mixing)
   integer                                 :: NTRACER      ! sum of NSUB
+  INTEGER, ALLOCATABLE, DIMENSION(:)      :: NSUB
   !------tracer flag and raio variables to "tag" water from precip------
   INTEGER                                 :: wvtflag      ! 0->before track_start; 1->at track_start
                                                           ! 2->during tracking period; 3->after track_end
@@ -500,7 +501,7 @@ module module_NoahMP_hrldas_driver
 INTERFACE
   SUBROUTINE hrldas_drv_HYDRO_ini(STC_io,SMC_io,SH2OX_io,infxsrt,sfcheadrt,soldrain,&
                                   ii,jj,kk,kt,dt,olddate,zsoil   &
-                                 ,NTRACER,OPT_WT, SMOIS_TR, SH2OXY_TR,SMOIS_SUB,SH2OXY_SUB &    !wt vars
+                                 ,NTRACER_loc,OPT_WT, SMOIS_TR, SH2OXY_TR,SMOIS_SUB,SH2OXY_SUB &    !wt vars
                                  ,infxsrt_tr,sfcheadrt_tr,soldrain_tr)       !wt vars
           implicit none
           integer,            intent(in)                             :: ii,jj,kk, kt
@@ -512,9 +513,9 @@ INTERFACE
 !--------------------------------------------------------
 ! Needed for water tracer capability
 !--------------------------------------------------------
-          integer,            intent(in)                             :: NTRACER
+          integer,            intent(in)                             :: NTRACER_loc
           integer,optional,   intent(in)                             :: OPT_WT
-          real,   optional,   intent(inout),dimension(ii,NTRACER,jj) :: SMOIS_TR, SH2OXY_TR, SMOIS_SUB,SH2OXY_SUB
+          real,   optional,   intent(inout),dimension(ii,NTRACER_loc,jj) :: SMOIS_TR, SH2OXY_TR, SMOIS_SUB,SH2OXY_SUB
           real,   optional,   intent(inout),dimension(ii,jj)         :: infxsrt_tr,sfcheadrt_tr, soldrain_tr
   END SUBROUTINE hrldas_drv_HYDRO_ini
 END INTERFACE
@@ -572,11 +573,12 @@ END INTERFACE
     else
       IOPT_PM  = 0
     end if
+    allocate(NSUB(num_soil_layers))
     NSUB     = noah_lsm%tracer_sublayer
-    NTRACER  = sum(NSUB(1:nsoil))
+    NTRACER  = sum(NSUB(1:num_soil_layers))
     nlst(did)%NTRACER = NTRACER
-    allocate(nlst(did)%NSUB(MAX_SOIL_LEVELS))
-    nlst(did)%NSUB    = NSUB
+    !allocate(nlst(did)%NSUB_rt(num_soil_layers))
+    nlst(did)%NSUB_rt    = NSUB
   end if
   print *, "FLAG1"
   print *, "OPT_WT,IOPT_PM:", OPT_WT, IOPT_PM
@@ -804,10 +806,10 @@ END INTERFACE
 !-----water tracer tracking times-------
   if (OPT_WT .eq. 1) then 
     write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
-       track_start(1:4), track_start(5:6), track_start(7:8), track_start(9:10), track_start(11:12),0
+       wvtstart(1:4), wvtstart(5:6), wvtstart(7:8), wvtstart(9:10), wvtstart(11:12),0
 
     write(wvtend,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
-       track_end(1:4), track_end(5:6), track_end(7:8), track_end(9:10), track_end(11:12),0
+       wvtend(1:4), wvtend(5:6), wvtend(7:8), wvtend(9:10), wvtend(11:12),0
   end if
 !---------------------------------------
   
@@ -1764,7 +1766,7 @@ print *, "NTRACER", NTRACER
   !-------water tracer calc------
   if (OPT_WT .eq. 1) then
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
-         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NSOIL,real(noah_timestep),          &
+         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, 1,real(noah_lsm%noah_timestep),          &
          olddate,zsoil(1:NSOIL)      &
          , NTRACER, OPT_WT=OPT_WT                           &
          , SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR           &
@@ -1774,7 +1776,7 @@ print *, "NTRACER", NTRACER
          , soldrain_tr =soldrain_tr)
   else
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
-         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, SMOIS,real(noah_lsm%noah_timestep), &
+         infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, 1, real(noah_lsm%noah_timestep), &
          olddate,zsoil(1:NSOIL), NTRACER)
   end if
 
@@ -2033,7 +2035,7 @@ print *, "NTRACER", NTRACER
         do I = 1, NSOIL
            do J = 1,NSUB(I)
               K = K + 1
-              ZSNSOXY_TR(:,K,:) = ZSNSOXY(:,I,:) + DZS(I)*(NSUB(I)-J)/NSUB(I)
+              ZSNSOXY_TR(:,K,:) = state%ZSNSOXY(:,I,:) + DZS(I)*(NSUB(I)-J)/NSUB(I)
            end do
         end do
 	smcwtdxy_TR   = 0.0
@@ -2163,18 +2165,19 @@ print *, "NTRACER", NTRACER
 		  XLAND,     XICE,     XICE_THRESHOLD,                        &
                   IDVEG, IOPT_CRS, IOPT_BTR, IOPT_RUN,  IOPT_SFC,   IOPT_FRZ, &
 	       IOPT_INF, IOPT_RAD, IOPT_ALB, IOPT_SNF, IOPT_TBOT,   IOPT_STC, &
-	       IOPT_GLA, IOPT_RSF, IZ0TLND,                                   &
+	       IOPT_GLA, IOPT_RSF, IOPT_SOIL, IOPT_PEDO, IOPT_CROP,           &
+               IOPT_IMPERV, IZ0TLND,                                          &
 		  T_PHY,  QV_CURR,    U_PHY,    V_PHY,    SWDOWN,        GLW, &
 		    P8W,   RAINBL,       SR,                                  &
 		    TSK,      HFX,      QFX,       LH,    GRDFLX,     SMSTAV, &
 		 SMSTOT,SFCRUNOFF, UDRUNOFF,   ALBEDO,     SNOWC,      SMOIS, &
-		   SH2O,     TSLB,     SNOW,    SNOWH,    CANWAT,     ACSNOM, &
+		   SH2O,     TSLB,     state%SNOW,    state%SNOWH,     CANWAT,     ACSNOM, &
 		 ACSNOW,    EMISS,     QSFC,                                  &
  		     Z0,      ZNT,                                            & ! IN/OUT LSM eqv
 		ISNOWXY,     TVXY,     TGXY, CANICEXY,  CANLIQXY,      EAHXY, &
 		  TAHXY,     CMXY,     CHXY,   FWETXY,  SNEQVOXY,   ALBOLDXY, &
-		QSNOWXY, WSLAKEXY,    ZWTXY,     WAXY,      WTXY,     TSNOXY, &
-		ZSNSOXY,  SNICEXY,  SNLIQXY, LFMASSXY,  RTMASSXY,   STMASSXY, &
+		QSNOWXY, QRAINXY, WSLAKEXY,    ZWTXY,     WAXY,      WTXY,     state%TSNOXY, &
+		state%ZSNSOXY,  state%SNICEXY,  state%SNLIQXY, LFMASSXY,  RTMASSXY,   STMASSXY, &
 		 WOODXY, STBLCPXY, FASTCPXY,      LAI,    XSAIXY,    TAUSSXY, &
 	        SMOISEQ, SMCWTDXY,DEEPRECHXY,  RECHXY,                        & ! IN/OUT Noah MP only
 	         T2MVXY,   T2MBXY,   Q2MVXY,   Q2MBXY,                        &
@@ -2186,11 +2189,19 @@ print *, "NTRACER", NTRACER
 		  SHGXY,    SHCXY,    SHBXY,    EVGXY,     EVBXY,      GHVXY, &
 		  GHBXY,    IRGXY,    IRCXY,    IRBXY,      TRXY,      EVCXY, &
 	       CHLEAFXY,   CHUCXY,   CHV2XY,   CHB2XY,                        &                          
+             PSNOWLIQXY,   PSNOWTEMPXY,      PSNOWDZXY,  PSNOWHEATXY,         &
+             PSNOWRHOXY,    PSNOWSWEXY,   PSNOWGRAN1XY, PSNOWGRAN2XY,         &
+            PSNOWHISTXY,    PSNOWALBXY,     PSNOWAGEXY,      act_lev,         &
+          PSNOWHEIGHTXY, PSNOWTOTSWEXY, PSNOWTHRUFALXY,     GLACINFO,         &
+                  GLACT,      FLOW_ICE,      FLOW_SNOW,   crocus_opt,         &
 #ifdef SPATIAL_SOIL
                  BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,             &
 		 DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,                       &
 		 REFDK_2D,REFKDT_2D,SLOPE_2D,                                 &
 		 CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D,        &
+                 AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
+                 IMPERV_2D,                                                   &
+                 SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D,         &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
@@ -2198,14 +2209,16 @@ print *, "NTRACER", NTRACER
                 ids,ide, jds,jde, kds,kde,                      &
                 ims,ime, jms,jme, kms,kme,                      &
                 its,ite, jts,jte, kts,kte,        &
+                iNTRACER=NTRACER, & 
 ! variables below are optional
                 MP_RAINC =  RAINCV, MP_RAINNC =    RAINNCV, MP_SHCV = RAINSHV,&
-		MP_SNOW  = SNOWNCV, MP_GRAUP  = GRAUPELNCV, MP_HAIL = HAILNCV &
+		MP_SNOW  = SNOWNCV, MP_GRAUP  = GRAUPELNCV, MP_HAIL = HAILNCV, &
+                VIS_ICEALB=VIS_ICEALB &
 #ifdef WRF_HYDRO
                 , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
 #endif
-                , NTRACER=NTRACER)
+                )
 
 print *, "NTRACER", NTRACER
 !print *, "FLAG8,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
@@ -2262,6 +2275,7 @@ print *, "NTRACER", NTRACER
                 ids,ide, jds,jde, kds,kde,                      &
                 ims,ime, jms,jme, kms,kme,                      &
                 its,ite, jts,jte, kts,kte,        &
+                iNTRACER=NTRACER, &
 ! variables below are optional
                 MP_RAINC =  RAINCV, MP_RAINNC =    RAINNCV, MP_SHCV = RAINSHV,&
     MP_SNOW  = SNOWNCV, MP_GRAUP  = GRAUPELNCV, MP_HAIL = HAILNCV, &
@@ -2270,7 +2284,7 @@ print *, "NTRACER", NTRACER
                 , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
 #endif
-                , NTRACER=NTRACER, wvtflag=wvtflag, iopt_pm=iopt_pm, wvt_ratio=wvt_ratio, NSUB=NSUB           & ! IN WVT
+                , wvtflag=wvtflag, iopt_pm=iopt_pm, wvt_ratio=wvt_ratio, NSUB=NSUB           & ! IN WVT
 		, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB                                              & ! IN WVT
                 , QFX_TR=QFX_TR, LH_TR=LH_TR, SFCRUNOFF_TR=SFCRUNOFF_TR, UDRUNOFF_TR=UDRUNOFF_TR      & !IN/OUT WVT
 		, SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR, SNOWXY_TR=SNOWXY_TR, SNOWHXY_TR=SNOWHXY_TR, CANWAT_TR=CANWAT_TR &
@@ -2665,26 +2679,26 @@ subroutine  ldas_output(itime, state, wvtflag)
    end if ! crocus_opt /= 0
    
    if (wvtflag .ge. 0) then
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LH_TR,IVGTYP,117)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ECANXY_TR,IVGTYP,118)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EDIRXY_TR,IVGTYP,119)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ETRANXY_TR,IVGTYP,120)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,UDRUNOFF_TR,IVGTYP,121)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SFCRUNOFF_TR,IVGTYP,122)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANLIQXY_TR,IVGTYP,123)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANICEXY_TR,IVGTYP,124)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WAXY_TR,IVGTYP,125)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WTXY_TR,IVGTYP,126)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNICEXY_TR,IVGTYP,127)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNLIQXY_TR,IVGTYP,128)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2OXY_TR,IVGTYP,129)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS_TR,IVGTYP,130)
-     !call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,4,FLUXXY_TR,IVGTYP,130)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWHXY_TR,IVGTYP,131)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWXY_TR,IVGTYP,132)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,133)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,134)
-     call output_NoahMP_NWM(trim(outdir),igrid,output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,135)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LH_TR,IVGTYP,117)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ECANXY_TR,IVGTYP,118)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EDIRXY_TR,IVGTYP,119)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ETRANXY_TR,IVGTYP,120)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,UDRUNOFF_TR,IVGTYP,121)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SFCRUNOFF_TR,IVGTYP,122)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANLIQXY_TR,IVGTYP,123)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,CANICEXY_TR,IVGTYP,124)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WAXY_TR,IVGTYP,125)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WTXY_TR,IVGTYP,126)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNICEXY_TR,IVGTYP,127)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNLIQXY_TR,IVGTYP,128)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SH2OXY_TR,IVGTYP,129)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,SMOIS_TR,IVGTYP,130)
+     !call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,FLUXXY_TR,IVGTYP,130)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWHXY_TR,IVGTYP,131)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWXY_TR,IVGTYP,132)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,133)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,134)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,135)
    end if
    
 #endif /* WRF_HYDRO */

@@ -93,6 +93,11 @@ module module_namelist_inc
        integer            :: nLastObs
 !#endif
 
+!-----needed for water tracer capability-----
+          integer  :: wvtflag_rt
+          integer  :: NTRACER
+          integer, allocatable,dimension(:) :: NSUB_rt
+          integer  :: PMOPT
 
    end type namelist_rt_field
 end module module_namelist_inc
