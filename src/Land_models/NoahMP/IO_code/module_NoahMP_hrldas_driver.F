@@ -220,6 +220,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAI       ! leaf area index
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  XSAIXY    ! stem area index
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  TAUSSXY   ! snow age factor
+  REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  LAI12M    ! monthly leaf area index
 
 ! OUT (with no Noah LSM equivalent) (as defined in WRF)
 
@@ -845,6 +846,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( LAI       (XSTART:XEND,YSTART:YEND) )  ! leaf area index
   ALLOCATE ( XSAIXY    (XSTART:XEND,YSTART:YEND) )  ! stem area index
   ALLOCATE ( TAUSSXY   (XSTART:XEND,YSTART:YEND) )  ! snow age factor
+  ALLOCATE ( LAI12M    (XSTART:XEND,YSTART:YEND,12) )  ! monthly leaf area index
 
 ! OUT (with no Noah LSM equivalent) (as defined in WRF)
 
@@ -1044,6 +1046,7 @@ module module_NoahMP_hrldas_driver
   LAI        = undefined_real
   XSAIXY     = undefined_real
   TAUSSXY    = undefined_real
+  LAI12M     = undefined_real
   XLONIN     = undefined_real
   SEAICE     = undefined_real
   SMCWTDXY   = undefined_real
@@ -1241,6 +1244,15 @@ module module_NoahMP_hrldas_driver
     CALL READ_MMF_RUNOFF(noah_lsm%MMF_RUNOFF_FILE, XSTART, XEND, YSTART, YEND,&
                          ZWTXY,EQZWT,RIVERBEDXY,RIVERCONDXY,PEXPXY,FDEPTHXY)
   end if
+
+!------------------------------------------------------------------------
+! Read in extra LAI monthly variable if needed
+!------------------------------------------------------------------------
+  if (noah_lsm%dynamic_veg_option == 9 .and. noah_lsm%EXTERNAL_LAI_FILENAME == " ") then
+     print *, "Reading LAI12M"
+     call read_monthly_lai_netcdf(noah_lsm%HRLDAS_SETUP_FILE, xstart, xend, ystart, yend, lai12m)
+  end if
+
 
 !----------------------------------------------------------------------
 ! Initialize Model State
@@ -1793,6 +1805,18 @@ end subroutine land_driver_ini
       CALL CALC_DECLIN(OLDDATE(1:19),XLAT_URB2D(I,J), XLONIN(I,J),COSZEN(I,J),JULIAN_IN)
     END DO
     END DO
+
+    if (noah_lsm%dynamic_veg_option == 9) then
+      if (noah_lsm%EXTERNAL_LAI_FILENAME /= " ") then
+        print *, "Using 8-day LAI"
+        if ((MOD(INT(JULIAN_IN+1),8) == 1 .and. abs(JULIAN_IN-INT(JULIAN_IN)) < 0.0001) .or. (itime == 0)) then
+           CALL READ_EXTERNAL_LAI(noah_lsm%EXTERNAL_LAI_FILENAME,XSTART,XEND,YSTART,YEND,JULIAN_IN,LAI)
+        end if
+      else 
+        print *, "Using monthly LAI"
+        CALL interpolate_vegetation(OLDDATE, XSTART, XEND, YSTART, YEND, LAI12M, LAI)
+      end if
+    end if
 
     READ(OLDDATE(1:4),*)  YR
     YEARLEN = 365                      ! find length of year for phenology (also S Hemisphere)

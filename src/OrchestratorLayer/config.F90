@@ -61,6 +61,7 @@ module config_base
      real               :: zlvl
      character(len=256) :: hrldas_setup_file = " "
      character(len=256) :: mmf_runoff_file = " "
+     character(len=256) :: external_lai_filename
      character(len=256) :: external_veg_filename_template = " "
      character(len=256) :: external_lai_filename_template = " "
      integer            :: xstart = 1
@@ -934,6 +935,7 @@ contains
      real               :: zlvl
      character(len=256) :: hrldas_setup_file = " "
      character(len=256) :: mmf_runoff_file = " "
+     character(len=256) :: external_lai_filename = " " 
      character(len=256) :: external_veg_filename_template = " "
      character(len=256) :: external_lai_filename_template = " "
      integer            :: xstart = 1
@@ -968,7 +970,7 @@ contains
 
          split_output_count, &
          khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
-         spatial_filename, &
+         spatial_filename, external_lai_filename, &
          external_veg_filename_template, external_lai_filename_template, &
          xstart, xend, ystart, yend, rst_bi_out, rst_bi_in
 
@@ -1102,6 +1104,7 @@ contains
     noah_lsm%zlvl = zlvl
     noah_lsm%hrldas_setup_file = hrldas_setup_file
     noah_lsm%mmf_runoff_file = " "!mmf_runoff_file
+    noah_lsm%external_lai_filename = external_lai_filename
     noah_lsm%external_veg_filename_template = " "!external_veg_filename_template
     noah_lsm%external_lai_filename_template = " "!external_lai_filename_template
     noah_lsm%xstart = 1!xstart
