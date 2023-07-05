@@ -1232,6 +1232,128 @@ contains
 !---------------------------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------------------------
 
+  subroutine read_external_lai(external_lai_filename,xstart, xend,ystart, yend,jday, lai)
+    implicit none
+    character(len=*),                              intent(in)    :: external_lai_filename
+    integer,                                       intent(in)    :: xstart, xend, ystart, yend
+    real,                                          intent(in)    :: jday
+    real,      dimension(xstart:xend,ystart:yend), intent(inout) :: lai    
+
+    integer*2, dimension(xstart:xend,ystart:yend)                :: lai_in
+    integer :: ierr,iret,varid,i8day
+    integer :: ncid
+
+    i8day = int(jday/8.0) + 1
+
+    write(*,*) "READING EXTERNAL LAI DATASET AT TIME PERIOD: ",i8day
+
+    ierr = nf90_open(external_lai_filename, NF90_NOWRITE, ncid)
+    if (ierr /= 0) then
+       write(*,'("FATAL ERROR: In read_external_lai():  Problem opening external LAI file: ''", A, "''")') trim(external_lai_filename)
+       stop
+    endif
+
+    iret = nf90_inq_varid(ncid,  "LAI",  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_external_lai():  Problem finding LAI in NetCDF file."
+      stop
+    endif
+
+   iret = nf90_get_var(ncid, varid, lai_in, start=(/xstart,ystart,i8day/), count=(/xend-xstart+1,yend-ystart+1,1/))
+
+    lai = 0.01*lai_in
+
+    ! Close the NetCDF file
+    ierr = nf90_close(ncid)
+    if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_external_lai() -  NF90_CLOSE"
+
+  end subroutine read_external_lai
+
+!---------------------------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------------------------
+
+  subroutine read_monthly_lai_netcdf(wrfinput_flnm, xstart, xend, ystart, yend, lai12m)
+    implicit none
+    character(len=*),                              intent(in)    :: wrfinput_flnm
+    integer,                                       intent(in)    :: xstart, xend, ystart, yend
+    real,      dimension(xstart:xend,ystart:yend), intent(inout) :: lai12m
+
+    integer :: ierr, iret, varid
+    integer :: ncid
+
+    write(*,*) "READING LAI12M from wrfinput: ", wrfinput_flnm
+
+    ierr = nf90_open(wrfinput_flnm, NF90_NOWRITE, ncid)
+    if (ierr /= 0) then
+       write(*,'("FATAL ERROR: In read_monthly_lai_netcdf():  Problem opening external wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
+       stop
+    endif
+
+    iret = nf90_inq_varid(ncid,  "LAI12M",  varid)
+    if (iret /= 0) then
+      print*, 'ncid = ', ncid
+      write(*,*) "FATAL ERROR: In read_monthly_lai_netcdf():  Problem finding LAI12M in NetCDF file."
+      stop
+    endif
+
+    iret = nf90_get_var(ncid, varid, lai12m, start=(/xstart,ystart,1/), count=(/xend-xstart+1,yend-ystart+1,12/))
+
+    ! Close the NetCDF file
+    ierr = nf90_close(ncid)
+    if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_monthly_lai_netcdf() -  NF90_CLOSE"
+
+  end subroutine read_monthly_lai_netcdf
+
+!---------------------------------------------------------------------------------------------------------
+
+  subroutine interpolate_vegetation(date, xstart, xend, ystart, yend, vegin, vegout)
+    implicit none
+    character(len=*),              intent(in)  :: date
+    integer,                       intent(in)  :: xstart, xend, ystart, yend
+    real, dimension(xend-xstart+1, yend-ystart+1, 12), intent(in)  :: vegin
+    real, dimension(xend-xstart+1, yend-ystart+1)   , intent(out) :: vegout
+
+    integer :: idim, jdim
+    integer :: imo
+    integer :: imo2
+    integer :: imody
+    real, allocatable, dimension(:,:) :: xdum, xdum2
+
+    integer, parameter, dimension(12) :: mday = (/31,28,31,30,31,30,31,31,30,31,30,31/)
+
+    read(date(6:10), '(I2,1x,I2)') imo, imody
+
+    idim = xend - xstart + 1
+    jdim = yend - ystart + 1
+
+    if (imody == 15) then
+       vegout = vegin(:,:,imo)
+    else if (imody > 15) then
+       allocate(xdum(idim,jdim), xdum2(idim,jdim))
+       xdum  = vegin(:,:,imo)
+       xdum2 = vegin(:,:,mod(imo,12)+1)
+       vegout = xdum + float(imody-15)/float(mday(imo))*(xdum2-xdum)
+       deallocate(xdum, xdum2)
+    else if (imody < 15) then
+       allocate(xdum(idim,jdim), xdum2(idim,jdim))
+       xdum2  = vegin(:,:,imo)
+       if (imo == 1) then
+          imo2 = 12
+       else
+          imo2 = imo - 1
+       endif
+       xdum   = vegin(:,:,imo2)
+       vegout = xdum + float(mday(imo2)-(15-imody)) / float(mday(imo2)) &
+            *(xdum2-xdum)
+       deallocate(xdum, xdum2)
+    endif
+
+  end subroutine interpolate_vegetation
+
+!---------------------------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------------------------
+
   subroutine get_landuse_or_glacinfo_netcdf(in_name, ncid, array, units, &
                                             xstart, xend, ystart, yend, &
                                             fatal, ierr)
