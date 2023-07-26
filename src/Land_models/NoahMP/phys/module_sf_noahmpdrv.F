@@ -75,6 +75,7 @@ CONTAINS
                  AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
                  IMPERV_2D,                                                   &
                  SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D,         &
+                 BEDROCKLYR_2D,                                               &
 #endif
 #ifdef WRF_HYDRO
                sfcheadrt,INFXSRT,soldrain,                                  &
@@ -188,6 +189,7 @@ CONTAINS
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  TAU0_2D        ! tau0 from Yang97 eqn. 10a
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  RSURFSNOW_2D   ! surface resistence for snow [s/m]
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  SCAMAX_2D      ! max fractional snow covered area (0.0-1.0)
+    INTEGER, DIMENSION( ims:ime, jms:jme ), INTENT(IN)          ::  BEDROCKLYR_2D  ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -844,6 +846,7 @@ CONTAINS
        parameters%tau0   = TAU0_2D(I,J)           ! tau0 from Yang97 eqn. 10a
        parameters%rsurf_snow = RSURFSNOW_2D(I,J)  ! surface resistence for snow [s/m]
        parameters%scamax = SCAMAX_2D(I,J)         ! maximum fractional snow covered area (0.0-1.0)
+       parameters%bedrocklyr = BEDROCKLYR_2D(I,J) ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
        CALL TRANSFER_MP_PARAMETERS(VEGTYP,SOILTYP,SLOPETYP,SOILCOLOR,CROPTYPE,parameters,iopt_imperv)
 
@@ -861,9 +864,26 @@ CONTAINS
        !The min diffs were pulled from the existing SOILPARM.TBL defaults.
        !Currently water is 0, so enforcing 0 as the absolute min.
        parameters%smcmax = min(parameters%smcmax, 1.0)
-       parameters%smcref = max(min(parameters%smcref, parameters%smcmax - 0.01), 0.0)
-       parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref - 0.01), 0.0)
-       parameters%smcdry = max(min(parameters%smcdry, parameters%smcref - 0.01), 0.0)
+       ! Relaxing parameter diff constraints to not disturb layers below bedrock
+       parameters%smcref = max(min(parameters%smcref, parameters%smcmax), 0.0)
+       parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref), 0.0)
+       parameters%smcdry = max(min(parameters%smcdry, parameters%smcref), 0.0)
+
+       if (IOPT_RUN .eq. 3) then
+         !ADCHANGE: Limit nroot to bedrock layer.
+         parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
+         !ADCHANGE: Hard-code soil params below bedrock to be effectively null
+         parameters%smcmax((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+       else
+         parameters%bedrocklyr = NSOIL
+       endif
 
 ! Initialized local
 
@@ -1770,6 +1790,7 @@ SUBROUTINE TRANSFER_MP_PARAMETERS(VEGTYPE,SOILTYPE,SLOPETYPE,SOILCOLOR,CROPTYPE,
     parameters%TAU0   = TAU0_TABLE
     parameters%RSURF_SNOW = RSURF_SNOW_TABLE
     parameters%SCAMAX = SCAMAX_TABLE
+    parameters%BEDROCKLYR = BEDROCKLYR_TABLE
 #endif
 ! ----------------------------------------------------------------------
 ! Transfer GENPARM parameters

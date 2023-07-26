@@ -312,6 +312,7 @@ MODULE MODULE_SF_NOAHMPLSM
      REAL :: IMPERV       !impervious fraction
      REAL :: SCAMAX       !maximum fractional snow covered area (0.0-1.0)
      REAL :: SWE_LIMIT    !maximum SWE limit (mm)
+     INTEGER :: BEDROCKLYR !lowest hydrologically active soil layer (below which is bedrock)
 
 !------------------------------------------------------------------------------------------!
 ! From the crop section of MPTABLE.TBL
@@ -6889,6 +6890,7 @@ ENDIF   ! CROPTYPE == 0
 ! local
   INTEGER                                 :: K,IZ   !do-loop index
   INTEGER                                 :: ITER   !iteration index
+  INTEGER                                 :: NSOIL_HYDRO !nsoil to use for hydro loops
   REAl                                    :: DTFINE !fine time step (s)
   REAL, DIMENSION(1:NSOIL)                :: RHSTT  !right-hand side term of the matrix
   REAL, DIMENSION(1:NSOIL)                :: AI     !left-hand side term
@@ -6923,6 +6925,9 @@ ENDIF   ! CROPTYPE == 0
   REAL                                    :: SUBDEF !accumulation of subsurface deficit [m]
 
 ! ----------------------------------------------------------------------
+
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
     RUNSRF = 0.0
     PDDUM  = 0.0
     RSAT   = 0.0
@@ -6931,7 +6936,7 @@ ENDIF   ! CROPTYPE == 0
 
 ! for the case when snowmelt water is too large
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        EPORE   = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
        RSAT    = RSAT + MAX(0.,SH2O(K)-EPORE)*DZSNSO(K)
        SH2O(K) = MIN(EPORE,SH2O(K))
@@ -6939,7 +6944,7 @@ ENDIF   ! CROPTYPE == 0
 
 !impermeable fraction due to frozen soil
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        FICE    = MIN(1.0,SICE(K)/parameters%SMCMAX(K))
        FCR(K)  = MAX(0.0,EXP(-A*(1.-FICE))- EXP(-A)) /  &
                         (1.0              - EXP(-A))
@@ -6950,7 +6955,7 @@ ENDIF   ! CROPTYPE == 0
     SICEMAX = 0.0
     FCRMAX  = 0.0
     SH2OMIN = parameters%SMCMAX(1)
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        IF (SICE(K) > SICEMAX) SICEMAX = SICE(K)
        IF (FCR(K)  > FCRMAX)  FCRMAX  = FCR(K)
        IF (SH2O(K) < SH2OMIN) SH2OMIN = SH2O(K)
@@ -7019,7 +7024,7 @@ ENDIF   ! CROPTYPE == 0
     IF(OPT_RUN == 4) THEN
        SMCTOT = 0.
        DZTOT  = 0.
-       DO K = 1,NSOIL
+       DO K = 1,NSOIL_HYDRO
           DZTOT   = DZTOT  + DZSNSO(K)
           SMCTOT  = SMCTOT + SMC(K)/parameters%SMCMAX(K)*DZSNSO(K)
           IF(DZTOT >= 2.0) EXIT
@@ -7095,11 +7100,11 @@ ENDIF   ! CROPTYPE == 0
 
     IF(OPT_RUN == 2) THEN
          WTSUB = 0.
-         DO K = 1, NSOIL
+         DO K = 1, NSOIL_HYDRO
            WTSUB = WTSUB + WCND(K)*DZSNSO(K)
          END DO
 
-         DO K = 1, NSOIL
+         DO K = 1, NSOIL_HYDRO
            MH2O    = RUNSUB*DT*(WCND(K)*DZSNSO(K))/WTSUB       ! mm
            SH2O(K) = SH2O(K) - MH2O/(DZSNSO(K)*1000.)
          END DO
@@ -7109,12 +7114,12 @@ ENDIF   ! CROPTYPE == 0
 ! Get water needed to bring MLIQ equal WATMIN from lower layer.
 
    IF(OPT_RUN /= 1) THEN
-      DO IZ = 1, NSOIL
+      DO IZ = 1, NSOIL_HYDRO
          MLIQ(IZ) = SH2O(IZ)*DZSNSO(IZ)*1000.
       END DO
 
       WATMIN = 0.01           ! mm
-      DO IZ = 1, NSOIL-1
+      DO IZ = 1, NSOIL_HYDRO-1
           IF (MLIQ(IZ) .LT. 0.) THEN
              XS = WATMIN-MLIQ(IZ)
           ELSE
@@ -7124,7 +7129,7 @@ ENDIF   ! CROPTYPE == 0
           MLIQ(IZ+1) = MLIQ(IZ+1) - XS
       END DO
 
-        IZ = NSOIL
+        IZ = NSOIL_HYDRO
         IF (MLIQ(IZ) .LT. WATMIN) THEN
            XS = WATMIN-MLIQ(IZ)
         ELSE
@@ -7134,7 +7139,7 @@ ENDIF   ! CROPTYPE == 0
         RUNSUB   = RUNSUB - XS/DT
         IF(OPT_RUN == 5)DEEPRECH = DEEPRECH - XS*1.E-3
 
-      DO IZ = 1, NSOIL
+      DO IZ = 1, NSOIL_HYDRO
         SH2O(IZ)     = MLIQ(IZ) / (DZSNSO(IZ)*1000.)
       END DO
    END IF
@@ -7166,6 +7171,7 @@ ENDIF   ! CROPTYPE == 0
 
   INTEGER :: K                      !do-loop index
   INTEGER, PARAMETER :: NFINE = 100 !no. of fine soil layers of 6m soil
+  INTEGER :: NSOIL_HYDRO            !lowest hydrologically active soil layer
   REAL    :: WD1                    !water deficit from coarse (4-L) soil moisture profile
   REAL    :: WD2                    !water deficit from fine (100-L) soil moisture profile
   REAL    :: DZFINE                 !layer thickness of the 100-L soil layers to 6.0 m
@@ -7173,17 +7179,19 @@ ENDIF   ! CROPTYPE == 0
   REAL, DIMENSION(1:NFINE) :: ZFINE !layer-bottom depth of the 100-L soil layers to 6.0 m
 ! ----------------------------------------------------------------------
 
+   NSOIL_HYDRO = parameters%BEDROCKLYR
+
    WD1 = 0.
-   DO K = 1,NSOIL
+   DO K = 1,NSOIL_HYDRO
      WD1 = WD1 + (parameters%SMCMAX(1)-SH2O(K)) * DZSNSO(K) ! [m]
    ENDDO
 
-   DZFINE = 3.0 * (-ZSOIL(NSOIL)) / NFINE
+   DZFINE = 3.0 * (-ZSOIL(NSOIL_HYDRO)) / NFINE
    do K =1,NFINE
       ZFINE(K) = FLOAT(K) * DZFINE
    ENDDO
 
-   ZWT = -3.*ZSOIL(NSOIL) - 0.001   ! initial value [m]
+   ZWT = -3.*ZSOIL(NSOIL_HYDRO) - 0.001   ! initial value [m]
 
    WD2 = 0.
    DO K = 1,NFINE
@@ -7223,6 +7231,7 @@ ENDIF   ! CROPTYPE == 0
 
 ! locals
   INTEGER :: IALP1, J, JJ,  K
+  INTEGER :: NSOIL_HYDRO   !lowest hydrologically active soil layer
   REAL                     :: VAL
   REAL                     :: DDT
   REAL                     :: PX
@@ -7239,6 +7248,8 @@ ENDIF   ! CROPTYPE == 0
   REAL                     :: imperv_eff   !effective imperviousness
 ! --------------------------------------------------------------------------------
 
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
     IF (QINSUR >  0.0) THEN
        DT1 = DT /86400.
        SMCAV = parameters%SMCMAX(1) - parameters%SMCWLT(1)
@@ -7251,7 +7262,7 @@ ENDIF   ! CROPTYPE == 0
 
        DD = DMAX(1)
 
-       DO K = 2,NSOIL
+       DO K = 2,NSOIL_HYDRO
           DICE    = DICE + (ZSOIL(K-1) - ZSOIL(K) ) * SICE(K)
           DMAX(K) = (ZSOIL(K-1) - ZSOIL(K)) * SMCAV
           DMAX(K) = DMAX(K) * (1.0-(SH2O(K) + SICE(K) - parameters%SMCWLT(K))/SMCAV)
@@ -7354,6 +7365,7 @@ ENDIF   ! CROPTYPE == 0
 
 ! local
     INTEGER                               :: K
+    INTEGER                               :: NSOIL_HYDRO !lowest hydrologically active soil layer
     REAL, DIMENSION(1:NSOIL)              :: DDZ
     REAL, DIMENSION(1:NSOIL)              :: DENOM
     REAL, DIMENSION(1:NSOIL)              :: DSMDZ
@@ -7367,8 +7379,10 @@ ENDIF   ! CROPTYPE == 0
 ! Niu and Yang (2006), J. of Hydrometeorology
 ! ----------------------------------------------------------------------
 
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
     IF(OPT_INF == 1) THEN
-      DO K = 1, NSOIL
+      DO K = 1, NSOIL_HYDRO
         CALL WDFCND1 (parameters,WDF(K),WCND(K),SMC(K),FCR(K),K)
         SMX(K) = SMC(K)
       END DO
@@ -7376,21 +7390,21 @@ ENDIF   ! CROPTYPE == 0
     END IF
 
     IF(OPT_INF == 2) THEN
-      DO K = 1, NSOIL
+      DO K = 1, NSOIL_HYDRO
         CALL WDFCND2 (parameters,WDF(K),WCND(K),SH2O(K),SICEMAX,K)
         SMX(K) = SH2O(K)
       END DO
-          IF(OPT_RUN == 5)SMXWTD=SMCWTD*SH2O(NSOIL)/SMC(NSOIL)  !same liquid fraction as in the bottom layer
+          IF(OPT_RUN == 5)SMXWTD=SMCWTD*SH2O(NSOIL_HYDRO)/SMC(NSOIL_HYDRO)  !same liquid fraction as in the bottom layer
     END IF
 
-    DO K = 1, NSOIL
+    DO K = 1, NSOIL_HYDRO
        IF(K == 1) THEN
           DENOM(K) = - ZSOIL (K)
           TEMP1    = - ZSOIL (K+1)
           DDZ(K)   = 2.0 / TEMP1
           DSMDZ(K) = 2.0 * (SMX(K) - SMX(K+1)) / TEMP1
           WFLUX(K) = WDF(K) * DSMDZ(K) + WCND(K) - PDDUM + ETRANI(K) + QSEVA
-       ELSE IF (K < NSOIL) THEN
+       ELSE IF (K < NSOIL_HYDRO) THEN
           DENOM(k) = (ZSOIL(K-1) - ZSOIL(K))
           TEMP1    = (ZSOIL(K-1) - ZSOIL(K+1))
           DDZ(K)   = 2.0 / TEMP1
@@ -7410,7 +7424,7 @@ ENDIF   ! CROPTYPE == 0
           END IF
           IF(OPT_RUN == 5) THEN   !gmm new m-m&f water table dynamics formulation
              TEMP1    = 2.0 * DENOM(K)
-             IF(ZWT < ZSOIL(NSOIL)-DENOM(NSOIL))THEN
+             IF(ZWT < ZSOIL(NSOIL_HYDRO)-DENOM(NSOIL_HYDRO))THEN
 !gmm interpolate from below, midway to the water table, to the middle of the auxiliary layer below the soil bottom
                 SMXBOT = SMX(K) - (SMX(K)-SMXWTD) *  DENOM(K) * 2./ (DENOM(K) + ZSOIL(K) - ZWT)
              ELSE
@@ -7423,12 +7437,12 @@ ENDIF   ! CROPTYPE == 0
        END IF
     END DO
 
-    DO K = 1, NSOIL
+    DO K = 1, NSOIL_HYDRO
        IF(K == 1) THEN
           AI(K)    =   0.0
           BI(K)    =   WDF(K  ) * DDZ(K  ) / DENOM(K)
           CI(K)    = - BI (K)
-       ELSE IF (K < NSOIL) THEN
+       ELSE IF (K < NSOIL_HYDRO) THEN
           AI(K)    = - WDF(K-1) * DDZ(K-1) / DENOM(K)
           CI(K)    = - WDF(K  ) * DDZ(K  ) / DENOM(K)
           BI(K)    = - ( AI (K) + CI (K) )
@@ -7486,6 +7500,7 @@ ENDIF   ! CROPTYPE == 0
 
 !local
     INTEGER                                 :: K
+    INTEGER                                 :: NSOIL_HYDRO !lowest hydrologically active soil layer
     REAL, DIMENSION(1:NSOIL)                :: RHSTTIN
     REAL, DIMENSION(1:NSOIL)                :: CIIN
     REAL                                    :: STOT
@@ -7493,10 +7508,13 @@ ENDIF   ! CROPTYPE == 0
     REAL                                    :: WATMIN  !minimum water content (m/m)
 
 ! ----------------------------------------------------------------------
+
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
     WPLUS = 0.0
     WMINUS = 0.0
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        RHSTT (K) =   RHSTT(K) * DT
        AI (K)    =      AI(K) * DT
        BI (K)    = 1. + BI(K) * DT
@@ -7505,16 +7523,16 @@ ENDIF   ! CROPTYPE == 0
 
 ! copy values for input variables before calling rosr12
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
        RHSTTIN(k) = RHSTT(K)
        CIIN(k)    = CI(K)
     END DO
 
 ! call ROSR12 to solve the tri-diagonal matrix
 
-    CALL ROSR12 (CI,AI,BI,CIIN,RHSTTIN,RHSTT,1,NSOIL,0)
+    CALL ROSR12 (CI,AI,BI,CIIN,RHSTTIN,RHSTT,1,NSOIL_HYDRO,0)
 
-    DO K = 1,NSOIL
+    DO K = 1,NSOIL_HYDRO
         SH2O(K) = SH2O(K) + CI(K)
     ENDDO
 
@@ -7526,16 +7544,16 @@ ENDIF   ! CROPTYPE == 0
 
 !update smcwtd
 
-     IF(ZWT < ZSOIL(NSOIL)-DZSNSO(NSOIL))THEN
+     IF(ZWT < ZSOIL(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO))THEN
 !accumulate qdrain to update deep water table and soil moisture later
         DEEPRECH =  DEEPRECH + DT * QDRAIN
      ELSE
-        SMCWTD = SMCWTD + DT * QDRAIN  / DZSNSO(NSOIL)
-        WPLUS        = MAX((SMCWTD-parameters%SMCMAX(NSOIL)), 0.0) * DZSNSO(NSOIL)
-        WMINUS       = MAX((1.E-4-SMCWTD), 0.0) * DZSNSO(NSOIL)
+        SMCWTD = SMCWTD + DT * QDRAIN  / DZSNSO(NSOIL_HYDRO)
+        WPLUS        = MAX((SMCWTD-parameters%SMCMAX(NSOIL_HYDRO)), 0.0) * DZSNSO(NSOIL_HYDRO)
+        WMINUS       = MAX((1.E-4-SMCWTD), 0.0) * DZSNSO(NSOIL_HYDRO)
 
-        SMCWTD = MAX( MIN(SMCWTD,parameters%SMCMAX(NSOIL)) , 1.E-4)
-        SH2O(NSOIL)    = SH2O(NSOIL) + WPLUS/DZSNSO(NSOIL)
+        SMCWTD = MAX( MIN(SMCWTD,parameters%SMCMAX(NSOIL_HYDRO)) , 1.E-4)
+        SH2O(NSOIL_HYDRO)    = SH2O(NSOIL_HYDRO) + WPLUS/DZSNSO(NSOIL_HYDRO)
 
 !reduce fluxes at the bottom boundaries accordingly
         QDRAIN = QDRAIN - WPLUS/DT
@@ -7544,7 +7562,7 @@ ENDIF   ! CROPTYPE == 0
 
   ENDIF
 
-    DO K = NSOIL,2,-1
+    DO K = NSOIL_HYDRO,2,-1
       EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
@@ -7557,16 +7575,16 @@ ENDIF   ! CROPTYPE == 0
 
    IF(WPLUS > 0.0) THEN
     SH2O(2)      = SH2O(2) + WPLUS/DZSNSO(2)
-    DO K = 2,NSOIL-1
+    DO K = 2,NSOIL_HYDRO-1
       EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
       WPLUS        = MAX((SH2O(K)-EPORE), 0.0) * DZSNSO(K)
       SH2O(K)      = MIN(EPORE,SH2O(K))
       SH2O(K+1)    = SH2O(K+1) + WPLUS/DZSNSO(K+1)
     END DO
 
-    EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(NSOIL) - SICE(NSOIL) ) )
-    WPLUS        = MAX((SH2O(NSOIL)-EPORE), 0.0) * DZSNSO(NSOIL)
-    SH2O(NSOIL)  = MIN(EPORE,SH2O(NSOIL))
+    EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(NSOIL_HYDRO) - SICE(NSOIL_HYDRO) ) )
+    WPLUS        = MAX((SH2O(NSOIL_HYDRO)-EPORE), 0.0) * DZSNSO(NSOIL_HYDRO)
+    SH2O(NSOIL_HYDRO)  = MIN(EPORE,SH2O(NSOIL_HYDRO))
    END IF
 
    ! Negative soil moisture check
@@ -7577,7 +7595,7 @@ ENDIF   ! CROPTYPE == 0
      ! WATMIN: in soilwater check this is a fixed value of 0.01 mm; why not smcdry?
      ! For this formulation, we convert 0.01mm to a soil water fraction per layer.
      ! So WATMIN = (0.01/1000.)/DZSNSO to convert to units of m/m for each layer.
-     DO K = 1,NSOIL-1
+     DO K = 1,NSOIL_HYDRO-1
        WATMIN    = 0.00001/DZSNSO(K) ! fraction
        ! Amount of water below residual soil water content
        WMINUS    = MAX ((WATMIN-SH2O(K))*DZSNSO(K), 0.0 )  ! m
@@ -7586,9 +7604,9 @@ ENDIF   ! CROPTYPE == 0
        SH2O(K+1) = SH2O(K+1) - WMINUS/DZSNSO(K+1)
      END DO
      ! Check bottom layer to see if deficit still exists
-     WATMIN      = 0.00001/DZSNSO(NSOIL) ! fraction
-     WMINUS      = MAX ((WATMIN-SH2O(NSOIL))*DZSNSO(NSOIL), 0.0 )  ! m
-     SH2O(NSOIL) = MAX(WATMIN, SH2O(NSOIL))
+     WATMIN      = 0.00001/DZSNSO(NSOIL_HYDRO) ! fraction
+     WMINUS      = MAX ((WATMIN-SH2O(NSOIL_HYDRO))*DZSNSO(NSOIL_HYDRO), 0.0 )  ! m
+     SH2O(NSOIL_HYDRO) = MAX(WATMIN, SH2O(NSOIL_HYDRO))
 #ifdef HYDRO_D
      IF (WMINUS .ne. 0) then
         write(*,*) "WARNING (SSTEP): SMC deficit - this water will be removed from subsurface runoff (meters).", WMINUS
@@ -7628,7 +7646,11 @@ ENDIF   ! CROPTYPE == 0
 ! local
     REAL    :: WM,WM_MAX,SM,SM_MAX,IRUNOFF,PRUNOFF
     INTEGER :: IZ
+    INTEGER :: NSOIL_HYDRO !lowest hydrologically active soil layer
 !------------------------------------------------------------------------
+
+    NSOIL_HYDRO = parameters%BEDROCKLYR
+
 !initialize
     WM      = 0.0
     WM_MAX  = 0.0
@@ -7638,7 +7660,7 @@ ENDIF   ! CROPTYPE == 0
     PRUNOFF = 0.0
     RUNSRF  = 0.0
 
-    DO IZ=1,NSOIL-2
+    DO IZ=1,NSOIL_HYDRO-2
        IF ((SMC(IZ)-parameters%SMCREF(IZ)) .GT. 0.) THEN ! soil moisture greater than field capacity
           SM     = SM + (SMC(IZ) - parameters%SMCREF(IZ) )*(-1)*ZSOIL(IZ) !m
           WM     = WM + (parameters%SMCREF(IZ)*(-1)*ZSOIL(IZ))            !m
@@ -7796,6 +7818,7 @@ ENDIF   ! CROPTYPE == 0
   REAL                                        :: RSBMX !baseflow coefficient [mm/s]
   INTEGER                                     :: IZ    !do-loop index
   INTEGER                                     :: IWT   !layer index above water table layer
+  INTEGER                                     :: NSOIL_HYDRO !lowest hydrologically active soil layer
   REAL,  DIMENSION(    1:NSOIL)               :: DZMM  !layer thickness [mm]
   REAL,  DIMENSION(    1:NSOIL)               :: ZNODE !node depth [m]
   REAL,  DIMENSION(    1:NSOIL)               :: MLIQ  !liquid water mass [kg/m2 or mm]
@@ -7816,6 +7839,9 @@ ENDIF   ! CROPTYPE == 0
   REAL, PARAMETER                             :: CMIC = 0.20   !microprore content (0.0-1.0)
                                                                !0.0-close to free drainage
 ! -------------------------------------------------------------
+
+      NSOIL_HYDRO = parameters%BEDROCKLYR
+
       QDIS      = 0.0
       QIN       = 0.0
 
@@ -7823,20 +7849,20 @@ ENDIF   ! CROPTYPE == 0
 !KWM:  Derive layer thickness in mm
 
       DZMM(1) = -ZSOIL(1)*1.E3
-      DO IZ = 2, NSOIL
+      DO IZ = 2, NSOIL_HYDRO
          DZMM(IZ)  = 1.E3 * (ZSOIL(IZ - 1) - ZSOIL(IZ))
       ENDDO
 
 ! Derive node (middle) depth in [m]
 !KWM:  Positive number, depth below ground surface in m
       ZNODE(1) = -ZSOIL(1) / 2.
-      DO IZ = 2, NSOIL
+      DO IZ = 2, NSOIL_HYDRO
          ZNODE(IZ)  = -ZSOIL(IZ-1) + 0.5 * (ZSOIL(IZ-1) - ZSOIL(IZ))
       ENDDO
 
 ! Convert volumetric soil moisture "sh2o" to mass
 
-      DO IZ = 1, NSOIL
+      DO IZ = 1, NSOIL_HYDRO
          SMC(IZ)      = SH2O(IZ) + SICE(IZ)
          MLIQ(IZ)     = SH2O(IZ) * DZMM(IZ)
          EPORE(IZ)    = MAX(0.01,parameters%SMCMAX(IZ) - SICE(IZ))
@@ -7846,8 +7872,8 @@ ENDIF   ! CROPTYPE == 0
 ! The layer index of the first unsaturated layer,
 ! i.e., the layer right above the water table
 
-      IWT = NSOIL
-      DO IZ = 2,NSOIL
+      IWT = NSOIL_HYDRO
+      DO IZ = 2,NSOIL_HYDRO
          IF(ZWT   .LE. -ZSOIL(IZ) ) THEN
             IWT = IZ-1
             EXIT
@@ -7881,22 +7907,22 @@ ENDIF   ! CROPTYPE == 0
 
       WT  = WT + (QIN - QDIS) * DT     !(mm)
 
-      IF(IWT.EQ.NSOIL) THEN
+      IF(IWT.EQ.NSOIL_HYDRO) THEN
          WA          = WA + (QIN - QDIS) * DT     !(mm)
          WT          = WA
-         ZWT         = (-ZSOIL(NSOIL) + 25.) - WA/1000./ROUS      !(m)
-         MLIQ(NSOIL) = MLIQ(NSOIL) - QIN * DT        ! [mm]
+         ZWT         = (-ZSOIL(NSOIL_HYDRO) + 25.) - WA/1000./ROUS      !(m)
+         MLIQ(NSOIL_HYDRO) = MLIQ(NSOIL_HYDRO) - QIN * DT        ! [mm]
 
-         MLIQ(NSOIL) = MLIQ(NSOIL) + MAX(0.,(WA - 5000.))
+         MLIQ(NSOIL_HYDRO) = MLIQ(NSOIL_HYDRO) + MAX(0.,(WA - 5000.))
          WA          = MIN(WA, 5000.)
       ELSE
 
-         IF (IWT.EQ.NSOIL-1) THEN
-            ZWT = -ZSOIL(NSOIL)                   &
-                 - (WT-ROUS*1000*25.) / (EPORE(NSOIL))/1000.
+         IF (IWT.EQ.NSOIL_HYDRO-1) THEN
+            ZWT = -ZSOIL(NSOIL_HYDRO)                   &
+                 - (WT-ROUS*1000*25.) / (EPORE(NSOIL_HYDRO))/1000.
          ELSE
             WS = 0.   ! water used to fill soil air pores
-            DO IZ = IWT+2,NSOIL
+            DO IZ = IWT+2,NSOIL_HYDRO
                WS = WS + EPORE(IZ) * DZMM(IZ)
             ENDDO
             ZWT = -ZSOIL(IWT+1)                  &
@@ -7904,11 +7930,11 @@ ENDIF   ! CROPTYPE == 0
          ENDIF
 
          WTSUB = 0.
-         DO IZ = 1, NSOIL
+         DO IZ = 1, NSOIL_HYDRO
            WTSUB = WTSUB + HK(IZ)*DZMM(IZ)
          END DO
 
-         DO IZ = 1, NSOIL           ! Removing subsurface runoff
+         DO IZ = 1, NSOIL_HYDRO           ! Removing subsurface runoff
          MLIQ(IZ) = MLIQ(IZ) - QDIS*DT*HK(IZ)*DZMM(IZ)/WTSUB
          END DO
       END IF
@@ -7920,7 +7946,7 @@ ENDIF   ! CROPTYPE == 0
 ! Get water needed to bring MLIQ equal WATMIN from lower layer.
 !
       WATMIN = 0.01
-      DO IZ = 1, NSOIL-1
+      DO IZ = 1, NSOIL_HYDRO-1
           IF (MLIQ(IZ) .LT. 0.) THEN
              XS = WATMIN-MLIQ(IZ)
           ELSE
@@ -7930,7 +7956,7 @@ ENDIF   ! CROPTYPE == 0
           MLIQ(IZ+1) = MLIQ(IZ+1) - XS
       END DO
 
-        IZ = NSOIL
+        IZ = NSOIL_HYDRO
         IF (MLIQ(IZ) .LT. WATMIN) THEN
            XS = WATMIN-MLIQ(IZ)
         ELSE
@@ -7940,7 +7966,7 @@ ENDIF   ! CROPTYPE == 0
         WA       = WA - XS
         WT       = WT - XS
 
-      DO IZ = 1, NSOIL
+      DO IZ = 1, NSOIL_HYDRO
         SH2O(IZ)     = MLIQ(IZ) / DZMM(IZ)
       END DO
 
@@ -7978,25 +8004,27 @@ ENDIF   ! CROPTYPE == 0
   INTEGER                                     :: IZ    !do-loop index
   INTEGER                                     :: IWTD   !layer index above water table layer
   INTEGER                                     :: KWTD   !layer index where the water table layer is
+  INTEGER                                     :: NSOIL_HYDRO !lowest hydrologically active soil layer
   REAL                                        :: WTDOLD
   REAL                                        :: DZUP
   REAL                                        :: SMCEQDEEP
   REAL,  DIMENSION(       0:NSOIL)            :: ZSOIL0
 ! -------------------------------------------------------------
 
+NSOIL_HYDRO = parameters%BEDROCKLYR
 
-ZSOIL0(1:NSOIL) = ZSOIL(1:NSOIL)
+ZSOIL0(1:NSOIL_HYDRO) = ZSOIL(1:NSOIL_HYDRO)
 ZSOIL0(0) = 0.
 
 !find the layer where the water table is
-     DO IZ=NSOIL,1,-1
+     DO IZ=NSOIL_HYDRO,1,-1
         IF(WTD + 1.E-6 < ZSOIL0(IZ)) EXIT
      ENDDO
         IWTD=IZ
 
 
         KWTD=IWTD+1  !layer where the water table is
-        IF(KWTD.LE.NSOIL)THEN    !wtd in the resolved layers
+        IF(KWTD.LE.NSOIL_HYDRO)THEN    !wtd in the resolved layers
            WTDOLD=WTD
            IF(SMC(KWTD).GT.SMCEQ(KWTD))THEN
 
@@ -8027,7 +8055,7 @@ ZSOIL0(0) = 0.
                KWTD=KWTD+1
                IWTD=IWTD+1
 !wtd crossed to the layer below. Now adjust it there
-               IF(KWTD.LE.NSOIL)THEN
+               IF(KWTD.LE.NSOIL_HYDRO)THEN
                    WTDOLD=WTD
                    IF(SMC(KWTD).GT.SMCEQ(KWTD))THEN
                    WTD = MIN( ( SMC(KWTD)*DZSNSO(KWTD) &
@@ -8046,40 +8074,40 @@ ZSOIL0(0) = 0.
 !                   QDRAIN = QDRAIN - 1000 * (SMCEQ(NSOIL)-SMC(NSOIL)) * DZSNSO(NSOIL) / DT
 !                   SMC(NSOIL)=SMCEQ(NSOIL)
 !adjust wtd in the ficticious layer below
-                   SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
-                   WTD = MIN( ( SMCWTD*DZSNSO(NSOIL) &
-                   - SMCEQDEEP*ZSOIL0(NSOIL) + parameters%SMCMAX(NSOIL)*(ZSOIL0(NSOIL)-DZSNSO(NSOIL)) ) / &
-                       ( parameters%SMCMAX(NSOIL)-SMCEQDEEP ) , ZSOIL0(NSOIL) )
+                   SMCEQDEEP = parameters%SMCMAX(NSOIL_HYDRO) * ( -parameters%PSISAT(NSOIL_HYDRO) / ( -parameters%PSISAT(NSOIL_HYDRO) - DZSNSO(NSOIL_HYDRO) ) ) ** (1./parameters%BEXP(NSOIL_HYDRO))
+                   WTD = MIN( ( SMCWTD*DZSNSO(NSOIL_HYDRO) &
+                   - SMCEQDEEP*ZSOIL0(NSOIL_HYDRO) + parameters%SMCMAX(NSOIL_HYDRO)*(ZSOIL0(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO)) ) / &
+                       ( parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP ) , ZSOIL0(NSOIL_HYDRO) )
                    RECH = RECH - (WTDOLD-WTD) * &
-                                 (parameters%SMCMAX(NSOIL)-SMCEQDEEP)
+                                 (parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP)
                 ENDIF
 
             ENDIF
-        ELSEIF(WTD.GE.ZSOIL0(NSOIL)-DZSNSO(NSOIL))THEN
+        ELSEIF(WTD.GE.ZSOIL0(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO))THEN
 !if wtd was already below the bottom of the resolved soil crust
            WTDOLD=WTD
-           SMCEQDEEP = parameters%SMCMAX(NSOIL) * ( -parameters%PSISAT(NSOIL) / ( -parameters%PSISAT(NSOIL) - DZSNSO(NSOIL) ) ) ** (1./parameters%BEXP(NSOIL))
+           SMCEQDEEP = parameters%SMCMAX(NSOIL_HYDRO) * ( -parameters%PSISAT(NSOIL_HYDRO) / ( -parameters%PSISAT(NSOIL_HYDRO) - DZSNSO(NSOIL_HYDRO) ) ) ** (1./parameters%BEXP(NSOIL_HYDRO))
            IF(SMCWTD.GT.SMCEQDEEP)THEN
-               WTD = MIN( ( SMCWTD*DZSNSO(NSOIL) &
-                 - SMCEQDEEP*ZSOIL0(NSOIL) + parameters%SMCMAX(NSOIL)*(ZSOIL0(NSOIL)-DZSNSO(NSOIL)) ) / &
-                     ( parameters%SMCMAX(NSOIL)-SMCEQDEEP ) , ZSOIL0(NSOIL) )
-               RECH = -(WTDOLD-WTD) * (parameters%SMCMAX(NSOIL)-SMCEQDEEP)
+               WTD = MIN( ( SMCWTD*DZSNSO(NSOIL_HYDRO) &
+                 - SMCEQDEEP*ZSOIL0(NSOIL_HYDRO) + parameters%SMCMAX(NSOIL_HYDRO)*(ZSOIL0(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO)) ) / &
+                     ( parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP ) , ZSOIL0(NSOIL_HYDRO) )
+               RECH = -(WTDOLD-WTD) * (parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP)
            ELSE
-               RECH = -(WTDOLD-(ZSOIL0(NSOIL)-DZSNSO(NSOIL))) * (parameters%SMCMAX(NSOIL)-SMCEQDEEP)
-               WTDOLD=ZSOIL0(NSOIL)-DZSNSO(NSOIL)
+               RECH = -(WTDOLD-(ZSOIL0(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO))) * (parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP)
+               WTDOLD=ZSOIL0(NSOIL_HYDRO)-DZSNSO(NSOIL_HYDRO)
 !and now even further down
-               DZUP=(SMCEQDEEP-SMCWTD)*DZSNSO(NSOIL)/(parameters%SMCMAX(NSOIL)-SMCEQDEEP)
+               DZUP=(SMCEQDEEP-SMCWTD)*DZSNSO(NSOIL_HYDRO)/(parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP)
                WTD=WTDOLD-DZUP
-               RECH = RECH - (parameters%SMCMAX(NSOIL)-SMCEQDEEP)*DZUP
+               RECH = RECH - (parameters%SMCMAX(NSOIL_HYDRO)-SMCEQDEEP)*DZUP
                SMCWTD=SMCEQDEEP
            ENDIF
 
 
          ENDIF
 
-IF(IWTD.LT.NSOIL .AND. IWTD.GT.0) THEN
+IF(IWTD.LT.NSOIL_HYDRO .AND. IWTD.GT.0) THEN
   SMCWTD=parameters%SMCMAX(IWTD)
-ELSEIF(IWTD.LT.NSOIL .AND. IWTD.LE.0) THEN
+ELSEIF(IWTD.LT.NSOIL_HYDRO .AND. IWTD.LE.0) THEN
   SMCWTD=parameters%SMCMAX(1)
 END IF
 
@@ -9346,6 +9374,7 @@ MODULE NOAHMP_TABLES
     REAL :: IMPERV_URBAN_TABLE  !imperviousness fraction
     REAL :: SCAMAX_TABLE        !maximum fractional snow covered area (0.0-1.0)
     REAL :: SWE_LIMIT_TABLE     !maximum SWE limit (mm)
+    INTEGER :: BEDROCKLYR_TABLE !lowest hydrologically active soil layer (below which is bedrock)
 
 ! MPTABLE.TBL crop parameters
 
@@ -9851,12 +9880,12 @@ CONTAINS
     REAL :: CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN,SWE_LIMIT,SCAMAX
+	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN,SWE_LIMIT,SCAMAX,BEDROCKLYR
 
     NAMELIST / noahmp_global_parameters / CO2,O2,TIMEAN,FSATMX,Z0SNO,SSI,SNOW_RET_FAC, &
             SWEMX,TAU0,GRAIN_GROWTH,EXTRA_GROWTH,DIRT_SOOT,&
 	    BATS_COSZ,BATS_VIS_NEW,BATS_NIR_NEW,BATS_VIS_AGE,BATS_NIR_AGE,BATS_VIS_DIR,BATS_NIR_DIR,&
-	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN,SWE_LIMIT,SCAMAX
+	    RSURF_SNOW,RSURF_EXP,IMPERV_URBAN,SWE_LIMIT,SCAMAX,BEDROCKLYR
 
 
     ! Initialize our variables to bad values, so that if the namelist read fails, we come to a screeching halt as soon as we try to use anything.
@@ -9884,6 +9913,7 @@ RSURF_SNOW_TABLE     = -1.E36
 IMPERV_URBAN_TABLE   = -1.E36
     SCAMAX_TABLE     = -1.E36
  SWE_LIMIT_TABLE     = -1.E36
+BEDROCKLYR_TABLE     = -1000
 
     inquire( file='MPTABLE.TBL', exist=file_named )
     if ( file_named ) then
@@ -9924,6 +9954,7 @@ RSURF_SNOW_TABLE     = RSURF_SNOW
 IMPERV_URBAN_TABLE   = IMPERV_URBAN
     SCAMAX_TABLE     = SCAMAX
  SWE_LIMIT_TABLE     = SWE_LIMIT
+BEDROCKLYR_TABLE     = BEDROCKLYR
 
   end subroutine read_mp_global_parameters
 

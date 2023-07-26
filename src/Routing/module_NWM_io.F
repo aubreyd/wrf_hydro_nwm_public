@@ -1119,13 +1119,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    integer :: waterVal ! Value in HRLDAS in WRFINPUT file used to define water bodies for masking
    integer :: sfcflag
    ! Local arrays for defining special variable dims
-   character (len=64), dimension(3) :: soilVarList = ["SOIL_T","SOIL_W","SOIL_M"]
-   character (len=64), dimension(4) :: snowVarList = ["ZSNSO_SN","SNICE","SNLIQ","SNOW_T"]
-   character (len=64), dimension(2) :: albVarList = ["ALBSND","ALBSNI"]
-   character (len=64), dimension(10) :: crocusVarList = ["PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE", &
-                                                         "PSNOWTEMP","PSNOWDZ","PSNOWHIST", & 
-                                                         "PSNOWLIQ","PSNOWHEAT","PSNOWRHO", &
-                                                         "PSNOWSWE"]
+   character (len=10), dimension(3) :: soilVarList
+   character (len=10), dimension(4) :: snowVarList
+   character (len=10), dimension(2) :: albVarList
+   character (len=10), dimension(10) :: crocusVarList
 
    ! Allocatable arrays to hold global output arrays, and local arrays for
    ! conversion to integers.
@@ -1169,6 +1166,27 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    if (nlst(1)%OVRTSWCRT > 0) then
      sfcflag = 0
    endif
+
+   ! Initialize variable lists so gnu is happy (does not likt multi-length strings)
+   soilVarList(1) = "SOIL_T"
+   soilVarList(2) = "SOIL_W"
+   soilVarList(3) = "SOIL_M"
+   snowVarList(1) = "ZSNSO_SN"
+   snowVarList(2) = "SNICE"
+   snowVarList(3) = "SNLIQ"
+   snowVarList(4) = "SNOW_T"
+   albVarList(1) = "ALBSND"
+   albVarList(2) = "ALBSNI"
+   crocusVarList(1) = "PSNOWGRAN1"
+   crocusVarList(2) = "PSNOWGRAN2"
+   crocusVarList(3) = "PSNOWAGE"
+   crocusVarList(4) = "PSNOWTEMP"
+   crocusVarList(5) = "PSNOWDZ"
+   crocusVarList(6) = "PSNOWHIST"
+   crocusVarList(7) = "PSNOWLIQ"
+   crocusVarList(8) = "PSNOWHEAT"
+   crocusVarList(9) = "PSNOWRHO"
+   crocusVarList(10) = "PSNOWSWE"
 
    ! Initialize NWM dictionary derived type containing all the necessary
    ! metadata for the output file.
@@ -1858,7 +1876,7 @@ subroutine output_rt_NWM(domainId,iGrid)
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
    real :: scaleFactorReciprocal
 
-   character (len=64), dimension(1) :: soilVarList = ["SOIL_M"]
+   character (len=10), dimension(1) :: soilVarList = ["SOIL_M"]
 
 ! Establish macro variables to hlep guide this subroutine.
 #ifdef MPP_LAND
@@ -3614,7 +3632,7 @@ subroutine output_lsmOut_NWM(domainId)
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
-   character (len=64), dimension(3) :: soilVarList = ["stc", "smc", "sh2ox"]
+   character (len=10), dimension(3) :: soilVarList
 
 #ifdef MPP_LAND
    mppFlag = 1
@@ -3638,6 +3656,11 @@ subroutine output_lsmOut_NWM(domainId)
    else
       myId = 0
    endif
+
+   ! Initialize variable lists so gnu is happy (does not likt multi-length strings)
+   soilVarList(1) = "stc"
+   soilVarList(2) = "smc"
+   soilVarList(3) = "sh2ox"
 
    ! Some sanity checking here.
    if(nlst(domainId)%LSMOUT_DOMAIN .eq. 0) then

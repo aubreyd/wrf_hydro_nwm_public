@@ -255,6 +255,7 @@ module module_rt_inc
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
       !REAL,    allocatable, DIMENSION(:)   :: SLDPTH
       REAL,    allocatable, DIMENSION(:,:)   :: NEXP
+      INTEGER, allocatable, DIMENSION(:,:)   :: bedrocklyr
 
 !!! define constant/parameter
     real ::   ov_rough(50)!, ZSOIL(100) ! ZSOIL moved to subsurface properties module

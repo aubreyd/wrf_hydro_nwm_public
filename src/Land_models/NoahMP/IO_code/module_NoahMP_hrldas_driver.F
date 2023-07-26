@@ -176,6 +176,8 @@ module module_NoahMP_hrldas_driver
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  tau0_2D         ! tau0 from Yang97 eqn. 10a
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  rsurfsnow_2D    ! surface resistence for snow [s/m]
   REAL, ALLOCATABLE, DIMENSION(:,:)       ::  scamax_2D       ! maximum fractional snow covered area (0.0-1.0)
+  INTEGER, ALLOCATABLE, DIMENSION(:,:)    ::  bedrocklyr_2D   ! lowest hydrologically active layer (below which is bedrock)
+  INTEGER                                 ::  kloop           ! counter for nsoil loop
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -801,6 +803,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( tau0_2D    (XSTART:XEND,YSTART:YEND) )            ! tau0 from Yang97 eqn. 10a
   ALLOCATE ( rsurfsnow_2D (XSTART:XEND,YSTART:YEND) )          ! surface resistence for snow [s/m]
   ALLOCATE ( scamax_2D  (XSTART:XEND,YSTART:YEND) )            ! maximum fractional snow covered area (0.0-1.0)
+  ALLOCATE ( bedrocklyr_2D(XSTART:XEND,YSTART:YEND) )          ! lowest hydrologically active soil layer (below which is bedrock)
 #endif
 
 ! INOUT (with generic LSM equivalent) (as defined in WRF)
@@ -1237,7 +1240,26 @@ module module_NoahMP_hrldas_driver
                       NSOIL,BEXP_3D,SMCDRY_3D,SMCWLT_3D,SMCREF_3D,SMCMAX_3D,  &
 		      DKSAT_3D,DWSAT_3D,PSISAT_3D,QUARTZ_3D,REFDK_2D,REFKDT_2D,&
 		      SLOPE_2D,CWPVT_2D,VCMX25_2D,MP_2D,HVT_2D,MFSNO_2D,RSURFEXP_2D, &
-                      SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D)
+                      SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D, &
+                      BEDROCKLYR_2D)
+
+    !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.               
+    if (IOPT_RUN .eq. 3) then
+       !ADCHANGE: Hard-code soil params below bedrock to be effectively null                        
+       do kloop = 1, NSOIL                                                                                
+         where (BEDROCKLYR_2D .lt. kloop) 
+           SMCMAX_3D(:,kloop,:) = 1.e-9
+           SMCREF_3D(:,kloop,:) = 1.e-9
+           SMCWLT_3D(:,kloop,:) = 1.e-9
+           SMCDRY_3D(:,kloop,:) = 1.e-9
+           DKSAT_3D(:,kloop,:) = 1.e-9 
+           DWSAT_3D(:,kloop,:) = 1.e-9                                       
+         end where
+       enddo
+    else
+       print *, "OPT_RUN is not 3 so setting all layers as hydrologically active."
+       BEDROCKLYR_2D = NSOIL 
+    endif
 
     if (noah_lsm%runoff_option == 7) then
         CALL READ_XAJ_RUNOFF(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
@@ -1889,6 +1911,7 @@ end subroutine land_driver_ini
                  AXAJ_2D,BXAJ_2D,XXAJ_2D,                                     &
                  IMPERV_2D,                                                   &
                  SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D,         &
+                 BEDROCKLYR_2D,                                               &
 #endif
 #ifdef WRF_HYDRO
                  sfcheadrt,INFXSRT,soldrain,                          &    !O
