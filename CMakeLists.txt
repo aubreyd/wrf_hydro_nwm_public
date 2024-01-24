@@ -1,8 +1,12 @@
 cmake_minimum_required (VERSION 3.12)
 cmake_policy(SET CMP0074 NEW)			# use xxxx_ROOT env vars
+if (NOT CMAKE_BUILD_TYPE)
+	set (CMAKE_BUILD_TYPE "Release")
+endif()
+
 
 # set project name and version numbers
-project (WRF_Hydro)
+project (WRF_Hydro LANGUAGES Fortran)
 set (WRF_Hydro_VERSION_MAJOR 5)
 set (WRF_Hydro_VERSION_MINOR 3)
 set (WRF_Hydro_VERSION_PATCH 0)
@@ -11,7 +15,6 @@ set (National_Water_Model_VERSION_MINOR 0)
 set (National_Water_Model_VERSION_PATCH beta)
 
 # set cmake to work with MPI Fortran
-enable_language (Fortran)
 find_package(MPI REQUIRED)
 add_compile_options(${MPI_Fortran_COMPILE_FLAGS})
 include_directories(${MPI_Fortran_INCLUDE_PATH})
@@ -20,6 +23,8 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set(CMAKE_SKIP_BUILD_RPATH  FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
+# enable ctests
+enable_testing()
 
 #message ("-- MPI Include directories: " ${MPI_INCLUDE_PATH} )
 #message ("-- MPI C COMPILER : " ${MPI_C_COMPILER} )
@@ -41,7 +46,7 @@ set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/src/cmake-modules)
 set (NETCDF_F90 "YES")
 set (NETCDF_F77 "YES")
 find_package(NetCDF REQUIRED)
-message("-- NetCDF Include Dir: ${NETCDF_INCLUDES}")
+message("-- NetCDF Include Dir(s): ${NETCDF_INCLUDES_F77} ${NETCDF_INCLUDES_F90}")
 
 # set user controled enviorment variables
 set (HYDRO_LSM $ENV{HYDRO_LSM} CACHE STRING "Name of the Land Surface Model to Use")
@@ -71,7 +76,11 @@ if (WRF_HYDRO STREQUAL "")
 endif (WRF_HYDRO STREQUAL "")
 
 if (HYDRO_D STREQUAL "")
-	set (HYDRO_D "0" CACHE STRING "Print additonal debug information in WRF-Hydro" FORCE)
+	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+		set (HYDRO_D "1" CACHE STRING "Print additonal debug information in WRF-Hydro" FORCE)
+	else()
+		set (HYDRO_D "0" CACHE STRING "Print additonal debug information in WRF-Hydro" FORCE)
+	endif()
 endif (HYDRO_D STREQUAL "")
 
 if (WRF_HYDRO_RAPID STREQUAL "")
@@ -189,25 +198,40 @@ option(BUILD_CROCUS "Build Crocus" ON)
 message("=============================================================")
 
 #set compile flags based on compiler id
-
 if (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
     # set compile flags for gfortran
     message ( "-- Using gfortran")
-    set (CMAKE_Fortran_FLAGS "-cpp -O2 -g -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4")
+    set (CMAKE_Fortran_FLAGS "-cpp -w -ffree-form -ffree-line-length-none -fconvert=big-endian -frecord-marker=4")
+    if (CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
+      set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fallow-argument-mismatch")
+    endif()
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -fbacktrace")
 elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel.*")
     # set compile flags for ifort
     message ( "-- Using ifort")
-    set (CMAKE_Fortran_FLAGS "-fpp -O2 -g -w -ftz -align all -fno-alias -fp-model precise -FR -convert big_endian")
+    set (CMAKE_Fortran_FLAGS "-fpp -w -ftz -align all -fno-alias -fp-model precise -FR -convert big_endian")
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -traceback")
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "PGI.*") OR (CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC.*"))
-	message ("-- Using PGI / NVHPC")
-	set (CMAKE_Fortran_FLAGS "-Mpreprocess -O2 -Mfree -byteswapio -Kieee ")
-else (CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*")
+    message ("-- Using NVHPC / PGI")
+    set (CMAKE_Fortran_FLAGS "-Mpreprocess -Mfree -byteswapio -Kieee ")
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -traceback")
+elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "Cray*"))
+    message ("-- Using Cray")
+    set (CMAKE_Fortran_FLAGS "-eZ -ffree -ef -h alias=none -h fp1 -hbyteswapio")
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O3 -G2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -G0") # -traceback")
+else ()
     message ("CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
     message ("Fortran compiler: " ${Fortran_COMPILER_NAME})
     message ("No optimized Fortran compiler flags are known, we just try -O2...")
-    set (CMAKE_Fortran_FLAGS_RELEASE "-cpp -O2")
-    set (CMAKE_Fortran_FLAGS_DEBUG   "-cpp -O0 -g")
-endif ( CMAKE_Fortran_COMPILER_ID MATCHES "GNU.*" )
+    set (CMAKE_Fortran_FLAGS "-cpp")
+    set (CMAKE_Fortran_FLAGS_RELEASE "-O2")
+    set (CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g")
+endif ()
+message ("-- CMAKE_Fortran_COMPILER full path: " ${CMAKE_Fortran_COMPILER})
 
 #set output directories for libraries binaries and fortran .mod files
 set(CMAKE_BINARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
@@ -218,7 +242,10 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/mods)
 #add common include directores need in the build
 include_directories(AFTER ${PROJECT_BINARY_DIR}/mods)
 include_directories(AFTER ${MPI_INCLUDE_PATH})
-include_directories(AFTER ${NETCDF_INCLUDES})
+# include_directories(AFTER ${NETCDF_INCLUDES})  # NOTE: We don't need the C include for netCDF
+include_directories(AFTER ${NETCDF_INCLUDES_F77})
+include_directories(AFTER ${NETCDF_INCLUDES_F90})
 include_directories(AFTER ${PROJECT_SOURCE_DIR}/src/Data_Rec)
 
 add_subdirectory("src")
+add_subdirectory("tests/ctests")
