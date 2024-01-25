@@ -147,6 +147,7 @@ subroutine output_chrt_NWM(domainId)
    real, allocatable, dimension(:) :: g_QLateral_trOut
    real, allocatable, dimension(:) :: g_hlink_trOut
    real, allocatable, dimension(:) :: g_qBucket_trOut
+   real, allocatable, dimension(:) :: strFlowLocal_tr
 !---------------------------------------------
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
@@ -189,9 +190,13 @@ subroutine output_chrt_NWM(domainId)
       myId = 0
    endif
 
+   print *, "ADCHECK: Before initChrtDict"
+
    ! Initialize NWM dictionary derived type containing all the necessary metadat
    ! for the output file.
    call initChrtDict(fileMeta,diagFlag,myId)
+
+   print *, "ADCHECK: Before array binary"
 
    ! Depending on the NWM forecast config, we will be outputting different
    ! varibles. DO NOT MODIFY THESE ARRAYS WITHOUT CONSULTING NCAR OR
@@ -231,6 +236,8 @@ subroutine output_chrt_NWM(domainId)
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
+
+   print *, "ADCHECK: Before allocations"
 
    ! First step is to collect and assemble all data that will be written to the
    ! NetCDF file. If we are not using MPI, we bypass the collection step through
@@ -339,6 +346,8 @@ subroutine output_chrt_NWM(domainId)
          !-------------------------
       endif
 
+      print *, "ADCHECK: Before local var allocations"
+
       ! Allocate local streamflow and velocity arrays. We need to do a check to
       ! for lake_type 2. However, we cannot set the values in the global array
       ! to missing as this causes the model to crash.
@@ -352,6 +361,10 @@ subroutine output_chrt_NWM(domainId)
          allocate(qlossLocal(RT_DOMAIN(domainId)%NLINKS))
          qlossLocal = RT_DOMAIN(domainId)%qloss !TML temp fix to test code
       endif
+      allocate(strFlowLocal_tr(RT_DOMAIN(domainId)%NLINKS))
+      strFlowLocal_tr = RT_DOMAIN(domainId)%QLINK_tr(:,1)
+
+      print *, "ADCHECK: Before local lake adjust"
 
       ! Loop through all the local links on this processor. For lake_type
       ! of 2, we need to manually set the streamflow and velocity values
@@ -364,6 +377,7 @@ subroutine output_chrt_NWM(domainId)
                if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
                   qlossLocal(iTmp) = fileMeta%modelNdv
                endif
+               strFlowLocal_tr(iTmp) = fileMeta%modelNdv
             endif
          end do
       endif
@@ -372,20 +386,33 @@ subroutine output_chrt_NWM(domainId)
       ! assemble into global arrays previously allocated.
       if(nlst(domainId)%channel_option .ne. 3) then
          ! Reach-based routing collection
+         print *, "ADCHECK: Before chrt var writes"
+         print *, "  strFlowLocal", strFlowLocal
+         print *, "  g_qlink1", g_qlink(:,1)
+         print *, "  nlinks", RT_DOMAIN(domainId)%NLINKS
+         print *, "  gsize", gsize
 #ifdef MPP_LAND
-         call ReachLS_write_io(strFlowLocal,g_qlink(:,1))
+         print *, "ADCHECK: Before tracer var writes qlink1"
+         !call ReachLS_write_io(strFlowLocal,g_qlink(:,1))
+         print *, "ADCHECK: Before tracer var writes qlink2"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK(:,2),g_qlink(:,2))
+         print *, "ADCHECK: Before tracer var writes order"
          call ReachLS_write_io(RT_DOMAIN(domainId)%ORDER,g_order)
          call ReachLS_write_io(RT_DOMAIN(domainId)%linkid,g_linkid)
          call ReachLS_write_io(RT_DOMAIN(domainId)%CHLAT,g_chlat)
          call ReachLS_write_io(RT_DOMAIN(domainId)%CHLON,g_chlon)
          call ReachLS_write_io(RT_DOMAIN(domainId)%ZELEV,g_zelev)
+         print *, "ADCHECK: Before tracer var writes qlateral"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral,g_QLateral)
          call ReachLS_write_io(velocityLocal,g_velocity)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
          !-----water tracer vars------
-         call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK_tr(:,1),g_qlink_tr(:,1))
+         print *, "ADCHECK: Before tracer var writes qlink_tr"
+         call ReachLS_write_io(strFlowLocal_tr,g_qlink_tr(:,1))
+         call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK_tr(:,2),g_qlink_tr(:,2))
+         print *, "ADCHECK: Before tracer var writes qlateral_tr"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral_tr,g_QLateral_tr)
+         print *, "ADCHECK: Before tracer var writes hlink_tr"
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK_tr,g_hlink_tr)
          !----------------------------
          ! Optional outputs
@@ -402,6 +429,7 @@ subroutine output_chrt_NWM(domainId)
             fileMeta%outFlag(11) = 1
             call ReachLS_write_io(qlossLocal,g_qloss)
          endif
+         print *, "ADCHECK: Before chrt chann/bucket writes"
          if(nlst(domainId)%UDMP_OPT .eq. 1) then
             ! Currently, we only allow channel-only outputs to be produced for
             ! NWM configurations.
@@ -434,6 +462,7 @@ subroutine output_chrt_NWM(domainId)
          endif
 #endif
       else
+         print *, "ADCHECK: Before chrt gridded var writes"
          ! Gridded routing collection
          call write_chanel_real(strFlowLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,1))
          call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,2))
@@ -459,6 +488,7 @@ subroutine output_chrt_NWM(domainId)
       endif
 
    else
+      print *, "ADCHECK: Before chrt no mpi alloc"
       gSize = rt_domain(domainId)%nlinksl
       ! No MPI - We are running on a single processor
       allocate(g_chlon(gsize))
@@ -530,6 +560,7 @@ subroutine output_chrt_NWM(domainId)
          g_qloss = RT_DOMAIN(domainId)%qloss
       endif
       if(nlst(domainId)%UDMP_OPT .eq. 1) then
+         print *, "ADCHECK: Before chrt qsfc qbuck assign"
          ! Currently, we only allow channel-only outputs to be produced for
          ! NWM configurations.
          if(nlst(domainId)%output_channelBucket_influx .eq. 1 .or. &
@@ -607,6 +638,7 @@ subroutine output_chrt_NWM(domainId)
 
    ! Only run NetCDF library calls to output data if we are on the master
    ! processor.
+   print *, "ADCHECK: Before chrt ascending indx"
    if(myId .eq. 0) then
       if(nlst(domainId)%channel_option .ne. 3) then
          ! Read in index values from Routelink that will be used to sort output
@@ -1126,6 +1158,7 @@ subroutine output_chrt_NWM(domainId)
    deallocate(g_qlink_tr)
    deallocate(g_QLateral_tr)
    deallocate(g_qBucket_tr)
+   deallocate(strFlowLocal_tr)
    !-------------------------
 
 end subroutine output_chrt_NWM

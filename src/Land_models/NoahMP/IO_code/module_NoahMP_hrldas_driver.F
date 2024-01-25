@@ -2806,6 +2806,7 @@ subroutine lsm_restart(state)
 !-----------------------------------------------------------------
 ! Needed for water tracer capability
 !-----------------------------------------------------------------
+if (OPT_WT .eq. 1) then
   call add_to_restart(ncid,SMOIS_TR     , "SMC_TR"   , layers="TRAC")   !1
   call add_to_restart(ncid,SH2OXY_TR    , "SH2O_TR"  , layers="TRAC")   !2
   call add_to_restart(ncid,SNICEXY_TR   , "SNICE_TR" , layers="SNOW")   !3
@@ -2823,6 +2824,7 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,UDRUNOFF_TR  , "UDRUNOFF_TR" )               !15
   call add_to_restart(ncid,SMOIS_SUB    , "SMC_SUB"  , layers="TRAC")   !16
   call add_to_restart(ncid,SH2OXY_SUB   , "SH2O_SUB" , layers="TRAC")   !17
+end if
 !-----------------------------------------------------------------
 
 #ifdef WRF_HYDRO

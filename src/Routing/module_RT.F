@@ -145,6 +145,10 @@ CONTAINS
 
      if(nlst(did)%UDMP_OPT .eq. 1) then
         allocate ( RT_DOMAIN(did)%landRunOff (ixrt,jxrt) )
+        rt_domain(did)%landRunOff = 0.
+! Water tracer - AD_TO_ADD namelist setting if block
+        allocate ( rt_domain(did)%landRunOff_tr (ixrt,jxrt) )
+        rt_domain(did)%landRunOff_tr = 0.
      endif
 
      !allocate( rt_domain(did)%subsurface%grid_transform%smcrt   	(IXRT,JXRT,NSOIL) )
@@ -321,6 +325,78 @@ CONTAINS
      rt_domain(did)%CH_LNKRT = 0.0
   endif
 
+! Water tracer - LSM Grid
+
+  allocate( rt_domain(did)%INFXSRT_tr(IX,JX) )
+  rt_domain(did)%INFXSRT_tr = 0.0
+
+  allocate( rt_domain(did)%SOLDRAIN_tr(IX,JX) )
+  rt_domain(did)%SOLDRAIN_tr = 0.0
+
+  allocate( rt_domain(did)%SMC_tr(IX,JX,NSOIL) )
+  rt_domain(did)%SMC_tr = 0.0
+
+  allocate( rt_domain(did)%SH2OX_tr(IX,JX,NSOIL) )
+  rt_domain(did)%SH2OX_tr = 0.0
+
+  allocate( rt_domain(did)%SMC_SUB(IX,JX,NSOIL) )
+  rt_domain(did)%SMC_SUB = 0.0
+
+  allocate( rt_domain(did)%SH2OX_SUB(IX,JX,NSOIL) )
+  rt_domain(did)%SH2OX_SUB = 0.0
+
+  allocate( rt_domain(did)%SICE_tr(IX,JX,NSOIL) )
+  rt_domain(did)%SICE_tr = 0.0
+
+  allocate( rt_domain(did)%SICE_SUB(IX,JX,NSOIL) )
+  rt_domain(did)%SICE_SUB = 0.0
+
+! Water tracer - RT grid
+
+  allocate( rt_domain(did)%SMCRT_tr(IXRT,JXRT,NSOIL) )
+  rt_domain(did)%SMCRT_tr = 0.0
+
+  allocate( rt_domain(did)%SMCRT_SUB(IXRT,JXRT,NSOIL) )
+  rt_domain(did)%SMCRT_SUB = 0.0
+
+ allocate( rt_domain(did)%SMCMAXRT_SUB(IXRT,JXRT,NSOIL) )
+  rt_domain(did)%SMCMAXRT_SUB = 0.0
+
+  allocate( rt_domain(did)%SH2OAGGRT_tr(NSOIL) )
+  rt_domain(did)%SH2OAGGRT_tr = 0.0
+
+  allocate( rt_domain(did)%SH2OAGGRT_SUB(NSOIL) )
+  rt_domain(did)%SH2OAGGRT_SUB = 0.0
+
+  rt_domain(did)%SFCHEADAGGRT_tr = 0.0
+
+  allocate( rt_domain(did)%q_sfcflx_x_tr(IXRT,JXRT) )
+  rt_domain(did)%q_sfcflx_x_tr = 0.0
+
+  allocate( rt_domain(did)%q_sfcflx_y_tr(IXRT,JXRT) )
+  rt_domain(did)%q_sfcflx_y_tr = 0.0
+
+  allocate( rt_domain(did)%QSTRMVOLRT_TS_tr(IXRT,JXRT) )
+  rt_domain(did)%QSTRMVOLRT_TS_tr = 0.0
+
+! check...moved
+
+!  rt_domain(did)%QSUBBDRYTRT_tr = 0.0
+
+!  allocate( rt_domain(did)%QSUBRT_tr(IXRT,JXRT) )
+!  rt_domain(did)%QSUBRT_tr = 0.0
+
+!  allocate( rt_domain(did)%QSUBBDRYRT_tr(IXRT,JXRT) )
+!  rt_domain(did)%QSUBBDRYRT_tr = 0.0
+
+!  rt_domain(did)%LSMVOL_tr = 0.0
+
+  allocate( rt_domain(did)%INFXSWGT_tr(IXRT,JXRT) )
+  rt_domain(did)%INFXSWGT_tr = 0.0
+
+  allocate( rt_domain(did)%SH2OWGT_tr(IXRT,JXRT,NSOIL) )
+  rt_domain(did)%SH2OWGT_tr = 0.0
+
 
   if (CHANRTSWCRT.eq.1 .or. CHANRTSWCRT .eq. 2) then  !IF/then for channel routing
 
@@ -478,6 +554,11 @@ CONTAINS
 
      allocate( rt_domain(did)%node_area(nsizes) )
 
+! Water tracer variables - AD_TO_ADD namelist setting if block 
+      allocate( rt_domain(did)%HLINK_tr(nsizes) ) 
+      allocate( rt_domain(did)%QLINK_tr(nsizes,2) )
+      allocate( rt_domain(did)%QLateral_tr(nsizes) )
+
 !!!! tmp
       if(nsizes .gt. 0) then
       rt_domain(did)%LINK = 0.0
@@ -526,6 +607,11 @@ CONTAINS
      endif
 
      rt_domain(did)%restQSTRM = .true.
+
+! Water tracer variables - AD_TO_ADD namelist setting if block 
+     rt_domain(did)%QLINK_tr = 0.
+     rt_domain(did)%HLINK_tr = 0.
+     rt_domain(did)%QLateral_tr = 0.
 
   END IF   !IF/then for channel routing
 
@@ -1280,6 +1366,16 @@ subroutine LandRT_ini(did)
         allocate (rt_domain(did)%z_max (rt_domain(did)%numbasns))
         allocate (rt_domain(did)%basns_area (rt_domain(did)%numbasns))
 
+        ! Water tracer variables - AD_TO_ADD namelist setting if block 
+        allocate (rt_domain(did)%z_gwsubbas_tr (rt_domain(did)%numbasns  ))
+        allocate (rt_domain(did)%qin_gwsubbas_tr (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%qout_gwsubbas_tr (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%z_gwsubbas_passive (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%z_gwsubbas_active (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%z_gwsubbas_passive_tr (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%z_gwsubbas_active_tr (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%cm_gwsubbas (rt_domain(did)%numbasns  ))
+
         if(nlst(did)%bucket_loss .eq. 1) then
            allocate(rt_domain(did)%qloss_gwsubbas(rt_domain(did)%numbasns))
            allocate(rt_domain(did)%gw_buck_loss(rt_domain(did)%numbasns))
@@ -1299,6 +1395,16 @@ subroutine LandRT_ini(did)
 
         !Temporary hardwire...
         rt_domain(did)%z_gwsubbas = 0.05   ! This gets updated with spun-up GW level in GWBUCKPARM.TBL
+
+        ! Water tracer variables - AD_TO_ADD namelist setting if block 
+        rt_domain(did)%z_gwsubbas_tr = 0.
+        rt_domain(did)%qin_gwsubbas_tr = 0.
+        rt_domain(did)%qout_gwsubbas_tr = 0.
+        rt_domain(did)%z_gwsubbas_passive = 0.
+        rt_domain(did)%z_gwsubbas_active = 0.
+        rt_domain(did)%z_gwsubbas_passive_tr = 0.
+        rt_domain(did)%z_gwsubbas_active_tr = 0.
+        rt_domain(did)%cm_gwsubbas = 0.
 
         call readBucket_nhd(trim(nlst(did)%GWBUCKPARM_file), rt_domain(did)%numbasns, &
              rt_domain(did)%gw_buck_coeff, rt_domain(did)%gw_buck_exp, rt_domain(did)%gw_buck_loss, &

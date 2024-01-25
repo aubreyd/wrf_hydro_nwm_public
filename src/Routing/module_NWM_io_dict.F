@@ -2861,7 +2861,9 @@ subroutine initGwDict(gwOutDict)
                          'm3 s-1', 'm3 s-1', 'm3 s-1', 'mm', &
                          'm3 s-1', 'm3 s-1', 'mm', &  ! tracer
                          'mm', 'mm', 'mm', 'mm', '1'] ! tracer
-   !gwOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude','latitude longitude','latitude longitude','latitude longitude']
+   !gwOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude','latitude longitude','latitude longitude','latitude longitude', &
+   !                            'latitude longitude','latitude longitude','latitude longitude','latitude longitude', &
+   !                            'latitude longitude','latitude longitude','latitude longitude','latitude longitude']
    gwOutDict%scaleFactor(:) = [0.001, 0.001, 0.001, 0.1, &
                                0.01, 0.01, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]  ! tracer
    gwOutDict%addOffset(:) = [0.0, 0.0, 0.0, 0.0, &
