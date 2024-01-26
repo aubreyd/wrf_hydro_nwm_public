@@ -344,6 +344,7 @@ module module_HYDRO_drv
 #endif
 
             if (nlst(did)%CHANRTSWCRT.eq.1.or.nlst(did)%CHANRTSWCRT.eq.2) then
+
                 !ADCHANGE: Change values for within lake reaches to NA
                 str_out = RT_DOMAIN(did)%QLINK
                 vel_out = RT_DOMAIN(did)%velocity
