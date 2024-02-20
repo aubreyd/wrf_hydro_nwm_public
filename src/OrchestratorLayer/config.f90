@@ -176,9 +176,9 @@ module config_base
      ! water tracer
      ! ADNOTE: Are these duplicated from hrldas namelist? Why repeat in hydro namelist?
      integer                             :: NTRACER      ! sum of NSUB
-     integer, allocatable,dimension(:)   :: NSUB_rt         ! number of sublayer for tracer
+     integer, allocatable,dimension(:)   :: NSUB         ! number of sublayer for tracer
      integer                             :: PMOPT        ! partial mixing option
-     integer                             :: WVTFLAG_rt
+     integer                             :: WVTFLAG
 
    contains
 
@@ -1125,6 +1125,13 @@ contains
     noah_lsm%track_end = track_end
     noah_lsm%partial_mixing_option = partial_mixing_option
     noah_lsm%tracer_sublayer = tracer_sublayer
+    !nlst(did)%NTRACER = 1
+    !if (noah_lsm%water_tracer_option .eq. 1) then
+    !  nlst(did)%PMOPT   = noah_lsm%partial_mixing_option
+    !  allocate(nlst(did)%NSUB(noah_lsm%nsoil))
+    !  nlst(did)%NSUB  = noah_lsm%tracer_sublayer(1:noah_lsm%nsoil)
+    !  nlst(did)%NTRACER = sum(nlst(did)%NSUB(1:noah_lsm%nsoil))
+    !end if
 
   end subroutine init_noah_lsm_and_wrf_hydro
 

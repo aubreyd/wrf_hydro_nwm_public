@@ -94,9 +94,9 @@ module module_namelist_inc
 !#endif
 
 !-----needed for water tracer capability-----
-          integer  :: wvtflag_rt
+          integer  :: wvtflag
           integer  :: NTRACER
-          integer, allocatable,dimension(:) :: NSUB_rt
+          integer, allocatable,dimension(:) :: NSUB
           integer  :: PMOPT
 
    end type namelist_rt_field

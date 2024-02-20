@@ -888,7 +888,7 @@ CONTAINS
 
 !print *, "NTRACER", NTRACER
 if (present(SMOIS_SUB)) then
-!  print *, "tracer active"
+  print *, "tracer active"
 end if
 !--------water tracer variable transfer-------
        if (present(SMOIS_SUB)) SMC_SUB (    1:iNTRACER)  = SMOIS_SUB   (I,      1:iNTRACER,J)
@@ -912,9 +912,9 @@ end if
        if (present(sfcheadrt_tr))  sfcheadrt_tr_pass        = sfcheadrt_tr(i,j)
 !print *, "FLAG003-1"
 !---------------------------------------------
-if (I .eq. 75 .and. J .eq. 46) then
+!if (I .eq. 75 .and. J .eq. 46) then
 !  print *, "FLAG002,PRCP, SMC,SMH2O,SMC_SUB,SH2O_SUB,SMC_TR,SH2O_TR,RUNSF,RUNSRF_TR:",PRCP,SMC,SMH2O,SMC_SUB,SH2O_SUB,SMC_TR,SH2O_TR,RUNSF,RUNSRF_TR
-end if
+!end if
 
        SLOPETYP     = 1                               ! set underground runoff slope term
        IST          = 1                               ! MP surface type: 1 = land; 2 = lake

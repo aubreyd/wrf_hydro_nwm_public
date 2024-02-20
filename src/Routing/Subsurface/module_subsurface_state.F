@@ -10,6 +10,12 @@ module module_subsurface_state
 
         ! flow from boundary cells to outside of domain on routing grid
         real, allocatable, dimension(:,:) :: qsubbdryrt
+
+        ! water tracer variables
+        real :: qsubbdrytrt_tr  ! need descrip & units
+        real, allocatable, dimension(:,:,:) :: qsubrt_tr  ! need descrip & units
+        real, allocatable, dimension(:,:,:) :: qsubrt_sub  ! need descrip & units
+        real, allocatable, dimension(:,:,:) :: qsubbdryrt_tr  ! need descrip & units
     contains
         procedure :: init => subsurface_state_init
         procedure :: destroy => subsurface_state_destroy
@@ -17,11 +23,13 @@ module module_subsurface_state
 
     contains
 
-    subroutine subsurface_state_init(this, ix, jx)
+    subroutine subsurface_state_init(this, ix, jx, ntracer)
         implicit none
         class(subsurface_state_interface), intent(inout) :: this ! the type object being initialized
         integer, intent(in) :: ix                     ! x grid size
         integer, intent(in) :: jx                     ! y grid size
+        ! for water tracers
+        integer, optional, intent(in) :: ntracer      ! number of tracers
 
         logical :: allocation_error = .false.
 
@@ -40,6 +48,33 @@ module module_subsurface_state
         else
             allocation_error = .true.
         end if
+
+        !----- water tracer variables
+
+        this%qsubbdrytrt_tr = 0.0
+
+        if ( .not. allocated(this%qsubrt_tr) ) then
+            allocate( this%qsubrt_tr(ix,jx,ntracer) )
+            this%qsubrt_tr = 0.0
+        else
+            allocation_error = .true.
+        end if
+
+        if ( .not. allocated(this%qsubrt_sub) ) then
+            allocate( this%qsubrt_sub(ix,jx,ntracer) )
+            this%qsubrt_sub = 0.0
+        else
+            allocation_error = .true.
+        end if
+
+        if ( .not. allocated(this%qsubbdryrt_tr) ) then
+            allocate( this%qsubbdryrt_tr(ix,jx,ntracer) )
+            this%qsubbdryrt_tr = 0.0
+        else
+            allocation_error = .true.
+        end if
+
+        !----- end water tracer variables        
 
         if ( allocation_error ) &
             write(0,*) "attempt to allocate data in members of subsurface io structure&
@@ -64,6 +99,28 @@ module module_subsurface_state
         else
             allocation_error = .true.
         end if
+
+!----- water tracer variables
+
+        if ( allocated(this%qsubrt_tr) ) then
+            deallocate( this%qsubrt_tr )
+        else
+            allocation_error = .true.
+        end if
+
+        if ( allocated(this%qsubrt_sub) ) then
+            deallocate( this%qsubrt_sub )
+        else
+            allocation_error = .true.
+        end if
+
+        if ( allocated(this%qsubbdryrt_tr) ) then
+            deallocate( this%qsubbdryrt_tr )
+        else
+            allocation_error = .true.
+        end if
+
+!----- end water tracer variables
 
         if ( allocation_error ) &
             write(0,*) "attempt to deallocate data in members of subsurface io structure&

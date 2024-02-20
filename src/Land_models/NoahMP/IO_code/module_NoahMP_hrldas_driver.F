@@ -577,8 +577,8 @@ END INTERFACE
     NSUB     = noah_lsm%tracer_sublayer
     NTRACER  = sum(NSUB(1:num_soil_layers))
     nlst(did)%NTRACER = NTRACER
-    !allocate(nlst(did)%NSUB_rt(num_soil_layers))
-    nlst(did)%NSUB_rt    = NSUB
+    allocate(nlst(did)%NSUB(num_soil_layers))
+    nlst(did)%NSUB    = NSUB
   end if
   print *, "FLAG1"
   print *, "OPT_WT,IOPT_PM:", OPT_WT, IOPT_PM
@@ -803,6 +803,7 @@ END INTERFACE
   nsoil = noah_lsm%nsoil
   act_lev = noah_lsm%act_lev
   crocus_opt = noah_lsm%crocus_opt
+
 !-----water tracer tracking times-------
   if (OPT_WT .eq. 1) then 
     write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &

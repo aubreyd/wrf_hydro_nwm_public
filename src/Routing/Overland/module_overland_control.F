@@ -59,12 +59,12 @@ module overland_control
 !---------------------------------------------
       real, allocatable, dimension(:,:) :: surface_water_head_lsm_tr
       real, allocatable, dimension(:,:) :: surface_water_head_routing_tr
-      real, allocatable, dimension(:,:) :: infiltration_excess_tr
+      !real, allocatable, dimension(:,:) :: infiltration_excess_tr
+      real, pointer, dimension(:,:) :: infiltration_excess_tr => null()
       real, allocatable, dimension(:,:) :: dhrt_tr
       real, allocatable, dimension(:,:) :: boundary_flux_tr
       real :: boundary_flux_total_tr
 !---------------------------------------------
-
 
       contains
       procedure :: init => overland_control_init
@@ -148,7 +148,8 @@ subroutine overland_control_init(this,lsm_ix,lsm_jx,rt_ix,rt_jx)
     else
         allocation_error = .true.
     end if
-    if ( .not. allocated(this%infiltration_excess_tr) ) then
+    !if ( .not. allocated(this%infiltration_excess_tr) ) then
+    if ( .not. associated(this%infiltration_excess_tr) ) then
         allocate( this%infiltration_excess_tr(rt_ix,rt_jx) )
         this%infiltration_excess_tr = 0.0
     else
@@ -232,7 +233,8 @@ subroutine overland_control_destroy(this)
     else
         allocation_error = .true.
     end if
-    if ( allocated(this%infiltration_excess_tr) ) then
+    !if ( allocated(this%infiltration_excess_tr) ) then
+    if ( associated(this%infiltration_excess_tr) ) then
         deallocate( this%infiltration_excess_tr)
     else
         allocation_error = .true.

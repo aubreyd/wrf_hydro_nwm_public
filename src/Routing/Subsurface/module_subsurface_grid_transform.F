@@ -14,6 +14,12 @@ module module_subsurface_grid_transform
 
         ! Soil Moisture Content -- ??? Wilting Point
         real, allocatable, dimension(:,:,:) :: smcwltrt
+
+        ! water tracer variables
+        real, allocatable, dimension(:,:,:) :: smcrt_tr  ! need descrip & units
+        real, allocatable, dimension(:,:,:) :: smcrt_sub  ! need descrip & units
+        real, allocatable, dimension(:,:,:) :: smcmaxrt_sub  ! need descrip & units
+
     contains
         procedure :: init => subsurface_grid_transform_init
         procedure :: destroy => subsurface_grid_transfrom_destroy
@@ -21,12 +27,14 @@ module module_subsurface_grid_transform
 
     contains
 
-    subroutine subsurface_grid_transform_init(this,ix,jx,nsoil)
+    subroutine subsurface_grid_transform_init(this,ix,jx,nsoil,ntracer)
         implicit none
         class(subsurface_grid_transform_interface), intent(inout) :: this ! the type object being initialized
         integer, intent(in) :: ix                     ! x grid size
         integer, intent(in) :: jx                     ! y grid size
         integer, intent(in) :: nsoil                  ! number of soil layers
+        ! for water tracers
+        integer, optional, intent(in) :: ntracer      ! number of tracers
 
         logical :: allocation_error = .false.
 
@@ -60,6 +68,32 @@ module module_subsurface_grid_transform
         else
             allocation_error = .true.
         end if
+
+        !----- water tracer variables
+
+        ! check to see if smcrt_tr is allocated
+        if ( .not. allocated(this%smcrt_tr) ) then
+            allocate( this%smcrt_tr(ix,jx,ntracer) )
+            this%smcrt_tr = 0.0
+        else
+            allocation_error = .true.
+        end if
+
+        ! check to see if smcrt_sub is allocated
+        if ( .not. allocated(this%smcrt_sub) ) then
+            allocate( this%smcrt_sub(ix,jx,ntracer) )
+            this%smcrt_sub = 0.0
+        else
+            allocation_error = .true.
+        end if
+
+        ! check to see if smcmaxrt_sub is allocated
+        if ( .not. allocated(this%smcmaxrt_sub) ) then
+            allocate( this%smcmaxrt_sub(ix,jx,ntracer) )
+            this%smcmaxrt_sub = 0.0
+        end if
+
+        !----- end water tracer variables
 
         if ( allocation_error ) &
             write(0,*) "attempt to allocate data in members of subsurface grid transform structure&
@@ -100,6 +134,31 @@ module module_subsurface_grid_transform
         else
             allocation_error = .true.
         end if
+
+!----- water tracer variables
+
+        ! check to see if smcrt_tr is allocated
+        if ( allocated(this%smcrt_tr) ) then
+            deallocate( this%smcrt_tr )
+        else
+            allocation_error = .true.
+        end if
+
+        ! check to see if smcrt_sub is allocated
+        if ( allocated(this%smcrt_sub) ) then
+            deallocate( this%smcrt_sub )
+        else
+            allocation_error = .true.
+        end if
+
+        ! check to see if smcmaxrt_sub is allocated
+        if ( allocated(this%smcmaxrt_sub) ) then
+            deallocate( this%smcmaxrt_sub )
+        else
+            allocation_error = .true.
+        end if
+
+!----- end water tracer variables
 
         if ( allocation_error ) &
             write(0,*) "attempt to deallocate data in members of subsurface grid transform structure&

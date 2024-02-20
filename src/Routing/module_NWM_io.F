@@ -393,7 +393,7 @@ subroutine output_chrt_NWM(domainId)
          print *, "  gsize", gsize
 #ifdef MPP_LAND
          print *, "ADCHECK: Before tracer var writes qlink1"
-         !call ReachLS_write_io(strFlowLocal,g_qlink(:,1))
+         call ReachLS_write_io(strFlowLocal,g_qlink(:,1))
          print *, "ADCHECK: Before tracer var writes qlink2"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK(:,2),g_qlink(:,2))
          print *, "ADCHECK: Before tracer var writes order"
@@ -2388,7 +2388,7 @@ subroutine output_rt_NWM(domainId,iGrid)
                   else if(iTmp2 .eq. 7) then
                      varRealTmp = RT_DOMAIN(domainId)%overland%control%boundary_flux_tr(iTmp,jTmp)
                   else if(iTmp2 .eq. 8) then
-                     varRealTmp = RT_DOMAIN(domainId)%SMCRT_TR(iTmp,jTmp,zTmp)
+                     varRealTmp = RT_DOMAIN(domainId)%subsurface%grid_transform%SMCRT_TR(iTmp,jTmp,zTmp)
                   !--------------------------------------------
                   endif
 

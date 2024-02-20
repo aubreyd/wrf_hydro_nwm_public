@@ -19,6 +19,9 @@ subroutine OverlandRouting( &
     jxrt, &      ! routing grid y size
     q_sfcflx_x, &! accumulated x flux
     q_sfcflx_y  &! accumulated y flux
+    ,WVTFLAG       & !wt var
+    ,q_sfcflx_x_tr & !wt var
+    ,q_sfcflx_y_tr & !wt var
     )
 #ifdef MPP_LAND
     use module_mpp_land, only:  mpp_land_max_int1,  sum_real1, my_id, io_id, numprocs
@@ -45,6 +48,14 @@ subroutine OverlandRouting( &
     !REAL, INTENT(IN), DIMENSION(IXRT,JXRT,9):: dist
     !REAL, INTENT(IN), DIMENSION(IXRT,JXRT,8)  :: SO8RT
     !INTEGER SO8RT_D(IXRT,JXRT,3)
+
+!-----------------------------------------------------
+! Needed for water tracer capability
+!-----------------------------------------------------
+    INTEGER, OPTIONAL, INTENT(IN)                     :: WVTFLAG
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(IXRT,JXRT) :: q_sfcflx_x_tr
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(IXRT,JXRT) :: q_sfcflx_y_tr
+!-----------------------------------------------------
 
     integer  :: i,j
 
@@ -125,7 +136,12 @@ subroutine OverlandRouting( &
             JXRT,                 &
             rt_option,            &
             q_sfcflx_x,           &
-            q_sfcflx_y)
+            q_sfcflx_y &
+            ,WVTFLAG       & !wt var
+            ,q_sfcflx_x_tr & !wt var
+            ,q_sfcflx_y_tr & !wt var
+            )
+
     else
         ovrt_data%control%surface_water_head_routing = ovrt_data%control%infiltration_excess
 #ifdef HYDRO_D
@@ -211,6 +227,9 @@ subroutine ov_rtng( &
         rt_option, &
         q_sfcflx_x, &
         q_sfcflx_y &
+        ,WVTFLAG       & !wt var
+        ,q_sfcflx_x_tr & !wt var
+        ,q_sfcflx_y_tr & !wt var
         )
 
     !yyww
@@ -248,6 +267,13 @@ subroutine ov_rtng( &
     !REAL, INTENT(INOUT)     :: QSTRMVOLTRT,QBDRYTRT,LAKE_INFLOTRT
     !REAL, INTENT(IN), DIMENSION(IXRT,JXRT,8)  :: SO8RT
 
+!-----------------------------------------------------
+! Needed for water tracer capbility
+!-----------------------------------------------------
+    INTEGER, INTENT(IN)                        :: WVTFLAG
+    REAL,    INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_x_tr
+    REAL,    INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_y_tr
+
     !DJG Local Variables
 
     INTEGER :: KRT,I,J,ct
@@ -255,6 +281,8 @@ subroutine ov_rtng( &
     REAL, DIMENSION(IXRT,JXRT)	:: INFXS_FRAC
     REAL	:: DT_FRAC,SUM_INFXS,sum_head
     !INTEGER SO8RT_D(IXRT,JXRT,3), rt_option
+
+    REAL :: PROPOR_TR
 
     !DJG ----------------------------------------------------------------------
     ! DJG BEGIN 1-D or 2-D OVERLAND FLOW ROUTING LOOP
@@ -278,6 +306,10 @@ subroutine ov_rtng( &
     !DJG Assign all infiltration excess to surface head...
     ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
 
+    if (WVTFLAG .gt. 0) then
+       ovrt_data%control%surface_water_head_routing_tr=ovrt_data%control%infiltration_excess_tr
+    end if
+
     !DJG Divide infiltration excess over all routing time-steps
     !	     INFXS_FRAC=INFXSUBRT/(DT/DTRT_TER)
 
@@ -286,6 +318,12 @@ subroutine ov_rtng( &
     q_sfcflx_y = 0.
     ct =0
 
+    !----wt cal----
+    if (WVTFLAG .gt. 0) then
+       q_sfcflx_x_tr = 0.0
+       q_sfcflx_y_tr = 0.0
+    end if
+    !--------------
 
     !DJG Execute routing time-step loop...
 
@@ -332,6 +370,16 @@ subroutine ov_rtng( &
                     ovrt_data%properties%retention_depth(I,J) = 5.0
 
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
+                       !----wt cal-----
+                       if (WVTFLAG .gt. 0) then
+                          call calculate_wt_ratio_ov(ovrt_data%control%surface_water_head_routing_tr(I,J), &
+                                        ovrt_data%control%surface_water_head_routing(I,J), PROPOR_TR)    
+                          ovrt_data%streams_and_lakes%surface_water_to_channel_tr(I,J) = &
+                                 ovrt_data%streams_and_lakes%surface_water_to_channel_tr(I,J) + &
+                                 (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))*PROPOR_TR
+                          ovrt_data%control%surface_water_head_routing_tr(I,J) = ovrt_data%properties%retention_depth(I,J)*PROPOR_TR
+                       end if
+                       !---------------
                         !!               QINFLO(CH_NET(I,J)=QINFLO(CH_NET(I,J)+SFCHEAD(I,J) - RETDEPRT(I,J)
                         ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel = ovrt_data%streams_and_lakes%accumulated_surface_water_to_channel + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
@@ -351,6 +399,16 @@ subroutine ov_rtng( &
 
                 IF (ovrt_data%streams_and_lakes%lake_mask(I,J) .gt. 0) THEN
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
+                       !----wt calc-----
+                       if (WVTFLAG .gt. 0) then
+                          call calculate_wt_ratio_ov(ovrt_data%control%surface_water_head_routing_tr(I,J), &
+                                        ovrt_data%control%surface_water_head_routing(I,J), PROPOR_TR)
+                          ovrt_data%streams_and_lakes%surface_water_to_lake_tr(I,J) = &
+                                 ovrt_data%streams_and_lakes%surface_water_to_lake_tr(I,J) + &
+                                 (ovrt_data%control%surface_water_head_routing(I,J)- ovrt_data%properties%retention_depth(I,J))*PROPOR_TR
+                          ovrt_data%control%surface_water_head_routing_tr(I,J) = ovrt_data%properties%retention_depth(I,J)*PROPOR_TR
+                       end if
+                       !----------------
                         ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + &
                             (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))
                         ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) = ovrt_data%streams_and_lakes%surface_water_to_lake(I,J) + &
@@ -373,20 +431,45 @@ subroutine ov_rtng( &
 
 
         if(rt_option .eq. 1) then
-            CALL ROUTE_OVERLAND1(DTRT_TER, &
-                ovrt_data%properties%distance_to_neighbor, &
-                ovrt_data%control%surface_water_head_routing, &
-                ovrt_data%control%DHRT, &
-                ovrt_data%properties%surface_slope_x,   &
-                ovrt_data%properties%surface_slope_y, &
-                ovrt_data%properties%retention_depth, &
-                ovrt_data%properties%roughness, &
-                IXRT, JXRT, &
-                ovrt_data%control%boundary_flux, &
-                ovrt_data%control%boundary_flux_total,    &
-                ovrt_data%properties%surface_slope, &
-                ovrt_data%properties%max_surface_slope_index, &
-                q_sfcflx_x, q_sfcflx_y)
+           if (WVTFLAG .gt. 0) then
+              CALL ROUTE_OVERLAND1(DTRT_TER, &
+                  ovrt_data%properties%distance_to_neighbor, &
+                  ovrt_data%control%surface_water_head_routing, &
+                  ovrt_data%control%DHRT, &
+                  ovrt_data%properties%surface_slope_x,   &
+                  ovrt_data%properties%surface_slope_y, &
+                  ovrt_data%properties%retention_depth, &
+                  ovrt_data%properties%roughness, &
+                  IXRT, JXRT, &
+                  ovrt_data%control%boundary_flux, &
+                  ovrt_data%control%boundary_flux_total,    &
+                  ovrt_data%properties%surface_slope, &
+                  ovrt_data%properties%max_surface_slope_index, &
+                  q_sfcflx_x, q_sfcflx_y        &
+                 ,WVTFLAG                & !wt var
+                 ,ovrt_data%control%surface_water_head_routing_tr & 
+                 ,ovrt_data%control%DHRT_tr &
+                 ,ovrt_data%control%boundary_flux_tr &
+                 ,ovrt_data%control%boundary_flux_total_tr  &
+                 ,q_sfcflx_x_tr    &
+                 ,q_sfcflx_y_tr    &
+                  )
+           else
+              CALL ROUTE_OVERLAND1(DTRT_TER, &
+                 ovrt_data%properties%distance_to_neighbor, &
+                 ovrt_data%control%surface_water_head_routing, &
+                 ovrt_data%control%DHRT, &
+                 ovrt_data%properties%surface_slope_x,   &
+                 ovrt_data%properties%surface_slope_y, &
+                 ovrt_data%properties%retention_depth, &
+                 ovrt_data%properties%roughness, &
+                 IXRT, JXRT, &
+                 ovrt_data%control%boundary_flux, &
+                 ovrt_data%control%boundary_flux_total,    &
+                 ovrt_data%properties%surface_slope, &
+                 ovrt_data%properties%max_surface_slope_index, &
+                 q_sfcflx_x, q_sfcflx_y)
+           end if  ! end water tracer check
         else
             CALL ROUTE_OVERLAND2(DTRT_TER, &
                 ovrt_data%properties%distance_to_neighbor, &
@@ -421,10 +504,15 @@ END SUBROUTINE OV_RTNG
 !DJG     SUBROUTINE ROUTE_OVERLAND1
 !DJG ----------------------------------------------------------------
 
+!----------------------------------------------------
 SUBROUTINE ROUTE_OVERLAND1(dt,                                &
         &          gsize,h,qsfc,sox,soy,                                   &
         &     retent_dep,dist_rough,XX,YY,QBDRY,QBDRYT,SO8RT,SO8RT_D,      &
-        &     q_sfcflx_x,q_sfcflx_y)
+        &     q_sfcflx_x,q_sfcflx_y                                        &
+             ,WVTFLAG, surface_water_head_routing_tr_pass                      & !wt vars
+             ,DHRT_TR_PASS, boundary_flux_tr_pass, boundary_flux_total_tr_pass & !wt vars
+             ,q_sfcflx_x_tr, q_sfcflx_y_tr                                     & !wt vars
+             )
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !
     !  Subroutine to route excess rainfall over the watershed
@@ -472,6 +560,24 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     REAL*8, DIMENSION(XX,YY) :: DH_tmp
     REAL, DIMENSION(XX,YY) :: edge_adjust ! mm
 
+!-----------------------------------------------------
+! Needed for water tracer capability
+!-----------------------------------------------------
+    INTEGER, OPTIONAL, INTENT(IN)                     :: WVTFLAG
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: surface_water_head_routing_tr_pass
+    REAL,    OPTIONAL, INTENT(IN),   DIMENSION(XX,YY) :: DHRT_TR_PASS
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: boundary_flux_tr_pass
+    REAL,    OPTIONAL, INTENT(INOUT)                  :: boundary_flux_total_tr_pass
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: q_sfcflx_x_tr
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: q_sfcflx_y_tr
+    !----local vars-----
+    REAL*8, DIMENSION(XX,YY) :: QBDRY_tmp_tr, DH_TR
+    REAL*8, DIMENSION(XX,YY) :: DH_tmp_tr
+    REAL                     :: tmp_adjust_tr
+    REAL                     :: qqsfc_tr
+    REAL                     :: PROPOR_TR 
+!-----------------------------------------------------
+
     !!! Declare Local Variables
 
     REAL :: dhdx,dhdy,alfax,alfay
@@ -493,6 +599,14 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     DH=0.
     DH_tmp=0.
     QBDRY_tmp =0.
+
+    !-----wt calc-----
+    if (present(WVTFLAG)) then
+       DH_TR        = 0.0
+       DH_tmp_tr    = 0.0
+       QBDRY_tmp_tr = 0.0
+    end if
+    !-----------------
 
     !!! Loop to route water
     do j=2,YY-1
@@ -527,23 +641,37 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
 
                     !Courant check (simple mass limit on overland flow)...
                     if (qqsfc.ge.(hmax*dt*tmp_gsize)) qqsfc = hmax*dt*tmp_gsize
+                       !-----wt calc-----
+                       if (present(WVTFLAG)) then
+                          call calculate_wt_ratio_ov(surface_water_head_routing_tr_pass(i,j),h(i,j),PROPOR_TR)
+                          qqsfc_tr = qqsfc*PROPOR_TR
+                       end if
+                       !-----------------
 
                     ! Accumulate directional fluxes on routing subgrid...
                     if (IXX0.gt.i) then
                         q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + qqsfc * &
                             (1.0 - 0.5 * (ABS(j-JYY0)))
+                        if (present(WVTFLAG)) q_sfcflx_x_tr(I,J) = q_sfcflx_x_tr(I,J) + qqsfc_tr * &  !wt calc
+                            (1.0 - 0.5 * (ABS(j-JYY0)))       !wt calc
                     else if (IXX0.lt.i) then
                         q_sfcflx_x(I,J) = q_sfcflx_x(I,J) - 1.0 * &
                             qqsfc * (1.0 - 0.5 * (ABS(j-JYY0)))
+                        if (present(WVTFLAG)) q_sfcflx_x_tr(I,J) = q_sfcflx_x_tr(I,J) - 1.0 * &
+                            qqsfc_tr * (1.0 - 0.5 * (ABS(j-JYY0)))
                     else
                         q_sfcflx_x(I,J) = q_sfcflx_x(I,J) + 0.
                     end if
                     if (JYY0.gt.j) then
                         q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + qqsfc * &
                             (1.0 - 0.5 * (ABS(i-IXX0)))
+                        if (present(WVTFLAG)) q_sfcflx_y_tr(I,J) = q_sfcflx_y_tr(I,J) + qqsfc_tr * &
+                            (1.0 - 0.5 * (ABS(i-IXX0)))
                     elseif (JYY0.lt.j) then
                         q_sfcflx_y(I,J) = q_sfcflx_y(I,J) - 1.0 * &
                             qqsfc * (1.0 - 0.5 * (ABS(i-IXX0)))
+                        if (present(WVTFLAG)) q_sfcflx_y_tr(I,J) = q_sfcflx_y_tr(I,J) - 1.0 * &
+                            qqsfc_tr * (1.0 - 0.5 * (ABS(i-IXX0)))
                     else
                         q_sfcflx_y(I,J) = q_sfcflx_y(I,J) + 0.
                     end if
@@ -552,16 +680,23 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
 
                     !yw changed as following:
                     tmp_adjust=qqsfc*1000
-
+                    if (present(WVTFLAG)) tmp_adjust_tr = qqsfc_tr*1000.
                     if((h(i,j) - tmp_adjust) <0 )  then
 #ifdef HYDRO_D
                         print*, "Error Warning: surface head is negative:  ",i,j,ixx0,jyy0, &
                             h(i,j) - tmp_adjust
 #endif
                         tmp_adjust = h(i,j)
+                        if (present(WVTFLAG)) tmp_adjust_tr = surface_water_head_routing_tr_pass(i,j)     !wt calc
                     end if
                     DH(i,j) = DH(i,j)-tmp_adjust
                     DH_tmp(ixx0,jyy0) = DH_tmp(ixx0,jyy0) + tmp_adjust
+                    !-----wt calc-----
+                    if (present(WVTFLAG)) then
+                       DH_tr(i,j) = DH_tr(i,j) - tmp_adjust_tr
+                       DH_tmp_tr(ixx0,jyy0) = DH_tmp_tr(ixx0,jyy0) + tmp_adjust_tr
+                    end if
+                    !-----------------
                     !yw end change
 
                     !DG Boundary adjustments here
@@ -580,7 +715,13 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
                             QBDRY_tmp(IXX0,JYY0)=QBDRY_tmp(IXX0,JYY0) - qqsfc*1000.
                             QBDRYT=QBDRYT - qqsfc
                             DH_tmp(IXX0,JYY0)= DH_tmp(IXX0,JYY0)-tmp_adjust
-
+                            !-----wt calc-----
+                            if (present(WVTFLAG)) then
+                               QBDRY_tmp_tr(IXX0,JYY0)=QBDRY_tmp_tr(IXX0,JYY0) - qqsfc_tr*1000.
+                               boundary_flux_total_tr_pass = boundary_flux_total_tr_pass - qqsfc_tr
+                               DH_tmp_tr(IXX0,JYY0)= DH_tmp_tr(IXX0,JYY0)-tmp_adjust_tr
+                            end if
+                            !-----------------
                         end if
                     end if
 
@@ -594,16 +735,35 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
     ! use double precision to solve the underflow problem.
     call MPP_LAND_COM_REAL8(DH_tmp,XX,YY,1)
     call MPP_LAND_COM_REAL8(QBDRY_tmp,XX,YY,1)
+    !-----wt calc----
+    if (present(WVTFLAG)) then
+       call MPP_LAND_COM_REAL8(DH_tmp_tr,XX,YY,1)
+       call MPP_LAND_COM_REAL8(QBDRY_tmp_tr,XX,YY,1)
+    end if
+    !----------------
 #endif
     QBDRY = QBDRY + QBDRY_tmp
     DH = DH+DH_tmp
+    !----wt calc-----
+    if (present(WVTFLAG)) then
+       boundary_flux_tr_pass = boundary_flux_tr_pass + QBDRY_tmp_tr
+       DH_tr = DH_tr + DH_tmp_tr
+    end if
+    !----------------
 
 #ifdef MPP_LAND
     call MPP_LAND_COM_REAL8(DH,XX,YY,99)
     call MPP_LAND_COM_REAL(QBDRY,XX,YY,99)
+    !-----wt calc----
+    if (present(WVTFLAG)) then
+       call MPP_LAND_COM_REAL8(DH_tr,XX,YY,99)
+       call MPP_LAND_COM_REAL(boundary_flux_tr_pass,XX,YY,99)
+    end if
+    !----------------
 #endif
 
     H = H + DH
+    if (present(WVTFLAG)) surface_water_head_routing_tr_pass = surface_water_head_routing_tr_pass + DH_TR
 
 !!! Scrape the outermost edges
 edge_adjust = 0.0
@@ -927,3 +1087,23 @@ SUBROUTINE ROUTE_OVERLAND2 (dt,                               &
 
     !DJG ----------------------------------------------------------------------
 end subroutine ROUTE_OVERLAND2
+
+
+!------------------------------------------------------
+! Huancui Hu: calculate_wt_ratio
+subroutine calculate_wt_ratio_ov (a,b,c)
+
+  implicit none
+  real,    intent(in)     :: a
+  real,    intent(in)     :: b
+  real,    intent(inout)  :: c
+
+  if (b .gt. 1.0E-10) then
+    c = min(1.0,max(a/b, 0.0))
+  else
+    c = 0.0
+  end if
+
+end subroutine
+!------------------------------------------------------
+

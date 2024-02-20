@@ -22,7 +22,7 @@ integer, parameter :: numChVars = 15  ! 4 tracer vars
 integer, parameter :: numLdasVars = 136  ! 20 tracer vars
 ! Note: if more ldas variables are added the logic will need to be changed in
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
-integer, parameter :: numLdasVars_crocus_off = 98  !!ADFIX
+integer, parameter :: numLdasVars_crocus_off = 118  !!ADFIX
 
 integer, parameter :: numRtDomainVars = 8 ! 3 tracer vars
 integer, parameter :: numLakeVars = 2
