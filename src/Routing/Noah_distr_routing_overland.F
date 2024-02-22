@@ -1,3 +1,5 @@
+module module_OverlandRouting
+contains
 !DJG ------------------------------------------------
 !DJG   SUBROUTINE OverlandRouting
 !DJG ------------------------------------------------
@@ -128,6 +130,8 @@ subroutine OverlandRouting( &
 #ifdef HYDRO_D
         write(6,*) "calling OV_RTNG "
 #endif
+print *, "ADCHECK: Before OV_RTNG"
+      if (present(WVTFLAG)) then
         CALL OV_RTNG(           &
             ovrt_data, &
             DT,                   &
@@ -141,6 +145,17 @@ subroutine OverlandRouting( &
             ,q_sfcflx_x_tr & !wt var
             ,q_sfcflx_y_tr & !wt var
             )
+      else
+        CALL OV_RTNG(           &
+            ovrt_data, &
+            DT,                   &
+            DTRT_TER,             &
+            IXRT,                 &
+            JXRT,                 &
+            rt_option,            &
+            q_sfcflx_x,           &
+            q_sfcflx_y)
+      end if
 
     else
         ovrt_data%control%surface_water_head_routing = ovrt_data%control%infiltration_excess
@@ -241,6 +256,45 @@ subroutine ov_rtng( &
     use overland_data
     IMPLICIT NONE
 
+!----------------------------------------------------
+! Define interface for ROUTE_OVERLAND1 [Huancui Hu]
+!INTERFACE
+!  SUBROUTINE ROUTE_OVERLAND1(dt,                                    &
+!              gsize,h,qsfc,sox,soy,                                   &
+!              retent_dep,dist_rough,XX,YY,QBDRY,QBDRYT,SO8RT,SO8RT_D,      &
+!              q_sfcflx_x,q_sfcflx_y                                        &
+!             , WVTFLAG, surface_water_head_routing_tr_pass                      & !wt vars
+!             , DHRT_TR_PASS, boundary_flux_tr_pass, boundary_flux_total_tr_pass & !wt vars
+!             , q_sfcflx_x_tr, q_sfcflx_y_tr                                     & !wt vars
+!             )
+!    IMPLICIT NONE
+!        INTEGER,           INTENT(IN)                     :: XX,YY
+!        REAL,              INTENT(IN)                     :: dt, gsize(xx,yy,9)
+!        REAL,              INTENT(INOUT),DIMENSION(XX,YY) :: h
+!        REAL,              INTENT(IN),   DIMENSION(XX,YY) :: qsfc
+!        REAL,              INTENT(IN),   DIMENSION(XX,YY) :: sox
+!        REAL,              INTENT(IN),   DIMENSION(XX,YY) :: soy
+!        REAL,              INTENT(IN),   DIMENSION(XX,YY) :: retent_dep
+!        REAL,              INTENT(IN),   DIMENSION(XX,YY) :: dist_rough
+!        REAL,              INTENT(INOUT),DIMENSION(XX,YY) :: QBDRY
+!        REAL,              INTENT(INOUT),DIMENSION(XX,YY) :: q_sfcflx_x, q_sfcflx_y
+!        REAL,              INTENT(INOUT)                  :: QBDRYT
+!        REAL,              INTENT(IN),DIMENSION(XX,YY,8)  :: SO8RT
+!        INTEGER,           INTENT(IN),DIMENSION(XX,YY,3)  :: SO8RT_D
+!!-----------------------------------------------------
+!! Needed for water tracer capability
+!!-----------------------------------------------------
+!        INTEGER, OPTIONAL, INTENT(IN)                     :: WVTFLAG
+!        REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: surface_water_head_routing_tr_pass
+!        REAL,    OPTIONAL, INTENT(IN),   DIMENSION(XX,YY) :: DHRT_TR_PASS
+!        REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: boundary_flux_tr_pass
+!        REAL,    OPTIONAL, INTENT(INOUT)                  :: boundary_flux_total_tr_pass
+!        REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: q_sfcflx_x_tr
+!        REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(XX,YY) :: q_sfcflx_y_tr
+!  END SUBROUTINE ROUTE_OVERLAND1
+!END INTERFACE
+!----------------------------------------------------
+
     !DJG --------DECLARATIONS----------------------------
 
     type (overland_struct), intent(inout) :: ovrt_data
@@ -270,9 +324,9 @@ subroutine ov_rtng( &
 !-----------------------------------------------------
 ! Needed for water tracer capbility
 !-----------------------------------------------------
-    INTEGER, INTENT(IN)                        :: WVTFLAG
-    REAL,    INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_x_tr
-    REAL,    INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_y_tr
+    INTEGER, OPTIONAL, INTENT(IN)                        :: WVTFLAG
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_x_tr
+    REAL,    OPTIONAL, INTENT(INOUT),DIMENSION(IXRT,JXRT):: q_sfcflx_y_tr
 
     !DJG Local Variables
 
@@ -306,8 +360,13 @@ subroutine ov_rtng( &
     !DJG Assign all infiltration excess to surface head...
     ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
 
+    print *, "ADCHECK: In OV_RTNG"
+
+    if ( present(WVTFLAG) ) then
     if (WVTFLAG .gt. 0) then
+       print *, "ADCHECK: In OV_RTNG with tracers"
        ovrt_data%control%surface_water_head_routing_tr=ovrt_data%control%infiltration_excess_tr
+    end if
     end if
 
     !DJG Divide infiltration excess over all routing time-steps
@@ -319,9 +378,11 @@ subroutine ov_rtng( &
     ct =0
 
     !----wt cal----
+    if ( present(WVTFLAG) ) then
     if (WVTFLAG .gt. 0) then
        q_sfcflx_x_tr = 0.0
        q_sfcflx_y_tr = 0.0
+    end if
     end if
     !--------------
 
@@ -370,7 +431,9 @@ subroutine ov_rtng( &
                     ovrt_data%properties%retention_depth(I,J) = 5.0
 
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
+                       print *, "ADCHECK: In OV_RTNG channel cell with excess water to route"
                        !----wt cal-----
+                       if ( present(WVTFLAG) ) then
                        if (WVTFLAG .gt. 0) then
                           call calculate_wt_ratio_ov(ovrt_data%control%surface_water_head_routing_tr(I,J), &
                                         ovrt_data%control%surface_water_head_routing(I,J), PROPOR_TR)    
@@ -378,6 +441,7 @@ subroutine ov_rtng( &
                                  ovrt_data%streams_and_lakes%surface_water_to_channel_tr(I,J) + &
                                  (ovrt_data%control%surface_water_head_routing(I,J) - ovrt_data%properties%retention_depth(I,J))*PROPOR_TR
                           ovrt_data%control%surface_water_head_routing_tr(I,J) = ovrt_data%properties%retention_depth(I,J)*PROPOR_TR
+                       end if
                        end if
                        !---------------
                         !!               QINFLO(CH_NET(I,J)=QINFLO(CH_NET(I,J)+SFCHEAD(I,J) - RETDEPRT(I,J)
@@ -398,8 +462,10 @@ subroutine ov_rtng( &
 
 
                 IF (ovrt_data%streams_and_lakes%lake_mask(I,J) .gt. 0) THEN
+                    print *, "ADCHECK: In OV_RTNG channel cell with excess water to route"
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
                        !----wt calc-----
+                       if ( present(WVTFLAG) ) then
                        if (WVTFLAG .gt. 0) then
                           call calculate_wt_ratio_ov(ovrt_data%control%surface_water_head_routing_tr(I,J), &
                                         ovrt_data%control%surface_water_head_routing(I,J), PROPOR_TR)
@@ -407,6 +473,7 @@ subroutine ov_rtng( &
                                  ovrt_data%streams_and_lakes%surface_water_to_lake_tr(I,J) + &
                                  (ovrt_data%control%surface_water_head_routing(I,J)- ovrt_data%properties%retention_depth(I,J))*PROPOR_TR
                           ovrt_data%control%surface_water_head_routing_tr(I,J) = ovrt_data%properties%retention_depth(I,J)*PROPOR_TR
+                       end if
                        end if
                        !----------------
                         ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake = ovrt_data%streams_and_lakes%accumulated_surface_water_to_lake + &
@@ -429,10 +496,11 @@ subroutine ov_rtng( &
 
         !DJG Debug...
 
-
+        print *, "ADCHECK: Before ROUTE_OVERLAND1"
         if(rt_option .eq. 1) then
-           if (WVTFLAG .gt. 0) then
-              CALL ROUTE_OVERLAND1(DTRT_TER, &
+           if ( present(WVTFLAG) ) then
+             if (WVTFLAG .gt. 0) then
+               CALL ROUTE_OVERLAND1(DTRT_TER, &
                   ovrt_data%properties%distance_to_neighbor, &
                   ovrt_data%control%surface_water_head_routing, &
                   ovrt_data%control%DHRT, &
@@ -454,6 +522,7 @@ subroutine ov_rtng( &
                  ,q_sfcflx_x_tr    &
                  ,q_sfcflx_y_tr    &
                   )
+             end if
            else
               CALL ROUTE_OVERLAND1(DTRT_TER, &
                  ovrt_data%properties%distance_to_neighbor, &
@@ -607,6 +676,8 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
        QBDRY_tmp_tr = 0.0
     end if
     !-----------------
+
+    print *, "ADCHECK: In ROUTE_OVERLAND1"
 
     !!! Loop to route water
     do j=2,YY-1
@@ -1106,4 +1177,4 @@ subroutine calculate_wt_ratio_ov (a,b,c)
 
 end subroutine
 !------------------------------------------------------
-
+end module module_OverlandRouting

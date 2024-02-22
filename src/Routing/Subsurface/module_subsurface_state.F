@@ -51,6 +51,7 @@ module module_subsurface_state
 
         !----- water tracer variables
 
+        if ( present(ntracer) ) then
         this%qsubbdrytrt_tr = 0.0
 
         if ( .not. allocated(this%qsubrt_tr) ) then
@@ -72,6 +73,7 @@ module module_subsurface_state
             this%qsubbdryrt_tr = 0.0
         else
             allocation_error = .true.
+        end if
         end if
 
         !----- end water tracer variables        

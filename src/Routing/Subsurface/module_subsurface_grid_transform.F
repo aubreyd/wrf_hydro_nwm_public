@@ -20,6 +20,9 @@ module module_subsurface_grid_transform
         real, allocatable, dimension(:,:,:) :: smcrt_sub  ! need descrip & units
         real, allocatable, dimension(:,:,:) :: smcmaxrt_sub  ! need descrip & units
 
+        ! for water tracers
+        integer :: ntracer      ! number of tracers
+
     contains
         procedure :: init => subsurface_grid_transform_init
         procedure :: destroy => subsurface_grid_transfrom_destroy
@@ -71,6 +74,7 @@ module module_subsurface_grid_transform
 
         !----- water tracer variables
 
+        if ( present(ntracer) ) then
         ! check to see if smcrt_tr is allocated
         if ( .not. allocated(this%smcrt_tr) ) then
             allocate( this%smcrt_tr(ix,jx,ntracer) )
@@ -91,6 +95,7 @@ module module_subsurface_grid_transform
         if ( .not. allocated(this%smcmaxrt_sub) ) then
             allocate( this%smcmaxrt_sub(ix,jx,ntracer) )
             this%smcmaxrt_sub = 0.0
+        end if
         end if
 
         !----- end water tracer variables

@@ -879,7 +879,67 @@ end subroutine MPP_seq_land_SO8
 subroutine disaggregateDomain_drv(did)
    use module_RT_data, only: rt_domain
    use config_base, only: nlst, noah_lsm
+
+!--------------------------------------------------------
+! Define interface for disaggregationDomain [Huancui Hu]
+INTERFACE
+  SUBROUTINE disaggregateDomain(IX,JX,NSOIL,IXRT,JXRT,AGGFACTRT, &
+               SICE, SMC,SH2OX, INFXSRT, area_lsm, SMCMAX1,SMCREF1, &
+               SMCWLT1, VEGTYP, LKSAT, NEXP, dist, INFXSWGT, &
+               LKSATFAC, CH_NETRT,SH2OWGT,SMCREFRT, INFXSUBRT,SMCMAXRT, &
+               SMCWLTRT,SMCRT, LAKE_MSKRT, LKSATRT, nexprt,  &
+               SLDPTH, soiltypRT, soiltyp, elrt, iswater,    &
+               impervfrac, imperv_adj  &
+               ,NTRACER, WVTFLAG, NSUB, SICE_TR_PASS, SMC_TR_PASS, SH2OX_TR_PASS & !wt vars
+               ,SICE_SUB_PASS, SMC_SUB_PASS, SH2OX_SUB_PASS, SMCRT_SUB_PASS      & !wt vars
+               ,SMCMAXRT_SUB, INFXSRT_TR_PASS, INFXSUBRT_TR_PASS, SMCRT_TR_PASS  & !wt vars
+            )
+
+        implicit none
+        integer,INTENT(IN)                              :: IX,JX,NSOIL,IXRT,JXRT,AGGFACTRT, iswater
+        real,   INTENT(OUT),  DIMENSION(IX,JX,NSOIL)    :: SICE
+        real,   INTENT(IN),   DIMENSION(IX,JX,NSOIL)    :: SMC,SH2OX
+        real,   INTENT(IN),   DIMENSION(IX,JX)          :: INFXSRT, area_lsm, SMCMAX1,SMCREF1, &
+                                                           SMCWLT1,  LKSAT
+        integer,INTENT(IN),   DIMENSION(IX,JX)          :: VEGTYP, soiltyp
+        real,   INTENT(IN),   DIMENSION(IXRT,JXRT,9)    :: dist
+        real,   INTENT(IN),   DIMENSION(IXRT,JXRT)      :: INFXSWGT, &
+                                                           LKSATFAC, elrt
+        integer,INTENT(INOUT),DIMENSION(IXRT,JXRT)      :: CH_NETRT, soiltypRT
+        real,   INTENT(IN),   DIMENSION(IXRT,JXRT,NSOIL):: SH2OWGT
+        real,   INTENT(OUT),  DIMENSION(IXRT,JXRT,NSOIL):: SMCREFRT, SMCMAXRT, &
+                                                           SMCWLTRT,SMCRT
+        real,   INTENT(OUT),  DIMENSION(IXRT,JXRT)      :: INFXSUBRT
+        real,   INTENT(INOUT),DIMENSION(IXRT,JXRT)      :: LKSATRT, NEXPRT
+        integer,INTENT(INOUT),DIMENSION(IXRT,JXRT)      :: LAKE_MSKRT
+        real,   INTENT(IN),   DIMENSION(NSOIL)          :: SLDPTH
+        real, intent(in),  dimension(IX,JX)           :: NEXP ! coarse grid n exponent
+        real, intent(in), dimension(IXRT,JXRT)        :: impervfrac ! impervious fraction
+        integer, intent(in)                           :: imperv_adj ! impervious configuration option from hydro.namelist 
+!--------------------------------------------------------
+! Needed for water tracer capability
+!--------------------------------------------------------
+        integer,         intent(in)                                :: NTRACER
+        integer,optional,intent(in)                                :: WVTFLAG
+        integer,optional,intent(in),   dimension(NSOIL)            :: NSUB
+        real,   optional,intent(inout),dimension(IX,JX,NTRACER)    :: SICE_TR_PASS
+        real,   optional,intent(in),   dimension(IX,JX,NTRACER)    :: SMC_TR_PASS
+        real,   optional,intent(in),   dimension(IX,JX,NTRACER)    :: SH2OX_TR_PASS
+        real,   optional,intent(in),   dimension(IX,JX)            :: INFXSRT_TR_PASS
+        real,   optional,intent(inout),dimension(IXRT,JXRT)        :: INFXSUBRT_TR_PASS
+        real,   optional,intent(inout),dimension(IXRT,JXRT,NTRACER):: SMCRT_TR_PASS
+        real,   optional,intent(inout),dimension(IXRT,JXRT,NTRACER):: SMCMAXRT_SUB
+        real,   optional,intent(inout),dimension(IX,JX,NTRACER)    :: SICE_SUB_PASS
+        real,   optional,intent(in),   dimension(IX,JX,NTRACER)    :: SMC_SUB_PASS
+        real,   optional,intent(in),   dimension(IX,JX,NTRACER)    :: SH2OX_SUB_PASS
+        real,   optional,intent(inout),dimension(IXRT,JXRT,NTRACER):: SMCRT_SUB_PASS
+
+  END SUBROUTINE disaggregateDomain
+END INTERFACE
+!--------------------------------------------------------
+
    integer :: did
+
    if (nlst(did)%WVTFLAG > 0) then
    call disaggregateDomain( RT_DOMAIN(did)%IX, RT_DOMAIN(did)%JX, nlst(did)%NSOIL, &
                             RT_DOMAIN(did)%IXRT, RT_DOMAIN(did)%JXRT, nlst(did)%AGGFACTRT, &
@@ -938,7 +998,8 @@ subroutine disaggregateDomain_drv(did)
                             RT_DOMAIN(did)%subsurface%properties%sldpth, &
                             RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, &
                             rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater, &
-                            rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj)
+                            rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj, &
+                            nlst(did)%NTRACER)
    end if
 end subroutine disaggregateDomain_drv
 
@@ -974,6 +1035,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                               mpp_land_sync,mpp_land_com_integer,mpp_land_max_int1, &
                               sum_real1
    use module_hydro_stop, only:HYDRO_stop
+   use module_subsurfaceRouting, only: calculate_wt_ratio
 #endif
 
    implicit none
@@ -1436,17 +1498,30 @@ end subroutine disaggregateDomain
 subroutine SubsurfaceRouting_drv(did)
 
     use module_RT_data, only: rt_domain
-    use config_base, only: nlst
+    use config_base, only: nlst, noah_lsm
+    use module_subsurfaceRouting
 
     implicit none
     integer :: did
     IF (nlst(did)%SUBRTSWCRT.EQ.1) THEN
-        call subsurfaceRouting ( rt_domain(did)%subsurface, &
+        print *, "water_tracer_option", noah_lsm%water_tracer_option
+        if (noah_lsm%water_tracer_option > 0) then
+          print *, "ADCHECK: Calling subsurfaceRouting with tracers"
+          call subsurfaceRouting ( rt_domain(did)%subsurface, &
             rt_domain(did)%subsurface_static, &
             rt_domain(did)%subsurface_input, &
             rt_domain(did)%subsurface_output &
             !rt_domain(did)%overland%control%infiltration_excess &
-            , nlst(did)%NTRACER, nlst(did)%NSOIL, nlst(did)%WVTFLAG, nlst(did)%PMOPT, nlst(did)%NSUB)
+            , nlst(did)%NTRACER, nlst(did)%WVTFLAG, nlst(did)%PMOPT, nlst(did)%NSUB)
+        else
+          print *, "ADCHECK: Calling subsurfaceRouting without tracers"
+          call subsurfaceRouting ( rt_domain(did)%subsurface, &
+            rt_domain(did)%subsurface_static, &
+            rt_domain(did)%subsurface_input, &
+            rt_domain(did)%subsurface_output &
+            !rt_domain(did)%overland%control%infiltration_excess &
+            , nlst(did)%NTRACER)
+        end if
     endif
 
 end subroutine SubsurfaceRouting_drv
@@ -1455,7 +1530,8 @@ end subroutine SubsurfaceRouting_drv
 
 subroutine OverlandRouting_drv(did)
     use module_RT_data, only: rt_domain
-    use config_base, only: nlst
+    use config_base, only: nlst, noah_lsm
+    use module_OverlandRouting
 
     implicit none
     integer :: did
@@ -1471,7 +1547,8 @@ subroutine OverlandRouting_drv(did)
             !         rt_domain(did)%overland%properties%distance_to_neighbor, rt_domain(did)%overland%properties%surface_slope, rt_domain(did)%overland%properties%max_surface_slope_index , &
             !         rt_domain(did)%overland%mass_balance%post_soil_moisture_content,rt_domain(did)%overland%mass_balance%pre_infiltration_excess,rt_domain(did)%overland%mass_balance%post_infiltration_excess, &
             !         rt_domain(did)%overland%mass_balance%pre_soil_moisture_content,rt_domain(did)%overland%mass_balance%accumulated_change_in_soil_moisture )
-        call OverlandRouting( &
+        if (noah_lsm%water_tracer_option > 0) then
+          call OverlandRouting( &
             rt_domain(did)%overland, &
             nlst(did)%DT, &
             nlst(did)%DTRT_TER, &
@@ -1480,7 +1557,21 @@ subroutine OverlandRouting_drv(did)
             rt_domain(did)%jxrt, &
             rt_domain(did)%q_sfcflx_x, &
             rt_domain(did)%q_sfcflx_y &
+            ,nlst(did)%WVTFLAG           & !wt var
+            ,rt_domain(did)%q_sfcflx_x_tr   & !wt var
+            ,rt_domain(did)%q_sfcflx_y_tr   & !wt var
             )
+        else
+          call OverlandRouting( &
+            rt_domain(did)%overland, &
+            nlst(did)%DT, &
+            nlst(did)%DTRT_TER, &
+            nlst(did)%rt_option, &
+            rt_domain(did)%ixrt, &
+            rt_domain(did)%jxrt, &
+            rt_domain(did)%q_sfcflx_x, &
+            rt_domain(did)%q_sfcflx_y)
+        end if
         ! ADCHANGE: If overland routing is called, INFXSUBRT is moved to SFCHEADSUBRT, so
         !           zeroing out just in case
         rt_domain(did)%overland%control%infiltration_excess = 0.0

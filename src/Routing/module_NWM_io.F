@@ -64,7 +64,7 @@ end function GetModelConfigType
 
 subroutine output_chrt_NWM(domainId)
    use module_rt_data, only: rt_domain
-   use config_base, only: nlst
+   use config_base, only: nlst, noah_lsm
    use Module_Date_utilities_rt, only: geth_newdate, geth_idts
    use module_NWM_io_dict
    use netcdf
@@ -234,6 +234,14 @@ subroutine output_chrt_NWM(domainId)
       fileMeta%outFlag(5) = 0
    endif
 
+   if (noah_lsm%water_tracer_option == 0) then
+     fileMeta%outFlag(12) = 0
+     fileMeta%outFlag(13) = 0
+     fileMeta%outFlag(14) = 0
+     fileMeta%outFlag(15) = 0
+     fileMeta%numVars = fileMeta%numVars - numChVars_tracer
+   end if
+
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
@@ -288,14 +296,16 @@ subroutine output_chrt_NWM(domainId)
             allocate(g_qlossOut(gsize))
          end if
          !----water tracer vars----
-         allocate(g_qlink_tr(gsize,2))
-         allocate(g_QLateral_tr(gsize))
-         allocate(g_hlink_tr(gsize))
-         allocate(g_qBucket_tr(gsize))
-         allocate(g_qlink_trOut(gsize,2))
-         allocate(g_QLateral_trOut(gsize))
-         allocate(g_hlink_trOut(gsize))
-         allocate(g_qBucket_trOut(gsize))
+         if (noah_lsm%water_tracer_option > 0) then
+           allocate(g_qlink_tr(gsize,2))
+           allocate(g_QLateral_tr(gsize))
+           allocate(g_hlink_tr(gsize))
+           allocate(g_qBucket_tr(gsize))
+           allocate(g_qlink_trOut(gsize,2))
+           allocate(g_QLateral_trOut(gsize))
+           allocate(g_hlink_trOut(gsize))
+           allocate(g_qBucket_trOut(gsize))
+         end if
          !-------------------------
       else
          allocate(g_chlon(1))
@@ -335,14 +345,16 @@ subroutine output_chrt_NWM(domainId)
             allocate(g_qlossOut(1))
          end if
          !----water tracer vars----
-         allocate(g_qlink_tr(1,2))
-         allocate(g_QLateral_tr(1))
-         allocate(g_hlink_tr(1))
-         allocate(g_qBucket_tr(1))
-         allocate(g_qlink_trOut(1,2))
-         allocate(g_QLateral_trOut(1))
-         allocate(g_hlink_trOut(1))
-         allocate(g_qBucket_trOut(1))
+         if (noah_lsm%water_tracer_option > 0) then
+           allocate(g_qlink_tr(1,2))
+           allocate(g_QLateral_tr(1))
+           allocate(g_hlink_tr(1))
+           allocate(g_qBucket_tr(1))
+           allocate(g_qlink_trOut(1,2))
+           allocate(g_QLateral_trOut(1))
+           allocate(g_hlink_trOut(1))
+           allocate(g_qBucket_trOut(1))
+         end if
          !-------------------------
       endif
 
@@ -361,9 +373,10 @@ subroutine output_chrt_NWM(domainId)
          allocate(qlossLocal(RT_DOMAIN(domainId)%NLINKS))
          qlossLocal = RT_DOMAIN(domainId)%qloss !TML temp fix to test code
       endif
-      allocate(strFlowLocal_tr(RT_DOMAIN(domainId)%NLINKS))
-      strFlowLocal_tr = RT_DOMAIN(domainId)%QLINK_tr(:,1)
-
+      if (noah_lsm%water_tracer_option > 0) then
+        allocate(strFlowLocal_tr(RT_DOMAIN(domainId)%NLINKS))
+        strFlowLocal_tr = RT_DOMAIN(domainId)%QLINK_tr(:,1)
+      end if
       print *, "ADCHECK: Before local lake adjust"
 
       ! Loop through all the local links on this processor. For lake_type
@@ -377,7 +390,9 @@ subroutine output_chrt_NWM(domainId)
                if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
                   qlossLocal(iTmp) = fileMeta%modelNdv
                endif
-               strFlowLocal_tr(iTmp) = fileMeta%modelNdv
+               if (noah_lsm%water_tracer_option > 0) then
+                 strFlowLocal_tr(iTmp) = fileMeta%modelNdv
+               end if
             endif
          end do
       endif
@@ -407,13 +422,15 @@ subroutine output_chrt_NWM(domainId)
          call ReachLS_write_io(velocityLocal,g_velocity)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
          !-----water tracer vars------
-         print *, "ADCHECK: Before tracer var writes qlink_tr"
-         call ReachLS_write_io(strFlowLocal_tr,g_qlink_tr(:,1))
-         call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK_tr(:,2),g_qlink_tr(:,2))
-         print *, "ADCHECK: Before tracer var writes qlateral_tr"
-         call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral_tr,g_QLateral_tr)
-         print *, "ADCHECK: Before tracer var writes hlink_tr"
-         call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK_tr,g_hlink_tr)
+         if (noah_lsm%water_tracer_option > 0) then
+           print *, "ADCHECK: Before tracer var writes qlink_tr"
+           call ReachLS_write_io(strFlowLocal_tr,g_qlink_tr(:,1))
+           call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK_tr(:,2),g_qlink_tr(:,2))
+           print *, "ADCHECK: Before tracer var writes qlateral_tr"
+           call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral_tr,g_QLateral_tr)
+           print *, "ADCHECK: Before tracer var writes hlink_tr"
+           call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK_tr,g_hlink_tr)
+         end if
          !----------------------------
          ! Optional outputs
          if(nudgeFlag .eq. 1)then
@@ -533,17 +550,19 @@ subroutine output_chrt_NWM(domainId)
       g_QLateral = RT_DOMAIN(domainId)%QLateral
       g_velocity = RT_DOMAIN(domainId)%velocity
       !-----water tracer vars------
-      allocate(g_qlink_tr(gsize,2))
-      allocate(g_QLateral_tr(gsize))
-      allocate(g_hlink_tr(gsize))
-      allocate(g_qBucket_tr(gsize))
-      allocate(g_qlink_trOut(gsize,2))
-      allocate(g_QLateral_trOut(gsize))
-      allocate(g_hlink_trOut(gsize))
-      allocate(g_qBucket_trOut(gsize))
-      g_hlink_tr = RT_DOMAIN(domainId)%HLINK_tr
-      g_qlink_tr = RT_DOMAIN(domainId)%QLINK_tr
-      g_QLateral_tr = RT_DOMAIN(domainId)%QLateral_tr
+      if (noah_lsm%water_tracer_option > 0) then
+        allocate(g_qlink_tr(gsize,2))
+        allocate(g_QLateral_tr(gsize))
+        allocate(g_hlink_tr(gsize))
+        allocate(g_qBucket_tr(gsize))
+        allocate(g_qlink_trOut(gsize,2))
+        allocate(g_QLateral_trOut(gsize))
+        allocate(g_hlink_trOut(gsize))
+        allocate(g_qBucket_trOut(gsize))
+        g_hlink_tr = RT_DOMAIN(domainId)%HLINK_tr
+        g_qlink_tr = RT_DOMAIN(domainId)%QLINK_tr
+        g_QLateral_tr = RT_DOMAIN(domainId)%QLateral_tr
+      end if
       !----------------------------
       ! Optional outputs
       if(nudgeFlag .eq. 1)then
@@ -687,10 +706,12 @@ subroutine output_chrt_NWM(domainId)
                g_qlossOut(iTmp) = g_qloss(indTmp)
             end if
             !----water tracer vars-----
-            g_qlink_trOut(iTmp,1)  = g_qlink_tr(indTmp,1)
-            g_QLateral_trOut(iTmp) = g_QLateral_tr(indTmp)
-            g_hlink_trOut(iTmp)    = g_hlink_tr(indTmp)
-            g_qBucket_trOut(iTmp)  = g_qBucket_tr(indTmp)
+            if (noah_lsm%water_tracer_option > 0) then
+              g_qlink_trOut(iTmp,1)  = g_qlink_tr(indTmp,1)
+              g_QLateral_trOut(iTmp) = g_QLateral_tr(indTmp)
+              g_hlink_trOut(iTmp)    = g_hlink_tr(indTmp)
+              g_qBucket_trOut(iTmp)  = g_qBucket_tr(indTmp)
+            end if
             !--------------------------
          end do
       else
@@ -713,10 +734,12 @@ subroutine output_chrt_NWM(domainId)
             g_qlossOut = g_qloss
          end if
          !----water tracer vars----
-         g_qlink_trOut(:,1) = g_qlink_tr(:,1)
-         g_QLateral_trOut = g_QLateral_tr
-         g_hlink_trOut = g_hlink_tr
-         g_qBucket_trOut = g_qBucket_tr
+         if (noah_lsm%water_tracer_option > 0) then
+           g_qlink_trOut(:,1) = g_qlink_tr(:,1)
+           g_QLateral_trOut = g_QLateral_tr
+           g_hlink_trOut = g_hlink_tr
+           g_qBucket_trOut = g_qBucket_tr
+         end if
          !-------------------------
       endif
 
@@ -769,10 +792,12 @@ subroutine output_chrt_NWM(domainId)
       varMetaInt(1,:) = PACK(g_orderOut,g_outInd == 1)
       varMetaInt8(1,:) = PACK(g_linkidOut,g_outInd == 1)
       !-----water tracer vars-----
-      varOutReal(12,:) = PACK(g_qlink_trOut(:,1),g_outInd == 1)
-      varOutReal(13,:) = PACK(g_QLateral_trOut,g_outInd == 1)
-      varOutReal(14,:) = PACK(g_hlink_trOut,g_outInd == 1)
-      varOutReal(15,:) = PACK(g_qBucket_trOut,g_outInd == 1)
+      if (noah_lsm%water_tracer_option > 0) then
+        varOutReal(12,:) = PACK(g_qlink_trOut(:,1),g_outInd == 1)
+        varOutReal(13,:) = PACK(g_QLateral_trOut,g_outInd == 1)
+        varOutReal(14,:) = PACK(g_hlink_trOut,g_outInd == 1)
+        varOutReal(15,:) = PACK(g_qBucket_trOut,g_outInd == 1)
+      end if
       !---------------------------
 
       ! Mask out missing values
@@ -1150,15 +1175,17 @@ subroutine output_chrt_NWM(domainId)
 
    deallocate(g_outInd)
    !----water tracer vars----
-   deallocate(g_hlink_trOut)
-   deallocate(g_qlink_trOut)
-   deallocate(g_QLateral_trOut)
-   deallocate(g_qBucket_trOut)
-   deallocate(g_hlink_tr)
-   deallocate(g_qlink_tr)
-   deallocate(g_QLateral_tr)
-   deallocate(g_qBucket_tr)
-   deallocate(strFlowLocal_tr)
+   if (noah_lsm%water_tracer_option > 0) then
+     deallocate(g_hlink_trOut)
+     deallocate(g_qlink_trOut)
+     deallocate(g_QLateral_trOut)
+     deallocate(g_qBucket_trOut)
+     deallocate(g_hlink_tr)
+     deallocate(g_qlink_tr)
+     deallocate(g_QLateral_tr)
+     deallocate(g_qBucket_tr)
+     deallocate(strFlowLocal_tr)
+   end if
    !-------------------------
 
 end subroutine output_chrt_NWM
@@ -1333,12 +1360,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,1,1,1,1,1,1,1,& !71-80
                              1,1,1,1,1,1,1,1,1,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             1,1,1,&               !99-101
-                             1,1,1,&               !102-104
-                             1,1,1,&               !105-107
-                             1,1,1,&               !108-110
-                             1,1,1,&               !111-113
-                             1,1,1,&               !114-116
+                             1,1,1,&               !99-101 (crocus)
+                             1,1,1,&               !102-104 (crocus)
+                             1,1,1,&               !105-107 (crocus)
+                             1,1,1,&               !108-110 (crocus)
+                             1,1,1,&               !111-113 (crocus)
+                             1,1,1,&               !114-116 (crocus)
                              1,1,1,1,&             !117-120 (tracers)
                              1,1,1,1,1,1,1,1,1,1,& !121-130 (tracers)
                              1,1,1,1,1,1]          !131-136 (tracers)
@@ -1355,12 +1382,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,1,1,0,1,0,0,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             0,0,0,&               !108-110 (crocus)
+                             0,0,0,&               !111-113 (crocus)
+                             0,0,0,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1377,12 +1404,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             0,0,0,&               !108-110 (crocus)
+                             0,0,0,&               !111-113 (crocus)
+                             0,0,0,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1399,12 +1426,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             0,0,0,&               !108-110 (crocus)
+                             0,0,0,&               !111-113 (crocus)
+                             0,0,0,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1421,12 +1448,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,0,1,1,0,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             0,0,0,&               !108-110 (crocus)
+                             0,0,0,&               !111-113 (crocus)
+                             0,0,0,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1443,12 +1470,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,0,0,0,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             1,1,0,&               !108-110 (crocus)
+                             1,0,0,&               !111-113 (crocus)
+                             1,1,1,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1465,12 +1492,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1,&               !114-116
+                             0,0,0,&               !99-101 (crocus)
+                             0,0,0,&               !102-104 (crocus)
+                             0,0,0,&               !105-107 (crocus)
+                             1,1,0,&               !108-110 (crocus)
+                             1,0,0,&               !111-113 (crocus)
+                             1,1,1,&               !114-116 (crocus)
                              0,0,0,0,&             !117-120 (tracers)
                              0,0,0,0,0,0,0,0,0,0,& !121-130 (tracers)
                              0,0,0,0,0,0]          !131-136 (tracers)
@@ -1480,17 +1507,49 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
    ! ! If crocus is off, these should not be outputted
    if (noah_lsm%crocus_opt == 0) then
+      fileMeta%outFlag(99) = 0
+      fileMeta%outFlag(100) = 0
       fileMeta%outFlag(101) = 0
       fileMeta%outFlag(102) = 0
       fileMeta%outFlag(103) = 0
       fileMeta%outFlag(104) = 0
+      fileMeta%outFlag(105) = 0
+      fileMeta%outFlag(106) = 0
+      fileMeta%outFlag(107) = 0
       fileMeta%outFlag(108) = 0
       fileMeta%outFlag(109) = 0
+      fileMeta%outFlag(110) = 0
       fileMeta%outFlag(111) = 0
+      fileMeta%outFlag(112) = 0
+      fileMeta%outFlag(113) = 0
       fileMeta%outFlag(114) = 0
       fileMeta%outFlag(115) = 0
       fileMeta%outFlag(116) = 0
-      fileMeta%numVars = numLdasVars_crocus_off ! 98
+      fileMeta%numVars = fileMeta%numVars - numLdasVars_crocus !numLdasVars_crocus_off ! 98
+   end if
+
+   if (noah_lsm%water_tracer_option == 0) then
+      fileMeta%outFlag(117) = 0
+      fileMeta%outFlag(118) = 0
+      fileMeta%outFlag(119) = 0
+      fileMeta%outFlag(120) = 0
+      fileMeta%outFlag(121) = 0
+      fileMeta%outFlag(122) = 0
+      fileMeta%outFlag(123) = 0
+      fileMeta%outFlag(124) = 0
+      fileMeta%outFlag(125) = 0
+      fileMeta%outFlag(126) = 0
+      fileMeta%outFlag(127) = 0
+      fileMeta%outFlag(128) = 0
+      fileMeta%outFlag(129) = 0
+      fileMeta%outFlag(130) = 0
+      fileMeta%outFlag(131) = 0
+      fileMeta%outFlag(132) = 0
+      fileMeta%outFlag(133) = 0
+      fileMeta%outFlag(134) = 0
+      fileMeta%outFlag(135) = 0
+      fileMeta%outFlag(136) = 0
+      fileMeta%numVars = fileMeta%numVars - numLdasVars_tracer
    end if
 
    ! call the GetModelConfigType function
@@ -1922,7 +1981,7 @@ end subroutine output_NoahMP_NWM
 
 subroutine output_rt_NWM(domainId,iGrid)
    use module_rt_data, only: rt_domain
-   use config_base, only: nlst
+   use config_base, only: nlst, noah_lsm
    use Module_Date_utilities_rt, only: geth_newdate, geth_idts
    use module_NWM_io_dict
    use netcdf
@@ -2030,6 +2089,13 @@ subroutine output_rt_NWM(domainId,iGrid)
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
+
+   if (noah_lsm%water_tracer_option == 0) then
+     fileMeta%outFlag(6) = 0
+     fileMeta%outFlag(7) = 0
+     fileMeta%outFlag(8) = 0
+     fileMeta%numVars = fileMeta%numVars - numRtDomainVars_tracer
+   end if
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
@@ -3818,6 +3884,15 @@ subroutine output_lsmOut_NWM(domainId)
    ! diagnostic in nature.
    fileMeta%outFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 
+   if (noah_lsm%water_tracer_option == 0) then
+     fileMeta%outFlag(15) = 0
+     fileMeta%outFlag(16) = 0
+     fileMeta%outFlag(17) = 0
+     fileMeta%outFlag(18) = 0
+     fileMeta%outFlag(19) = 0
+     fileMeta%numVars = fileMeta%numVars - numLsmVars_tracer
+   end if
+
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
@@ -5174,7 +5249,7 @@ end subroutine output_chanObs_NWM
 ! User controllable options: None.
 subroutine output_gw_NWM(domainId,iGrid)
    use module_rt_data, only: rt_domain
-   use config_base, only: nlst
+   use config_base, only: nlst, noah_lsm
    use Module_Date_utilities_rt, only: geth_newdate, geth_idts
    use module_NWM_io_dict
    use netcdf
@@ -5292,6 +5367,18 @@ subroutine output_gw_NWM(domainId,iGrid)
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
 
+   if (noah_lsm%water_tracer_option == 0) then
+      fileMeta%outFlag(5) = 0
+      fileMeta%outFlag(6) = 0
+      fileMeta%outFlag(7) = 0
+      fileMeta%outFlag(8) = 0
+      fileMeta%outFlag(9) = 0
+      fileMeta%outFlag(10) = 0
+      fileMeta%outFlag(11) = 0
+      fileMeta%outFlag(12) = 0
+      fileMeta%numVars = numGwVars - numGwVars_tracer
+   end if
+
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
@@ -5309,14 +5396,16 @@ subroutine output_gw_NWM(domainId,iGrid)
          allocate(g_z_gwsubbas(rt_domain(domainId)%gnumbasns))
          allocate(g_basnsInd(rt_domain(domainId)%gnumbasns))
          !----water tracer vars----
-         allocate(g_qin_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
-         allocate(g_qout_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
-         allocate(g_z_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
-         allocate(g_z_gwsubbas_passive(rt_domain(domainId)%gnumbasns))
-         allocate(g_z_gwsubbas_active(rt_domain(domainId)%gnumbasns))
-         allocate(g_z_gwsubbas_passive_tr(rt_domain(domainId)%gnumbasns))
-         allocate(g_z_gwsubbas_active_tr(rt_domain(domainId)%gnumbasns))
-         allocate(g_cm_gwsubbas(rt_domain(domainId)%gnumbasns))
+         if (noah_lsm%water_tracer_option > 0) then
+           allocate(g_qin_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
+           allocate(g_qout_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
+           allocate(g_z_gwsubbas_tr(rt_domain(domainId)%gnumbasns))
+           allocate(g_z_gwsubbas_passive(rt_domain(domainId)%gnumbasns))
+           allocate(g_z_gwsubbas_active(rt_domain(domainId)%gnumbasns))
+           allocate(g_z_gwsubbas_passive_tr(rt_domain(domainId)%gnumbasns))
+           allocate(g_z_gwsubbas_active_tr(rt_domain(domainId)%gnumbasns))
+           allocate(g_cm_gwsubbas(rt_domain(domainId)%gnumbasns))
+         end if
       else
          allocate(g_qin_gwsubbas(1))
          allocate(g_qout_gwsubbas(1))
@@ -5324,9 +5413,11 @@ subroutine output_gw_NWM(domainId,iGrid)
          allocate(g_z_gwsubbas(1))
          allocate(g_basnsInd(1))
          !----water tracer vars---
-         allocate(g_qin_gwsubbas_tr(1))
-         allocate(g_qout_gwsubbas_tr(1))
-         allocate(g_z_gwsubbas_tr(1))
+         if (noah_lsm%water_tracer_option > 0) then
+           allocate(g_qin_gwsubbas_tr(1))
+           allocate(g_qout_gwsubbas_tr(1))
+           allocate(g_z_gwsubbas_tr(1))
+         end if
       endif
 
       if(nlst(domainId)%UDMP_OPT .eq. 1) then
@@ -5344,14 +5435,16 @@ subroutine output_gw_NWM(domainId,iGrid)
             call ReachLS_write_io(rt_domain(domainId)%qloss_gwsubbas,g_qloss_gwsubbas)
          endif
          !-----water tracer vars-----
-         call ReachLS_write_io(rt_domain(domainId)%qin_gwsubbas_tr/nlst(domainId)%DT,g_qin_gwsubbas_tr)
-         call ReachLS_write_io(rt_domain(domainId)%qout_gwsubbas_tr,g_qout_gwsubbas_tr)
-         call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_tr*1000.,g_z_gwsubbas_tr)
-         call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_passive*1000.,g_z_gwsubbas_passive)
-         call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_active*1000., g_z_gwsubbas_active)
-         call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_passive_tr*1000.,g_z_gwsubbas_passive_tr)
-         call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_active_tr*1000., g_z_gwsubbas_active_tr)
-         call ReachLS_write_io(rt_domain(domainId)%cm_gwsubbas, g_cm_gwsubbas)
+         if (noah_lsm%water_tracer_option > 0) then
+           call ReachLS_write_io(rt_domain(domainId)%qin_gwsubbas_tr/nlst(domainId)%DT,g_qin_gwsubbas_tr)
+           call ReachLS_write_io(rt_domain(domainId)%qout_gwsubbas_tr,g_qout_gwsubbas_tr)
+           call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_tr*1000.,g_z_gwsubbas_tr)
+           call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_passive*1000.,g_z_gwsubbas_passive)
+           call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_active*1000., g_z_gwsubbas_active)
+           call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_passive_tr*1000.,g_z_gwsubbas_passive_tr)
+           call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas_active_tr*1000., g_z_gwsubbas_active_tr)
+           call ReachLS_write_io(rt_domain(domainId)%cm_gwsubbas, g_cm_gwsubbas)
+         end if
          !---------------------------
       else
          call gw_write_io_real(rt_domain(domainId)%numbasns,rt_domain(domainId)%qin_gwsubbas,  &
@@ -5448,14 +5541,16 @@ subroutine output_gw_NWM(domainId,iGrid)
       varOutReal(3,:) = g_qloss_gwsubbas
       varOutReal(4,:) = g_z_gwsubbas
       !----water tracer vars----
-      varOutReal(5,:) = g_qin_gwsubbas_tr
-      varOutReal(6,:) = g_qout_gwsubbas_tr
-      varOutReal(7,:) = g_z_gwsubbas_tr
-      varOutReal(8,:) = g_z_gwsubbas_passive
-      varOutReal(9,:) = g_z_gwsubbas_active
-      varOutReal(10,:) = g_z_gwsubbas_passive_tr
-      varOutReal(11,:) = g_z_gwsubbas_active_tr
-      varOutReal(12,:) = g_cm_gwsubbas
+      if (noah_lsm%water_tracer_option > 0) then
+        varOutReal(5,:) = g_qin_gwsubbas_tr
+        varOutReal(6,:) = g_qout_gwsubbas_tr
+        varOutReal(7,:) = g_z_gwsubbas_tr
+        varOutReal(8,:) = g_z_gwsubbas_passive
+        varOutReal(9,:) = g_z_gwsubbas_active
+        varOutReal(10,:) = g_z_gwsubbas_passive_tr
+        varOutReal(11,:) = g_z_gwsubbas_active_tr
+        varOutReal(12,:) = g_cm_gwsubbas
+      end if
       !-------------------------
 
       ! Mask out missing values
@@ -5670,14 +5765,16 @@ subroutine output_gw_NWM(domainId,iGrid)
    deallocate(g_z_gwsubbas)
    deallocate(g_basnsInd)
    !-----water tracer vars-----
-   deallocate(g_qin_gwsubbas_tr)
-   deallocate(g_qout_gwsubbas_tr)
-   deallocate(g_z_gwsubbas_tr)
-   deallocate(g_z_gwsubbas_passive)
-   deallocate(g_z_gwsubbas_active)
-   deallocate(g_z_gwsubbas_passive_tr)
-   deallocate(g_z_gwsubbas_active_tr)
-   deallocate(g_cm_gwsubbas)
+   if (noah_lsm%water_tracer_option > 0) then
+     deallocate(g_qin_gwsubbas_tr)
+     deallocate(g_qout_gwsubbas_tr)
+     deallocate(g_z_gwsubbas_tr)
+     deallocate(g_z_gwsubbas_passive)
+     deallocate(g_z_gwsubbas_active)
+     deallocate(g_z_gwsubbas_passive_tr)
+     deallocate(g_z_gwsubbas_active_tr)
+     deallocate(g_cm_gwsubbas)
+   end if
    !---------------------------
 end subroutine output_gw_NWM
 

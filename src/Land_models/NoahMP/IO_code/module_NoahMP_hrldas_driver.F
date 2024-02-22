@@ -2337,8 +2337,10 @@ print *, "NTRACER", NTRACER
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
      if (OPT_WT .le. 0) then
+       print *, "ADCHECK: Before hrldas_drv_HYDRO without tracers"
        call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NTRACER) 
      else
+       print *, "ADCHECK: Before hrldas_drv_HYDRO with tracers"
        call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, &
             NTRACER, WVTFLAG=WVTFLAG, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB, &    ! water tracer vars      
             SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR,              &    ! water tracer vars
@@ -2368,7 +2370,7 @@ print *, "NTRACER", NTRACER
 !------------------------------------------------------------------------
 ! Write Restart - timestamp equal to output will have same states
 !------------------------------------------------------------------------
-
+      print *, "ADCHECK: Before LSM restart"
       if ( (noah_lsm%restart_frequency_hours .gt. 0) .and. &
            (mod(ITIME, int(noah_lsm%restart_frequency_hours*3600./nint(dtbl))) == 0)) then
        if(noah_lsm%rst_bi_out .eq. 0) then

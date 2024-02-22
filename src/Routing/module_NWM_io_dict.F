@@ -18,18 +18,23 @@ module module_NWM_io_dict
 implicit none
 
 ! Declare parameter values for module.
-integer, parameter :: numChVars = 15  ! 4 tracer vars
-integer, parameter :: numLdasVars = 136  ! 20 tracer vars
+integer, parameter :: numChVars = 15
+integer, parameter :: numChVars_tracer = 4
+integer, parameter :: numLdasVars = 136
 ! Note: if more ldas variables are added the logic will need to be changed in
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
-integer, parameter :: numLdasVars_crocus_off = 118  !!ADFIX
-
-integer, parameter :: numRtDomainVars = 8 ! 3 tracer vars
+integer, parameter :: numLdasVars_crocus_off = 98  !!ADFIX
+integer, parameter :: numLdasVars_crocus = 18
+integer, parameter :: numLdasVars_tracer = 20
+integer, parameter :: numRtDomainVars = 8
+integer, parameter :: numRtDomainVars_tracer = 3
 integer, parameter :: numLakeVars = 2
 integer, parameter :: numChGrdVars = 1
-integer, parameter :: numLsmVars = 19 ! 5 tracer vars
+integer, parameter :: numLsmVars = 19
+integer, parameter :: numLsmVars_tracer = 5
 integer, parameter :: numChObsVars = 1
-integer, parameter :: numGwVars = 12 ! 8 tracer vars
+integer, parameter :: numGwVars = 12
+integer, parameter :: numGwVars_tracer = 8
 integer :: i
 !integer :: nsoil = nlst_rt(1)%nsoil
 integer :: nsoil
@@ -1089,12 +1094,12 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                "GPP","NPP","PSN","APAR","ACCET", &                       !86-90
                                "CANWAT","SOILICE","SOILSAT_TOP","SOILSAT","SNOWT_AVG", & !91-95
                                "ALBSND","ALBSNI","QRAIN",&                               !96-98
-                               "glacier", "glacier_thickness" ,"PSNOWALB",&              !99-101
-                               "PSNOWTHRUFAL" ,"PSNOWHEIGHT","PSNOWTOTSWE" ,&            !102-104
-                               "PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE",&                    !105-107
-                               "PSNOWTEMP","PSNOWDZ","PSNOWHIST",&                       !108-110
-                               "PSNOWLIQ","PSNOWHEAT","PSNOWRHO",&                       !111-113
-                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW",&                     !114-116
+                               "glacier", "glacier_thickness" ,"PSNOWALB",&              !99-101 (crocus)
+                               "PSNOWTHRUFAL" ,"PSNOWHEIGHT","PSNOWTOTSWE" ,&            !102-104 (crocus)
+                               "PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE",&                    !105-107 (crocus)
+                               "PSNOWTEMP","PSNOWDZ","PSNOWHIST",&                       !108-110 (crocus)
+                               "PSNOWLIQ","PSNOWHEAT","PSNOWRHO",&                       !111-113 (crocus)
+                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW",&                     !114-116 (crocus)
                                "LH_TR","ECAN_TR","EDIR_TR","ETRAN_TR","UGDRNOFF_TR",&    !117-121 (tracers)
                                "SFCRNOFF_TR","CANLIQ_TR","CANICE_TR","WA_TR","WT_TR",&   !122-126 (tracers)
                                "SNICE_TR","SNLIQ_TR","SOIL_W_TR","SOIL_M_TR","FLUX_TR",& !127-131 (tracers)

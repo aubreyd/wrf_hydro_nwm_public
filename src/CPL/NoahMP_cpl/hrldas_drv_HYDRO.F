@@ -22,7 +22,6 @@
 !2345678
        
 !-------NEEDED FOR WATER TRACER CAPABILITY--------
-       
        subroutine hrldas_drv_HYDRO(STC_io,SMC_io,SH2OX_io,infxsrt,sfcheadrt,soldrain,ii,jj,kk, &
                                    NTRACER_loc, WVTFLAG_loc, SMOIS_SUB, SH2OXY_SUB, &      !wt vars
                                    SMOIS_TR, SH2OXY_TR,infxsrt_tr,sfcheadrt_tr, soldrain_tr )   !wt vars
@@ -50,6 +49,7 @@
 
           if (present(WVTFLAG_loc)) then
 print *, 'Flag 3)001'
+          print *, "ADCHECK: In hrldas_drv_HYDRO with tracers active"
             do k = 1, NTRACER_loc
               SMC_SUB(:,:,k)    = SMOIS_SUB(:,k,:)
               SH2OX_SUB(:,:,k)  = SH2OXY_SUB(:,k,:)
@@ -76,6 +76,7 @@ print *, 'Flag 3)003'
             end do
 
           else
+            print *, "ADCHECK: In hrldas_drv_HYDRO without tracers"
             call hrldas_cpl_HYDRO(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk,NTRACER_loc)  
 
             do k = 1, kk
@@ -120,6 +121,7 @@ print *, 'Flag 3)003'
           end do
 !----------wt calc----------
           if (present(OPT_WT)) then
+            print *, "ADCHECK: Before hrldas_cpl_HYDRO_ini with tracers"
             do k = 1, NTRACER_loc
               SMC_TR(:,:,k)    = SMOIS_TR(:,k,:)
               SH2OX_TR(:,:,k)  = SH2OXY_TR(:,k,:)
@@ -144,6 +146,7 @@ print *, 'Flag 3)003'
             end do
 
           else
+             print *, "ADCHECK: Before hrldas_cpl_HYDRO_ini without tracers"
              call hrldas_cpl_HYDRO_ini(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk,kt,dt,olddate,zsoil,NTRACER_loc)
 
            do k = 1, kk
@@ -540,3 +543,4 @@ print *, 'Flag 3)003'
           endif
 
      end subroutine updateNameList
+

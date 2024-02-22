@@ -196,6 +196,7 @@ module module_HYDRO_drv
         call mpp_land_bcast_int1(outflag)
 #endif
 
+        print *, "ADCHECK: Before hydro rst"
         if (rstflag .eq. 1) call HYDRO_rst_out(did)
 
         if (outflag .lt. 0) return
@@ -243,6 +244,7 @@ module module_HYDRO_drv
 
       if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
         if(nlst(did)%LSMOUT_DOMAIN .eq. 1)  then
+            print *, "ADCHECK: Before output_lsm"
             if(nlst(did)%io_form_outputs .eq. 0) then
                 call output_lsm(trim(nlst(did)%olddate(1:4)//nlst(did)%olddate(6:7)//nlst(did)%olddate(9:10)  &
                     //nlst(did)%olddate(12:13)//nlst(did)%olddate(15:16)//  &
@@ -270,6 +272,7 @@ module module_HYDRO_drv
                    nlst(did)%io_config_outputs .ne. 3) then
                     ! Output gridded routing variables on National Water Model
                     ! high-res routing grid
+                    print *, "ADCHECK: Before output_rt"
                     if(nlst(did)%io_form_outputs .ne. 0) then
                         call output_rt_NWM(did,nlst(did)%igrid)
                     else
@@ -301,6 +304,7 @@ module module_HYDRO_drv
                 if(nlst(did)%GWBASESWCRT .ne. 0) then
                     if(nlst(did)%channel_only .eq. 0) then
                         if(nlst(did)%output_gw .ne. 0) then
+                            print *, "ADCHECK: Before output_gw"
                             call output_gw_NWM(did,nlst(did)%igrid)
                         endif
                     endif
@@ -362,6 +366,7 @@ module module_HYDRO_drv
                 if(nlst(did)%io_form_outputs .ne. 0) then
                     ! Call National Water Model output routine for output on NHD forecast points.
                     if(nlst(did)%CHRTOUT_DOMAIN .ne. 0) then
+                        print *, "ADCHECK: Before output_chrt"
                         call output_chrt_NWM(did)
                     endif
                     ! Call the subroutine to output frxstPts.
@@ -453,6 +458,7 @@ module module_HYDRO_drv
                 if(nlst(did)%io_form_outputs .ne. 0) then
                     ! Output lakes in NWM format
                     if(nlst(did)%outlake .ne. 0) then
+                        print *, "ADCHECK: Before output_lakes"
                         call output_lakes_NWM(did,nlst(did)%igrid)
                     endif
                 else
@@ -613,31 +619,36 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 
    ! step 1) disaggregate specific fields from LSM to Hydro grid
    if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
-
       RT_DOMAIN(did)%overland%streams_and_lakes%surface_water_to_channel = zeroFlt
       if (nlst(did)%WVTFLAG .gt. 0) then
+        print *, "ADCHECK: Before disaggregateDomain_drv with tracer active"
         RT_DOMAIN(did)%overland%streams_and_lakes%surface_water_to_channel_tr = zeroFlt
       end if
       RT_DOMAIN(did)%LAKE_INFLORT_DUM = rt_domain(did)%overland%streams_and_lakes%surface_water_to_lake
 
+      print *, "ADCHECK: Before disaggregateDomain_drv"
       if(nlst(did)%SUBRTSWCRT .ne. 0 .or. nlst(did)%OVRTSWCRT .ne. 0) then
          call disaggregateDomain_drv(did)
       endif
+     print *, "ADCHECK: After disaggregateDomain_drv"
       if(nlst(did)%OVRTSWCRT .eq. 0) then
          if(nlst(did)%UDMP_OPT .eq. 1) then
             if (nlst(did)%WVTFLAG .gt. 0) then
+               print *, "ADCHECK: Before RunOffDisag with tracers"
                call RunOffDisag(RT_DOMAIN(did)%INFXSRT, RT_DOMAIN(did)%landRunOff,        &
                  rt_domain(did)%dist_lsm(:,:,9),rt_domain(did)%overland%properties%distance_to_neighbor(:,:,9), &
                  RT_DOMAIN(did)%INFXSWGT, nlst(did)%AGGFACTRT, RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx, &
                  wvtflag_pass=nlst(did)%WVTFLAG, INFXSRT_tr_pass=RT_DOMAIN(did)%INFXSRT_tr, &  ! wt vars
                  landRunOff_tr_pass=RT_DOMAIN(did)%landRunOff_tr) ! wt vars
             else
+               print *, "ADCHECK: Before RunOffDisag no tracers"
      	       call RunOffDisag(RT_DOMAIN(did)%INFXSRT, RT_DOMAIN(did)%landRunOff,        &
                  rt_domain(did)%dist_lsm(:,:,9),rt_domain(did)%overland%properties%distance_to_neighbor(:,:,9), &
                  RT_DOMAIN(did)%INFXSWGT, nlst(did)%AGGFACTRT, RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx)
             endif
          endif
       endif
+      print *, "ADCHECK: After RunOffDisag"
 
 #ifdef HYDRO_D
       call system_clock(count=clock_count_1, count_rate=clock_rate)
@@ -648,6 +659,7 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
    ! step 2)
    if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
       if(nlst(did)%SUBRTSWCRT .ne.0) then
+         print *, "ADCHECK: Before SubsurfaceRouting_drv"
          call SubsurfaceRouting_drv(did)
       endif
 #ifdef HYDRO_D
@@ -668,6 +680,7 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
       call system_clock(count=clock_count_1, count_rate=clock_rate)
 #endif
       if(nlst(did)%OVRTSWCRT .ne. 0) then
+         print *, "ADCHECK: Before OverlandRouting_drv"
          call OverlandRouting_drv(did)
       else
          !ADCHANGE: Updating landRunoff instead of surface_water_head_routing. This now allows

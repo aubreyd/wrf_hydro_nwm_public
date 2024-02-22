@@ -31,13 +31,15 @@ module module_subsurface_data
 
     contains
 
-    subroutine subsurface_struct_init(this,ix,jx,nsoil,overland_data)
+    subroutine subsurface_struct_init(this,ix,jx,nsoil,overland_data,ntracer)
         implicit none
         class(subsurface_struct), intent(inout) :: this ! the type object being initialized
         integer, intent(in) :: ix                     ! x grid size
         integer, intent(in) :: jx                     ! y grid size
         integer, intent(in) :: nsoil                  ! number of soil layers
         type(overland_struct), intent(inout) :: overland_data        ! overland data strucuture
+        ! for water tracers
+        integer, optional, intent(in) :: ntracer      ! number of tracers
 
     if (this%pointer_allocation_guard .eqv. .false. ) then
         this%pointer_allocation_guard = .true.
@@ -47,7 +49,11 @@ module module_subsurface_data
             write(0,*) "Failure to allocate subsurface io interface"
         else
             !write(0,*) "Allocating io structure"
-            call this%state%init(ix,jx)
+            if ( present(ntracer) ) then
+               call this%state%init(ix,jx,ntracer)
+            else
+               call this%state%init(ix,jx)
+            end if
         end if
 
         ! allocate the properties interface
@@ -65,7 +71,11 @@ module module_subsurface_data
             write(0,*) "Failure to allocate grid transform interface"
         else
             !write(0,*) "Allocating grid transform structure"
-            call this%grid_transform%init(ix,jx,nsoil)
+            if ( present(ntracer) ) then
+               call this%grid_transform%init(ix,jx,nsoil,ntracer)
+            else
+               call this%grid_transform%init(ix,jx,nsoil)
+            end if
         end if
     else
         write(0,*)  "Attempt to double allocate subsurface_struct"
