@@ -8512,11 +8512,11 @@ end if
        RSAT =  RSAT + WPLUS
        SUBDEF = SUBDEF + WMINUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
-!       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
-!    RUNSRF = RUNSRF_SAVE/NITER
+    RUNSRF = RUNSRF_SAVE/NITER
     !-----wt calc-----
     if (present(WVTFLAG)) then
       call get_wt_ratio(QINSUR_TR, QINSUR, PROPOR_TR)
