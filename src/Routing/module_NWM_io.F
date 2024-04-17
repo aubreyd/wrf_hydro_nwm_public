@@ -1204,7 +1204,7 @@ end subroutine output_chrt_NWM
 !
 ! User controllable options: None.
 
-subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,ixPar,jxPar,zNum,varReal,vegTyp,varInd)
+subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,ixPar,jxPar,zNum,varReal,vegTyp,varInd,fileStatus)
    use module_rt_data, only: rt_domain
    use config_base, only: nlst, noah_lsm
    use Module_Date_utilities_rt, only: geth_newdate, geth_idts
@@ -1227,6 +1227,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    real, intent(in) :: varReal(ixPar,zNum,jxPar) ! Variable data to be written.
    integer, intent(inout) :: vegTyp(ixPar,jxPar) ! Vegetation type grid used to mask out variables.
    integer, intent(in) :: varInd ! Variable index used to extact meta-data from.
+   integer, intent(inout) :: fileStatus
 
    ! Derived types.
    type(ldasMeta) :: fileMeta
@@ -1265,6 +1266,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
    real*8, allocatable, dimension(:) :: yCoord,xCoord,yCoord2
    real, allocatable, dimension(:,:,:) :: varRealTmp
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
+   integer :: numWriteVars
 
 #ifdef MPP_LAND
    mppFlag = 1
@@ -1525,7 +1527,7 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       fileMeta%outFlag(114) = 0
       fileMeta%outFlag(115) = 0
       fileMeta%outFlag(116) = 0
-      fileMeta%numVars = fileMeta%numVars - numLdasVars_crocus !numLdasVars_crocus_off ! 98
+      !fileMeta%numVars = fileMeta%numVars - numLdasVars_crocus !numLdasVars_crocus_off ! 98
    end if
 
    if (noah_lsm%water_tracer_option == 0) then
@@ -1549,13 +1551,20 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       fileMeta%outFlag(134) = 0
       fileMeta%outFlag(135) = 0
       fileMeta%outFlag(136) = 0
-      fileMeta%numVars = fileMeta%numVars - numLdasVars_tracer
+      !fileMeta%numVars = fileMeta%numVars - numLdasVars_tracer
    end if
+
+   ! Based on our IO and physics settings, how many variables are we ACTUALLY writing
+   ! (numVars is max possible)
+   numWriteVars = sum(fileMeta%outFlag(1:fileMeta%numVars))
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
-   if(varInd .eq. 1) then
+   ! New file count variable to track start and end of file
+   if (fileStatus == 0 .and. fileMeta%outFlag(varInd) .eq. 1) then
+   print *, "ADCHECK: Creating LDASOUT file", fileStatus, numWriteVars
+   !if(varInd .eq. 1) then   ! THIS IS BAD: what if the first time you call this routine is NOT on VarInd 1??
       ! We are on the first variable, we need to create the output file with
       ! attributes first.
       if(myId .eq. 0) then
@@ -1950,11 +1959,15 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       deallocate(localCompTmp)
       deallocate(varRealTmp)
 
+      fileStatus = fileStatus + 1
+
    endif
 
    if(myId .eq. 0) then
       ! Only close the file if we are finished with the very last variable.
-      if(varInd .eq. fileMeta%numVars) then
+      if (fileStatus == numWriteVars) then
+!      if(varInd .eq. fileMeta%numVars) then
+        print *, "ADCHECK: Closing LDASOUT file", fileStatus, numWriteVars
          ! Close the output file
          iret = nf90_close(ftnNoahMP)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to close LDASOUT file.')

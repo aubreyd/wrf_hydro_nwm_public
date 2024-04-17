@@ -65,7 +65,8 @@ module config_base
      character(len=256) :: track_end = ""
      integer            :: partial_mixing_option = 0
      integer            :: wvtflag = 0
-     integer, dimension(MAX_SOIL_LEVELS) :: tracer_sublayer ! number of sublayers for tracer
+     !integer, dimension(MAX_SOIL_LEVELS) :: tracer_sublayer ! number of sublayers for tracer
+     integer, allocatable, dimension(:) :: tracer_sublayer ! number of sublayers for tracer
 
   end type NOAHLSM_OFFLINE_
 
@@ -1124,7 +1125,8 @@ contains
     noah_lsm%track_start = track_start
     noah_lsm%track_end = track_end
     noah_lsm%partial_mixing_option = partial_mixing_option
-    noah_lsm%tracer_sublayer = tracer_sublayer
+    allocate(noah_lsm%tracer_sublayer(noah_lsm%nsoil))
+    noah_lsm%tracer_sublayer = tracer_sublayer(1:noah_lsm%nsoil)
     !nlst(did)%NTRACER = 1
     !if (noah_lsm%water_tracer_option .eq. 1) then
     !  nlst(did)%PMOPT   = noah_lsm%partial_mixing_option
