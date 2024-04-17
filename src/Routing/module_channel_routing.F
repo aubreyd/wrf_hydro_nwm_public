@@ -644,7 +644,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEI   !-- lake inflow (cms)
         REAL,                DIMENSION(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
-        REAL, INTENT(IN),    DIMENSION(NLAKES)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evaporation and precipitation
+        REAL, INTENT(INOUT),    DIMENSION(NLAKES)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evaporation and precipitation
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
         !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
@@ -1688,7 +1688,7 @@ end subroutine drive_CHANNEL
        real, intent(INOUT), dimension(:)    :: RESHT    !-- reservoir height (m)
        real, intent(INOUT), dimension(:)    :: QLAKEI   !-- lake inflow (cms)
        real,                dimension(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
-       real, intent(IN), dimension(:)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evap and precipitaion
+       real, intent(INOUT), dimension(:)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evap and precipitaion
        real, intent(INOUT), dimension(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
 
        integer(kind=int64), intent(IN), dimension(:)    :: LAKENODE !-- outflow from lake used in diffusion scheme
