@@ -35,7 +35,7 @@ module module_HYDRO_io
    use netcdf
    use module_hydro_stop, only:HYDRO_stop
    use hashtable
-   use iso_fortran_env, only: int64
+   use iso_fortran_env, only: int64, compiler_version
 
    implicit none
 
@@ -1518,7 +1518,8 @@ end subroutine get_albedo12m_netcdf
    implicit none
    integer, intent(in) :: gnumbasns, numbasns
    integer(kind=int64), intent(in),  dimension(numbasns) :: basnsInd
-   real,    intent(out), dimension(numbasns) :: gw_buck_coeff, gw_buck_exp, gw_buck_loss
+   real,    intent(out), dimension(numbasns) :: gw_buck_coeff, gw_buck_exp
+   real,    intent(out), dimension(:), allocatable :: gw_buck_loss
    real,    intent(out), dimension(numbasns) :: z_max, z_gwsubbas, basns_area
    integer, intent(out), dimension(numbasns) :: bas_id
    real, dimension(gnumbasns) :: tmp_buck_coeff, tmp_buck_exp, tmp_buck_loss
@@ -2451,10 +2452,10 @@ endif
 #endif
 
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
          call hydro_stop("In output_gw_spinup() - Problem nf90_create")
-       endif 
+       endif
 
        iret = nf90_def_dim(ncid, "time", NF90_UNLIMITED, dimid_times)
        iret = nf90_def_dim(ncid, "x", ixrtd, dimid_ix)  !-- make a decimated grid
@@ -2789,7 +2790,7 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
 #endif
 
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
          call hydro_stop("In output_gw_spinup() - Problem nf90_create")
        endif
@@ -3213,15 +3214,15 @@ subroutine sub_output_gw(igrid, split_output_count, ixrt, jxrt, nsoil, &
         print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
         if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create points")
-        endif 
+        endif
 
-        iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2) 
+        iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2)
         if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create observation")
-        endif 
+        endif
 
        do i=1,nlk
         if(ORDER(i) .ge. order_to_write) then
@@ -3968,12 +3969,12 @@ end subroutine output_chrt
         print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create points")
        endif
 
-       iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2) 
+       iret = nf90_create(trim(output_flnm2), OR(NF90_CLOBBER, NF90_NETCDF4), ncid2)
        if (iret /= 0) then
            call hydro_stop("In output_chrt() - Problem nf90_create observation")
        endif
@@ -4887,10 +4888,10 @@ end subroutine mpp_output_chrt
       print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
       if (iret /= 0) then
          call hydro_stop("In output_lakes() - Problem nf90_create")
-      endif 
+      endif
 
       do i=1,NLAKES
          station_id(i) = i
@@ -5135,10 +5136,10 @@ end subroutine mpp_output_chrt
       print*, 'output_flnm = "'//trim(output_flnm)//'"'
 #endif
 
-      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+      iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
       if (iret /= 0) then
          call hydro_stop("In output_lakes() - Problem nf90_create")
-      endif 
+      endif
 
       iret = nf90_def_dim(ncid, "station", nlakes, stationdim)
 
@@ -5366,10 +5367,10 @@ end subroutine mpp_output_chrt
 
 
 !--- define dimension
-        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+        iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
         if (iret /= 0) then
            call hydro_stop("In output_chrtgrd() - Problem nf90_create")
-        endif 
+        endif
 
         iret = nf90_def_dim(ncid, "time", NF90_UNLIMITED, timedim)
         iret = nf90_def_dim(ncid, "x", ixrt, ixlondim)
@@ -5792,7 +5793,7 @@ end subroutine mpp_output_chrt
      if(IO_id.eq.my_id) &
 #endif
 
-       iret = nf90_create(trim(outFile), OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create(trim(outFile), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
 
 #ifdef MPP_LAND
        call mpp_land_bcast_int1(iret)
@@ -6045,6 +6046,7 @@ end subroutine mpp_output_chrt
 !                    nlst(did)%GWBASESWCRT .ne. 0       )
 
    !         put global attribute
+   iret = nf90_put_att(ncid, NF90_GLOBAL, "compiler_version", compiler_version())
    iret = nf90_put_att(ncid, NF90_GLOBAL, "his_out_counts", rt_domain(did)%his_out_counts)
    iret = nf90_put_att(ncid, NF90_GLOBAL, "Restart_Time", nlst(did)%olddate(1:19))
    iret = nf90_put_att(ncid, NF90_GLOBAL, "Since_Date", nlst(did)%sincedate(1:19))
@@ -8984,9 +8986,9 @@ end subroutine MPP_READ_CHROUTING_new
         real, dimension(:) :: chlat,chlon
         integer :: iret, nodes, i, ncid, dimid_n, varid
 
-        nodes = size(chlon,1)        
+        nodes = size(chlon,1)
 
-       iret = nf90_create("nodeInfor.nc", OR(NF90_CLOBBER, NF90_NETCDF4), ncid) 
+       iret = nf90_create("nodeInfor.nc", OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
        iret = nf90_def_dim(ncid, "node", nodes, dimid_n)  !-- make a decimated grid
 !  define the varialbes
        iret = nf90_def_var(ncid, "fromNode", NF90_INT, (/dimid_n/), varid)
@@ -9076,7 +9078,7 @@ call get_1d_netcdf_real(ncid, 'MusX',     MUSX,      'read_route_link_netcdf', .
 call get_1d_netcdf_real(ncid, 'Length',   CHANLEN,   'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'n',        MannN,     'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'So',       So,        'read_route_link_netcdf', .TRUE.)
-!! impose a minimum as this sometimes fails in the file. 
+!! impose a minimum as this sometimes fails in the file.
 where(So .lt. 0.00001) So=0.00001
 call get_1d_netcdf_real(ncid, 'ChSlp',    ChSSlp,    'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'BtmWdth',  Bw,        'read_route_link_netcdf', .TRUE.)
@@ -10302,9 +10304,9 @@ end subroutine output_chrt2
       iret = nf90_create(trim(output_flnm), OR(NF90_CLOBBER, NF90_NETCDF4), ncid)
 
       if (iret /= 0) then
-          print*, "Problem nf90_create" 
-          call hydro_stop("output_gw_netcdf") 
-      endif 
+          print*, "Problem nf90_create"
+          call hydro_stop("output_gw_netcdf")
+      endif
 
 !!! Define dimensions
 
@@ -11276,7 +11278,7 @@ use module_mpp_land,only: mpp_land_bcast_int1
 
   if (present(rt)) then
     regrid = rt
-  else 
+  else
     regrid = .false.
   endif
 

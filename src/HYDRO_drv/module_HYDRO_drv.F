@@ -980,7 +980,7 @@ else
        RT_DOMAIN(did)%HLINK, RT_DOMAIN(did)%ELRT,RT_DOMAIN(did)%CHANLEN,&
        RT_DOMAIN(did)%MannN,RT_DOMAIN(did)%So, RT_DOMAIN(did)%ChSSlp, &
        RT_DOMAIN(did)%Bw,RT_DOMAIN(did)%Tw,RT_DOMAIN(did)%Tw_CC, RT_DOMAIN(did)%n_CC, &
-       RT_DOMAIN(did)%ChannK,& 
+       RT_DOMAIN(did)%ChannK,&
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
        RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
@@ -994,7 +994,7 @@ else
        ,RT_DOMAIN(did)%lake_index,RT_DOMAIN(did)%link_location,&
        RT_DOMAIN(did)%mpp_nlinks,RT_DOMAIN(did)%nlinks_index, &
        RT_DOMAIN(did)%yw_mpp_nlinks  &
-       , RT_DOMAIN(did)%LNLINKSL,RT_DOMAIN(did)%LLINKID &
+       , RT_DOMAIN(did)%LNLINKSL &
        , rt_domain(did)%gtoNode,rt_domain(did)%toNodeInd,rt_domain(did)%nToInd  &
 #endif
        , rt_domain(did)%CH_LNKRT_SL   &
