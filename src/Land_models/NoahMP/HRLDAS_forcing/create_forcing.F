@@ -441,11 +441,13 @@ program create_forcing
 
      if (date(12:13) == "00") then
         where (geo_em%use == geo_em%iswater .or. geo_em%use == geo_em%islake) vegfra%field = 0.0
+        !where (geo_em%use == geo_em%iswater) vegfra%field = 0.0
         call output_databuffer(ncid, vegfra)
      endif
 
      if (date(12:13) == "00" .and. vary_lai) then
         where (geo_em%use == geo_em%iswater .or. geo_em%use == geo_em%islake) lai%field = 0.0
+        !where (geo_em%use == geo_em%iswater) lai%field = 0.0
         call output_databuffer(ncid, lai)
      endif
 
@@ -461,6 +463,7 @@ program create_forcing
            call output_timestring_to_netcdf(ncid, date)
 
            where(geo_em%use == geo_em%iswater .or. geo_em%use == geo_em%islake) geo_em%tmn = -1.e36
+           !where(geo_em%use == geo_em%iswater) geo_em%tmn = -1.e36
 
            call output_to_netcdf(ncid,     "XLAT", "degree_north", geo_em%lat, geo_em%idim, geo_em%jdim)
            call output_to_netcdf(ncid,    "XLONG", "degree_east" , geo_em%lon, geo_em%idim, geo_em%jdim)

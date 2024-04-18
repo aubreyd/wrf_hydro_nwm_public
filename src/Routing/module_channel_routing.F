@@ -625,7 +625,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
        QLateral, &
        HLINK, ELRT, CHANLEN, MannN, So, ChSSlp, Bw, Tw, Tw_CC, n_CC,  &
        ChannK, RESHT, &
-       ZELEV, CVOL, NLAKES, QLAKEI, QLAKEO, LAKENODE, &
+       ZELEV, CVOL, NLAKES, QLAKEI, QLAKEO, LAKE_PRECIP, LAKE_EVAP, LAKENODE, &
        dist, QINFLOWBASE, CHANXI, CHANYJ, channel_option, RETDEP_CHAN, &
        NLINKSL, LINKID, node_area  &
 #ifdef MPP_LAND
@@ -714,6 +714,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEI   !-- lake inflow (cms)
         REAL,                DIMENSION(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
+        REAL, INTENT(INOUT),    DIMENSION(NLAKES)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evaporation and precipitation
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
         !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
@@ -1560,10 +1561,12 @@ end if
 
               ! Calls run for a single reservoir depending on its type as
               ! in whether it uses level pool, machine learning, or persistence.
-              ! Inflow, lateral inflow, water elevation, and the routing period
-              ! are passed in. Updated outflow and water elevation are returned.
+              ! Inflow, lateral inflow, water elevation, eveporation, precipitation,
+              ! and the routing period are passed in. Updated outflow and water elevation are returned.
               call rt_domain(did)%reservoirs(i)%ptr%run(QLAKEIP(i), QLAKEI(i), &
-                   QLLAKE(i), RESHT(i), QLAKEO(i), DTCT, rt_domain(did)%final_reservoir_type(i), &
+                   QLLAKE(i), RESHT(i), QLAKEO(i), &
+                   LAKE_EVAP(i), LAKE_PRECIP(i), &
+                   DTCT, rt_domain(did)%final_reservoir_type(i), &
                    rt_domain(did)%reservoir_assimilated_value(i), rt_domain(did)%reservoir_assimilated_source_file(i))
 
               ! TODO: Encapsulate the lake state variable for water elevation (RESHT(i))
@@ -1607,6 +1610,8 @@ end if
          call updateLake_grid(QLAKEO, nlakes,lake_index)
          call updateLake_grid(QLAKEI, nlakes,lake_index)
          call updateLake_grid(QLAKEIP,nlakes,lake_index)
+         call updateLake_grid(LAKE_EVAP,nlakes,lake_index)
+         call updateLake_grid(LAKE_PRECIP,nlakes,lake_index)
     endif
 #endif
 
@@ -2061,7 +2066,7 @@ end subroutine drive_CHANNEL
         TYPEL, ORDER, MAXORDER,   CH_LNKRT, &
         LAKE_MSKRT, DT, DTCT, DTRT_CH,MUSK, MUSX, QLINK, &
         CHANLEN, MannN, So, ChSSlp, Bw, Tw, Tw_CC, n_CC, &
-        ChannK, RESHT, CVOL, QLAKEI, QLAKEO, LAKENODE, &
+        ChannK, RESHT, CVOL, QLAKEI, QLAKEO, LAKE_PRECIP, LAKE_EVAP, LAKENODE, &
         QINFLOWBASE, CHANXI, CHANYJ, channel_option,  &
         nlinks,NLINKSL, LINKID, node_area, qout_gwsubbas, &
         LAKEIDA, LAKEIDM, NLAKES, LAKEIDX, &
@@ -2152,6 +2157,7 @@ end subroutine drive_CHANNEL
        real, intent(INOUT), dimension(:)    :: RESHT    !-- reservoir height (m)
        real, intent(INOUT), dimension(:)    :: QLAKEI   !-- lake inflow (cms)
        real,                dimension(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
+       real, intent(INOUT), dimension(:)    :: LAKE_EVAP, LAKE_PRECIP  !-- lake evap and precipitaion
        real, intent(INOUT), dimension(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
 
        integer(kind=int64), intent(IN), dimension(:)    :: LAKENODE !-- outflow from lake used in diffusion scheme
@@ -2198,6 +2204,7 @@ end subroutine drive_CHANNEL
        integer :: n, kk2, nt, nsteps  ! tmp
        real, intent(in), dimension(:) :: qout_gwsubbas
        real, allocatable,dimension(:) :: tmpQLAKEO, tmpQLAKEI, tmpRESHT
+       real, allocatable,dimension(:) :: tmpLAKE_EVAP, tmpLAKE_PRECIP
        integer, allocatable, dimension(:) :: tmpFinalResType
        real, allocatable,dimension(:) :: tmpAssimilatedValue
        character(len=256), allocatable,dimension(:) :: tmpAssimilatedSourceFile
@@ -2208,6 +2215,8 @@ end subroutine drive_CHANNEL
             allocate(tmpQLAKEO(NLAKES))
             allocate(tmpQLAKEI(NLAKES))
             allocate(tmpRESHT(NLAKES))
+            allocate(tmpLAKE_EVAP(NLAKES))
+            allocate(tmpLAKE_PRECIP(NLAKES))
             allocate(tmpFinalResType(nlakes))
 #ifdef MPP_LAND
         endif
@@ -2374,6 +2383,8 @@ do nt = 1, nsteps
       tmpQLAKEO = QLAKEO
       tmpQLAKEI = QLAKEI
       tmpRESHT = RESHT
+      tmpLAKE_EVAP = LAKE_EVAP
+      tmpLAKE_PRECIP = LAKE_PRECIP
       tmpFinalResType = rt_domain(did)%final_reservoir_type
       tmpAssimilatedValue = rt_domain(did)%reservoir_assimilated_value
       tmpAssimilatedSourceFile = rt_domain(did)%reservoir_assimilated_source_file
@@ -2425,10 +2436,12 @@ do nt = 1, nsteps
 
             ! Calls run for a single reservoir depending on its type as
             ! in whether it uses level pool, machine learning, or persistence.
-            ! Inflow, lateral inflow, water elevation, and the routing period
-            ! are passed in. Updated outflow and water elevation are returned.
+            ! Inflow, lateral inflow, water elevation, evaporation precipitation,
+            ! and the routing period are passed in. Updated outflow and water elevation are returned.
             call rt_domain(did)%reservoirs(lakeid)%ptr%run(Qup, Quc, 0.0, &
-                 RESHT(lakeid), tmpQLINK(k,2), DTRT_CH, rt_domain(did)%final_reservoir_type(lakeid), &
+                 RESHT(lakeid), tmpQLINK(k,2), &
+                 LAKE_EVAP(lakeid), LAKE_PRECIP(lakeid), &
+                 DTRT_CH, rt_domain(did)%final_reservoir_type(lakeid), &
                  rt_domain(did)%reservoir_assimilated_value(lakeid), rt_domain(did)%reservoir_assimilated_source_file(lakeid))
 
             ! TODO: Encapsulate the lake state variable for water elevation (RESHT(lakeid))
@@ -2474,6 +2487,8 @@ do nt = 1, nsteps
    call updateLake_seq(QLAKEO,nlakes,tmpQLAKEO)
    call updateLake_seq(QLAKEI,nlakes,tmpQLAKEI)
    call updateLake_seq(RESHT,nlakes,tmpRESHT)
+   call updateLake_seq(LAKE_EVAP,nlakes,tmpLAKE_EVAP)
+   call updateLake_seq(LAKE_PRECIP,nlakes,tmpLAKE_PRECIP)
    call updateLake_seqInt(rt_domain(did)%final_reservoir_type, nlakes, tmpFinalResType)
    call updateLake_seq(rt_domain(did)%reservoir_assimilated_value, nlakes, tmpAssimilatedValue)
    !call updateLake_seq_char(rt_domain(did)%reservoir_assimilated_source_file, nlakes, tmpAssimilatedSourceFile)
@@ -2507,6 +2522,8 @@ if(my_id .eq. io_id)      then
    if(allocated(tmpQLAKEO))  deallocate(tmpQLAKEO)
    if(allocated(tmpQLAKEI))  deallocate(tmpQLAKEI)
    if(allocated(tmpRESHT))  deallocate(tmpRESHT)
+   if(allocated(tmpLAKE_EVAP))  deallocate(tmpLAKE_EVAP)
+   if(allocated(tmpLAKE_PRECIP))  deallocate(tmpLAKE_PRECIP)
    if(allocated(tmpFinalResType)) deallocate(tmpFinalResType)
 endif
 #endif

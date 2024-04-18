@@ -23,6 +23,7 @@ if [[ ! -z $env_file ]]; then
     unset NCEP_WCOSS
     unset NWM_META
     unset WRF_HYDRO_NUDGING
+    unset EXTRALAKELAYERS
 
     echo "configure: Sourcing $env_file for the compile options."
     source $env_file
@@ -84,7 +85,7 @@ fi
 echo
 echo '*****************************************************************'
 echo "The environment variables used in the compile:"
-grepStr="(WRF_HYDRO)|(HYDRO_D)|(SPATIAL_SOIL)|(WRF_HYDRO_RAPID)|(HYDRO_REALTIME)|(NCEP_WCOSS)|(WRF_HYDRO_NUDGING)|(NETCDF)"
+grepStr="(WRF_HYDRO)|(HYDRO_D)|(SPATIAL_SOIL)|(WRF_HYDRO_RAPID)|(HYDRO_REALTIME)|(NCEP_WCOSS)|(WRF_HYDRO_NUDGING)|(NETCDF)|(EXTRALAKELAYERS)"
 printenv | egrep -w "${grepStr}" | sort
 
 exit 0

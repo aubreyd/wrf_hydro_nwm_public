@@ -1236,12 +1236,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,1,1,1,1,1,1,1,& !71-80
                              1,1,1,1,1,1,1,1,1,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             1,1,1,&               !99-101
-                             1,1,1,&               !102-104
-                             1,1,1,&               !105-107
-                             1,1,1,&               !108-110
-                             1,1,1,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,1,1,&           !99-103 (WRF-Lake)
+                             1,1,1,&               !104-106 (Crocus)
+                             1,1,1,&               !107-109 (Crocus)
+                             1,1,1,&               !110-112 (Crocus)
+                             1,1,1,&               !113-115 (Crocus)
+                             1,1,1,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
 
   else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
@@ -1255,12 +1256,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,1,1,0,1,0,0,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             1,1,1,1,1,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
@@ -1274,12 +1276,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
@@ -1293,12 +1296,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,0,1,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
@@ -1312,12 +1316,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,0,1,1,0,0,0,0,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             0,0,0,&               !108-110
-                             0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             0,0,0,&               !113-115 (Crocus)
+                             0,0,0,&               !116-118 (Crocus)
+                             0,0,0]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
@@ -1331,12 +1336,13 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              0,0,0,0,0,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             1,1,0,&               !113-115 (Crocus)
+                             1,0,0,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
 
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
@@ -1350,29 +1356,21 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,0,0,0,0,0,0,0,& !71-80
                              0,0,0,0,0,0,0,0,0,1,& !81-90
                              1,1,1,1,1,1,1,1,&     !91-98
-                             0,0,0,&               !99-101
-                             0,0,0,&               !102-104
-                             0,0,0,&               !105-107
-                             1,1,0,&               !108-110
-                             1,0,0,&               !111-113
-                             1,1,1]                !114
+                             0,0,0,0,0,&           !99-103 (WRF-Lake)
+                             0,0,0,&               !104-106 (Crocus)
+                             0,0,0,&               !107-109 (Crocus)
+                             0,0,0,&               !110-112 (Crocus)
+                             1,1,0,&               !113-115 (Crocus)
+                             1,0,0,&               !116-118 (Crocus)
+                             1,1,1]                !119-121 (Crocus)
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
 
    ! ! If crocus is off, these should not be outputted
    if (noah_lsm%crocus_opt == 0) then
-      fileMeta%outFlag(101) = 0
-      fileMeta%outFlag(102) = 0
-      fileMeta%outFlag(103) = 0
-      fileMeta%outFlag(104) = 0
-      fileMeta%outFlag(108) = 0
-      fileMeta%outFlag(109) = 0
-      fileMeta%outFlag(111) = 0
-      fileMeta%outFlag(114) = 0
-      fileMeta%outFlag(115) = 0
-      fileMeta%outFlag(116) = 0
-      fileMeta%numVars = numLdasVars_crocus_off ! 98
+      fileMeta%outFlag(104:121) = 0
+      fileMeta%numVars = numLdasVars_crocus_off ! 103
    end if
 
    ! call the GetModelConfigType function
@@ -1448,6 +1446,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          iret = nf90_def_dim(ftnNoahMP,'vis_nir',fileMeta%numSpectrumBands,dimId(7))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define vis_nir dimension')
          endif
+         iret = nf90_def_dim(ftnNoahMP,'lake_layers',fileMeta%numLakeLayers,dimId(8))
+         call nwmCheck(diagFlag,iret,'ERROR: Unable to define lake_layers dimension')
 
          ! Create and populate reference_time and time variables.
          iret = nf90_def_var(ftnNoahMP,"time",nf90_int,dimId(1),timeId)
@@ -1534,6 +1534,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numLakeLayers) then
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
@@ -1546,6 +1548,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                  else if(fileMeta%numLev(iTmp) .eq. fileMeta%numLakeLayers) then
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
@@ -2407,12 +2411,14 @@ subroutine output_lakes_NWM(domainId,iGrid)
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_lakeLat,g_lakeLon,g_lakeElev
    real, allocatable, dimension(:) :: g_lakeInflow,g_lakeOutflow
+   real, allocatable, dimension(:) :: g_lakePrcp,g_lakeEvap
    real, allocatable, dimension(:) :: g_lakeType
    real, allocatable, dimension(:) :: g_lake_assimilated_value
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_file
    integer(kind=int64), allocatable, dimension(:) :: g_lakeid
    real, allocatable, dimension(:) :: g_lakeLatOut,g_lakeLonOut,g_lakeElevOut
    real, allocatable, dimension(:) :: g_lakeInflowOut,g_lakeOutflowOut
+   real, allocatable, dimension(:) :: g_lakePrcpOut,g_lakeEvapOut
    integer(kind=int64), allocatable, dimension(:) :: g_lakeTypeOut, g_lakeidOut
    real, allocatable, dimension(:) :: g_lake_assimilated_valueOut
    character(len=256), allocatable, dimension(:) :: g_lake_assimilated_source_fileOut
@@ -2466,25 +2472,25 @@ subroutine output_lakes_NWM(domainId,iGrid)
 
    if(nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,1]
+      fileMeta%outFlag(:) = [1,1,1,1]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -2503,6 +2509,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeElev(gsize))
       allocate(g_lakeInflow(gsize))
       allocate(g_lakeOutflow(gsize))
+      allocate(g_lakePrcp(gsize))
+      allocate(g_lakeEvap(gsize))
       allocate(g_lakeType(gsize))
       allocate(g_lake_assimilated_value(gsize))
       allocate(g_lake_assimilated_source_file(gsize))
@@ -2514,6 +2522,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
          allocate(g_lakeElevOut(gsize))
          allocate(g_lakeInflowOut(gsize))
          allocate(g_lakeOutflowOut(gsize))
+         allocate(g_lakePrcpOut(gsize))
+         allocate(g_lakeEvapOut(gsize))
          allocate(g_lakeTypeOut(gsize))
          allocate(g_lake_assimilated_valueOut(gsize))
          allocate(g_lake_assimilated_source_fileOut(gsize))
@@ -2526,6 +2536,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeElev = RT_DOMAIN(domainID)%RESHT
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
+      g_lakePrcp = RT_DOMAIN(domainID)%LAKE_PRECIP
+      g_lakeEvap = RT_DOMAIN(domainID)%LAKE_EVAP*3600.0    ! converted from kg/m2/s to mm before writing to output file
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
       g_lakeType = RT_DOMAIN(domainID)%final_reservoir_type
       g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
@@ -2539,6 +2551,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       call write_lake_real(g_lakeElev,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeInflow,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeOutflow,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lakePrcp,RT_DOMAIN(domainId)%lake_index,gsize)
+      call write_lake_real(g_lakeEvap,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lakeType,RT_DOMAIN(domainId)%lake_index,gsize)
       call write_lake_real(g_lake_assimilated_value,RT_DOMAIN(domainId)%lake_index,gsize)
       !call write_lake_char(g_lake_assimilated_source_file,RT_DOMAIN(domainId)%lake_index,gsize)
@@ -2552,12 +2566,16 @@ subroutine output_lakes_NWM(domainId,iGrid)
       allocate(g_lakeElev(gsize))
       allocate(g_lakeInflow(gsize))
       allocate(g_lakeOutflow(gsize))
+      allocate(g_lakePrcp(gsize))
+      allocate(g_lakeEvap(gsize))
       allocate(g_lakeid(gsize))
       allocate(g_lakeLonOut(gsize))
       allocate(g_lakeLatOut(gsize))
       allocate(g_lakeElevOut(gsize))
       allocate(g_lakeInflowOut(gsize))
       allocate(g_lakeOutflowOut(gsize))
+      allocate(g_lakePrcpOut(gsize))
+      allocate(g_lakeEvapOut(gsize))
       allocate(g_lakeidOut(gsize))
       allocate(g_lakeTypeOut(gsize))
       allocate(g_lake_assimilated_valueOut(gsize))
@@ -2568,6 +2586,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       g_lakeElev = RT_DOMAIN(domainID)%RESHT
       g_lakeInflow = RT_DOMAIN(domainID)%QLAKEI
       g_lakeOutflow = RT_DOMAIN(domainID)%QLAKEO
+      g_lakePrcp = RT_DOMAIN(domainID)%LAKE_PRECIP
+      g_lakeEvap = RT_DOMAIN(domainID)%LAKE_EVAP*3600.0    ! converted from kg/m2/s to mm before writing to output file
       g_lakeid = RT_DOMAIN(domainId)%LAKEIDM
       g_lakeType = RT_DOMAIN(domainId)%final_reservoir_type
       g_lake_assimilated_value = RT_DOMAIN(domainID)%reservoir_assimilated_value
@@ -2651,6 +2671,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
             indTmp = indTmp + 1 ! Python starts index values at 0, so we need to add one.
             g_lakeInflowOut(iTmp) = g_lakeInflow(indTmp)
             g_lakeOutflowOut(iTmp) = g_lakeOutflow(indTmp)
+            g_lakePrcpOut(iTmp) = g_lakePrcp(indTmp)
+            g_lakeEvapOut(iTmp) = g_lakeEvap(indTmp)
             g_lakeLonOut(iTmp) = g_lakeLon(indTmp)
             g_lakeLatOut(iTmp) = g_lakeLat(indTmp)
             g_lakeElevOut(iTmp) = g_lakeElev(indTmp)
@@ -2662,6 +2684,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       else
          g_lakeInflowOut = g_lakeInflow
          g_lakeOutflowOut = g_lakeOutflow
+         g_lakePrcpOut = g_lakePrcp
+         g_lakeEvapOut = g_lakeEvap
          g_lakeLonOut = g_lakeLon
          g_lakeLatOut = g_lakeLat
          g_lakeElevOut = g_lakeElev
@@ -2672,6 +2696,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       endif
       varOutReal(1,:) = g_lakeInflowOut(:)
       varOutReal(2,:) = g_lakeOutflowOut(:)
+      varOutReal(3,:) = g_lakePrcpOut(:)
+      varOutReal(4,:) = g_lakeEvapOut(:)
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -3018,6 +3044,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
    deallocate(g_lakeElev)
    deallocate(g_lakeInflow)
    deallocate(g_lakeOutflow)
+   deallocate(g_lakePrcp)
+   deallocate(g_lakeEvap)
    deallocate(g_lakeid)
    deallocate(g_lakeType)
    deallocate(g_lake_assimilated_value)
@@ -3029,6 +3057,8 @@ subroutine output_lakes_NWM(domainId,iGrid)
       deallocate(g_lakeElevOut)
       deallocate(g_lakeInflowOut)
       deallocate(g_lakeOutflowOut)
+      deallocate(g_lakePrcpOut)
+      deallocate(g_lakeEvapOut)
       deallocate(g_lakeidOut)
       deallocate(g_lakeTypeOut)
       deallocate(g_lake_assimilated_valueOut)

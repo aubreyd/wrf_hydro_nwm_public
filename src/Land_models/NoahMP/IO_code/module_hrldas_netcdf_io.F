@@ -67,6 +67,7 @@ module module_hrldas_netcdf_io
   integer, private :: dimid_snow_layers_remember
   integer, private :: dimid_glacier_layers_remember
   integer, private :: crocus_opt = 0
+  integer, private :: dimid_lake_layers_remember
 
   interface define_rst_var
      module procedure define_3d_real,define_2d_real,define_2d_int
@@ -516,6 +517,8 @@ contains
       write(*,*) "Problems finding global attribute: ISLAKE; setting to -1"
       islake = -1
     end if
+    !call error_handler(ierr, failure="In read_hrldas_hdrinfo()- "// &
+    !                   "Problems finding global attribute 'ISLAKE'")
 
     ierr = nf90_get_att(ncid, NF90_GLOBAL, "ISURBAN", isurban)
     call error_handler(ierr, failure="In read_hrldas_hdrinfo()- "// &
@@ -589,7 +592,7 @@ contains
        ystart, yend,                                                   &
        iswater, islake, vegtyp, soltyp, terrain, tbot_2d, latitude,    &
        longitude, xland, seaice, msftx, msfty, &
-       local_crocus_opt, glacinfo, glact, vis_icealb)
+       local_crocus_opt, glacinfo, glact, vis_icealb, local_lake_opt)
     implicit none
     character(len=*),          intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -597,6 +600,7 @@ contains
     integer,                   intent(in)  :: islake
     integer, dimension(xstart:xend,ystart:yend), intent(out) :: vegtyp, soltyp
     integer,                                     intent(in)  :: local_crocus_opt
+    integer,                                     intent(in)  :: local_lake_opt
     integer, dimension(xstart:xend,ystart:yend), intent(out), optional :: glacinfo
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: terrain
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: tbot_2d
@@ -730,8 +734,13 @@ contains
     ! Make sure vegtyp and soltyp are consistent when it comes to water points,
     ! by setting soil category to water when vegetation category is water, and
     ! vice-versa.
-    where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
-    where (soltyp == 14) vegtyp = ISWATER
+    if (local_lake_opt == 1) then
+      where (vegtyp == ISWATER) soltyp = 14
+      where (soltyp == 14 .and. vegtyp /= ISWATER) soltyp = 8
+    else 
+      where (vegtyp == ISWATER .or. vegtyp == ISLAKE) soltyp = 14
+      where (soltyp == 14) vegtyp = ISWATER
+    endif
 
   end subroutine readland_hrldas
 
@@ -911,6 +920,76 @@ contains
     if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_imperv() -  NF90_CLOSE"
 
   end subroutine read_imperv
+
+!---------------------------------------------------------------------------------------------------------
+  subroutine read_lake_depth(wrfinput_flnm,xstart,xend,ystart,yend,lake_depth)
+    implicit none
+    character(len=*),          intent(in)  :: wrfinput_flnm
+    integer,                   intent(in)  :: xstart, xend, ystart, yend
+    real,    dimension(xstart:xend,  ystart:yend), intent(out) :: lake_depth
+    
+    character(len=24)  :: name
+    integer :: ierr,iret
+    integer :: ncid, varid
+
+    ! Open the NetCDF file.
+    write(*,'("wrfinput_flnm: ''", A, "''")') trim(wrfinput_flnm)
+    ierr = nf90_open(wrfinput_flnm, NF90_NOWRITE, ncid)
+    if (ierr /= 0) then
+       write(*,'("read_lake_depth:  Problem opening wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
+       stop
+    endif
+
+! Get lake depth (LAKE_DEPTH)
+    name = "LAKE_DEPTH"
+    iret = nf90_inq_varid(ncid,  name,  varid)
+    if (iret == 0) then
+      ierr = nf90_get_var(ncid, varid, lake_depth, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+    else
+      stop "Problem retrieving LAKE_DEPTH with use_lake_depth = 1"
+    endif
+
+! Close the NetCDF file
+    ierr = nf90_close(ncid)
+    if (ierr /= 0) stop "MODULE_NOAHLSM_HRLDAS_INPUT: read_lake_depth :  NF90_CLOSE"
+
+
+  end subroutine read_lake_depth
+
+!---------------------------------------------------------------------------------------------------------
+  subroutine read_lake_id(wrfinput_flnm,xstart,xend,ystart,yend,lake_id)
+    implicit none
+    character(len=*),          intent(in)  :: wrfinput_flnm
+    integer,                   intent(in)  :: xstart, xend, ystart, yend
+    integer,    dimension(xstart:xend,  ystart:yend), intent(out) :: lake_id
+    
+    character(len=24)  :: name
+    integer :: ierr,iret
+    integer :: ncid, varid
+
+    ! Open the NetCDF file.
+    write(*,'("wrfinput_flnm: ''", A, "''")') trim(wrfinput_flnm)
+    ierr = nf90_open(wrfinput_flnm, NF90_NOWRITE, ncid)
+    if (ierr /= 0) then
+       write(*,'("read_lake_id:  Problem opening wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
+       stop
+    endif
+
+! Get lake ID (LAKE_ID)
+    name = "LAKE_ID"
+    iret = nf90_inq_varid(ncid,  name,  varid)
+    if (iret == 0) then
+      ierr = nf90_get_var(ncid, varid, lake_id, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
+    else
+      stop "Problem retrieving LAKE_ID"
+    endif
+
+! Close the NetCDF file
+    ierr = nf90_close(ncid)
+    if (ierr /= 0) stop "MODULE_NOAHLSM_HRLDAS_INPUT: read_lake_id :  NF90_CLOSE"
+
+
+  end subroutine read_lake_id
 
 !---------------------------------------------------------------------------------------------------------
 
@@ -2469,6 +2548,7 @@ contains
     integer :: dimid_ix, dimid_jx, dimid_times, dimid_datelen, varid, n
     integer :: dimid_dum, dimid_layers, dimid_snow_layers
     integer :: dimid_glacier_layers
+    integer :: dimid_lake_layers
     integer :: iret
     character(len=256) :: output_flnm
     character(len=19)  :: date19
@@ -2509,8 +2589,14 @@ contains
        !iret = nf90_def_dim(ncid, "south_north_stag", jxfull+1, dimid_dum)
        iret = nf90_def_dim(ncid, "soil_layers_stag", nsoil, dimid_layers)
        iret = nf90_def_dim(ncid, "snow_layers", nsnow, dimid_snow_layers)
+#ifndef EXTRALAKELAYERS
+       iret = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
+#else
+       iret = nf90_def_dim(ncid, "lake_layers", 25, dimid_lake_layers)
+#endif
        if (crocus_opt /= 0) &
             iret = nf90_def_dim(ncid, "glacier_levels", act_level, dimid_glacier_layers)
+       iret = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
        iret = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "OUTPUT FROM HRLDAS "//version)
        iret = nf90_put_att(ncid, NF90_GLOBAL, "missing_value", -1.E33)
 
@@ -2568,6 +2654,7 @@ contains
     dimid_snow_layers_remember = dimid_snow_layers
     if (crocus_opt /= 0) &
          dimid_glacier_layers_remember = dimid_glacier_layers
+    dimid_lake_layers_remember = dimid_lake_layers
     iswater_remember = iswater
 
     allocate(vegtyp_remember(ixpar,jxpar))
@@ -2806,6 +2893,8 @@ contains
           		zdimid = dimid_snow_layers_remember
                 elseif (snow_or_soil == "MAXS") then
                         zdimid = dimid_glacier_layers_remember
+                elseif (snow_or_soil == "LAKE") then
+                        zdimid = dimid_lake_layers_remember
        		else
           		write(*,'("SNOW_OR_SOIL unrecognized: ", A)') adjustl(trim(snow_or_soil))
           stop "FATAL ERROR: In module_hrldas_netcdf_io.F add_to_output_3d() - SNOW_OR_SOIL"
@@ -3112,8 +3201,12 @@ contains
     integer :: varid
     integer :: dimid_times, dimid_datelen, dimid_ix, dimid_jx, dimid_dum, dimid_layers, dimid_snow_layers, dimid_sosn_layers
     integer :: dimid_glacier_layers
+    integer :: dimid_lake_layers
+    integer :: dimid_lakesoilsnow_layers, dimid_lakesoilsnow_layers2, dimid_lakesoil_layers
     character(len=19) :: date19
     integer :: rank
+    integer, parameter :: nlevsnow = 5
+    integer, parameter :: nlevsoil = 10
 
 #ifdef _PARALLEL_
 
@@ -3160,8 +3253,18 @@ contains
     ierr = nf90_def_dim(ncid, "soil_layers_stag", nsoil, dimid_layers)
     ierr = nf90_def_dim(ncid, "snow_layers", nsnow, dimid_snow_layers)
     ierr = nf90_def_dim(ncid, "sosn_layers", nsnow+nsoil, dimid_sosn_layers)
+
     if (crocus_opt /= 0) &
          ierr = nf90_def_dim(ncid, "glacier_levels", act_level, dimid_glacier_layers)
+
+#ifndef EXTRALAKELAYERS 
+    ierr = nf90_def_dim(ncid, "lake_layers", 10, dimid_lake_layers)
+#else
+    ierr = nf90_def_dim(ncid, "lake_layers", 25, dimid_lake_layers)
+#endif
+    ierr = nf90_def_dim(ncid, "lakesoilsnow_layers", nlevsnow+nlevsoil, dimid_lakesoilsnow_layers)
+    ierr = nf90_def_dim(ncid, "lakesoilsnow_layers2", nlevsnow+nlevsoil+1, dimid_lakesoilsnow_layers2)
+    ierr = nf90_def_dim(ncid, "lakesoil_layers", nlevsoil, dimid_lakesoil_layers)
 
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "TITLE", "RESTART FILE FROM HRLDAS "//version)
     ierr = nf90_put_att(ncid, NF90_GLOBAL, "compiler_version", compiler_version())
@@ -3978,6 +4081,22 @@ contains
        ierr = nf90_inq_dimid(ncid, "sosn_layers", dimid_kx)
        call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
                                 "Problem nf90_inq_dimid for 'sosn_layers'")
+    else if (output_layers == "LKSS") then
+       ierr = nf90_inq_dimid(ncid, "lakesoilsnow_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoilsnow_layers'")
+    else if (output_layers == "LKEX") then
+       ierr = nf90_inq_dimid(ncid, "lakesoilsnow_layers2", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoilsnow_layers2'")
+    else if (output_layers == "LKSO") then
+       ierr = nf90_inq_dimid(ncid, "lakesoil_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lakesoil_layers'")
+    else if (output_layers == "LAKE") then
+       ierr = nf90_inq_dimid(ncid, "lake_layers", dimid_kx)
+       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &
+                                "Problem nf90_inq_dimid for 'lake_layers'")
     else if (output_layers == "MAXS" .and. crocus_opt /= 0) then
        ierr = nf90_inq_dimid(ncid, "glacier_levels", dimid_kx)
        call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_3d() - "// &

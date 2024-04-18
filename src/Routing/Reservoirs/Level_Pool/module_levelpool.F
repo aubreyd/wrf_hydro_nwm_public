@@ -146,13 +146,14 @@ contains
     ! which will then call the LEVELPOOL method/subroutine for processing the
     ! inputs and returning the output.
     subroutine run_levelpool_reservoir(this, previous_timestep_inflow, inflow, &
-        lateral_inflow, water_elevation, outflow, routing_period, dynamic_reservoir_type, &
-        assimilated_value, assimilated_source_file)
+        lateral_inflow, water_elevation, outflow, lake_evap, lake_precip, &
+        routing_period, dynamic_reservoir_type, assimilated_value, assimilated_source_file)
         implicit none
         class(levelpool), intent(inout) :: this
         real, intent(in)    :: previous_timestep_inflow ! cubic meters per second (cms)
         real, intent(in)    :: inflow                   ! cubic meters per second (cms)
         real, intent(in)    :: lateral_inflow           ! cubic meters per second (cms)
+        real, intent(in)    :: lake_evap, lake_precip   ! kg/m2/s and mm
         real, intent(inout) :: water_elevation          ! meters
         real, intent(out)   :: outflow                  ! cubic meters per second (cms)
         real, intent(in)    :: routing_period           ! seconds
@@ -164,6 +165,8 @@ contains
         ! Update input variables
         this%input%inflow = inflow
         this%input%lateral_inflow = lateral_inflow
+        this%input%lake_evap = lake_evap
+        this%input%lake_precip = lake_precip
 
         ! Update state variables
         this%state%water_elevation = water_elevation
@@ -176,6 +179,8 @@ contains
                                routing_period,                               &
                                this%state%water_elevation,                   &
                                this%properties%lake_area,                    &
+                               this%input%lake_precip,                  	 &
+                               this%input%lake_evap,                    	 &
                                this%properties%weir_elevation,               &
                                this%properties%max_depth,                    &
                                this%properties%weir_coeffecient,             &
@@ -217,7 +222,7 @@ contains
     !   SUBROUTINE LEVELPOOL
     ! ------------------------------------------------
 
-    subroutine LEVELPOOL_PHYSICS(ln,qi0,qi1,qo1,ql,dt,H,ar,we,maxh,wc,wl,dl,oe,oc,oa)
+    subroutine LEVELPOOL_PHYSICS(ln,qi0,qi1,qo1,ql,dt,H,ar,lakep,lakeet,we,maxh,wc,wl,dl,oe,oc,oa)
 
         !! ----------------------------  argument variables
         !! All elevations should be relative to a common base (often belev(k))
@@ -229,6 +234,8 @@ contains
         real, intent(OUT)   :: qo1     ! outflow at current timestep
         real, intent(IN)    :: ql      ! lateral inflow
         real, intent(IN)    :: ar      ! area of reservoir (km^2)
+        real, intent(IN)    :: lakep   ! precip on lake surface (mm)
+        real, intent(IN)    :: lakeet  ! evap from lake surface (kg/m2/s)
         real, intent(IN)    :: we      ! bottom of weir elevation
         real, intent(IN)    :: wc      ! weir coeff.
         real, intent(IN)    :: wl      ! weir length (m)
@@ -267,7 +274,12 @@ contains
         if (LAKE_OPT == 1) then     ! If-block for simple pass through scheme....
 
            qo1 = qi1                 ! Set outflow equal to inflow at current time
-           H = Htmp                  ! Set new lake water elevation to incoming lake el.
+           !H = Htmp                  ! Set new lake water elevation to incoming lake el.
+		   ! Set new lake water elevation to incoming lake el.
+		   ! and update based on net (P-ET) at surface
+		   ! lakep (precip) units converted from mm to m
+		   ! lakeet (evap) units converted from kg/m2/s to m
+		   H = Htmp + (lakep - lakeet*3600.)*dt/3600./1000.
 
         else if (LAKE_OPT == 2) then   ! If-block for Chow et al level pool scheme
 
@@ -364,7 +376,13 @@ contains
 
            !-- determine dh and H
            dh = (dh1/4.) + (0.75*dh3)
-           H = H + dh
+           !H = H + dh
+		   ! update H based on net (P-ET) at surface
+		   ! lakep (precip) units converted from mm to m
+		   ! lakeet (evap) units converted from kg/m2/s to m
+		   H = H + dh + (lakep - lakeet*3600.)*dt/3600./1000.
+		   !write(*,*) 'Test LAKE_P, LAKE_ET'
+		   !write(*,*) lakep, lakeet
 
            !-- compute final discharge
            dh = H - we

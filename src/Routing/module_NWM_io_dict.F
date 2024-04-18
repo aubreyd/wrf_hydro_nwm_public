@@ -19,12 +19,12 @@ implicit none
 
 ! Declare parameter values for module.
 integer, parameter :: numChVars = 12
-integer, parameter :: numLdasVars = 116
+integer, parameter :: numLdasVars = 121
 ! Note: if more ldas variables are added the logic will need to be changed in
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
-integer, parameter :: numLdasVars_crocus_off = 98
+integer, parameter :: numLdasVars_crocus_off = 103
 integer, parameter :: numRtDomainVars = 5
-integer, parameter :: numLakeVars = 2
+integer, parameter :: numLakeVars = 4
 integer, parameter :: numChGrdVars = 6
 integer, parameter :: numLsmVars = 14
 integer, parameter :: numChObsVars = 1
@@ -127,6 +127,11 @@ type ldasMeta
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
    integer :: numSpectrumBands = 2
+#ifndef EXTRALAKELAYERS
+   integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -428,6 +433,11 @@ type lsmMeta
    integer :: numSnowLayers = 3
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
+#ifndef EXTRALAKELAYERS
+   integer :: numLakeLayers = 10
+#else
+   integer :: numLakeLayers = 25
+#endif
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -1075,14 +1085,16 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                "GPP","NPP","PSN","APAR","ACCET", &                       !86-90
                                "CANWAT","SOILICE","SOILSAT_TOP","SOILSAT","SNOWT_AVG", & !91-95
                                "ALBSND","ALBSNI","QRAIN",&                               !96-98
-                               "glacier", "glacier_thickness" ,"PSNOWALB",&              !99-101
-                               "PSNOWTHRUFAL" ,"PSNOWHEIGHT","PSNOWTOTSWE" ,&            !102-104
-                               "PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE",&                    !105-107
-                               "PSNOWTEMP","PSNOWDZ","PSNOWHIST",&                       !108-110
-                               "PSNOWLIQ","PSNOWHEAT","PSNOWRHO",&                       !111-113
-                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW"]                      !114-116
+                               "LAKE_PRECIP2D","LAKE_EVAP2D","LAKE_DEPTH2D",&            !99-101 (WRF-Lake)
+                               "LAKE_T3D","LAKE_ICE3D",&                                 !102-103 (WRF-Lake)
+                               "glacier", "glacier_thickness" ,"PSNOWALB",&              !104-106 (Crocus)
+                               "PSNOWTHRUFAL" ,"PSNOWHEIGHT","PSNOWTOTSWE" ,&            !107-109 (Crocus)
+                               "PSNOWGRAN1","PSNOWGRAN2","PSNOWAGE",&                    !110-112 (Crocus)
+                               "PSNOWTEMP","PSNOWDZ","PSNOWHIST",&                       !113-115 (Crocus)
+                               "PSNOWLIQ","PSNOWHEAT","PSNOWRHO",&                       !116-118 (Crocus)
+                               "PSNOWSWE", "FLOW_ICE", "FLOW_SNOW"]                      !119-121 (Crocus)
 
-  ldasOutDict%longName(:) = [character(len=128) :: &
+   ldasOutDict%longName(:) = [character(len=128) :: &
                               "Dominant vegetation category",&          !1
                               "Dominant soil category",&                !2
                               "Green Vegetation Fraction",&             !3
@@ -1181,24 +1193,29 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                               "snowpack albedo, direct",&               !96
                               "snowpack albedo, diffuse",&              !97
                               "Rainfall rate on the ground",&           !98
-                              "Glacier grid point",&                    !99
-                              "Glacier height",&                        !100
-                              "Snow albedo",&                           !101
-                              "Runoff from glacier",&                   !102
-                              "Total snow height",&                     !103
-                              "Total snow swe", &                       !104
-                               "Snow gran 1, optiacal diameter",&       !105
-                               "Snow gran 2, sphericity",&              !106
-                               "Snow age",&                             !107
-                               "Snow temperature",&                     !108
-                               "Snow thickness",&                       !109
-                               "Snow history",&                         !110
-                               "Liquid in snow",&                       !111
-                               "Snow heat",&                            !112
-                               "Snow density",&                         !113
-                               "Snow water equivalent", &               !114
-                               "Accumulated glacier melt from ice", &   !115
-                               "Accumulated glacier melt from snow"]    !116
+                              "Rainfall rate on the lakes surface",&    !99 (WRF-Lake)
+                              "Evaporation rate from the lakes surface",&  !100 (WRF-Lake)
+                              "Lake Depth",&                               !101 (WRF-Lake)
+                              "Lake water temperature",&                   !102 (WRF-Lake)
+                              "Lake ice conditions",&                      !103 (WRF-Lake)
+                              "Glacier grid point",&                    !104 (Crocus)
+                              "Glacier height",&                        !105 (Crocus)
+                              "Snow albedo",&                           !106 (Crocus)
+                              "Runoff from glacier",&                   !107 (Crocus)
+                              "Total snow height",&                     !108 (Crocus)
+                              "Total snow swe", &                       !109 (Crocus)
+                               "Snow gran 1, optiacal diameter",&       !110 (Crocus)
+                               "Snow gran 2, sphericity",&              !111 (Crocus)
+                               "Snow age",&                             !112 (Crocus)
+                               "Snow temperature",&                     !113 (Crocus)
+                               "Snow thickness",&                       !114 (Crocus)
+                               "Snow history",&                         !115 (Crocus)
+                               "Liquid in snow",&                       !116 (Crocus)
+                               "Snow heat",&                            !117 (Crocus)
+                               "Snow density",&                         !118 (Crocus)
+                               "Snow water equivalent", &               !119 (Crocus)
+                               "Accumulated glacier melt from ice", &   !120 (Crocus)
+                               "Accumulated glacier melt from snow"]    !121 (Crocus)
 
    ldasOutDict%units(:) = [character(len=64) :: &
                             "category","category","-","-","-", &               !1-5
@@ -1220,13 +1237,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             "g m-2","g m-2","g m-2","g m-2","g m-2s-1 CO2", &  !81-85
                             "g m-2s-1 C","g m-2s-1 C","umol CO2 m-2 s-1","W m-2","mm", & !86-90
                             "mm","1","1","1","K", &                            !91-95
-                            "-","-","mm s-1",&                                 !96-98
-                            "-","m","-", &                                     !99-101
-                            "kg/(m2 s)","m","kg m-2",&                         !102-104
-                            "m","-","days since snowfall",&                    !105-107
-                            "K","m","-",&                                      !108-110
-                            "kg/m3","J/m2","m",&                               !111-113
-                            "kg m-2","kg/m2","kg/m2"]                          !114-116
+                            "-","-","mm s-1", &                                !96-98
+                            "mm","mm","m","K","-", &                           !99-103 (WRF-Lake)
+                            "-","m","-", &                                     !104-106 (Crocus)
+                            "kg/(m2 s)","m","kg m-2",&                         !107-109 (Crocus)
+                            "m","-","days since snowfall",&                    !110-112 (Crocus)
+                            "K","m","-",&                                      !113-115 (Crocus)
+                            "kg/m3","J/m2","m",&                               !116-118 (Crocus)
+                            "kg m-2","kg/m2","kg/m2"]                          !119-121 (Crocus)
 
    ldasOutDict%scaleFactor(:) = [1.0, 1.0, 0.01, 0.1, 0.1, &                   !1-5
                                  0.1, 0.01, 0.1, 0.00001, 0.01, &              !6-10
@@ -1248,12 +1266,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  0.01, 0.01, 0.01, 0.01, 0.01, &               !86-90
                                  0.01, 0.01, 0.001, 0.001, 0.1, &              !91-95
                                  0.01, 0.01, 0.00001, &                        !96-98
-                                 1.0, 0.1, 0.01, &                             !99-101
-                                 0.0001, 0.0001, 0.1, &                        !102-104
-                                 0.01, 0.01, 0.01, &                           !105-107
-                                 0.1, 0.0001, 0.01, &                          !108-110
-                                 0.001, 1000.0, 0.1, &                         !111-113
-                                 0.1, 0.001, 0.001 ]                           !114-116
+                                 0.00001, 0.00001, &                           !99-100 (WRF-Lake)
+                                 0.00001, 0.00001, 0.00001, &                  !101-103 (WRF-Lake)
+                                 1.0, 0.1, 0.01, &                             !104-106 (Crocus)
+                                 0.0001, 0.0001, 0.1, &                        !107-109 (Crocus)
+                                 0.01, 0.01, 0.01, &                           !110-112 (Crocus)
+                                 0.1, 0.0001, 0.01, &                          !113-115 (Crocus)
+                                 0.001, 1000.0, 0.1, &                         !116-118 (Crocus)
+                                 0.1, 0.001, 0.001 ]                           !119-121 (Crocus)
 
    ldasOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !1-10
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !11-20
@@ -1265,12 +1285,13 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !71-80
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, & !81-90
                                0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &         !91-98
-                               0.0,0.0,0.0, &                             !99-101
-                               0.0,0.0,0.0, &                             !102-104
-                               0.0,0.0,0.0, &                             !105-107
-                               0.0,0.0,0.0, &                             !108-110
-                               0.0,0.0,0.0, &                             !111-113
-                               0.0,0.0,0.0]                               !114-116
+                               0.0,0.0,0.0,0.0,0.0, &                     !99-103 (WRF-Lake)
+                               0.0,0.0,0.0, &                             !104-106 (Crocus)
+                               0.0,0.0,0.0, &                             !107-109 (Crocus)
+                               0.0,0.0,0.0, &                             !110-112 (Crocus)
+                               0.0,0.0,0.0, &                             !113-115 (Crocus)
+                               0.0,0.0,0.0, &                             !116-118 (Crocus)
+                               0.0,0.0,0.0]                               !119-121 (Crocus)
 
    ! Note that output flags will be set in the the output routine, and will vary
    ! by the IOC flag specified in hydro.namelist.
@@ -1284,12 +1305,13 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                              0,0,0,0,0,0,0,0,0,0, & !71-80
                              0,0,0,0,0,0,0,0,0,0, & !81-90
                              0,0,0,0,0,0,0,0, &     !91-98
-                             0,0,0, &               !99-101
-                             0,0,0, &               !102-104
-                             0,0,0, &               !105-107
-                             0,0,0, &               !108-110
-                             0,0,0, &               !111-103
-                             0,0,0]                 !114-116
+                             0,0,0,0,0, &           !99-103 (WRF-Lake)
+                             0,0,0, &               !104-106 (Crocus)
+                             0,0,0, &               !107-109 (Crocus)
+                             0,0,0, &               !110-112 (Crocus)
+                             0,0,0, &               !113-115 (Crocus)
+                             0,0,0, &               !116-118 (Crocus)
+                             0,0,0]                 !119-121 (Crocus)
 
    ldasOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1, & !1-10
                                   1,1,1,1,1,1,1,1,1,1, & !11-20
@@ -1301,12 +1323,13 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                   1,1,1,1,1,1,1,1,1,1, & !71-80
                                   1,1,1,1,1,1,1,1,1,1, & !81-90
                                   1,1,1,1,1,1,1,1, &     !91-98
-                                  1,1,1, &               !99-101
-                                  1,1,1, &               !102-104
-                                  1,1,1, &               !105-107
-                                  1,1,1, &               !108-110
-                                  1,1,1, &               !111-113
-                                  1,1,1]                 !114-116
+                                  1,1,1,1,1, &           !99-103 (WRF-Lake)
+                                  1,1,1, &               !104-106 (Crocus)
+                                  1,1,1, &               !107-109 (Crocus)
+                                  1,1,1, &               !110-112 (Crocus)
+                                  1,1,1, &               !113-115 (Crocus)
+                                  1,1,1, &               !116-118 (Crocus)
+                                  1,1,1]                 !119-121 (Crocus)
 
    ldasOutDict%numLev(:) = [1,1,1,1,1,1,1,1,1,1, &  !1-10
                             1,1,1,1,1,1,1,1,1,1, &  !11-20
@@ -1318,13 +1341,21 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             1,1,1,1,1,1,1,1,1,1, &  !71-80
                             1,1,1,1,1,1,1,1,1,1, &  !81-90
                             1,1,1,1,1,2,2,1, &      !91-98
-                            1,1,1, &                !99-101
-                            1,1,1, &                !102-104
-                            40,40,40, &             !105-107
-                            40,40,40, &             !108-110
-                            40,40,40, &             !111-113
-                            40,1,1]                 !114-116
-   ldasOutDict%numLev(105:114) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
+                            1,1,1,10,10, &          !99-103 (WRF-Lake) can we use num lake levels?
+                            1,1,1, &                !104-106 (Crocus)
+                            1,1,1, &                !107-109 (Crocus)
+                            40,40,40, &             !110-112 (Crocus)
+                            40,40,40, &             !113-115 (Crocus)
+                            40,40,40, &             !116-118 (Crocus)
+                            40,1,1]                 !119-121 (Crocus)
+! Set WRF-Lake layers
+#ifndef EXTRALAKELAYERS
+   ldasOutDict%numLev(102:103) = 10
+#else
+   ldasOutDict%numLev(102:103) = 25
+#endif
+! Set Crocus layers
+   ldasOutDict%numLev(110:119) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10
@@ -1346,12 +1377,13 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !86-90
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !91-95
                                  -9999.0,-9999.0,-999.0,                  & !96-98
-                                 -9999.0,-9999.0,-9999.0,                 & !99-101
-                                 -9999.0,-9999.0,-9999.0,                 & !102-104
-                                 -9999.0,-9999.0,-9999.0,                 & !105-107
-                                 -9999.0,-9999.0,-9999.0,                 & !108-110
-                                 -9999.0, 9999000.0,-9999.0,                 & !111-113
-                                 -9999.0,-9999.0,-9999.0 ]                  !114-116
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !99-103 (WRF-Lake)
+                                 -9999.0,-9999.0,-9999.0,                 & !104-106 (Crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !107-109 (Crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !110-112 (Crocus)
+                                 -9999.0,-9999.0,-9999.0,                 & !113-115 (Crocus)
+                                 -9999.0, 9999000.0,-9999.0,              & !116-118 (Crocus)
+                                 -9999.0,-9999.0,-9999.0 ]                  !119-121 (Crocus)
 
    ldasOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10
@@ -1373,12 +1405,13 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !86-90
                               -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !91-95
                               -9999.0,-9999.0,-999.0,                  & !96-98
-                              -9999.0,-9999.0,-9999.0,                 & !99-101
-                              -9999.0,-9999.0,-9999.0,                 & !102-104
-                              -9999.0,-9999.0,-9999.0,                 & !105-107
-                              -9999.0,-9999.0,-9999.0,                 & !108-110
-                              -9999.0, 9999000.0,-9999.0,                 & !111-113
-                              -9999.0,-9999.0,-9999.0 ]                  !114-116
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !99-103 (WRF-Lake)
+                              -9999.0,-9999.0,-9999.0,                 & !104-106 (Crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !107-109 (Crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !110-112 (Crocus)
+                              -9999.0,-9999.0,-9999.0,                 & !113-115 (Crocus)
+                              -9999.0, 9999000.0,-9999.0,              & !116-118 (Crocus)
+                              -9999.0,-9999.0,-9999.0 ]                  !119-121 (Crocus)
 
    ldasOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                     !1-5
                                  -1000.0d0, -1.0d0, -1500.0d0, 0.0d0, 0.0d0, &            !6-10
@@ -1400,13 +1433,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  0.0d0, 0.0d0, 0.0d0, 0.0d0, -1000.0d0, &                 !86-90
                                  -5.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                    !91-95
                                  0.0d0, 0.0d0, 0.0d0,&                                    !96-98
+                                 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &                     !99-103 (WRF-Lake)
    !! NBNB Check these values
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !99-101
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !102-104
-                                 -1.0d2, 0.0d0, 0.0d0, &                                  !105-107
-                                 0.0d0, 0.0d0, 0.0d0, &                                   !108-110
-                                 0.0d0, -2.0d12, 0.0d0, &                                  !111-113
-                                 0.0d0, 0.0d0, 0.0d0 ]                                    !114-116
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !104-106 (Crocus)
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !107-109 (Crocus)
+                                 -1.0d2, 0.0d0, 0.0d0, &                                  !110-112 (Crocus)
+                                 0.0d0, 0.0d0, 0.0d0, &                                   !113-115 (Crocus)
+                                 0.0d0, -2.0d12, 0.0d0, &                                 !116-118 (Crocus)
+                                 0.0d0, 0.0d0, 0.0d0 ]                                    !119-121 (Crocus)
 
    ldasOutDict%validMaxDbl(:) = [100.0d0, 100.0d0, 1.0d0, 20.0d0, 20.0d0, &             !1-5
                                  3000.0d0, 1.0d0, 1500.0d0, 100.0d0, 1.0d0, &           !6-10
@@ -1428,13 +1462,14 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                                  1000.0d0, 1000.0d0, 1000.0d0, 1000.0d0, 1.0D+6, &      !86-90
                                  30000.0d0, 1.0d0, 1.0d0, 1.0d0, 400.0d0, &             !91-95
                                  1.0d0, 1.0d0, 100.0d0,&                                !96-98
+                                 10000.0d0, 10000.0d0, 2000.0d0, 400.0d0, 1.0d0, &      !99-103 (WRF-Lake)
    ! NBNB Check these values
-                                 1.0d0, 1.0d4, 1.0d0, &                                 !99-101
-                                 1.0d5, 1.0d4, 1.0d8, &                                 !102-104
-                                 1.0D2, 1.0D2, 1.0d5, &                                 !105-107
-                                 300.0d0, 1.0d4, 1.0d2, &                               !108-110
-                                 1.0d5, 0.0d0, 1.0d3, &                                 !111-113
-                                 1.0d6, 1.d5, 1.d5]                                     !114-116
+                                 1.0d0, 1.0d4, 1.0d0, &                                 !104-106 (Crocus)
+                                 1.0d5, 1.0d4, 1.0d8, &                                 !107-109 (Crocus)
+                                 1.0D2, 1.0D2, 1.0d5, &                                 !110-112 (Crocus)
+                                 300.0d0, 1.0d4, 1.0d2, &                               !113-115 (Crocus)
+                                 1.0d5, 0.0d0, 1.0d3, &                                 !116-118 (Crocus)
+                                 1.0d6, 1.d5, 1.d5]                                     !119-121 (Crocus)
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
@@ -1903,18 +1938,20 @@ subroutine initLakeDict(lakeOutDict,procId,diagFlag)
    lakeOutDict%lonUnits = "degrees_east"
    lakeOutDict%lonStName = "longitude"
 
-   lakeOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow']
-   lakeOutDict%longName(:) = [character(len=64) :: 'Lake Inflow','Lake Outflow']
-   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1']
-   lakeOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude','latitude longitude']
-   lakeOutDict%scaleFactor(:) = [0.01,0.01]
-   lakeOutDict%addOffset(:) = [0.0,0.0]
-   lakeOutDict%outFlag(:) = [0,0]
-   lakeOutDict%timeZeroFlag(:) = [1,1]
-   lakeOutDict%fillReal(:) = [-9999.0,-9999.0]
-   lakeOutDict%missingReal(:) = [-9999.0,-9999.0]
-   lakeOutDict%validMinDbl(:) = [-10000.0d0, -10000.0d0]
-   lakeOutDict%validMaxDbl(:) = [10000.0d0, 10000.0d0]
+   lakeOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','lake_precip','lake_evap']
+   lakeOutDict%longName(:) = [character(len=64) :: 'Lake Inflow','Lake Outflow', &
+        'Lake Precipitation','Lake Evaporation']
+   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1', 'mm', 'mm']
+   lakeOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude', &
+        'latitude longitude','latitude longitude','latitude longitude']
+   lakeOutDict%scaleFactor(:) = [0.01,0.01,0.01,0.01]
+   lakeOutDict%addOffset(:) = [0.0,0.0,0.0,0.0]
+   lakeOutDict%outFlag(:) = [0,0,0,0]
+   lakeOutDict%timeZeroFlag(:) = [1,1,1,1]
+   lakeOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
+   lakeOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
+   lakeOutDict%validMinDbl(:) = [-10000.0d0, -10000.0d0, 0.0d0, 0.0d0]
+   lakeOutDict%validMaxDbl(:) = [10000.0d0, 10000.0d0, 10000.0d0, 10000.0d0]
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.

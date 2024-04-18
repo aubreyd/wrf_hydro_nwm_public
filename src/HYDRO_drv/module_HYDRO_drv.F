@@ -468,6 +468,7 @@ module module_HYDRO_drv
                             RT_DOMAIN(did)%LATLAKE,RT_DOMAIN(did)%LONLAKE, &
                             RT_DOMAIN(did)%ELEVLAKE,RT_DOMAIN(did)%QLAKEI, &
                             RT_DOMAIN(did)%QLAKEO, &
+                            RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
                             RT_DOMAIN(did)%RESHT,nlst(did)%DT,Kt)
                     endif
                     if(nlst(did)%outlake .eq. 2) then
@@ -482,6 +483,7 @@ module module_HYDRO_drv
                             RT_DOMAIN(did)%LATLAKE,RT_DOMAIN(did)%LONLAKE, &
                             RT_DOMAIN(did)%ELEVLAKE,RT_DOMAIN(did)%QLAKEI, &
                             RT_DOMAIN(did)%QLAKEO, &
+                            RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
                             RT_DOMAIN(did)%RESHT,nlst(did)%DT,Kt,RT_DOMAIN(did)%LAKEIDM)
                     endif
 
@@ -938,7 +940,8 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        RT_DOMAIN(did)%ChannK,&
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%CVOL, RT_DOMAIN(did)%QLAKEI, &
-       RT_DOMAIN(did)%QLAKEO, RT_DOMAIN(did)%LAKENODE, &
+       RT_DOMAIN(did)%QLAKEO, &
+       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, RT_DOMAIN(did)%LAKENODE, &
        RT_DOMAIN(did)%QINFLOWBASE, RT_DOMAIN(did)%CHANXI, RT_DOMAIN(did)%CHANYJ, nlst(did)%channel_option,  &
        RT_DOMAIN(did)%nlinks, RT_DOMAIN(did)%NLINKSL, RT_DOMAIN(did)%LINKID, RT_DOMAIN(did)%node_area,         &
        RT_DOMAIN(did)%qout_gwsubbas, &
@@ -981,6 +984,7 @@ else
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
        RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
+       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
        RT_DOMAIN(did)%LAKENODE, rt_domain(did)%overland%properties%distance_to_neighbor, &
        RT_DOMAIN(did)%QINFLOWBASE, RT_DOMAIN(did)%CHANXI, &
        RT_DOMAIN(did)%CHANYJ, nlst(did)%channel_option, &
@@ -1675,17 +1679,25 @@ end subroutine HYDRO_ini
          call get2d_lsm_vegtyp(RT_DOMAIN(did)%VEGTYP,RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx,trim(nlst(did)%geo_static_flnm))
 
 
-            if(nlst(did)%sys_cpl .eq. 2 ) then
-              ! coupling with WRF
-                if(present(soltyp0) ) then
+         if(nlst(did)%sys_cpl .eq. 2 ) then
+            ! coupling with WRF
+            if(present(soltyp0) ) then
+               if (noah_lsm%sf_lake_physics == 1) then
+                  where(VEGTYP0 == rt_domain(did)%iswater ) soltyp0 = rt_domain(did)%isoilwater
+               else
                   where(VEGTYP0 == rt_domain(did)%iswater .or. VEGTYP0 == rt_domain(did)%islake) soltyp0 = rt_domain(did)%isoilwater
-                  where(soltyp0 == rt_domain(did)%isoilwater) VEGTYP0 = rt_domain(did)%iswater
-                   soltyp = soltyp0
-                   RT_DOMAIN(did)%VEGTYP = VEGTYP0
-                endif
+               endif
+               where(soltyp0 == rt_domain(did)%isoilwater) VEGTYP0 = rt_domain(did)%iswater
+               soltyp = soltyp0
+               RT_DOMAIN(did)%VEGTYP = VEGTYP0
             endif
+         endif
 
-         where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
+         if (noah_lsm%sf_lake_physics == 1) then
+            where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater ) soltyp = rt_domain(did)%isoilwater
+         else
+            where(RT_DOMAIN(did)%VEGTYP == rt_domain(did)%iswater .or. RT_DOMAIN(did)%VEGTYP == rt_domain(did)%islake) soltyp = rt_domain(did)%isoilwater
+         endif
          where(soltyp == rt_domain(did)%isoilwater) RT_DOMAIN(did)%VEGTYP = rt_domain(did)%iswater
 
 ! LKSAT,

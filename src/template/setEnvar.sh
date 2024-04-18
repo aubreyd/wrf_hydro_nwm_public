@@ -22,3 +22,7 @@ export NWM_META=0
 
 # Streamflow nudging: 0=Off, 1=On.
 export WRF_HYDRO_NUDGING=0
+
+# WRF-Lake extra layers: 0=10 layers, 1=25 layers
+export EXTRALAKELAYERS=0
+

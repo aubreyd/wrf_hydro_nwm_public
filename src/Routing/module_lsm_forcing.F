@@ -341,7 +341,6 @@ end subroutine weather_2D_inputs_destroy
     ! Make sure vegtyp and soltyp are consistent when it comes to water points,
     ! by setting soil category to water when vegetation category is water, and
     ! vice-versa.
-    where (vegtyp == islake) vegtyp = iswater
     where (vegtyp == iswater) soltyp = isoilwater
     where (soltyp == isoilwater) vegtyp = iswater
 

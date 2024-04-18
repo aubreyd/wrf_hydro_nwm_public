@@ -70,6 +70,12 @@ module config_base
      REAL, DIMENSION(MAX_SOIL_LEVELS) :: soil_thick_input       ! depth to soil interfaces from namelist [m]
      integer :: rst_bi_out, rst_bi_in !0: default netcdf format. 1: binary write/read by each core.
      CHARACTER(LEN = 256) :: spatial_filename
+
+      ! lake components
+     integer             :: sf_lake_physics    = 0
+     real                :: lakedepth_default  = 6.0
+     real                :: lake_min_elev      = 5.0
+     integer             :: use_lakedepth      = 0
   end type NOAHLSM_OFFLINE_
 
   type WRF_HYDRO_OFFLINE_
@@ -947,6 +953,10 @@ contains
      integer            :: ystart = 1
      integer            :: xend = 0
      integer            :: yend = 0
+     integer            :: sf_lake_physics    = 0
+     real               :: lakedepth_default  = 6.0
+     real               :: lake_min_elev      = 5.0
+     integer            :: use_lakedepth      = 0
      REAL, DIMENSION(MAX_SOIL_LEVELS) :: soil_thick_input       ! depth to soil interfaces from namelist [m]
      integer :: rst_bi_out, rst_bi_in !0: default netcdf format. 1: binary write/read by each core.
      CHARACTER(LEN = 256)                    ::  spatial_filename
@@ -969,10 +979,9 @@ contains
          frozen_soil_option, radiative_transfer_option, snow_albedo_option, &
          pcp_partition_option, tbot_option, temp_time_scheme_option, &
          glacier_option, surface_resistance_option, &
-
          soil_data_option, pedotransfer_option, crop_option, &
          imperv_option, &
-
+         sf_lake_physics,lakedepth_default,lake_min_elev,use_lakedepth, &
          split_output_count, &
          khour, kday, zlvl, hrldas_setup_file, mmf_runoff_file, &
          spatial_filename, &
@@ -1119,6 +1128,11 @@ contains
     noah_lsm%rst_bi_out = rst_bi_out
     noah_lsm%rst_bi_in = rst_bi_in
     noah_lsm%spatial_filename = spatial_filename
+
+    noah_lsm%sf_lake_physics = sf_lake_physics
+    noah_lsm%lakedepth_default = lakedepth_default
+    noah_lsm%lake_min_elev = lake_min_elev
+    noah_lsm%use_lakedepth = use_lakedepth
 
   end subroutine init_noah_lsm_and_wrf_hydro
 
