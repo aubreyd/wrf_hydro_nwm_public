@@ -2,20 +2,20 @@
 !  Author(s)/Contact(s):
 !  Abstract:
 !  History Log:
-! 
+!
 !  Usage:
 !  Parameters: <Specify typical arguments passed>
 !  Input Files:
 !        <list file names and briefly describe the data they include>
 !  Output Files:
 !        <list file names and briefly describe the information they include>
-! 
+!
 !  Condition codes:
 !        <list exit condition or error codes returned >
 !        If appropriate, descriptive troubleshooting instructions or
 !        likely causes for failures could be mentioned here with the
 !        appropriate error code
-! 
+!
 !  User controllable options: <if applicable>
 
 MODULE module_noah_chan_param_init_rt
@@ -32,7 +32,7 @@ CONTAINS
 
     integer :: IINDEX, CHANCATS
     integer :: ORDER, IUNIT
-    integer, PARAMETER :: NCHANTYPES=50 
+    integer, PARAMETER :: NCHANTYPES=50
     real,dimension(NCHANTYPES)    :: BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann
     real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK
     real,dimension(NCHANTYPES)    :: TOPWIDCC, NCC
@@ -115,7 +115,7 @@ CONTAINS
     implicit none
     integer :: IINDEX, CHANCATS
     integer :: ORDER
-    integer, PARAMETER :: NCHANTYPES=50 
+    integer, PARAMETER :: NCHANTYPES=50
     real,dimension(NCHANTYPES)    :: BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann
     real,dimension(NCHANTYPES)    :: CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk
     !real,dimension(NCHANTYPES)    :: TOPWID, TOPWIDCC, NCC  ! compound components
@@ -141,7 +141,7 @@ CONTAINS
 !       call mpp_land_bcast_real(NCHANTYPES,TOPWIDCC)
 !       call mpp_land_bcast_real(NCHANTYPES,NCC)
 
-    return 
+    return
     END SUBROUTINE mpp_CHAN_PARM_INIT
 #endif
 !-----------------------------------------------------------------

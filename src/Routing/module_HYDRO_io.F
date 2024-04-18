@@ -35,7 +35,7 @@ module module_HYDRO_io
    use netcdf
    use module_hydro_stop, only:HYDRO_stop
    use hashtable
-   use iso_fortran_env, only: int64
+   use iso_fortran_env, only: int64, compiler_version
 
    implicit none
 
@@ -1518,7 +1518,8 @@ end subroutine get_albedo12m_netcdf
    implicit none
    integer, intent(in) :: gnumbasns, numbasns
    integer(kind=int64), intent(in),  dimension(numbasns) :: basnsInd
-   real,    intent(out), dimension(numbasns) :: gw_buck_coeff, gw_buck_exp, gw_buck_loss
+   real,    intent(out), dimension(numbasns) :: gw_buck_coeff, gw_buck_exp
+   real,    intent(out), dimension(:), allocatable :: gw_buck_loss
    real,    intent(out), dimension(numbasns) :: z_max, z_gwsubbas, basns_area
    integer, intent(out), dimension(numbasns) :: bas_id
    real, dimension(gnumbasns) :: tmp_buck_coeff, tmp_buck_exp, tmp_buck_loss
@@ -6006,6 +6007,7 @@ end subroutine mpp_output_chrt
 !                    nlst(did)%GWBASESWCRT .ne. 0       )
 
    !         put global attribute
+   iret = nf90_put_att(ncid, NF90_GLOBAL, "compiler_version", compiler_version())
    iret = nf90_put_att(ncid, NF90_GLOBAL, "his_out_counts", rt_domain(did)%his_out_counts)
    iret = nf90_put_att(ncid, NF90_GLOBAL, "Restart_Time", nlst(did)%olddate(1:19))
    iret = nf90_put_att(ncid, NF90_GLOBAL, "Since_Date", nlst(did)%sincedate(1:19))
@@ -9037,7 +9039,7 @@ call get_1d_netcdf_real(ncid, 'MusX',     MUSX,      'read_route_link_netcdf', .
 call get_1d_netcdf_real(ncid, 'Length',   CHANLEN,   'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'n',        MannN,     'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'So',       So,        'read_route_link_netcdf', .TRUE.)
-!! impose a minimum as this sometimes fails in the file. 
+!! impose a minimum as this sometimes fails in the file.
 where(So .lt. 0.00001) So=0.00001
 call get_1d_netcdf_real(ncid, 'ChSlp',    ChSSlp,    'read_route_link_netcdf', .TRUE.)
 call get_1d_netcdf_real(ncid, 'BtmWdth',  Bw,        'read_route_link_netcdf', .TRUE.)
@@ -11237,7 +11239,7 @@ use module_mpp_land,only: mpp_land_bcast_int1
 
   if (present(rt)) then
     regrid = rt
-  else 
+  else
     regrid = .false.
   endif
 

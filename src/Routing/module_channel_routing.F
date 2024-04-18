@@ -630,7 +630,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
        NLINKSL, LINKID, node_area  &
 #ifdef MPP_LAND
        , lake_index,link_location,mpp_nlinks,nlinks_index,yw_mpp_nlinks  &
-       , LNLINKSL, LLINKID  &
+       , LNLINKSL  &
        , gtoNode,toNodeInd,nToNodeInd &
 #endif
        , CH_LNKRT_SL &
@@ -691,8 +691,8 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, DIMENSION(NLINKS)                   :: dzGwChanHead
         REAL, DIMENSION(NLINKS)                   :: Q_GW_CHAN_FLUX     !DJG !!! Change 'INTENT' to 'OUT' when ready to update groundwater state...
         REAL, DIMENSION(IXRT,JXRT)                :: ZWATTBLRT          !DJG !!! Match with subsfce/gw routing & Change 'INTENT' to 'INOUT' when ready to update groundwater state...
-        REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: gwHead            !DJG !!! groundwater head from Fersch-2d gw implementation...units (m ASL)
-        REAL, INTENT(INOUT), DIMENSION(IXRT,JXRT) :: qgw_chanrt         !DJG !!! Channel-gw flux as used in Fersch 2d gw implementation...units (m^3/s)...Change 'INTENT' to 'OUT' when ready to update groundwater state...
+        REAL, INTENT(INOUT), DIMENSION(:,:), allocatable :: gwHead      !DJG !!! groundwater head from Fersch-2d gw implementation...units (m ASL)
+        REAL, INTENT(INOUT), DIMENSION(:,:), allocatable :: qgw_chanrt  !DJG !!! Channel-gw flux as used in Fersch 2d gw implementation...units (m^3/s)...Change 'INTENT' to 'OUT' when ready to update groundwater state...
 
 !-- Channel temperature variables
         real, dimension(nlinks)                :: InflowUpstream          ! total inflow to reach from upstream reaches (m3/s)
@@ -743,7 +743,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
         integer(kind=int64) link_location(ixrt,jxrt)
         real     ywtmp(ixrt,jxrt)
         integer LNLINKSL
-        integer(kind=int64), dimension(LNLINKSL) :: LLINKID
         real*8,  dimension(LNLINKSL) :: LQLateral
 !        real*4,  dimension(LNLINKSL) :: LQLateral
         integer, dimension(:) ::  toNodeInd

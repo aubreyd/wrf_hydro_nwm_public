@@ -1,5 +1,3 @@
-cmake_minimum_required (VERSION 2.8)
-
 add_library(hydro_routing STATIC
 	module_UDMAP.F
 	module_channel_routing.F
@@ -16,7 +14,8 @@ add_library(hydro_routing STATIC
 	module_RT.F
 	Noah_distr_routing.F
 	Noah_distr_routing_overland.F
-	Noah_distr_routing_subsurface.F        
+	Noah_distr_routing_subsurface.F
+        module_riverTemperatureRuns.F
 )
 
 target_link_libraries(hydro_routing PUBLIC hydro_mpp)
@@ -33,4 +32,5 @@ target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_levelpool)
 target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_hybrid)
 target_link_libraries(hydro_routing PUBLIC hydro_data_rec)
 target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_rfc)
+target_link_libraries(hydro_routing PUBLIC hydro_routing_rivertemperature)
 
