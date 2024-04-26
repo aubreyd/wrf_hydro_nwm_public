@@ -539,6 +539,7 @@ CONTAINS
 
      allocate( rt_domain(did)%lake_precip(NLAKES) )
      allocate( rt_domain(did)%lake_evap(NLAKES) )
+     allocate( rt_domain(did)%lake_netoutflow(NLAKES) )
 
      allocate( rt_domain(did)%HLINK(nsizes) )  !--used for diffusion only
 
@@ -588,6 +589,8 @@ CONTAINS
       rt_domain(did)%QLAKEO = 0.0
       rt_domain(did)%lake_precip = 0.0
       rt_domain(did)%lake_evap = 0.0
+      rt_domain(did)%lake_netoutflow = 0.0
+
       rt_domain(did)%QLINK = 0
 #ifdef WRF_HYDRO_NUDGING
       rt_domain(did)%nudge = 0

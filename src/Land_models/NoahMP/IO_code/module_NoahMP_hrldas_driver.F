@@ -118,7 +118,7 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  IOPT_FRZ  ! supercooled liquid water (1-> NY06; 2->Koren99)
   INTEGER                                 ::  IOPT_INF  ! frozen soil permeability (1-> NY06; 2->Koren99)
   INTEGER                                 ::  IOPT_RAD  ! radiation transfer (1->gap=F(3D,cosz); 2->gap=0; 3->gap=1-Fveg)
-  INTEGER                                 ::  IOPT_ALB ! snow surface albedo (1->BATS; 2->CLASS)
+  INTEGER                                 ::  IOPT_ALB  ! snow surface albedo (1->BATS; 2->CLASS)
   INTEGER                                 ::  IOPT_SNF  ! rainfall & snowfall (1-Jordan91; 2->BATS; 3->Noah)
   INTEGER                                 ::  IOPT_TBOT ! lower boundary of soil temperature (1->zero-flux; 2->Noah)
   INTEGER                                 ::  IOPT_STC  ! snow/soil temperature time scheme
@@ -393,6 +393,7 @@ module module_NoahMP_hrldas_driver
 
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_precip
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_evap
+  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_netoutflow
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_grids
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_dh_avg      ! average change in lake water level due to P and ET (m)
 
@@ -492,7 +493,7 @@ module module_NoahMP_hrldas_driver
 
   contains
 
- subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
+  subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
      use module_HYDRO_drv, only: HYDRO_ini
      use config_base, only: nlst
      use module_rt_data, only: rt_domain
@@ -1763,12 +1764,15 @@ endif
 
    allocate(lake_precip(nlakes))
    allocate(lake_evap(nlakes))
+   allocate(lake_netoutflow(nlakes))
    allocate(lake_grids(nlakes))
    allocate(lake_dh_avg(nlakes))
    lake_precip = 0.0
    lake_evap   = 0.0
    lake_grids  = 0
    lake_dh_avg = 0.0
+   lake_netoutflow = 0.0
+
 #endif
 
    !!--- Setup variable list. Change as needed; rest of parsing should adapt automatically.
@@ -1863,18 +1867,11 @@ endif
 !#endif
 #endif
 
-  !-- added by Reza to be used in the river temperature modules
-  RT_DOMAIN(did)%TMN_temp = TMN
-  RT_DOMAIN(did)%TSK_temp = TSK
-  RT_DOMAIN(did)%TG_temp = TGXY
-  RT_DOMAIN(did)%TSLB_temp = TSLB
-
 end subroutine land_driver_ini
 
 !===============================================================================
   subroutine land_driver_exe(itime, state)
     use module_hydro_io, only: read_channel_only
-    use module_rt_data, only: rt_domain !TLE: added to transmit ground temperature to water temp. model
     use state_module, only: state_type
 #ifdef WRF_HYDRO
     use module_RT_data, only: rt_domain
@@ -1882,7 +1879,6 @@ end subroutine land_driver_ini
     implicit  none
     type(state_type) :: state
     integer :: itime          ! timestep loop
-
 #ifdef WRF_HYDRO
     integer :: ilake
     integer :: lake_idx
@@ -1909,7 +1905,7 @@ end subroutine land_driver_ini
       if(forc_typ .eq. 8) then
           call read_forc_ldasout(olddate,hgrid, noah_lsm%indir, dtbl,ix,jx,infxsrt,soldrain)
           call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain, &
-            lake_precip,lake_evap,lake_grids,nlakes, ix,jx,NSOIL)
+            lake_precip,lake_evap,lake_netoutflow,lake_grids,nlakes, ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1925,7 +1921,7 @@ end subroutine land_driver_ini
           write(hgrid_hydro,'(I1)') igrid_hydro
           call read_channel_only(olddate, hgrid_hydro, noah_lsm%indir, noah_lsm%forcing_timestep)
           call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain, &
-            lake_precip,lake_evap,lake_grids,nlakes, ix,jx,NSOIL)
+            lake_precip,lake_evap,lake_netoutflow,lake_grids,nlakes, ix,jx,NSOIL)
           call geth_newdate(newdate, olddate, nint(dtbl))
           olddate = newdate
           return
@@ -1942,14 +1938,8 @@ end subroutine land_driver_ini
      ! Build a filename template
      inflnm_template = trim(noah_lsm%indir)//"/<date>.LDASIN_DOMAIN"//hgrid
 
+
 #ifdef WRF_HYDRO
-
-
-!!-- added by Reza to be used in the river temperature modules
-RT_DOMAIN(did)%TMN_temp = TMN
-RT_DOMAIN(did)%TSK_temp = TSK
-RT_DOMAIN(did)%TG_temp = TGXY
-RT_DOMAIN(did)%TSLB_temp = TSLB
 
      if(wrf_hydro%finemesh .ne. 0) goto 991
 
@@ -1975,7 +1965,7 @@ RT_DOMAIN(did)%TSLB_temp = TSLB
                T_PHY(:,1,:), QV_CURR(:,1,:), U_PHY(:,1,:), V_PHY(:,1,:), &
                P8W(:,1,:), GLW, SWDOWN, RAINBL_tmp, &
                LAI, SNOWBL, VEGFRA, state%SNOWH, &
-               ITIME, noah_lsm%FORCING_TIMESTEP, noah_lsm%noah_timestep, prcp0)
+               ITIME, noah_lsm%FORCING_TIMESTEP, prcp0)
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
            call geth_newdate(newdate, forcDate, noah_lsm%FORCING_TIMESTEP)
@@ -2161,20 +2151,24 @@ RT_DOMAIN(did)%TSLB_temp = TSLB
 #ifdef WRF_HYDRO
 #endif
          do ilake = 1, nlakes
-
+           
+           print *, "evapb",lake_evap(ilake),lake_idx
            ! find ID for this lake:
            lake_idx = rt_domain(did)%lakeidm(ilake)
-
-           lake_precip(ilake) = sum(rainbl , mask = lake_id == lake_idx)
-           lake_evap(ilake) = sum(qfx, mask = lake_id == lake_idx)
            lake_grids(ilake) = count(mask = lake_id == lake_idx)
-
+           lake_precip(ilake) = sum(rainbl, mask = lake_id == lake_idx)
+           lake_evap(ilake)   = sum(qfx, mask = lake_id == lake_idx)
+           
+           print *, "evapa",lake_evap(ilake),lake_idx
            ! update lake depth based on based on net (P-ET) at surface
            ! lake_precip units converted from mm/s to m
            ! lake_evap units converted from kg/m2/s to m
            ! dtbl is time step in seconds
-           lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600.)*dtbl/3600./1000.
+           lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600. + lake_netoutflow(ilake)) * dtbl/3600./1000.
+
            where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
+           print *, "dhlake",dtbl,lake_precip(ilake),lake_evap(ilake),lake_netoutflow(ilake),lake_grids(ilake)
+
          end do
 
          ! mask lake output variables:
@@ -2213,7 +2207,9 @@ RT_DOMAIN(did)%TSLB_temp = TSLB
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
-     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,lake_precip,lake_evap,lake_grids,nlakes,ix,jx,NSOIL) 
+     call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:), &
+        SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,lake_precip, &
+        lake_evap,lake_netoutflow,lake_grids,nlakes,ix,jx,NSOIL) 
 #endif
 
 ! Output for history
@@ -3216,7 +3212,6 @@ subroutine define_rst_variables(ncid, state)
                              "Problem nf90_close")
 
    end subroutine define_rst_variables
-
 
 end module module_NoahMP_hrldas_driver
 

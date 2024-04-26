@@ -59,7 +59,8 @@ module module_HRLDAS_HYDRO
 
 CONTAINS
 
-    subroutine hrldas_cpl_HYDRO(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,lake_precip,lake_evap,lake_grids,nlakes,ii,jj,kk)
+    subroutine hrldas_cpl_HYDRO(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain, &
+              lake_precip,lake_evap,lake_netoutflow,lake_grids,nlakes,ii,jj,kk)
 
 !---lpr added 2015-07-30---------
 #ifdef WRF_HYDRO_RAPID
@@ -75,7 +76,7 @@ CONTAINS
        integer :: nlakes
        real,dimension(ii,jj,kk) :: STC,SMC,SH2OX
        real,dimension(ii,jj) ::infxsrt,sfcheadrt, soldrain, qsgw
-       real,dimension(nlakes) ::lake_precip,lake_evap
+       real,dimension(nlakes) ::lake_precip,lake_evap,lake_netoutflow
        integer,dimension(nlakes) ::lake_grids
 
 !lpr add 2014-06-24
@@ -170,17 +171,19 @@ CONTAINS
            
            call sum_real1d(lake_precip, nlakes)
            call sum_real1d(lake_evap, nlakes)
-           call sum_int1d(lake_grids, nlakes)
-           where(lake_grids>0) lake_precip = lake_precip / lake_grids
-           where(lake_grids>0) lake_evap = lake_evap / lake_grids
+           !call sum_real1d(lake_netoutflow, nlakes) !probably don't need
+           !call sum_int1d(lake_grids, nlakes)
+           where(lake_grids > 0) lake_precip = lake_precip / lake_grids
+           where(lake_grids > 0) lake_evap = lake_evap / lake_grids
+           where(lake_grids > 0) lake_netoutflow = lake_netoutflow / lake_grids
            
            RT_DOMAIN(did)%STC = STC
            RT_DOMAIN(did)%SMC = SMC
            RT_DOMAIN(did)%SH2OX = SH2OX
            RT_DOMAIN(did)%infxsrt = infxsrt
            RT_DOMAIN(did)%soldrain = soldrain
-           RT_DOMAIN(did)%lake_precip = lake_precip
-           RT_DOMAIN(did)%lake_evap = lake_evap
+           RT_DOMAIN(did)%lake_netoutflow = lake_netoutflow
+
         end if
 
            if(nlst(did)%GWBASESWCRT == 3) gw2d(did)%qsgw = qsgw
@@ -211,7 +214,11 @@ CONTAINS
            STC = rt_domain(did)%STC
            SMC = rt_domain(did)%SMC
            SH2OX = rt_domain(did)%SH2OX
+           !lake_grids = rt_domain(did)%lake_grids
+           lake_netoutflow = rt_domain(did)%lake_netoutflow
+           lake_evap = rt_domain(did)%lake_evap
            sfcheadrt = rt_domain(did)%overland%control%surface_water_head_lsm
+
         end if
         if(nlst(did)%GWBASESWCRT == 3)  qsgw = gw2d(did)%qsgw
 

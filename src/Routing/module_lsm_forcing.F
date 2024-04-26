@@ -1114,10 +1114,10 @@ end subroutine weather_2D_inputs_destroy
 ! assumes K=1 is 12z (Ks or ~ sunrise)
 ! First Precip...
        IF (K.EQ.2) THEN
-       PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
+        PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
 !       PRCP1 =0./3600.0      !units mm/s  (Simulates <1"/hr for first 10 hours...)
        ELSEIF (K.GT.1) THEN
-!        PRCP1 =0./3600.0      !units mm/s
+!       PRCP1 =0./3600.0      !units mm/s
 !       ELSE
          PRCP1 = 0.
        END IF

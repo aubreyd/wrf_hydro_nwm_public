@@ -469,6 +469,7 @@ module module_HYDRO_drv
                             RT_DOMAIN(did)%ELEVLAKE,RT_DOMAIN(did)%QLAKEI, &
                             RT_DOMAIN(did)%QLAKEO, &
                             RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
+                        !   RT_DOMAIN(did)%LAKE_NETOUTFLOW, &
                             RT_DOMAIN(did)%RESHT,nlst(did)%DT,Kt)
                     endif
                     if(nlst(did)%outlake .eq. 2) then
@@ -484,6 +485,7 @@ module module_HYDRO_drv
                             RT_DOMAIN(did)%ELEVLAKE,RT_DOMAIN(did)%QLAKEI, &
                             RT_DOMAIN(did)%QLAKEO, &
                             RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
+                        !   RT_DOMAIN(did)%LAKE_NETOUTFLOW, &
                             RT_DOMAIN(did)%RESHT,nlst(did)%DT,Kt,RT_DOMAIN(did)%LAKEIDM)
                     endif
 
@@ -941,7 +943,8 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%CVOL, RT_DOMAIN(did)%QLAKEI, &
        RT_DOMAIN(did)%QLAKEO, &
-       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, RT_DOMAIN(did)%LAKENODE, &
+       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, & 
+       RT_DOMAIN(did)%LAKE_NETOUTFLOW, RT_DOMAIN(did)%LAKENODE, &
        RT_DOMAIN(did)%QINFLOWBASE, RT_DOMAIN(did)%CHANXI, RT_DOMAIN(did)%CHANYJ, nlst(did)%channel_option,  &
        RT_DOMAIN(did)%nlinks, RT_DOMAIN(did)%NLINKSL, RT_DOMAIN(did)%LINKID, RT_DOMAIN(did)%node_area,         &
        RT_DOMAIN(did)%qout_gwsubbas, &
@@ -966,7 +969,7 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        , nlst(did)%channel_bypass )
 
 else
-    print *, "calling drive_CHANNEL"
+    print *, "calling gridded drive_CHANNEL"
     call drive_CHANNEL(did, RT_DOMAIN(did)%latval,RT_DOMAIN(did)%lonval, &
        RT_DOMAIN(did)%timestep_flag,RT_DOMAIN(did)%IXRT,RT_DOMAIN(did)%JXRT, &
        nlst(did)%SUBRTSWCRT, rt_domain(did)%subsurface%state%qsubrt, &
@@ -984,7 +987,7 @@ else
        RT_DOMAIN(did)%RESHT, &
        RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
        RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
-       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, &
+       RT_DOMAIN(did)%LAKE_PRECIP,RT_DOMAIN(did)%LAKE_EVAP, RT_DOMAIN(did)%LAKE_NETOUTFLOW, &
        RT_DOMAIN(did)%LAKENODE, rt_domain(did)%overland%properties%distance_to_neighbor, &
        RT_DOMAIN(did)%QINFLOWBASE, RT_DOMAIN(did)%CHANXI, &
        RT_DOMAIN(did)%CHANYJ, nlst(did)%channel_option, &
@@ -1018,10 +1021,14 @@ endif
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
            write(6,*) "*****yw******end drive_CHANNEL "
+           write(6,*) "1lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
+           !RT_DOMAIN(did)%LAKE_NETOUTFLOW,
 #else
            write(78,*) "*****yw******end drive_CHANNEL "
+           write(6,*) "2lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
 #endif
 #endif
+           write(6,*) "3lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
 
       end subroutine driveChannelRouting
 
