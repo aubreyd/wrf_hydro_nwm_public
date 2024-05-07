@@ -87,7 +87,11 @@ print *, "In rt_allocate: Before overland init"
 print *, "In rt_allocate: Before subsurface init"
 
       ! allocate subsurface data structures
+      if ( present(ntracer) ) then
+      call rt_domain(did)%subsurface%init(ixrt, jxrt, nsoil, rt_domain(did)%overland, ntracer)
+      else
       call rt_domain(did)%subsurface%init(ixrt, jxrt, nsoil, rt_domain(did)%overland)
+      endif
 
 print *, "In rt_allocate: Before subsurface_static init"
 
@@ -165,7 +169,6 @@ print *, "In rt_allocate: Before setting checks"
      rt_domain(did)%SMCRTCHK = 0
      allocate( rt_domain(did)%SH2OAGGRT   	(NSOIL) )
      rt_domain(did)%SH2OAGGRT = 0
-     print *, "In rt_allocate: Before tracer1"
      if (noah_lsm%water_tracer_option > 0) then
         allocate( rt_domain(did)%SH2OAGGRT_TR        (NTRACER) )   !wt var
         rt_domain(did)%SH2OAGGRT_TR = 0
@@ -180,7 +183,6 @@ print *, "In rt_allocate: Before setting checks"
      if(nlst(did)%UDMP_OPT .eq. 1) then
         allocate ( RT_DOMAIN(did)%landRunOff (ixrt,jxrt) )
         rt_domain(did)%landRunOff = 0.
-        print *, "In rt_allocate: Before tracer2"
         if (noah_lsm%water_tracer_option > 0) then
            allocate ( rt_domain(did)%landRunOff_tr (ixrt,jxrt) )
            rt_domain(did)%landRunOff_tr = 0.
@@ -247,7 +249,6 @@ print *, "In rt_allocate: Before setting checks"
      rt_domain(did)%SH2OWGT     = 0.0
      allocate( rt_domain(did)%INFXSAGGRT 	(IXRT,JXRT) )
      rt_domain(did)%INFXSAGGRT 	= 0.0
-print *, "In rt_allocate: Before tracer3"
      !------Needed for water tracer capability------
      if (noah_lsm%water_tracer_option > 0) then
         allocate( rt_domain(did)%INFXSWGT_TR    (IXRT,JXRT) )
@@ -318,9 +319,9 @@ print *, "In rt_allocate: Before tracer3"
             rt_domain(did)%SMC   = 0.25
   allocate( rt_domain(did)%SICE (IX,JX,NSOIL) )
             rt_domain(did)%SICE  = 0.
-  print *, "In rt_allocate: Before tracer4"
   !-----needed for water tracer capability-----
   if (noah_lsm%water_tracer_option > 0) then
+     print *, "ADCHECK_rt: Before smc_tr allocation"
      allocate( rt_domain(did)%SMC_tr  (IX,JX,NTRACER) )
             rt_domain(did)%SMC_tr   = 0.0
      allocate( rt_domain(did)%SH2OX_tr  (IX,JX,NTRACER) ) 
@@ -333,6 +334,7 @@ print *, "In rt_allocate: Before tracer3"
             rt_domain(did)%SICE_tr    = 0.0
      allocate( rt_domain(did)%SICE_SUB (IX,JX,NTRACER))
             rt_domain(did)%SICE_SUB   = 0.0
+     print *, "ADCHECK_rt: After smc_tr allocation", rt_domain(did)%SMC_tr(1,1,:)
   end if
   !--------------------------------------------
   ! allocate( rt_domain(did)%dist_lsm (ixrt,jxrt,9) )
@@ -411,32 +413,32 @@ print *, "In rt_allocate: Before tracer3"
   endif
 
 ! Water tracer - LSM Grid
-  print *, "In rt_allocate: Before tracer5"
 
   if (noah_lsm%water_tracer_option > 0) then
-     allocate( rt_domain(did)%INFXSRT_tr(IX,JX) )
-     rt_domain(did)%INFXSRT_tr = 0.0
 
-     allocate( rt_domain(did)%SOLDRAIN_tr(IX,JX) )
-     rt_domain(did)%SOLDRAIN_tr = 0.0
+     !allocate( rt_domain(did)%INFXSRT_tr(IX,JX) )
+     !rt_domain(did)%INFXSRT_tr = 0.0
 
-     allocate( rt_domain(did)%SMC_tr(IX,JX,NSOIL) )
-     rt_domain(did)%SMC_tr = 0.0
+     !allocate( rt_domain(did)%SOLDRAIN_tr(IX,JX) )
+     !rt_domain(did)%SOLDRAIN_tr = 0.0
 
-     allocate( rt_domain(did)%SH2OX_tr(IX,JX,NSOIL) )
-     rt_domain(did)%SH2OX_tr = 0.0
+     !allocate( rt_domain(did)%SMC_tr(IX,JX,NSOIL) )
+     !rt_domain(did)%SMC_tr = 0.0
 
-     allocate( rt_domain(did)%SMC_SUB(IX,JX,NSOIL) )
-     rt_domain(did)%SMC_SUB = 0.0
+     !allocate( rt_domain(did)%SH2OX_tr(IX,JX,NSOIL) )
+     !rt_domain(did)%SH2OX_tr = 0.0
 
-     allocate( rt_domain(did)%SH2OX_SUB(IX,JX,NSOIL) )
-     rt_domain(did)%SH2OX_SUB = 0.0
+     !allocate( rt_domain(did)%SMC_SUB(IX,JX,NSOIL) )
+     !rt_domain(did)%SMC_SUB = 0.0
 
-     allocate( rt_domain(did)%SICE_tr(IX,JX,NSOIL) )
-     rt_domain(did)%SICE_tr = 0.0
+     !allocate( rt_domain(did)%SH2OX_SUB(IX,JX,NSOIL) )
+     !rt_domain(did)%SH2OX_SUB = 0.0
 
-     allocate( rt_domain(did)%SICE_SUB(IX,JX,NSOIL) )
-     rt_domain(did)%SICE_SUB = 0.0
+     !allocate( rt_domain(did)%SICE_tr(IX,JX,NSOIL) )
+     !rt_domain(did)%SICE_tr = 0.0
+
+     !allocate( rt_domain(did)%SICE_SUB(IX,JX,NSOIL) )
+     !rt_domain(did)%SICE_SUB = 0.0
 
      ! Water tracer - RT grid
 
@@ -449,11 +451,11 @@ print *, "In rt_allocate: Before tracer3"
      ! allocate( rt_domain(did)%SMCMAXRT_SUB(IXRT,JXRT,NSOIL) )
      !  rt_domain(did)%SMCMAXRT_SUB = 0.0
 
-     allocate( rt_domain(did)%SH2OAGGRT_tr(NSOIL) )
-     rt_domain(did)%SH2OAGGRT_tr = 0.0
+     !allocate( rt_domain(did)%SH2OAGGRT_tr(NSOIL) )
+     !rt_domain(did)%SH2OAGGRT_tr = 0.0
 
-     allocate( rt_domain(did)%SH2OAGGRT_SUB(NSOIL) )
-     rt_domain(did)%SH2OAGGRT_SUB = 0.0
+     !allocate( rt_domain(did)%SH2OAGGRT_SUB(NSOIL) )
+     !rt_domain(did)%SH2OAGGRT_SUB = 0.0
 
      ! check...moved
 
@@ -467,11 +469,11 @@ print *, "In rt_allocate: Before tracer3"
 
      !  rt_domain(did)%LSMVOL_tr = 0.0
 
-     allocate( rt_domain(did)%INFXSWGT_tr(IXRT,JXRT) )
-     rt_domain(did)%INFXSWGT_tr = 0.0
+     !allocate( rt_domain(did)%INFXSWGT_tr(IXRT,JXRT) )
+     !rt_domain(did)%INFXSWGT_tr = 0.0
 
-     allocate( rt_domain(did)%SH2OWGT_tr(IXRT,JXRT,NSOIL) )
-     rt_domain(did)%SH2OWGT_tr = 0.0
+     !allocate( rt_domain(did)%SH2OWGT_tr(IXRT,JXRT,NSOIL) )
+     !rt_domain(did)%SH2OWGT_tr = 0.0
 
   end if
 
@@ -646,9 +648,9 @@ print *, "In rt_allocate: Before tracer3"
      print *, "In rt_allocate: Before tracer6"
 ! Water tracer variables - AD_TO_ADD namelist setting if block 
       if (noah_lsm%water_tracer_option > 0) then
-         allocate( rt_domain(did)%HLINK_tr(nsizes) ) 
-         allocate( rt_domain(did)%QLINK_tr(nsizes,2) )
-         allocate( rt_domain(did)%QLateral_tr(nsizes) )
+         !allocate( rt_domain(did)%HLINK_tr(nsizes) ) 
+         !allocate( rt_domain(did)%QLINK_tr(nsizes,2) )
+         !allocate( rt_domain(did)%QLateral_tr(nsizes) )
       end if
 
 !!!! tmp

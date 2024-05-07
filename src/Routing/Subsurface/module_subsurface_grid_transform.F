@@ -74,7 +74,9 @@ module module_subsurface_grid_transform
 
         !----- water tracer variables
 
+        print *, "ADCHECK_tracer_ini: Before ntracer check", ntracer
         if ( present(ntracer) ) then
+        print *, "ADCHECK_tracer_ini: In ntracer check"
         ! check to see if smcrt_tr is allocated
         if ( .not. allocated(this%smcrt_tr) ) then
             allocate( this%smcrt_tr(ix,jx,ntracer) )
