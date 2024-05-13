@@ -1965,7 +1965,7 @@ end subroutine land_driver_ini
                T_PHY(:,1,:), QV_CURR(:,1,:), U_PHY(:,1,:), V_PHY(:,1,:), &
                P8W(:,1,:), GLW, SWDOWN, RAINBL_tmp, &
                LAI, SNOWBL, VEGFRA, state%SNOWH, &
-               ITIME, noah_lsm%FORCING_TIMESTEP, prcp0)
+               ITIME,noah_lsm%FORCING_TIMESTEP,noah_lsm%noah_timestep,prcp0)
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
            call geth_newdate(newdate, forcDate, noah_lsm%FORCING_TIMESTEP)
@@ -2152,22 +2152,26 @@ end subroutine land_driver_ini
 #endif
          do ilake = 1, nlakes
            
-           print *, "evapb",lake_evap(ilake),lake_idx
            ! find ID for this lake:
            lake_idx = rt_domain(did)%lakeidm(ilake)
            lake_grids(ilake) = count(mask = lake_id == lake_idx)
            lake_precip(ilake) = sum(rainbl, mask = lake_id == lake_idx)
            lake_evap(ilake)   = sum(qfx, mask = lake_id == lake_idx)
            
-           print *, "evapa",lake_evap(ilake),lake_idx
-           ! update lake depth based on based on net (P-ET) at surface
+           ! update lake depth based on based on net (P-ET+resnetoutflow) at surface
            ! lake_precip units converted from mm/s to m
            ! lake_evap units converted from kg/m2/s to m
+           ! lake outflow m^3/s converted to meters for each lake pixel
            ! dtbl is time step in seconds
-           lake_dh_avg(ilake) = (lake_precip(ilake) - lake_evap(ilake)*3600. + lake_netoutflow(ilake)) * dtbl/3600./1000.
+           lake_dh_avg(ilake) = (lake_precip(ilake)/lake_grids(ilake) &
+                - lake_evap(ilake)*3600./lake_grids(ilake))*dtbl/3600./1000.& 
+                + lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
 
            where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
-           print *, "dhlake",dtbl,lake_precip(ilake),lake_evap(ilake),lake_netoutflow(ilake),lake_grids(ilake)
+
+           print *, "dhlake", (lake_precip(ilake)/lake_grids(ilake))*dtbl/3600./1000.,&
+                              (lake_evap(ilake)/lake_grids(ilake)*3600)*dtbl/3600./1000.,&
+                              lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
 
          end do
 
