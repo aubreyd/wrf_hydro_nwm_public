@@ -24,7 +24,7 @@ integer, parameter :: numLdasVars = 116
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
 integer, parameter :: numLdasVars_crocus_off = 98
 
-integer, parameter :: numRtDomainVars = 5
+integer, parameter :: numRtDomainVars = 8
 integer, parameter :: numLakeVars = 2
 integer, parameter :: numChGrdVars = 1
 integer, parameter :: numLsmVars = 14
@@ -1769,20 +1769,20 @@ subroutine initRtDomainDict(rtDomainDict,procId,diagFlag)
    endif
 
    rtDomainDict%varNames(:) = [character(len=64) :: "zwattablrt","sfcheadsubrt","QSTRMVOLRT",&
-                               "QBDRYRT","SOIL_M"]
+                               "QBDRYRT","SOIL_M","qsub","elrt","nexp"]
    rtDomainDict%longName(:) = [character(len=64) :: "depth to saturation, rounded to highest saturated layer",&
                                "surface head","channel inflow",&
                                "accumulated value of the boundary flux, + into domain - out of domain",&
-                               "volumetric soil moisture"]
-   rtDomainDict%units(:) = [character(len=64) :: "m","mm","mm","mm","m3 m-3"]
-   rtDomainDict%scaleFactor(:) = [0.1,1.0,1.0,1.0,0.01]
-   rtDomainDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0]
-   rtDomainDict%outFlag(:) = [0,0,0,0,0]
-   rtDomainDict%timeZeroFlag(:) = [1,1,1,1,1]
-   rtDomainDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
-   rtDomainDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
-   rtDomainDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, -1000000.0d0, 0.0d0]
-   rtDomainDict%validMaxDbl(:) = [100.0d0, 1000000.0d0, 1000000.0d0, 1000000.0d0, 100.0d0]
+                               "volumetric soil moisture", "subsurface flow","elev","nexp"]
+   rtDomainDict%units(:) = [character(len=64) :: "m","mm","mm","mm","m3 m-3","m3/s","m",""]
+   rtDomainDict%scaleFactor(:) = [0.1,1.0,1.0,1.0,0.01,0.0001,0.0001,0.0001]
+   rtDomainDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+   rtDomainDict%outFlag(:) = [0,0,0,0,0,0,0,0]
+   rtDomainDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1]
+   rtDomainDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   rtDomainDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   rtDomainDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, -1000000.0d0, 0.0d0, -1000.0d0,-1000.0d0, 0.0d0]
+   rtDomainDict%validMaxDbl(:) = [100.0d0, 1000000.0d0, 1000000.0d0, 1000000.0d0, 100.0d0, 1000.0d0,100000.0d0,1000.0d0]
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.

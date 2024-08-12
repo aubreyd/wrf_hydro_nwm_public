@@ -1876,25 +1876,25 @@ subroutine output_rt_NWM(domainId,iGrid)
 
    if(nlst(domainId)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,1,1,1,1]
    else if(nlst(domainId)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else if(nlst(domainId)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else if(nlst(domainId)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else if(nlst(domainId)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else if(nlst(domainId)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else if(nlst(domainId)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,1,0,0,0]
+      fileMeta%outFlag(:) = [1,1,0,0,0,0,0,0]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -2250,6 +2250,12 @@ subroutine output_rt_NWM(domainId,iGrid)
                      varRealTmp = RT_DOMAIN(domainId)%overland%control%boundary_flux(iTmp,jTmp)
                   else if(iTmp2 .eq. 5) then
                      varRealTmp = rt_domain(domainId)%subsurface%grid_transform%smcrt(iTmp,jTmp,zTmp)
+                  else if(iTmp2 .eq. 6) then
+                     varRealTmp = rt_domain(domainId)%subsurface%state%qsubrt(iTmp,jTmp)
+                  else if(iTmp2 .eq. 7) then
+                     varRealTmp = rt_domain(domainId)%elrt(iTmp,jTmp)
+                  else if(iTmp2 .eq. 8) then
+                     varRealTmp = rt_domain(domainId)%subsurface%properties%nexprt(iTmp,jTmp)
                   endif
 
                   ! Run a quick gross check on values to ensure they aren't outside our

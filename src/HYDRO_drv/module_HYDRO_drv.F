@@ -584,6 +584,8 @@ module module_HYDRO_drv
         integer:: did
         integer:: rst_out
 
+        integer:: iprint, jprint
+
 !       call HYDRO_out(did)
 
 
@@ -599,6 +601,11 @@ module module_HYDRO_drv
 !              ! does not run the NOAH LASF model, only read the parameter
 !              call read_land_par(did,lsm(did)%ix,lsm(did)%jx)
 !          endif
+
+iprint=23
+jprint=21
+
+print *, "ADCHECK_hydroexe_start: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
 
 
 if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
@@ -624,6 +631,8 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
          endif
       endif
 
+print *, "ADCHECK_hydroexe_after_disag: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
+
 #ifdef HYDRO_D
       call system_clock(count=clock_count_1, count_rate=clock_rate)
 #endif
@@ -646,6 +655,7 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 #endif
    end if !! channel_only & channelBucket_only == 0
 
+print *, "ADCHECK_hydroexe_after_subsfc: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
 
    ! step 3) todo split
    if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
@@ -690,6 +700,8 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 #endif
 #endif
 
+print *, "ADCHECK_hydroexe_after_ovrt: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
+
       RT_DOMAIN(did)%QSTRMVOLRT_TS = rt_domain(did)%overland%streams_and_lakes%surface_water_to_channel
       RT_DOMAIN(did)%QSTRMVOLRT_ACC = RT_DOMAIN(did)%QSTRMVOLRT_ACC + RT_DOMAIN(did)%QSTRMVOLRT_TS
 
@@ -721,6 +733,8 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 #endif
    end if !! channel_only == 0
 
+print *, "ADCHECK_hydroexe_after_gw: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
+
    ! step 5) river channel physics
    call driveChannelRouting(did)
 #ifdef HYDRO_D
@@ -733,6 +747,8 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 #endif
 #endif
 
+print *, "ADCHECK_hydroexe_after_chan: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
+
    !! if not channel_only
    if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
 
@@ -742,6 +758,8 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
       endif
 
    end if !! channel_only & channelBucket_only == 0
+
+print *, "ADCHECK_hydroexe_after_agg: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
 
 end if
 
@@ -755,6 +773,7 @@ end if
            call HYDRO_time_adv(did)
            call HYDRO_out(did, 1)
 
+print *, "ADCHECK_hydroexe_after_hydro_out: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
 
 !           write(90 + my_id,*) "finish calling hydro_exe"
 !           call flush(90+my_id)
