@@ -606,7 +606,12 @@ iprint=23
 jprint=21
 
 print *, "ADCHECK_hydroexe_start: smcrt", rt_domain(did)%subsurface%grid_transform%smcrt(iprint,jprint,:)
-
+              print *, "   ------------"
+              print *, "   ELEV"
+              print *,     rt_domain(did)%elrt(iprint-1,jprint+1), rt_domain(did)%elrt(iprint,jprint+1), rt_domain(did)%elrt(iprint+1,jprint+1)
+              print *,     rt_domain(did)%elrt(iprint-1,jprint), rt_domain(did)%elrt(iprint,jprint), rt_domain(did)%elrt(iprint+1,jprint)
+              print *,     rt_domain(did)%elrt(iprint-1,jprint-1), rt_domain(did)%elrt(iprint,jprint-1), rt_domain(did)%elrt(iprint+1,jprint-1)
+              print *, "   ------------"
 
 if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
     nlst(did)%SUBRTSWCRT         .ne. 0 .or. &

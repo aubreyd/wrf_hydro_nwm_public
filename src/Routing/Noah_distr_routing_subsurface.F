@@ -148,7 +148,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     REAL (KIND=double) :: smctot1a,smctot2a
     INTEGER :: kx,count
 
-    INTEGER :: iprint, jprint
+    INTEGER :: iprint, jprint, yesprint
 
 #ifdef HYDRO_D
     ! ADCHANGE: Water balance variables
@@ -164,11 +164,11 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     !DJG    - SUBSURFACE ROUITNG ONLY PERFORMED ON SATURATED LAYERS
     !DJG -----------------------------------------------------------------
 
-    !iprint = 23
-    !jprint = 21
+    iprint = 23
+    jprint = 21
 
-    iprint = 42
-    jprint = 20
+    !iprint = 42
+    !jprint = 20
 
     !Z. Cui -----------------------------------------------------------------
     !Move SUBDT initialization up to avoid crash when HYDRO_D is defined
@@ -278,22 +278,32 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     DO I=1,subrt_static%IXRT
         DO J=1,subrt_static%JXRT
 
+            yesprint = 0
+            !if ((i .ge. (iprint-1) .and. i .le. (iprint+1)) .and. (j .ge. (jprint-1) .and. j .le. (jprint+1))) yesprint = 1
+            if ( i .eq. iprint .and. j .eq. jprint ) yesprint = 1
+
             !!DJG Check for courant condition violation...put limit on qsub
             !!DJG QSUB HAS units of m^3/s SUBFLO has units of m
 
             ! ADCHANGE: Moved this constraint to the ROUTE_SUBSURFACE routines
-            !IF (CWATAVAIL(i,j).le.ABS(qsubrt(i,j))/subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT) THEN
-            !  subrt_data%state%qsubrt(i,j) = -1.0*CWATAVAIL(i,j)
-            !  SUBFLO = subrt_data%state%qsubrt(i,j)  !Units of qsubrt converted via CWATAVAIL
-            !ELSE
+            IF (CWATAVAIL(i,j).le.ABS(subrt_data%state%qsubrt(i,j))/subrt_data%properties%distance_to_neighbor(i,j,9)*SUBDT) THEN
+              if (yesprint) then
+                print *, "ADCHECK_LIMITING_OUTLOOP! i j", i, j
+                print *, "   cwatavail qsubrt", CWATAVAIL(i,j), subrt_data%state%qsubrt(i,j)
+                print *, "   area", subrt_data%properties%distance_to_neighbor(i,j,9)
+              endif
+              subrt_data%state%qsubrt(i,j) = -1.0*CWATAVAIL(i,j)
+              SUBFLO = subrt_data%state%qsubrt(i,j)  !Units of qsubrt converted via CWATAVAIL
+            ELSE
             SUBFLO = subrt_data%state%qsubrt(i,j) / subrt_data%properties%distance_to_neighbor(i,j,9) * SUBDT !Convert qsubrt from m^3/s to m
-            !END IF
+            END IF
 
             WATAVAIL = 0.  !Initialize to 0. for every cell...
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_drv_after_rtg: qsub SUBFLO", subrt_data%state%qsubrt(i,j), SUBFLO
-               print *, "     smc", subrt_data%grid_transform%smcrt(I,J,:)
+            if (yesprint) then
+               print *, "ADCHECK_drv_after_rtg: i j", i, j
+               print *, "   qsub SUBFLO", subrt_data%state%qsubrt(i,j), SUBFLO
+               print *, "   smc", subrt_data%grid_transform%smcrt(I,J,:)
             endif
 
             !!DJG Begin loop through soil profile to adjust soil water content
@@ -304,9 +314,10 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                 ! Loop through soil layers from bottom to top
                 DO KK=subrt_static%nsoil,1,-1
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_subflo+_lyr_loop_ini: lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
-               print *, "     smcmax sldpth", subrt_data%grid_transform%smcmaxrt(I,J,KK), subrt_data%properties%sldpth(KK)
+            if (yesprint) then
+               print *, "ADCHECK_subflo+_lyr_loop_ini: i j", i, j
+               print *, "   lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
+               print *, "   smcmax sldpth", subrt_data%grid_transform%smcmaxrt(I,J,KK), subrt_data%properties%sldpth(KK)
             endif
 
                     ! Check for saturated layers
@@ -328,9 +339,10 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                         END IF
                     END IF
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_subflo+_lyr_loop: lyr WATAVAIL SUBFLO", KK, WATAVAIL, SUBFLO
-               print *, "     smc", subrt_data%grid_transform%smcrt(I,J,KK)
+            if (yesprint) then
+               print *, "ADCHECK_subflo+_lyr_loop: i j", i, j
+               print *, "   lyr WATAVAIL SUBFLO", KK, WATAVAIL, SUBFLO
+               print *, "   smc", subrt_data%grid_transform%smcrt(I,J,KK)
             endif
 
                     IF (SUBFLO.EQ.0.) EXIT
@@ -346,8 +358,9 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                     SUBFLO=0.
                 END IF
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_after_subflo+_lyr_loop: infilexcess SUBFLO", subrt_input%infiltration_excess(I,J), SUBFLO
+            if (yesprint) then
+               print *, "ADCHECK_after_subflo+_lyr_loop: i j", i, j
+               print *, "   infilexcess SUBFLO", subrt_input%infiltration_excess(I,J), SUBFLO
             endif
 
                 !DJG Error trap...
@@ -372,27 +385,30 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                 DO KK=SATLYRCHK(I,J),subrt_static%nsoil
                     WATAVAIL = (subrt_data%grid_transform%smcrt(I,J,KK) - subrt_data%grid_transform%smcrefrt(I,J,KK)) * subrt_data%properties%sldpth(KK)
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_subflo-_lyr_loop_ini: lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
-               print *, "     smcmax smcref sldpth", subrt_data%grid_transform%smcmaxrt(I,J,KK), subrt_data%grid_transform%smcrefrt(I,J,KK), subrt_data%properties%sldpth(KK)
-               print *, "     WATAVAIL", WATAVAIL
+            if (yesprint) then
+               print *, "ADCHECK_subflo-_lyr_loop_ini: i j", i, j
+               print *, "   lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
+               print *, "   smcmax smcref sldpth", subrt_data%grid_transform%smcmaxrt(I,J,KK), subrt_data%grid_transform%smcrefrt(I,J,KK), subrt_data%properties%sldpth(KK)
+               print *, "   WATAVAIL", WATAVAIL
             endif
 
                     IF (WATAVAIL.GE.ABS(SUBFLO)) THEN
                         !?yw mod                 IF (WATAVAIL.GE.(ABS(SUBFLO)+0.000001) ) THEN
                         subrt_data%grid_transform%smcrt(I,J,KK) = subrt_data%grid_transform%smcrt(I,J,KK) + SUBFLO/subrt_data%properties%sldpth(KK)
                         SUBFLO=0.
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_subflo-_watavail_gt_subflo: lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
-               print *, "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL
+            if (yesprint) then
+               print *, "ADCHECK_subflo-_watavail_gt_subflo: i j", i, j
+               print *, "   lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
+               print *, "   SUBFLO WATAVAIL", SUBFLO, WATAVAIL
             endif
 
                     ELSE     ! Since subflo is small on a time-step following is unlikely...
                         subrt_data%grid_transform%smcrt(I,J,KK) = subrt_data%grid_transform%smcrefrt(I,J,KK)
                         SUBFLO=SUBFLO+WATAVAIL
-            if (i .eq. iprint .and. j .eq. jprint) then
-               print *, "ADCHECK_subflo-_watavail_le_subflo: lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
-               print *, "     SUBFLO WATAVAIL", SUBFLO, WATAVAIL
+            if (yesprint) then
+               print *, "ADCHECK_subflo-_watavail_le_subflo: i j", i, j
+               print *, "   lyr smc", KK, subrt_data%grid_transform%smcrt(I,J,KK)
+               print *, "   SUBFLO WATAVAIL", SUBFLO, WATAVAIL
             endif
                     END IF
                     IF (SUBFLO.EQ.0.) EXIT
@@ -516,16 +532,16 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
 
     !DJG Local Variables
     INTEGER :: KK,i,j
-    INTEGER :: iprint, jprint
+    INTEGER :: iprint, jprint, yesprint
 
     !!!! Find saturated layer depth...
     ! Loop through domain to determine sat. layers and assign wat tbl depth...
 
-    !iprint = 23
-    !jprint = 21
+    iprint = 23
+    jprint = 21
 
-    iprint = 42
-    jprint = 20
+    !iprint = 42
+    !jprint = 20
 
     SATLYRCHK = 0  !set flag for sat. layers
     CWATAVAIL = 0.  !set wat avail for subsfc rtng = 0.
@@ -535,6 +551,10 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
 
     DO J=1,JXRT
         DO I=1,IXRT
+
+            yesprint = 0
+            !if ((i .ge. (iprint-1) .and. i .le. (iprint+1)) .and. (j .ge. (jprint-1) .and. j .le. (jprint+1))) yesprint = 1
+            if ( i .eq. iprint .and. j .eq. jprint ) yesprint = 1
 
             ! Loop through soil layers from bottom to top
             DO KK=NSOIL,1,-1
@@ -552,8 +572,9 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
 
             END DO
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_findzwat_after_satlyrchk: satlyrchk", SATLYRCHK(i, j)
+            if (yesprint) then
+              print *, "ADCHECK_findzwat_after_satlyrchk: i j", i, j
+              print *, "   satlyrchk", SATLYRCHK(i, j)
             end if
 
             ! Designate ZWATTABLRT based on highest sat. layer and
@@ -588,8 +609,9 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                 SATLYRCHK(I,J) = NSOIL + 1
             END IF
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_findzwat_after_cwatavail: zwattblrt", ZWATTABLRT(I,J)
+            if (yesprint) then
+              print *, "ADCHECK_findzwat_after_cwatavail: i j", i, j
+              print *, "     zwattblrt", ZWATTABLRT(I,J)
               print *, "     cwatavail", CWATAVAIL(I,J)
             end if
 
@@ -664,13 +686,13 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    real*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
    ! Local parameters
    real :: tmp_dist(9)
-   integer :: iprint, jprint
+   integer :: iprint, jprint, yesprint
 
-   !iprint = 23
-   !jprint = 21
+   iprint = 23
+   jprint = 21
 
-    iprint = 42
-    jprint = 20
+   !iprint = 42
+   !jprint = 20
 
    ! Initialize temp variables
    qsub_tmp = 0.
@@ -684,6 +706,10 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
 
       do i=2,XX-1 ! start i loop
 
+         yesprint = 0
+         !if ((i .ge. (iprint-1) .and. i .le. (iprint+1)) .and. (j .ge. (jprint-1) .and. j .le. (jprint+1))) yesprint = 1
+         if ( i .eq. iprint .and. j .eq. jprint ) yesprint = 1
+
          if (i.ge.2.AND.i.le.XX-1.AND.j.ge.2.AND.j.le.YY-1) then !if grdcl chk
             ! check for boundary grid point?
 
@@ -693,14 +719,38 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
             index = SO8RT_D(i,j,3)
             !beta = -1.0
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_sub_ini: IXX0 JYY0", IXX0, JYY0
+            if (yesprint) then
+              print *, "ADCHECK_sub_ini: i j", i, j
+              print *, "   IXX0 JYY0", IXX0, JYY0
               print *, "   z zneigh", z(i,j), z(IXX0,JYY0)
               print *, "   nexp nexp_neigh", nexp(i,j), nexp(IXX0,JYY0)
+              print *, "   index", index
+              print *, "   ------------"
+              print *, "   nexp"
               print *,     nexp(i-1,j+1), nexp(i,j+1), nexp(i+1,j+1)
               print *,     nexp(i-1,j), nexp(i,j), nexp(i+1,j)
               print *,     nexp(i-1,j-1), nexp(i,j-1), nexp(i+1,j-1)
-              print *, "   index", index
+              print *, "   ------------"
+              print *, "   latksat"
+              print *,     latksat(i-1,j+1), latksat(i,j+1), latksat(i+1,j+1)
+              print *,     latksat(i-1,j), latksat(i,j), latksat(i+1,j)
+              print *,     latksat(i-1,j-1), latksat(i,j-1), latksat(i+1,j-1)
+              print *, "   ------------"
+              print *, "   z"
+              print *,     z(i-1,j+1), z(i,j+1), z(i+1,j+1)
+              print *,     z(i-1,j), z(i,j), z(i+1,j)
+              print *,     z(i-1,j-1), z(i,j-1), z(i+1,j-1)
+              print *, "   ------------"
+              print *, "   SO8RT_D index"
+              print *,     SO8RT_D(i-1,j+1,3), SO8RT_D(i,j+1,3), SO8RT_D(i+1,j+1,3)
+              print *,     SO8RT_D(i-1,j,3), SO8RT_D(i,j,3), SO8RT_D(i+1,j,3)
+              print *,     SO8RT_D(i-1,j-1,3), SO8RT_D(i,j-1,3), SO8RT_D(i+1,j-1,3)
+              print *, "   ------------"
+              print *, "   CWATAVAIL"
+              print *,     CWATAVAIL(i-1,j+1), CWATAVAIL(i,j+1), CWATAVAIL(i+1,j+1)
+              print *,     CWATAVAIL(i-1,j), CWATAVAIL(i,j), CWATAVAIL(i+1,j)
+              print *,     CWATAVAIL(i-1,j-1), CWATAVAIL(i,j-1), CWATAVAIL(i+1,j-1)
+              print *, "   ------------"
             endif
 
             ! ADCHANGE: Always call routine to check for steepest elev+head slope
@@ -718,8 +768,9 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                 call hydro_stop("In ROUTE_SUBSURFACE1() - soldep is = zero")
             endif
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_after_getsub8: IXX0 JYY0", IXX0, JYY0
+            if (yesprint) then
+              print *, "ADCHECK_after_getsub8: i j", i, j
+              print *, "   IXX0 JYY0", IXX0, JYY0
               print *, "   z zneigh", z(i,j), z(IXX0,JYY0)
               print *, "   nexp nexp_neigh", nexp(i,j), nexp(IXX0,JYY0)
               print *, "   index beta", index, beta
@@ -748,8 +799,9 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp(i,j) ) * beta
                qqsub = gamma * hh
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_after_fluxcalc: hh ksat", hh, ksat
+            if (yesprint) then
+              print *, "ADCHECK_after_fluxcalc: i j", i, j
+              print *, "   hh ksat", hh, ksat
               print *, "   gamma qqsub", gamma, qqsub
             endif
 
@@ -758,11 +810,16 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                ! Calculate total water to route (where dist(i,j,9) is cell area):
                waterToRoute = ABS(qqsub) / dist(i,j,9) * SUBDT
                if ( (qqsub .le. 0.0) .and. (CWATAVAIL(i,j) .lt. waterToRoute) ) THEN
-                  qqsub = -1.0 * CWATAVAIL(i,j) * dist(i,j,9) / SUBDT
+                  if (yesprint) then
+                    print *, "ADCHECK_LIMITING_INLOOP! i j", i, j
+                    print *, "   qqsub, waterToRoute, CWATAVAIL", qqsub, waterToRoute, CWATAVAIL(i,j)
+                  endif
+                  !qqsub = -1.0 * CWATAVAIL(i,j) * dist(i,j,9) / SUBDT
                endif
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_after_watercheck: CWATAVAIL qqsub", CWATAVAIL(i,j), qqsub
+            if (yesprint) then
+              print *, "ADCHECK_after_watercheck: i j", i, j
+              print *, "   CWATAVAIL qqsub", CWATAVAIL(i,j), qqsub
             endif
 
                ! Remove from cell qsub to track net fluxes over full i, j loop
@@ -782,8 +839,9 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                   call hydro_stop("In ROUTE_SUBSURFACE1() - qqsub should be negative")
                endif
 
-            if (i .eq. iprint .and. j .eq. jprint) then
-              print *, "ADCHECK_after_qsubadj: qsub_self qsubtmp_self", qsub(i,j), qsub_tmp(i,j)
+            if (yesprint) then
+              print *, "ADCHECK_after_qsubadj: i j", i, j
+              print *, "   qsub_self qsubtmp_self", qsub(i,j), qsub_tmp(i,j)
               print *, "   qsub_neigh qsubtmp_neigh", qsub(ixx0,jyy0), qsub_tmp(ixx0,jyy0)
             endif
 
