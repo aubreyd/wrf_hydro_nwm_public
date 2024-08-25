@@ -905,7 +905,7 @@ subroutine disaggregateDomain_drv(did)
                             rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater, &
                             rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj, &
                             RT_DOMAIN(did)%bedrocklyr, rt_domain(did)%subsurface%properties%bedrocklyr_rt,  &
--                           rt_domain(did)%subsurface%properties%zsoil, rt_domain(did)%subsurface%properties%soldeprt )
+                            rt_domain(did)%subsurface%properties%zsoil, rt_domain(did)%subsurface%properties%soldeprt )
 end subroutine disaggregateDomain_drv
 
 !===================================================================================================
