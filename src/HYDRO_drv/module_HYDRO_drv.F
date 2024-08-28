@@ -161,6 +161,7 @@ module module_HYDRO_drv
             !           qfx_tmp, prcp_out_tmp, etpndx_tmp
 
         outflag = -99
+        print *, "ADCHECK: Starting HYDRO_out"
 
 #ifdef MPP_LAND
         if(IO_id .eq. my_id) then
@@ -168,13 +169,16 @@ module module_HYDRO_drv
             if(nlst(did)%olddate(1:19) .eq. nlst(did)%startdate(1:19) .and. rt_domain(did)%his_out_counts .eq. 0) then
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
+                print *, "ADCHECK: Before write"
                 write(6,*) "output hydrology at time : ",nlst(did)%olddate(1:19), rt_domain(did)%his_out_counts
 #else
+                print *, "ADCHECK: Before write wcoss"
                 write(78,*) "output hydrology at time : ",nlst(did)%olddate(1:19), rt_domain(did)%his_out_counts
 #endif
 #endif
                 outflag = 99
             else
+                print *, "ADCHECK: Before newdate"
                 if(nlst(did)%dt .gt. nlst(did)%out_dt*60) then
                     call geth_newdate(out_date, nlst(did)%startdate, nint(nlst(did)%dt*rt_domain(did)%out_counts))
                 else
@@ -183,8 +187,10 @@ module module_HYDRO_drv
                 if ( out_date(1:19) == nlst(did)%olddate(1:19) ) then
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
+                    print *, "ADCHECK: Before write2"
                     write(6,*) "output hydrology at time : ",nlst(did)%olddate(1:19)
 #else
+                    print *, "ADCHECK: Before write2 wcoss"
                     write(78,*) "output hydrology at time : ",nlst(did)%olddate(1:19)
 #endif
 #endif
@@ -193,9 +199,11 @@ module module_HYDRO_drv
             endif
 #ifdef MPP_LAND
         endif
+        print *, "ADCHECK: Before bcast"
         call mpp_land_bcast_int1(outflag)
 #endif
 
+        print *, "ADCHECK: Before restart out"
         if (rstflag .eq. 1) call HYDRO_rst_out(did)
 
         if (outflag .lt. 0) return
@@ -249,6 +257,7 @@ module module_HYDRO_drv
                     ".LSMOUT_DOMAIN"//trim(nlst(did)%hgrid)),     &
                     did)
             else
+                print *, "ADCHECK: Before lsm out"
                 call output_lsmOut_NWM(did)
             endif
         endif
@@ -271,6 +280,7 @@ module module_HYDRO_drv
                     ! Output gridded routing variables on National Water Model
                     ! high-res routing grid
                     if(nlst(did)%io_form_outputs .ne. 0) then
+                        print *, "ADCHECK: Before rtout out"
                         call output_rt_NWM(did,nlst(did)%igrid)
                     else
                         call output_rt(    &
@@ -301,6 +311,7 @@ module module_HYDRO_drv
                 if(nlst(did)%GWBASESWCRT .ne. 0) then
                     if(nlst(did)%channel_only .eq. 0) then
                         if(nlst(did)%output_gw .ne. 0) then
+                            print *, "ADCHECK: Before gw out"
                             call output_gw_NWM(did,nlst(did)%igrid)
                         endif
                     endif
@@ -362,6 +373,7 @@ module module_HYDRO_drv
                 if(nlst(did)%io_form_outputs .ne. 0) then
                     ! Call National Water Model output routine for output on NHD forecast points.
                     if(nlst(did)%CHRTOUT_DOMAIN .ne. 0) then
+                        print *, "ADCHECK: Before chrt out"
                         call output_chrt_NWM(did)
                     endif
                     ! Call the subroutine to output frxstPts.
@@ -370,6 +382,7 @@ module module_HYDRO_drv
                     endif
                     ! Call the subroutine to output CHANOBS
                     if(nlst(did)%CHANOBS_DOMAIN .ne. 0) then
+                        print *, "ADCHECK: Before chanobs out"
                         call output_chanObs_NWM(did)
                     endif
                 else
@@ -446,6 +459,7 @@ module module_HYDRO_drv
                         RT_DOMAIN(did)%g_ixrt,RT_DOMAIN(did)%g_jxrt )
 #endif
                 else
+                    print *, "ADCHECK: Before chgrid out"
                     call output_chrtout_grd_NWM(did,nlst(did)%igrid)
                 endif
             endif
@@ -453,6 +467,7 @@ module module_HYDRO_drv
                 if(nlst(did)%io_form_outputs .ne. 0) then
                     ! Output lakes in NWM format
                     if(nlst(did)%outlake .ne. 0) then
+                        print *, "ADCHECK: Before lake out"
                         call output_lakes_NWM(did,nlst(did)%igrid)
                     endif
                 else
@@ -753,6 +768,7 @@ end if
 !          call HYDRO_out(did)
 !yw  endif
            call HYDRO_time_adv(did)
+     print *, "ADCHECK: Before outputs"
            call HYDRO_out(did, 1)
 
 
@@ -766,7 +782,7 @@ end if
            if(allocated(RT_DOMAIN(did)%SOLDRAIN)) RT_DOMAIN(did)%SOLDRAIN = 0
            if(allocated(rt_domain(did)%subsurface%state%qsubrt))   RT_DOMAIN(did)%subsurface%state%qsubrt   = 0
 
-
+      print *, "ADCHECK: After outputs"
 
       end subroutine HYDRO_exe
 
@@ -1052,6 +1068,7 @@ endif
 #endif
 
 #ifdef HYDRO_D
+if (.FALSE.) then
 ! ADCHANGE: START Initial water balance variables
 ! ALL VARS in MM
         suminfxsrt1 = 0.
@@ -1074,6 +1091,7 @@ endif
         smcrttot1 = smcrttot1/float(numprocs)
 #endif
 ! END Initial water balance variables
+endif
 #endif
 
         do J=1,RT_DOMAIN(did)%JX
@@ -1244,6 +1262,7 @@ endif
 	RT_DOMAIN(did)%SMC = RT_DOMAIN(did)%SH2OX + RT_DOMAIN(did)%SICE
 
 #ifdef HYDRO_D
+if (.FALSE.) then
 ! ADCHANGE: START Final water balance variables
 ! ALL VARS in MM
         suminfxs2 = 0.
@@ -1288,6 +1307,7 @@ endif
 #ifdef MPP_LAND
 	endif
 #endif
+endif
 ! END Final water balance variables
 #endif
 

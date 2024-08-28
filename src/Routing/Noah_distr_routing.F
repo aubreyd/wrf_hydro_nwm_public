@@ -1147,6 +1147,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                      SMCMAXRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
                      SMCREFRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
                      SMCWLTRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT)
+
                   end if ! end if above bedrock layer
 
                end do !End do for soil profile loop
@@ -1241,8 +1242,10 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    endwhere
 
 #ifdef HYDRO_D
+if (.FALSE.) then
    ! ADCHANGE: START Final water balance variables
    ! ALL VARS in MM
+   print *, "ADCHECK: Before final water budget check"
    suminfxsrt2 = 0.
    smcrttot2 = 0.
    do ii=1,IXRT
@@ -1276,6 +1279,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    endif
 #endif
    ! END Final water balance variables
+endif
 #endif
 
 #ifdef HYDRO_D
