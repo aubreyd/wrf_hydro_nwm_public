@@ -190,13 +190,9 @@ subroutine output_chrt_NWM(domainId)
       myId = 0
    endif
 
-   print *, "ADCHECK: Before initChrtDict"
-
    ! Initialize NWM dictionary derived type containing all the necessary metadat
    ! for the output file.
    call initChrtDict(fileMeta,diagFlag,myId)
-
-   print *, "ADCHECK: Before array binary"
 
    ! Depending on the NWM forecast config, we will be outputting different
    ! varibles. DO NOT MODIFY THESE ARRAYS WITHOUT CONSULTING NCAR OR
@@ -244,8 +240,6 @@ subroutine output_chrt_NWM(domainId)
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
-
-   print *, "ADCHECK: Before allocations"
 
    ! First step is to collect and assemble all data that will be written to the
    ! NetCDF file. If we are not using MPI, we bypass the collection step through
@@ -358,8 +352,6 @@ subroutine output_chrt_NWM(domainId)
          !-------------------------
       endif
 
-      print *, "ADCHECK: Before local var allocations"
-
       ! Allocate local streamflow and velocity arrays. We need to do a check to
       ! for lake_type 2. However, we cannot set the values in the global array
       ! to missing as this causes the model to crash.
@@ -377,7 +369,6 @@ subroutine output_chrt_NWM(domainId)
         allocate(strFlowLocal_tr(RT_DOMAIN(domainId)%NLINKS))
         strFlowLocal_tr = RT_DOMAIN(domainId)%QLINK_tr(:,1)
       end if
-      print *, "ADCHECK: Before local lake adjust"
 
       ! Loop through all the local links on this processor. For lake_type
       ! of 2, we need to manually set the streamflow and velocity values
@@ -401,34 +392,26 @@ subroutine output_chrt_NWM(domainId)
       ! assemble into global arrays previously allocated.
       if(nlst(domainId)%channel_option .ne. 3) then
          ! Reach-based routing collection
-         print *, "ADCHECK: Before chrt var writes"
          print *, "  strFlowLocal", strFlowLocal
          print *, "  g_qlink1", g_qlink(:,1)
          print *, "  nlinks", RT_DOMAIN(domainId)%NLINKS
          print *, "  gsize", gsize
 #ifdef MPP_LAND
-         print *, "ADCHECK: Before tracer var writes qlink1"
          call ReachLS_write_io(strFlowLocal,g_qlink(:,1))
-         print *, "ADCHECK: Before tracer var writes qlink2"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK(:,2),g_qlink(:,2))
-         print *, "ADCHECK: Before tracer var writes order"
          call ReachLS_write_io(RT_DOMAIN(domainId)%ORDER,g_order)
          call ReachLS_write_io(RT_DOMAIN(domainId)%linkid,g_linkid)
          call ReachLS_write_io(RT_DOMAIN(domainId)%CHLAT,g_chlat)
          call ReachLS_write_io(RT_DOMAIN(domainId)%CHLON,g_chlon)
          call ReachLS_write_io(RT_DOMAIN(domainId)%ZELEV,g_zelev)
-         print *, "ADCHECK: Before tracer var writes qlateral"
          call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral,g_QLateral)
          call ReachLS_write_io(velocityLocal,g_velocity)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
          !-----water tracer vars------
          if (noah_lsm%water_tracer_option > 0) then
-           print *, "ADCHECK: Before tracer var writes qlink_tr"
            call ReachLS_write_io(strFlowLocal_tr,g_qlink_tr(:,1))
            call ReachLS_write_io(RT_DOMAIN(domainId)%QLINK_tr(:,2),g_qlink_tr(:,2))
-           print *, "ADCHECK: Before tracer var writes qlateral_tr"
            call ReachLS_write_io(RT_DOMAIN(domainId)%QLateral_tr,g_QLateral_tr)
-           print *, "ADCHECK: Before tracer var writes hlink_tr"
            call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK_tr,g_hlink_tr)
          end if
          !----------------------------
@@ -446,7 +429,6 @@ subroutine output_chrt_NWM(domainId)
             fileMeta%outFlag(11) = 1
             call ReachLS_write_io(qlossLocal,g_qloss)
          endif
-         print *, "ADCHECK: Before chrt chann/bucket writes"
          if(nlst(domainId)%UDMP_OPT .eq. 1) then
             ! Currently, we only allow channel-only outputs to be produced for
             ! NWM configurations.
@@ -479,7 +461,6 @@ subroutine output_chrt_NWM(domainId)
          endif
 #endif
       else
-         print *, "ADCHECK: Before chrt gridded var writes"
          ! Gridded routing collection
          call write_chanel_real(strFlowLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,1))
          call write_chanel_real(RT_DOMAIN(domainId)%QLINK(:,2),rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_qlink(:,2))
@@ -505,7 +486,6 @@ subroutine output_chrt_NWM(domainId)
       endif
 
    else
-      print *, "ADCHECK: Before chrt no mpi alloc"
       gSize = rt_domain(domainId)%nlinksl
       ! No MPI - We are running on a single processor
       allocate(g_chlon(gsize))
@@ -579,7 +559,6 @@ subroutine output_chrt_NWM(domainId)
          g_qloss = RT_DOMAIN(domainId)%qloss
       endif
       if(nlst(domainId)%UDMP_OPT .eq. 1) then
-         print *, "ADCHECK: Before chrt qsfc qbuck assign"
          ! Currently, we only allow channel-only outputs to be produced for
          ! NWM configurations.
          if(nlst(domainId)%output_channelBucket_influx .eq. 1 .or. &
@@ -657,7 +636,6 @@ subroutine output_chrt_NWM(domainId)
 
    ! Only run NetCDF library calls to output data if we are on the master
    ! processor.
-   print *, "ADCHECK: Before chrt ascending indx"
    if(myId .eq. 0) then
       if(nlst(domainId)%channel_option .ne. 3) then
          ! Read in index values from Routelink that will be used to sort output
@@ -1563,7 +1541,6 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
 
    ! New file count variable to track start and end of file
    if (fileStatus == 0 .and. fileMeta%outFlag(varInd) .eq. 1) then
-   print *, "ADCHECK: Creating LDASOUT file", fileStatus, numWriteVars
    !if(varInd .eq. 1) then   ! THIS IS BAD: what if the first time you call this routine is NOT on VarInd 1??
       ! We are on the first variable, we need to create the output file with
       ! attributes first.
@@ -1633,6 +1610,9 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
          if ((fileMeta%outFlag(96) .eq. 1) .or. (fileMeta%outFlag(96) .eq. 1)) then
          iret = nf90_def_dim(ftnNoahMP,'vis_nir',fileMeta%numSpectrumBands,dimId(7))
          call nwmCheck(diagFlag,iret,'ERROR: Unable to define vis_nir dimension')
+         if (noah_lsm%water_tracer_option == 1) &
+              iret = nf90_def_dim(ftnNoahMP,'tracer_layers',fileMeta%numTracerLayers,dimId(9))
+         call nwmCheck(diagFlag,iret,'ERROR: Unable to define tracer_layers dimension')
          endif
 
          ! Create and populate reference_time and time variables.
@@ -1720,6 +1700,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                  else if(noah_lsm%water_tracer_option == 1 .and. fileMeta%numLev(iTmp) .eq. fileMeta%numTracerLayers) then
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(9),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_int,(/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
@@ -1732,6 +1714,8 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(8),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. fileMeta%numSpectrumBands) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(7),dimId(3),dimId(1)/),varId)
+                  else if(noah_lsm%water_tracer_option == 1 .and. fileMeta%numLev(iTmp) .eq. fileMeta%numTracerLayers) then
+                     iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(9),dimId(3),dimId(1)/),varId)
                   else if(fileMeta%numLev(iTmp) .eq. 1) then
                      iret = nf90_def_var(ftnNoahMP,trim(fileMeta%varNames(iTmp)),nf90_float,(/dimId(2),dimId(3),dimId(1)/),varId)
                   endif
@@ -1967,7 +1951,6 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       ! Only close the file if we are finished with the very last variable.
       if (fileStatus == numWriteVars) then
 !      if(varInd .eq. fileMeta%numVars) then
-        print *, "ADCHECK: Closing LDASOUT file", fileStatus, numWriteVars
          ! Close the output file
          iret = nf90_close(ftnNoahMP)
          call nwmCheck(diagFlag,iret,'ERROR: Unable to close LDASOUT file.')

@@ -178,7 +178,6 @@ CONTAINS
            RT_DOMAIN(did)%infxsrt = infxsrt
            RT_DOMAIN(did)%soldrain = soldrain
            if (present(WVTFLAG)) then
-             print *, "ADCHECK: in hrldas_cpl_HYDRO with tracers" 
              nlst(did)%wvtflag          = WVTFLAG
              RT_DOMAIN(did)%SMC_SUB     = SMC_SUB
              RT_DOMAIN(did)%SH2OX_SUB   = SH2OX_SUB
@@ -202,7 +201,6 @@ CONTAINS
         ntime = 1
 
 !print *, "FLAG 4)002"
-        print *, "ADCHECK: in hrldas_cpl_HYDRO before HYDRO_exe"
         call HYDRO_exe(did)
 !print *, "FLAG 4)003, sfcheadrt(75,46), sfcheadrt_tr(75,46):",sfcheadrt(75,46), sfcheadrt_tr(75,46)
 !print *, "FLAG 4)003, RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23),RT_DOMAIN(did)%SH2OX_SUB(44,23):",RT_DOMAIN(did)%SMC(44,23,:),RT_DOMAIN(did)%SMC_SUB(44,23,:),RT_DOMAIN(did)%SH2OX(44,23,:),RT_DOMAIN(did)%SH2OX_SUB(44,23,:)
@@ -224,7 +222,6 @@ CONTAINS
            SMC = rt_domain(did)%SMC
            SH2OX = rt_domain(did)%SH2OX
            sfcheadrt = rt_domain(did)%overland%control%surface_water_head_lsm
-           print *, "ADCHECK: in hrldas_cpl_HYDRO after HYDRO_exe"
            if (present(WVTFLAG)) then
              SMC_SUB   = rt_domain(did)%SMC_SUB
              SH2OX_SUB = rt_domain(did)%SH2OX_SUB

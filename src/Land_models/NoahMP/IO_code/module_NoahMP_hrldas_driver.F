@@ -807,13 +807,15 @@ END INTERFACE
 
 !-----water tracer tracking times-------
   if (OPT_WT .eq. 1) then 
-    write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
+    write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",I2.2)') &
        noah_lsm%track_start(1:4), noah_lsm%track_start(5:6), noah_lsm%track_start(7:8), noah_lsm%track_start(9:10), noah_lsm%track_start(11:12),0
 
-    write(wvtend,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
+    write(wvtend,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",I2.2)') &
        noah_lsm%track_end(1:4), noah_lsm%track_end(5:6), noah_lsm%track_end(7:8), noah_lsm%track_end(9:10), noah_lsm%track_end(11:12),0
   end if
-  print *, "ADCHECK_tracer_times: wvtstart wvtend", wvtstart, wvtend
+#ifdef HYDRO_D
+  print *, "ADCHECK_tracer: wvtstart wvtend", wvtstart, wvtend
+#endif
 !---------------------------------------
   
   ids = xstart
@@ -1876,11 +1878,13 @@ endif
    if(my_id .eq. io_id) &
        print*, "t0OutputFlag: ", t0OutputFlag
 #endif
+#ifdef HYDRO_D
 print *, "ADCHECK_tracer: Before ldas_output wvtflag, OPT_WT, IOPT_PM", wvtflag, OPT_WT, IOPT_PM
 print *, "ADCHECK_tracer: Before ldas_output NSUB", NSUB
 print *, "ADCHECK_tracer: Before ldas_output nlst%NSUB", nlst(did)%NSUB
 print *, "ADCHECK_tracer: Before ldas_output noah_lsm%tracer_sublayer", noah_lsm%tracer_sublayer
 print *, "ADCHECK_tracer: Before ldas_output NTRACER", NTRACER
+#endif
 ! ldas_output subroutine will be called when
 ! the t0OutputFlag is 1 in the hydro.namelist
 ! the ldas_output requires one variables ITIME
@@ -2020,18 +2024,26 @@ end subroutine land_driver_ini
 !------water tracer variables initiation-------
 if (OPT_WT .eq. 1) then 
   if (olddate < wvtstart) then
-    print *, "ADCHECK_wvt_status: before tracer: olddate wvtstart ", olddate, wvtstart
+#ifdef HYDRO_D
+    print *, "ADCHECK_tracer: before tracer: olddate wvtstart ", olddate, wvtstart
+#endif
     wvtflag = 0
   else
     if (olddate(1:15) == wvtstart(1:15)) then
-      print *, "ADCHECK_wvt_status: start tracer: olddate wvtstart ", olddate, wvtstart
+#ifdef HYDRO_D
+      print *, "ADCHECK_tracer: start tracer: olddate wvtstart ", olddate, wvtstart
+#endif
       wvtflag = 1
     else
       if (olddate < wvtend) then
-       print *, "ADCHECK_wvt_status: during tracer: olddate wvtstart ", olddate, wvtstart
+#ifdef HYDRO_D
+       print *, "ADCHECK_tracer: during tracer: olddate wvtstart ", olddate, wvtstart
+#endif
         wvtflag = 2
       else
-        print *, "ADCHECK_wvt_status: after tracer: olddate wvtstart ", olddate, wvtstart
+#ifdef HYDRO_D
+        print *, "ADCHECK_tracer: after tracer: olddate wvtstart ", olddate, wvtstart
+#endif
         wvtflag = 3
       end if
     end if
@@ -2099,8 +2111,6 @@ print *, "NTRACER", NTRACER
 end if
 !print *, "FLAG5, SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
 print *, "NTRACER", NTRACER
-print *, "ADCHECK after readforc: SMOIS_SUB, SH2OXY_SUB", SMOIS_SUB(30,:,30), SH2OXY_SUB(30,:,30)
-print *, "ADCHECK after readforc: SMOIS, SH2O", SMOIS(30,:,30), SH2O(30,:,30)
 !----------------------------------------------
 
 991  continue
@@ -2330,9 +2340,9 @@ print *, "NTRACER", NTRACER
                 , INFXSRT_TR=INFXSRT_TR, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr           &    !O water tracer
 #endif 
                 )
-!print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
-!print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
-
+print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
+print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
+print *, "FLAG9-1, FLUXXY_TR RUNSBXY_TR :", FLUXXY_TR(30,:,30), RUNSBXY_TR(30,30)
     end if
 
 
@@ -2368,10 +2378,8 @@ print *, "NTRACER", NTRACER
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
      if (OPT_WT .le. 0) then
-       print *, "ADCHECK: Before hrldas_drv_HYDRO without tracers"
        call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL,NTRACER) 
      else
-       print *, "ADCHECK: Before hrldas_drv_HYDRO with tracers"
        call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, &
             NTRACER, WVTFLAG=WVTFLAG, SMOIS_SUB=SMOIS_SUB, SH2OXY_SUB=SH2OXY_SUB, &    ! water tracer vars      
             SMOIS_TR=SMOIS_TR, SH2OXY_TR=SH2OXY_TR,              &    ! water tracer vars
@@ -2401,7 +2409,6 @@ print *, "NTRACER", NTRACER
 !------------------------------------------------------------------------
 ! Write Restart - timestamp equal to output will have same states
 !------------------------------------------------------------------------
-      print *, "ADCHECK: Before LSM restart"
       if ( (noah_lsm%restart_frequency_hours .gt. 0) .and. &
            (mod(ITIME, int(noah_lsm%restart_frequency_hours*3600./nint(dtbl))) == 0)) then
        if(noah_lsm%rst_bi_out .eq. 0) then
@@ -2691,7 +2698,6 @@ subroutine  ldas_output(itime, state, wvtflag)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNDXY,IVGTYP,96,fileStatus)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,2,ALBSNIXY,IVGTYP,97,fileStatus)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QRAINXY,IVGTYP,98,fileStatus)
-   print *, "ADCHECK: fileStatus before crocus", fileStatus
    if (crocus_opt /= 0) then
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(GLACINFO),IVGTYP,99,fileStatus)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(GLACT),IVGTYP,100,fileStatus)
@@ -2713,8 +2719,7 @@ subroutine  ldas_output(itime, state, wvtflag)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115,fileStatus)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116,fileStatus)
    end if ! crocus_opt /= 0
-   print *, "ADCHECK: fileStatus before tracer", fileStatus   
-   if (wvtflag .ge. 0) then
+   if (opt_wt .gt. 0) then
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LH_TR,IVGTYP,117,fileStatus)
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ECANXY_TR,IVGTYP,118,fileStatus)
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,EDIRXY_TR,IVGTYP,119,fileStatus)
@@ -2727,16 +2732,15 @@ subroutine  ldas_output(itime, state, wvtflag)
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,WTXY_TR,IVGTYP,126,fileStatus)
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNICEXY_TR,IVGTYP,127,fileStatus)
      call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,3,SNLIQXY_TR,IVGTYP,128,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%nsoil,SH2OXY_TR,IVGTYP,129,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,noah_lsm%nsoil,SMOIS_TR,IVGTYP,130,fileStatus)
-     !call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,4,FLUXXY_TR,IVGTYP,130,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWHXY_TR,IVGTYP,131,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWXY_TR,IVGTYP,132,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,133,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,134,fileStatus)
-     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,135,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,ntracer,SH2OXY_TR,IVGTYP,129,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,ntracer,SMOIS_TR,IVGTYP,130,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,ntracer,FLUXXY_TR,IVGTYP,131,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWHXY_TR,IVGTYP,132,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SNOWXY_TR,IVGTYP,133,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSNOWXY_TR,IVGTYP,134,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOW_TR,IVGTYP,135,fileStatus)
+     call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,ACSNOM_TR,IVGTYP,136,fileStatus)
    end if
-   print *, "ADCHECK: fileStatus after all", fileStatus   
 #endif /* WRF_HYDRO */
 
 !#ifdef WRF_HYDRO

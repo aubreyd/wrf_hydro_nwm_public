@@ -133,6 +133,7 @@ type ldasMeta
    integer :: numSoilLayers                       ! Fill from Namelist
    integer :: act_lev
    integer :: numSpectrumBands = 2
+   integer :: numTracerLayers                       ! Fill from Namelist
    character (len=512) :: modelOutputType = "land"
    character (len=64) :: modelConfigType
 
@@ -841,7 +842,8 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
 
    ldasOutDict%numSoilLayers = nlst(1)%nsoil
    ldasOutDict%act_lev = nlst(1)%act_lev
-
+   ldasOutDict%numTracerLayers = nlst(1)%ntracer 
+   print *, "ADCHECK_output_dict ntracer", nlst(1)%ntracer
 
    ldasOutDict%modelNdv = 9.9692099683868690E36
    ldasOutDict%modelNdv2 = -1.E33
@@ -1385,6 +1387,7 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             3,3,4,4,4,1,1,1,1,1]    !127-136 (tracer)
 
    ldasOutDict%numLev(105:114) = ldasOutDict%act_lev ! Set crocus levels to number from namelist
+   ldasOutDict%numLev(129:131) = ldasOutDict%numTracerLayers  ! Set tracer levels to number from namelist
 
    ldasOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !1-5
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0, & !6-10

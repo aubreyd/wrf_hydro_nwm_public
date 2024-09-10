@@ -941,7 +941,6 @@ END INTERFACE
    integer :: did
 
    if (nlst(did)%WVTFLAG > 0) then
-   print *, "ADCHECK_disag: In wvt check SMC_TR", rt_domain(did)%SMC_TR(1,1,:)
    call disaggregateDomain( RT_DOMAIN(did)%IX, RT_DOMAIN(did)%JX, nlst(did)%NSOIL, &
                             RT_DOMAIN(did)%IXRT, RT_DOMAIN(did)%JXRT, nlst(did)%AGGFACTRT, &
                             RT_DOMAIN(did)%SICE, RT_DOMAIN(did)%SMC, RT_DOMAIN(did)%SH2OX, &
@@ -976,7 +975,6 @@ END INTERFACE
                             ,rt_domain(did)%subsurface%grid_transform%SMCRT_TR  &  !wt vars
                           )
    else
-   print *, "ADCHECK_disag: No wvt SMC_TR", rt_domain(did)%SMC_TR(1,1,:)
    call disaggregateDomain( RT_DOMAIN(did)%IX, RT_DOMAIN(did)%JX, nlst(did)%NSOIL, &
                             RT_DOMAIN(did)%IXRT, RT_DOMAIN(did)%JXRT, nlst(did)%AGGFACTRT, &
                             RT_DOMAIN(did)%SICE, RT_DOMAIN(did)%SMC, RT_DOMAIN(did)%SH2OX, &
@@ -1003,7 +1001,6 @@ END INTERFACE
                             rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj, &
                             nlst(did)%NTRACER)
    end if
-print *, "ADCHECK_disag: end" 
 end subroutine disaggregateDomain_drv
 
 !===================================================================================================
@@ -1138,8 +1135,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real    :: suminfxs1,suminfxsrt2 ! total infiltration excess, start and finish
 #endif
 
-   print *, "ADCHECK_disag: In disag " !SMC_TR_PASS", SMC_TR_PASS(1,1,:)
-
    ! Initialize variables
    SICE = SMC - SH2OX
    SMCREFRT = 0.0
@@ -1188,14 +1183,11 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
    !DJG Weighting alg. alteration...(prescribe wghts if time = 1)
 
-   print *, "ADCHECK_disag: After disag mass balance"
-
    do J=1,JX ! Start coarse grid j loop
       do I=1,IX ! Start coarse grid i loop
 
          !DJG Weighting alg. alteration...
          LSMVOL = INFXSRT(I,J) * area_lsm(I,J) ! mm * m2
-         print *, "ADCHECK: Before lsmvol_tr"
          if (present(WVTFLAG)) LSMVOL_TR=INFXSRT_TR_PASS(I,J)*area_lsm(I,J)
 
          do AGGFACYRT=AGGFACTRT-1,0,-1 ! Start disagg fine grid j loop
@@ -1212,7 +1204,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                INFXSUBRT(IXXRT,JYYRT) = LSMVOL *     &
                                         INFXSWGT(IXXRT,JYYRT) / dist(IXXRT,JYYRT,9)
 
-               print *, "ADCHECK: before INFXSUBRT_TR_PASS"
                if (present(WVTFLAG)) then
                  INFXSUBRT_TR_PASS(IXXRT,JYYRT)=LSMVOL_TR*     &
                    INFXSWGT(IXXRT,JYYRT)/dist(IXXRT,JYYRT,9)        !INFXSWGT_TR_PASS not used
@@ -1238,7 +1229,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                            SMCWLTRT(IXXRT,JYYRT,KRT) = 0.
                         endif
                      endif
-                     print *, "ADCHECK: before SMCMAXRT_SUB"
                      !-----wt calc-----
                      if (present(WVTFLAG)) then
                         ISUB1 = sum(NSUB(1:KRT))-NSUB(KRT)+1
@@ -1251,7 +1241,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                      SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J)
                      WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J) !TODO: Not used again so can delete
                      SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
-                     print *, "ADCHECK: before SMCMAXRT_SUB2"
                      !-----wt calc-----
                      if (present(WVTFLAG)) then
                         ISUB1 = sum(NSUB(1:KRT))-NSUB(KRT)+1
@@ -1266,7 +1255,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                   IF (SMCMAXRT(IXXRT,JYYRT,KRT) .GT. 0) THEN !Check for smcmax data (=0 over water)
                      SMCRT(IXXRT,JYYRT,KRT) = SH2OX(I,J,KRT) * SH2OWGT(IXXRT,JYYRT,KRT)
                      !old SMCRT(IXXRT,JYYRT,KRT)=SMC(I,J,KRT)
-                     print *, "ADCHECK: before SMCRT_TR_PASS"
                      !-----wt calc-----
                      if (present(WVTFLAG)) then
                         ISUB1 = sum(NSUB(1:KRT))-NSUB(KRT)+1
@@ -1282,7 +1270,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                      !TODO: Double-check the values for water cells
                      SMCRT(IXXRT,JYYRT,KRT) = 0.001  !will be skipped w/ landmask
                      SMCMAXRT(IXXRT,JYYRT,KRT) = 0.001
-                     print *, "ADCHECK: before SMCMAXRT_SUB"
                      !-----wt calc-----
                      if (present(WVTFLAG)) then
                         do KSUB = 1, NSUB(KRT)
@@ -1432,7 +1419,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
       INFXSUBRT = 0.0
    endwhere
 
-   print *, "ADCHECK: Before OCEAN_INFXSUBRT_TR"
    !----wt calc-----
    if (present(WVTFLAG)) then
       where (ELRT .lt. -9998)
@@ -1494,8 +1480,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
       call MPP_LAND_COM_REAL(SMCWLTRT(:,:,i),IXRT,JXRT,99)
    end DO
 
-   print *, "ADCHECK: Before MPP_COM"
-
    !-----wt calc-----
    if (present(WVTFLAG)) then
       call MPP_LAND_COM_REAL(INFXSUBRT_TR_PASS,IXRT,JXRT,99)
@@ -1507,8 +1491,6 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    end if
   !-----------------
 #endif
-
-print *, "ADCHECK: After disag"
 
 end subroutine disaggregateDomain
 !===================================================================================================
@@ -1525,7 +1507,6 @@ subroutine SubsurfaceRouting_drv(did)
     IF (nlst(did)%SUBRTSWCRT.EQ.1) THEN
         print *, "water_tracer_option", noah_lsm%water_tracer_option
         if (noah_lsm%water_tracer_option > 0) then
-          print *, "ADCHECK: Calling subsurfaceRouting with tracers"
           call subsurfaceRouting ( rt_domain(did)%subsurface, &
             rt_domain(did)%subsurface_static, &
             rt_domain(did)%subsurface_input, &
@@ -1533,7 +1514,6 @@ subroutine SubsurfaceRouting_drv(did)
             !rt_domain(did)%overland%control%infiltration_excess &
             , nlst(did)%NTRACER, nlst(did)%WVTFLAG, nlst(did)%PMOPT, nlst(did)%NSUB)
         else
-          print *, "ADCHECK: Calling subsurfaceRouting without tracers"
           call subsurfaceRouting ( rt_domain(did)%subsurface, &
             rt_domain(did)%subsurface_static, &
             rt_domain(did)%subsurface_input, &

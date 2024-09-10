@@ -887,9 +887,9 @@ CONTAINS
        DEEPRECH              = 0.
 
 !print *, "NTRACER", NTRACER
-if (present(SMOIS_SUB)) then
-  print *, "tracer active"
-end if
+!if (present(SMOIS_SUB)) then
+!  print *, "tracer active"
+!end if
 !--------water tracer variable transfer-------
        if (present(SMOIS_SUB)) SMC_SUB (    1:iNTRACER)  = SMOIS_SUB   (I,      1:iNTRACER,J)
        if (present(SH2OXY_SUB)) SH2O_SUB(   1:iNTRACER)  = SH2OXY_SUB    (I,      1:iNTRACER,J)

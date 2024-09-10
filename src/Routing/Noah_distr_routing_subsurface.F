@@ -39,11 +39,6 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     REAL, DIMENSION(subrt_static%ixrt,subrt_static%jxrt)   :: CWATAVAIL
     INTEGER, DIMENSION(subrt_static%ixrt,subrt_static%jxrt) :: SATLYRCHK
 
-    print *, "ADCHECK: NTRACER", NTRACER
-    if (present(WVTFLAG)) print *, "ADCHECK: WVTFLAG", WVTFLAG
-    if (present(PMOPT)) print *, "ADCHECK: PMOPT", PMOPT
-    if (present(NSUB)) print *, "ADCHECK: NSUB", NSUB
-
     CWATAVAIL = 0.
     CALL FINDZWAT(subrt_static%ixrt,subrt_static%jxrt,subrt_static%NSOIL, &
         subrt_data%grid_transform%smcrt, &
@@ -70,7 +65,6 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     ! This subroutine returns: ZWATTABLRT, CWATAVAIL and SATLYRCHK
 
     if (present(WVTFLAG)) then
-       print *, "ADCHECK: Calling SUBSFC_RTNG with tracers"
        CALL SUBSFC_RTNG( subrt_data, subrt_static, subrt_input, subrt_output, &
                          CWATAVAIL, SATLYRCHK &
                          ,NTRACER &
@@ -86,7 +80,6 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
                          !,SMCMAXRT_SUB_PASS  = SMCMAXRT_SUB_PASS   & !wt vars
                        )
     else
-       print *, "ADCHECK: Calling SUBSFC_RTNG without tracers"
        CALL SUBSFC_RTNG( subrt_data, subrt_static, subrt_input, subrt_output, &
                          CWATAVAIL, SATLYRCHK &
                          ,NTRACER)
@@ -311,7 +304,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     ! rt_option flag). Remove this hard-coded option when rt_option=2 is fixed for subsurface.
     !     if(subrt_static%rt_option .eq. 1) then
     if (present(WVTFLAG)) then
-       print *, "ADCHECK: Before ROUTE_SUBSURFACE1 tracers"
        CALL ROUTE_SUBSURFACE1(subrt_data%properties%distance_to_neighbor, &
                            subrt_data%properties%zwattablrt, &
                            subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
@@ -336,7 +328,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                           ,subrt_data%grid_transform%SMCRT_SUB   &
                           )
     else
-       print *, "ADCHECK: Before ROUTE_SUBSURFACE1 no tracers"
        CALL ROUTE_SUBSURFACE1(subrt_data%properties%distance_to_neighbor, &
                            subrt_data%properties%zwattablrt, &
                            subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
@@ -379,7 +370,6 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
             SUBFLO = subrt_data%state%qsubrt(i,j) / subrt_data%properties%distance_to_neighbor(i,j,9) * SUBDT !Convert qsubrt from m^3/s to m
             !END IF
 
-            print *, "ADCHECK: Before SUBFLO_SUB"
             !-----wt cacl-----
             if (present(WVTFLAG)) then
                INFXSUBRT_TR_FILL = 0         !initialize INFXSUBRT_TR_FILL
@@ -806,8 +796,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    ! Local parameters
    real :: tmp_dist(9)
 
-   print *, "ADCHECK: Start ROUTE_SUBSURFACE1"
-
    ! Initialize temp variables
    qsub_tmp = 0.
    QSUBDRY_tmp = 0.
@@ -885,7 +873,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
 
                !-----wt calc-----
                if (present(WVTFLAG)) then
-                  print *, "ADCHECK: In ROUTE_SUBSURFACE1 tracer1"
                   if (qqsub .le. 1.0e-12 .and. SATLYRCHK(i,j) .lt. NSOIL+1) then
                      call calculate_qsubout_tr(i,j,SATLYRCHK(i,j),NSOIL,NTRACER,PMOPT,NSUB,SLDPTH,&
                                             qqsub,dist(i,j,9),SUBDT,qqsub_tr_lose,qqsub_sub_lose,  &
@@ -941,7 +928,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
 
                   !-----wt calc-----
                   if (present(WVTFLAG)) then
-                     print *, "ADCHECK: In ROUTE_SUBSURFACE1 tracer2"
                      do KSOIL = 1, NSOIL
                         do KSUB = 1, NSUB(KSOIL)
                            ISUB = sum(NSUB(1:KSOIL)) - NSUB(KSOIL) + KSUB
@@ -973,8 +959,6 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    ! (i.e., net of out-flux from one cell and in-flux from its neighbor cell)
    qsub = qsub + qsub_tmp
    QSUBDRY = QSUBDRY + QSUBDRY_tmp
-
-  print *, "ADCHECK: End ROUTE_SUBSURFACE1"
 
 #ifdef MPP_LAND
    call MPP_LAND_COM_REAL(qsub,XX,YY,99)

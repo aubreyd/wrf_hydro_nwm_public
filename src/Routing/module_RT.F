@@ -321,7 +321,6 @@ print *, "In rt_allocate: Before setting checks"
             rt_domain(did)%SICE  = 0.
   !-----needed for water tracer capability-----
   if (noah_lsm%water_tracer_option > 0) then
-     print *, "ADCHECK_rt: Before smc_tr allocation"
      allocate( rt_domain(did)%SMC_tr  (IX,JX,NTRACER) )
             rt_domain(did)%SMC_tr   = 0.0
      allocate( rt_domain(did)%SH2OX_tr  (IX,JX,NTRACER) ) 
@@ -334,7 +333,6 @@ print *, "In rt_allocate: Before setting checks"
             rt_domain(did)%SICE_tr    = 0.0
      allocate( rt_domain(did)%SICE_SUB (IX,JX,NTRACER))
             rt_domain(did)%SICE_SUB   = 0.0
-     print *, "ADCHECK_rt: After smc_tr allocation", rt_domain(did)%SMC_tr(1,1,:)
   end if
   !--------------------------------------------
   ! allocate( rt_domain(did)%dist_lsm (ixrt,jxrt,9) )
@@ -828,10 +826,8 @@ if(nlst(did)%UDMP_OPT .eq. 1) then
 endif
 
 print *, "Before ntracer rt_allocate"
-print *, "ADCHECK: ntracer", nlst(did)%NTRACER
 
 !if (nlst(did)%NTRACER .gt. 0) then
-  print *, "ADCHECK: rt_allocate_tracer"
   call rt_allocate(did,rt_domain(did)%ix,rt_domain(did)%jx,&
      rt_domain(did)%ixrt,rt_domain(did)%jxrt, nlst(did)%nsoil,nlst(did)%CHANRTSWCRT,NTRACER=nlst(did)%NTRACER)
 !else
@@ -1160,7 +1156,6 @@ subroutine LandRT_ini(did)
 #ifdef MPP_LAND
 
         if(nlst(did)%UDMP_OPT .eq. 1) then
-           print *, "ADCHECK: Before llinkid allocate"
            ! NHDPLUS
            rt_domain(did)%LNLINKSL = LNUMRSL
            allocate(rt_domain(did)%LLINKID(rt_domain(did)%LNLINKSL))
@@ -1195,7 +1190,6 @@ subroutine LandRT_ini(did)
            write(6,*) "LNLINKSL, NLINKS, GNLINKS =",rt_domain(did)%LNLINKSL,rt_domain(did)%NLINKSL,rt_domain(did)%GNLINKSL
            call flush(6)
 #endif
-           print *, "ADCHECK: Before llinkid allocate2"
            allocate(rt_domain(did)%LLINKID(rt_domain(did)%LNLINKSL))
 
            k = 0
@@ -1304,7 +1298,6 @@ subroutine LandRT_ini(did)
      !DJG     include as a subroutine in module module_Noahlsm_wrfcode_input.F
      !DJG  Calculate terrain slopes 'SOXRT,SOYRT' from subgrid elevation 'ELRT'
 
-     print *, "ADCHECK: Before overland slope"
      rt_domain(did)%overland%properties%surface_slope = -999
      Vmax = 0.0
      do j=2,rt_domain(did)%JXRT-1
@@ -1461,7 +1454,6 @@ subroutine LandRT_ini(did)
   end if ! end of neither channel_only nor channelBucket_only
 
   if(nlst(did)%UDMP_OPT .eq. 1) then
-     print *, "ADCHECK: Before gw allocations"
      allocate (rt_domain(did)%qout_gwsubbas (rt_domain(did)%nlinksL))
      rt_domain(did)%qout_gwsubbas = 0
      if (nlst(did)%NTRACER .gt. 0) then

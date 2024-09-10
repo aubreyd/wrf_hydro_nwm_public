@@ -41,7 +41,6 @@ module module_subsurface_data
         ! for water tracers
         integer, optional, intent(in) :: ntracer      ! number of tracers
 
-    print *, "ADCHECK: In subsurface_struct_init"
     if (this%pointer_allocation_guard .eqv. .false. ) then
         this%pointer_allocation_guard = .true.
         ! allocate the io interface
@@ -49,7 +48,6 @@ module module_subsurface_data
         if ( .not. associated( this%state) ) then
             write(0,*) "Failure to allocate subsurface io interface"
         else
-            print *, "ADCHECK: state_init"
             !write(0,*) "Allocating io structure"
             if ( present(ntracer) ) then
                call this%state%init(ix,jx,ntracer)
@@ -73,7 +71,6 @@ module module_subsurface_data
             write(0,*) "Failure to allocate grid transform interface"
         else
             !write(0,*) "Allocating grid transform structure"
-            print *, "ADCHECK: grid_transform_init"
             if ( present(ntracer) ) then
                call this%grid_transform%init(ix,jx,nsoil,ntracer)
             else

@@ -130,7 +130,6 @@ subroutine OverlandRouting( &
 #ifdef HYDRO_D
         write(6,*) "calling OV_RTNG "
 #endif
-print *, "ADCHECK: Before OV_RTNG"
       if (present(WVTFLAG)) then
         CALL OV_RTNG(           &
             ovrt_data, &
@@ -360,11 +359,8 @@ subroutine ov_rtng( &
     !DJG Assign all infiltration excess to surface head...
     ovrt_data%control%surface_water_head_routing=ovrt_data%control%infiltration_excess
 
-    print *, "ADCHECK: In OV_RTNG"
-
     if ( present(WVTFLAG) ) then
     if (WVTFLAG .gt. 0) then
-       print *, "ADCHECK: In OV_RTNG with tracers"
        ovrt_data%control%surface_water_head_routing_tr=ovrt_data%control%infiltration_excess_tr
     end if
     end if
@@ -431,7 +427,6 @@ subroutine ov_rtng( &
                     ovrt_data%properties%retention_depth(I,J) = 5.0
 
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
-                       print *, "ADCHECK: In OV_RTNG channel cell with excess water to route"
                        !----wt cal-----
                        if ( present(WVTFLAG) ) then
                        if (WVTFLAG .gt. 0) then
@@ -462,7 +457,6 @@ subroutine ov_rtng( &
 
 
                 IF (ovrt_data%streams_and_lakes%lake_mask(I,J) .gt. 0) THEN
-                    print *, "ADCHECK: In OV_RTNG channel cell with excess water to route"
                     IF (ovrt_data%control%surface_water_head_routing(I,J) .GT. ovrt_data%properties%retention_depth(I,J)) THEN
                        !----wt calc-----
                        if ( present(WVTFLAG) ) then
@@ -496,7 +490,6 @@ subroutine ov_rtng( &
 
         !DJG Debug...
 
-        print *, "ADCHECK: Before ROUTE_OVERLAND1"
         if(rt_option .eq. 1) then
            if ( present(WVTFLAG) ) then
              if (WVTFLAG .gt. 0) then
@@ -676,8 +669,6 @@ SUBROUTINE ROUTE_OVERLAND1(dt,                                &
        QBDRY_tmp_tr = 0.0
     end if
     !-----------------
-
-    print *, "ADCHECK: In ROUTE_OVERLAND1"
 
     !!! Loop to route water
     do j=2,YY-1

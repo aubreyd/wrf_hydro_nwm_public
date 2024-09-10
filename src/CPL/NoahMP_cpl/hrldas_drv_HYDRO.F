@@ -75,7 +75,6 @@ print *, 'Flag 3)003'
             end do
 
           else
-            print *, "ADCHECK: In hrldas_drv_HYDRO without tracers"
             call hrldas_cpl_HYDRO(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk,NTRACER)  
 
             do k = 1, kk
@@ -120,7 +119,6 @@ print *, 'Flag 3)003'
           end do
 !----------wt calc----------
           if (present(OPT_WT)) then
-            print *, "ADCHECK: Before hrldas_cpl_HYDRO_ini with tracers"
             do k = 1, NTRACER
               SMC_TR(:,:,k)    = SMOIS_TR(:,k,:)
               SH2OX_TR(:,:,k)  = SH2OXY_TR(:,k,:)
@@ -145,16 +143,15 @@ print *, 'Flag 3)003'
             end do
 
           else
-             print *, "ADCHECK: Before hrldas_cpl_HYDRO_ini without tracers"
-             call hrldas_cpl_HYDRO_ini(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk,kt,dt,olddate,zsoil,NTRACER)
+            call hrldas_cpl_HYDRO_ini(STC,SMC,SH2OX,infxsrt,sfcheadrt,soldrain,ii,jj,kk,kt,dt,olddate,zsoil,NTRACER)
 
-           do k = 1, kk
+            do k = 1, kk
                STC_io(:,k,:) = STC(:,:,k)
                SMC_io(:,k,:) = SMC(:,:,k) 
                SH2OX_io(:,k,:) = SH2OX(:,:,k) 
-           end do 
-         end if
-             call open_print_mpp(6)
+            end do 
+          end if
+          call open_print_mpp(6)
        end subroutine hrldas_drv_HYDRO_ini
 
        subroutine HYDRO_frocing_drv (indir,forc_typ, snow_assim,olddate,     &
