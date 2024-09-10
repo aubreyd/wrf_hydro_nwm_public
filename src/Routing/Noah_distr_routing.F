@@ -1003,6 +1003,7 @@ END INTERFACE
                             rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj, &
                             nlst(did)%NTRACER)
    end if
+print *, "ADCHECK_disag: end" 
 end subroutine disaggregateDomain_drv
 
 !===================================================================================================
@@ -1137,7 +1138,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real    :: suminfxs1,suminfxsrt2 ! total infiltration excess, start and finish
 #endif
 
-   print *, "ADCHECK_disag: In disag SMC_TR_PASS", SMC_TR_PASS(1,1,:)
+   print *, "ADCHECK_disag: In disag " !SMC_TR_PASS", SMC_TR_PASS(1,1,:)
 
    ! Initialize variables
    SICE = SMC - SH2OX
@@ -1492,20 +1493,22 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
       call MPP_LAND_COM_REAL(SMCRT(:,:,i),IXRT,JXRT,99)
       call MPP_LAND_COM_REAL(SMCWLTRT(:,:,i),IXRT,JXRT,99)
    end DO
-  print *, "ADCHECK: Before MPP_COM"
-  !-----wt calc-----
-  if (present(WVTFLAG)) then
-     call MPP_LAND_COM_REAL(INFXSUBRT_TR_PASS,IXRT,JXRT,99)
-     do i = 1, NTRACER
-        call MPP_LAND_COM_REAL(SMCMAXRT_SUB(:,:,i),IXRT,JXRT,99)
-        call MPP_LAND_COM_REAL(SMCRT_SUB_PASS(:,:,i),IXRT,JXRT,99)
-        call MPP_LAND_COM_REAL(SMCRT_TR_PASS(:,:,i),IXRT,JXRT,99)
-     end do
-  end if
+
+   print *, "ADCHECK: Before MPP_COM"
+
+   !-----wt calc-----
+   if (present(WVTFLAG)) then
+      call MPP_LAND_COM_REAL(INFXSUBRT_TR_PASS,IXRT,JXRT,99)
+      do i = 1, NTRACER
+         call MPP_LAND_COM_REAL(SMCMAXRT_SUB(:,:,i),IXRT,JXRT,99)
+         call MPP_LAND_COM_REAL(SMCRT_SUB_PASS(:,:,i),IXRT,JXRT,99)
+         call MPP_LAND_COM_REAL(SMCRT_TR_PASS(:,:,i),IXRT,JXRT,99)
+      end do
+   end if
   !-----------------
 #endif
 
-print *, "ADCHECK: After disag SMC_TR_PASS", SMC_TR_PASS(1,1,:)
+print *, "ADCHECK: After disag"
 
 end subroutine disaggregateDomain
 !===================================================================================================

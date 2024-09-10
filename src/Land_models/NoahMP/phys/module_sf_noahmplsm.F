@@ -960,7 +960,7 @@ contains
           print *, "ERROR around FLAG0013, ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
         end if
       end do
-if (ILOC .eq. 44 .and. JLOC .eq. 23) then
+if (ILOC .eq. 30 .and. JLOC .eq. 30) then
 !  print *, "FLAG0013, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
 end if
     end if
@@ -8521,9 +8521,9 @@ end if
     if (present(WVTFLAG)) then
       call get_wt_ratio(QINSUR_TR, QINSUR, PROPOR_TR)
       RUNSRF_TR = RUNSRF * PROPOR_TR
-if (ILOC .eq. 75 .and. JLOC .eq. 46) then
-!  print *, "FLAG IN SOILWATER001-1, QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR:",QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR
-!  print *, "SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
+if (ILOC .eq. 30 .and. JLOC .eq. 30) then
+  print *, "FLAG IN SOILWATER001-1, QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR:",QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR
+  print *, "SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
 end if
     end if
     !-----------------
@@ -11099,9 +11099,9 @@ DEPTH = DZSNSO_SUB
      END IF
   END DO
   residual = (PDDUM-QSEVA-ETRANI(1))*DT - RSAT - FLUX_BULK(1) - (SH2O(1)-SH2O0(1))*DEPTH_OLD(1)
-if (II .eq. 75 .and. JJ .eq. 46) then
-!  print *, "FLAG in SMR_TR001, FLUX_BULK,QDRAIN,residual:", FLUX_BULK,QDRAIN,residual
-!  print *, "PDDUM, QSEVA, ETRANI, RSAT:",PDDUM, QSEVA, ETRANI, RSAT
+if (II .eq. 30 .and. JJ .eq. 30) then
+  print *, "FLAG in SMR_TR001, FLUX_BULK,QDRAIN,residual:", FLUX_BULK,QDRAIN,residual
+  print *, "PDDUM, QSEVA, ETRANI, RSAT:",PDDUM, QSEVA, ETRANI, RSAT
 end if
 !--------STEP 1a: calculate sublayer fluxes-----------------------
   ISUB = 0
@@ -11124,8 +11124,9 @@ end if
         ETRAN_SUB(ISUB) = ETRANI(K)/NSUB(K)
 ! update SH2O_SUB in accordance with SH2O
         SH2O_SUB(ISUB) = SH2O(K)
-if (II .eq. 75 .and. JJ .eq. 46) then
-!  print *, "FLAG in SMR_TR002, K,ISUB,FLUX(ISUB):",K,ISUB,FLUX(ISUB)
+if (II .eq. 30 .and. JJ .eq. 30) then
+  print *, "FLAG in SMR_TR002, K,ISUB,FLUX(ISUB):",K,ISUB,FLUX(ISUB)
+  print *, "FLAG in SMR_TR002b, K,ISUB,SH2O_SUB(ISUB),SH2O(K):",K,ISUB, SH2O_SUB(ISUB),SH2O(K)
 end if
      END DO
   END DO
@@ -11192,8 +11193,8 @@ FLUX_DIRE = SOLVE_ORDER
            END IF
            RATIO(K) = NOMENI/DENOMI
 
-if (II .eq. 75 .and. JJ .eq. 46) then
-!  print *, "FLAG in SMR_TR003, N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K):",N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K)
+if (II .eq. 30 .and. JJ .eq. 30) then
+  print *, "FLAG in SMR_TR003, N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K):",N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K)
 end if
 
            SOLVED(K) = 1

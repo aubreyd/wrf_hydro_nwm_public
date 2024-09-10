@@ -808,11 +808,12 @@ END INTERFACE
 !-----water tracer tracking times-------
   if (OPT_WT .eq. 1) then 
     write(wvtstart,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
-       wvtstart(1:4), wvtstart(5:6), wvtstart(7:8), wvtstart(9:10), wvtstart(11:12),0
+       noah_lsm%track_start(1:4), noah_lsm%track_start(5:6), noah_lsm%track_start(7:8), noah_lsm%track_start(9:10), noah_lsm%track_start(11:12),0
 
     write(wvtend,'(A4,"-",A2,"-",A2,"_",A2,":",A2,":",A2)') &
-       wvtend(1:4), wvtend(5:6), wvtend(7:8), wvtend(9:10), wvtend(11:12),0
+       noah_lsm%track_end(1:4), noah_lsm%track_end(5:6), noah_lsm%track_end(7:8), noah_lsm%track_end(9:10), noah_lsm%track_end(11:12),0
   end if
+  print *, "ADCHECK_tracer_times: wvtstart wvtend", wvtstart, wvtend
 !---------------------------------------
   
   ids = xstart
@@ -2019,14 +2020,18 @@ end subroutine land_driver_ini
 !------water tracer variables initiation-------
 if (OPT_WT .eq. 1) then 
   if (olddate < wvtstart) then
+    print *, "ADCHECK_wvt_status: before tracer: olddate wvtstart ", olddate, wvtstart
     wvtflag = 0
   else
     if (olddate(1:15) == wvtstart(1:15)) then
+      print *, "ADCHECK_wvt_status: start tracer: olddate wvtstart ", olddate, wvtstart
       wvtflag = 1
     else
       if (olddate < wvtend) then
+       print *, "ADCHECK_wvt_status: during tracer: olddate wvtstart ", olddate, wvtstart
         wvtflag = 2
       else
+        print *, "ADCHECK_wvt_status: after tracer: olddate wvtstart ", olddate, wvtstart
         wvtflag = 3
       end if
     end if
@@ -2094,6 +2099,8 @@ print *, "NTRACER", NTRACER
 end if
 !print *, "FLAG5, SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
 print *, "NTRACER", NTRACER
+print *, "ADCHECK after readforc: SMOIS_SUB, SH2OXY_SUB", SMOIS_SUB(30,:,30), SH2OXY_SUB(30,:,30)
+print *, "ADCHECK after readforc: SMOIS, SH2O", SMOIS(30,:,30), SH2O(30,:,30)
 !----------------------------------------------
 
 991  continue

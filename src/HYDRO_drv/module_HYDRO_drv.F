@@ -230,7 +230,7 @@ module module_HYDRO_drv
         call mpp_land_bcast_int1(rtflag)
         call mpp_land_bcast_int1(iniflag)
 #endif
-
+        print *, "ADCHECK: Before restQSTRM"
 
         !yw keep the initial time otuput for debug
         if(rtflag == 1) then
@@ -241,7 +241,7 @@ module module_HYDRO_drv
         if (iniflag == 1) then
             if(nlst(did)%t0OutputFlag .eq. 0) return
         endif
-
+      print *, "ADCHECK: Before channel only checks"
       if(nlst(did)%channel_only .eq. 0 .and. nlst(did)%channelBucket_only .eq. 0) then
         if(nlst(did)%LSMOUT_DOMAIN .eq. 1)  then
             print *, "ADCHECK: Before output_lsm"
