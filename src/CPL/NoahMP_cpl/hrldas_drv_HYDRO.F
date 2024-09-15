@@ -48,7 +48,6 @@
           end do
 
           if (present(WVTFLAG)) then
-print *, 'Flag 3)001'
             do k = 1, NTRACER
               SMC_SUB(:,:,k)    = SMOIS_SUB(:,k,:)
               SH2OX_SUB(:,:,k)  = SH2OXY_SUB(:,k,:)
@@ -60,14 +59,12 @@ print *, 'Flag 3)001'
                                   SMC_TR=SMC_TR, SH2OX_TR=SH2OX_TR,                          & !wt vars
                                   infxsrt_tr=infxsrt_tr,sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr   & !wt vars
                                   )
-print *, 'Flag 3)002'
              do k = 1, NTRACER
                SMOIS_SUB(:,k,:)  = SMC_SUB(:,:,k)
                SH2OXY_SUB(:,k,:) = SH2OX_SUB(:,:,k)
                SMOIS_TR(:,k,:)   = SMC_TR(:,:,k)
                SH2OXY_TR(:,k,:)  = SH2OX_TR(:,:,k)
              end do
-print *, 'Flag 3)003'
              do k = 1, kk
                STC_io(:,k,:) = STC(:,:,k)
                SMC_io(:,k,:) = SMC(:,:,k)

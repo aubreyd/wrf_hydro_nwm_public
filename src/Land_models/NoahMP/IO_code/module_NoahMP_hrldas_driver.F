@@ -581,9 +581,12 @@ END INTERFACE
     allocate(nlst(did)%NSUB(num_soil_layers))
     nlst(did)%NSUB    = NSUB
   end if
-  print *, "FLAG1"
-  print *, "OPT_WT,IOPT_PM:", OPT_WT, IOPT_PM
-  print *, "NTRACER", NTRACER 
+
+#ifdef HYDRO_D
+  print *, "Initialize water tracer settings"
+  print *, "  OPT_WT IOPT_PM NTRACER NSUB:", OPT_WT, IOPT_PM, NTRACER
+  print *, "  NSUB", NSUB
+#endif
 
   !!----------------------------------------------------------------------------
   !! channel_only
@@ -1335,8 +1338,6 @@ if (OPT_WT .eq. 1) then
   SMOIS_SUB      = undefined_real
   SH2OXY_SUB     = undefined_real
 end if
-print *, "FLAG2"
-print *, "NTRACER", NTRACER
 !-------------------------------------------------
 
 !----------------------------------------------------------------------
@@ -1878,13 +1879,7 @@ endif
    if(my_id .eq. io_id) &
        print*, "t0OutputFlag: ", t0OutputFlag
 #endif
-#ifdef HYDRO_D
-print *, "ADCHECK_tracer: Before ldas_output wvtflag, OPT_WT, IOPT_PM", wvtflag, OPT_WT, IOPT_PM
-print *, "ADCHECK_tracer: Before ldas_output NSUB", NSUB
-print *, "ADCHECK_tracer: Before ldas_output nlst%NSUB", nlst(did)%NSUB
-print *, "ADCHECK_tracer: Before ldas_output noah_lsm%tracer_sublayer", noah_lsm%tracer_sublayer
-print *, "ADCHECK_tracer: Before ldas_output NTRACER", NTRACER
-#endif
+
 ! ldas_output subroutine will be called when
 ! the t0OutputFlag is 1 in the hydro.namelist
 ! the ldas_output requires one variables ITIME
@@ -1898,8 +1893,6 @@ print *, "ADCHECK_tracer: Before ldas_output NTRACER", NTRACER
 !  endif
 !#endif
 #endif
-print *, "FLAG3"
-print *, "NTRACER", NTRACER
 end subroutine land_driver_ini
 
 !===============================================================================
@@ -2048,9 +2041,7 @@ if (OPT_WT .eq. 1) then
       end if
     end if
   end if
-!print *, "FLAG4, SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26)
-print *, "wvtflag", wvtflag
-print *, "NTRACER", NTRACER
+
   ! call tell_wt_flag(olddate, wvtstart, wvtend, wvtflag)
   if (wvtflag == 1) then
         QFX_TR        = 0.0
@@ -2110,7 +2101,6 @@ print *, "NTRACER", NTRACER
   
 end if
 !print *, "FLAG5, SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
-print *, "NTRACER", NTRACER
 !----------------------------------------------
 
 991  continue
@@ -2196,11 +2186,7 @@ print *, "NTRACER", NTRACER
       end if
     end if
 
-print *, "FLAG6"
-
     if (wvtflag .le. 0) then
-print *, "FLAG7"
-print *, "NTRACER", NTRACER
          CALL noahmplsm(ITIMESTEP,       YR, JULIAN_IN,   COSZEN, XLAT_URB2D, &
 	           DZ8W,     DTBL,      DZS,     NUM_SOIL_LAYERS,         DX, &
 		 IVGTYP,   ISLTYP,   VEGFRA,   GVFMAX,       TMN,             &
@@ -2262,11 +2248,7 @@ print *, "NTRACER", NTRACER
 #endif
                 )
 
-print *, "NTRACER", NTRACER
-!print *, "FLAG8,SFCRUNOFF(28,22):",SFCRUNOFF(28,22)
     else
-!print *, "FLAG9,SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23):",SFCRUNOFF(44,23),SFCRUNOFF_TR(44,23)
-print *, "NTRACER", NTRACER
          CALL noahmplsm(ITIMESTEP,       YR, JULIAN_IN,   COSZEN, XLAT_URB2D, &
 	           DZ8W,     DTBL,      DZS,     NUM_SOIL_LAYERS,         DX, &
 		 IVGTYP,   ISLTYP,   VEGFRA,   GVFMAX,       TMN,             &
@@ -2340,9 +2322,9 @@ print *, "NTRACER", NTRACER
                 , INFXSRT_TR=INFXSRT_TR, sfcheadrt_tr=sfcheadrt_tr,soldrain_tr=soldrain_tr           &    !O water tracer
 #endif 
                 )
-print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
-print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
-print *, "FLAG9-1, FLUXXY_TR RUNSBXY_TR :", FLUXXY_TR(30,:,30), RUNSBXY_TR(30,30)
+!print *, "FLAG9-1, SMOIS(44,23,:),SMOIS_SUB(44,23,:),SH2OX(44,23),SH2OXY_SUB(44,23):",SMOIS(44,:,23),SMOIS_SUB(44,:,23),SH2O(44,:,23),SH2OXY_SUB(44,:,23)
+!print *, "FLAG9-1,SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26):",SFCRUNOFF(32,26),SFCRUNOFF_TR(32,26),RUNSFXY(32,26),RUNSFXY_TR(32,26),INFXSRT(32,26),INFXSRT_TR(32,26),sfcheadrt(32,26),sfcheadrt_tr(32,26)
+!print *, "FLAG9-1, FLUXXY_TR RUNSBXY_TR :", FLUXXY_TR(30,:,30), RUNSBXY_TR(30,30)
     end if
 
 

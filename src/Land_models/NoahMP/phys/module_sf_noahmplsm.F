@@ -960,9 +960,9 @@ contains
           print *, "ERROR around FLAG0013, ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",ILOC, JLOC, SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
         end if
       end do
-if (ILOC .eq. 30 .and. JLOC .eq. 30) then
-  print *, "ADCHECK_FLAG0013 SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
-end if
+!if (ILOC .eq. 30 .and. JLOC .eq. 30) then
+!  print *, "ADCHECK_FLAG0013 SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB:",SMC, SH2O, SICE, SMC_SUB, SH2O_SUB, SICE_SUB
+!end if
     end if
 
     QVAP = MAX( FGEV/LATHEAG, 0.)       ! positive part of fgev; Barlage change to ground v3.6
@@ -6518,9 +6518,9 @@ end if
        WSLAKE = WSLAKE + (QINSUR-QSEVA)*1000.*DT -RUNSRF*DT   !mm
     ELSE                                                      ! soil
        if (present(WVTFLAG)) then
-       if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
-         print *, "ADCHECK_before_soilwater: FLUX_TR", FLUX_TR
-       endif
+       !if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
+       !  print *, "ADCHECK_before_soilwater: FLUX_TR", FLUX_TR
+       !endif
           CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
                             QINSUR ,QSEVA  ,ETRANI ,SICE   ,ILOC   , JLOC , & !in
                             SH2O   ,SMC    ,ZWT    ,VEGTYP , & !inout
@@ -6536,9 +6536,9 @@ end if
 			    
           EDIR_TR = EDIR_TR + QSEVA_TR*1000.    !unit: mm/s
 
-       if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
-         print *, "ADCHECK_after_soilwater: FLUX_TR", FLUX_TR
-       endif
+       !if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
+       !  print *, "ADCHECK_after_soilwater: FLUX_TR", FLUX_TR
+       !endif
 
        else 
           CALL      SOILWATER (parameters,NSOIL  ,NSNOW  ,DT     ,ZSOIL  ,DZSNSO , & !in
@@ -8506,11 +8506,11 @@ end if
     QDRAIN_SAVE = 0.0
     RUNSRF_SAVE = 0.0
     DO ITER = 1, NITER
-    !   IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
-    !      CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
-    !                  SICEMAX,QINSUR ,                         & !in
-    !                  PDDUM  ,RUNSRF )                           !out
-    !   END IF
+       IF(QINSUR > 0. .and. OPT_RUN == 3) THEN
+          CALL INFIL (parameters,NSOIL  ,DTFINE     ,ZSOIL  ,SH2O   ,SICE   , & !in
+                      SICEMAX,QINSUR ,                         & !in
+                      PDDUM  ,RUNSRF )                           !out
+       END IF
 
        IF (QINSUR > 0. .AND. OPT_RUN == 7) THEN
           CALL COMPUTE_XAJ_SURFRUNOFF(parameters,DTFINE,FCR,NSOIL,SMC,ZSOIL,QINSUR,& ! in
@@ -8531,20 +8531,20 @@ end if
        RSAT =  RSAT + WPLUS
        SUBDEF = SUBDEF + WMINUS
        QDRAIN_SAVE = QDRAIN_SAVE + QDRAIN
-       !RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
+       RUNSRF_SAVE = RUNSRF_SAVE + RUNSRF
     END DO
 
     QDRAIN = QDRAIN_SAVE/NITER
-    !RUNSRF = RUNSRF_SAVE/NITER
+    RUNSRF = RUNSRF_SAVE/NITER
     !-----wt calc-----
     if (present(WVTFLAG)) then
       call get_wt_ratio(QINSUR_TR, QINSUR, PROPOR_TR)
       RUNSRF_TR = RUNSRF * PROPOR_TR
-if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
-  print *, "ADCHECK_SOILWATER001-1 QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR:",QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR
-  print *, "ADCHECK_SOILWATER001-1 SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
-  print *, "ADCHECK_SOILWATER001-1: FLUX_TR:",FLUX_TR
-end if
+!if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
+!  print *, "ADCHECK_SOILWATER001-1 QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR:",QINSUR_TR, QINSUR, PROPOR_TR,RUNSRF,RUNSRF_TR
+!  print *, "ADCHECK_SOILWATER001-1 SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
+!  print *, "ADCHECK_SOILWATER001-1: FLUX_TR:",FLUX_TR
+!end if
     end if
     !-----------------
 
@@ -8606,20 +8606,20 @@ end if
    
    !-----wt calc-----
    if (present(WVTFLAG)) then
-if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
-  print *, "ADCHECK_SOILWATER002: RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
-  print *, "ADCHECK_SOILWATER002: SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
-  print *, "ADCHECK_SOILWATER002: FLUX_TR:",FLUX_TR
-end if
+!if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
+!  print *, "ADCHECK_SOILWATER002: RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
+!  print *, "ADCHECK_SOILWATER002: SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR:",SH2O,SH2O_SUB,SH2O_TR,PDDUM,PDDUM_TR
+!  print *, "ADCHECK_SOILWATER002: FLUX_TR:",FLUX_TR
+!end if
      call SMT_TR (ILOC,JLOC,IOPT_PM, NSUB, NTRACER, SH2O_SUB, DZSNSO_TR(1:NTRACER), &
                   SH2O, SH2O0, ZSOIL, DT, NSOIL,                          & !IN
                   PDDUM, QSEVA, ETRANI, QDRAIN, RSAT,                     & !IN
                   SH2O_TR, PDDUM_TR, QSEVA_TR, ETRAN_TR,                  &
                   QDRAIN_TR,RSAT_TR, FLUX_TR)
-if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
-  print *, "ADCHECK_SOILWATER003,RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
-  print *, "ADCHECK_SOILWATER003: FLUX_TR:",FLUX_TR
-end if
+!if (ILOC .eq. iprint .and. JLOC .eq. jprint) then
+!  print *, "ADCHECK_SOILWATER003,RUNSRF,RUNSRF_TR,RSAT,RSAT_TR:",RUNSRF,RUNSRF_TR,RSAT,RSAT_TR
+!  print *, "ADCHECK_SOILWATER003: FLUX_TR:",FLUX_TR
+!end if
      ! convert unit to mm/s
      QDRAIN_TR = QDRAIN_TR*1000.0
      RUNSRF_TR = RUNSRF_TR*1000.0 + RSAT_TR*1000.0/DT
@@ -11121,10 +11121,10 @@ DEPTH = DZSNSO_SUB
      END IF
   END DO
   residual = (PDDUM-QSEVA-ETRANI(1))*DT - RSAT - FLUX_BULK(1) - (SH2O(1)-SH2O0(1))*DEPTH_OLD(1)
-if (II .eq. 30 .and. JJ .eq. 30) then
-  print *, "FLAG in SMR_TR001, FLUX_BULK,QDRAIN,residual:", FLUX_BULK,QDRAIN,residual
-  print *, "PDDUM, QSEVA, ETRANI, RSAT:",PDDUM, QSEVA, ETRANI, RSAT
-end if
+!if (II .eq. 30 .and. JJ .eq. 30) then
+!  print *, "FLAG in SMR_TR001, FLUX_BULK,QDRAIN,residual:", FLUX_BULK,QDRAIN,residual
+!  print *, "PDDUM, QSEVA, ETRANI, RSAT:",PDDUM, QSEVA, ETRANI, RSAT
+!end if
 !--------STEP 1a: calculate sublayer fluxes-----------------------
   ISUB = 0
   Do K = 1, NSOIL
@@ -11146,10 +11146,10 @@ end if
         ETRAN_SUB(ISUB) = ETRANI(K)/NSUB(K)
 ! update SH2O_SUB in accordance with SH2O
         SH2O_SUB(ISUB) = SH2O(K)
-if (II .eq. 30 .and. JJ .eq. 30) then
-  print *, "FLAG in SMR_TR002, K,ISUB,FLUX(ISUB):",K,ISUB,FLUX(ISUB)
-  print *, "FLAG in SMR_TR002b, K,ISUB,SH2O_SUB(ISUB),SH2O(K):",K,ISUB, SH2O_SUB(ISUB),SH2O(K)
-end if
+!if (II .eq. 30 .and. JJ .eq. 30) then
+!  print *, "FLAG in SMR_TR002, K,ISUB,FLUX(ISUB):",K,ISUB,FLUX(ISUB)
+!  print *, "FLAG in SMR_TR002b, K,ISUB,SH2O_SUB(ISUB),SH2O(K):",K,ISUB, SH2O_SUB(ISUB),SH2O(K)
+!end if
      END DO
   END DO
 !--------STEP 1b: get the solve order for different layers---------
@@ -11215,9 +11215,9 @@ FLUX_DIRE = SOLVE_ORDER
            END IF
            RATIO(K) = NOMENI/DENOMI
 
-if (II .eq. 30 .and. JJ .eq. 30) then
-  print *, "FLAG in SMR_TR003, N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K):",N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K)
-end if
+!if (II .eq. 30 .and. JJ .eq. 30) then
+!  print *, "FLAG in SMR_TR003, N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K):",N,K,SOLVED(K),NOMENI,DENOMI,RATIO(K)
+!end if
 
            SOLVED(K) = 1
            IF ( abs(RATIO(K)) < 1.0E-6 ) THEN  !!ADCHECK changed location of end paren

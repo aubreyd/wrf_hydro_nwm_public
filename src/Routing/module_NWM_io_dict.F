@@ -843,7 +843,6 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
    ldasOutDict%numSoilLayers = nlst(1)%nsoil
    ldasOutDict%act_lev = nlst(1)%act_lev
    ldasOutDict%numTracerLayers = nlst(1)%ntracer 
-   print *, "ADCHECK_output_dict ntracer", nlst(1)%ntracer
 
    ldasOutDict%modelNdv = 9.9692099683868690E36
    ldasOutDict%modelNdv2 = -1.E33
