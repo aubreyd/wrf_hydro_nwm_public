@@ -29,6 +29,7 @@ module module_HYDRO_drv
 #endif
     use module_hydro_stop, only: HYDRO_stop
     use module_UDMAP, only: get_basn_area_nhd
+    use module_channel_diversions, only: init_diversions
     use netcdf
 
     implicit none
@@ -954,24 +955,27 @@ contains
                     RT_DOMAIN(did)%HLINK, RT_DOMAIN(did)%ELRT,RT_DOMAIN(did)%CHANLEN,&
                     RT_DOMAIN(did)%MannN,RT_DOMAIN(did)%So, RT_DOMAIN(did)%ChSSlp, &
                     RT_DOMAIN(did)%Bw,RT_DOMAIN(did)%Tw,RT_DOMAIN(did)%Tw_CC, RT_DOMAIN(did)%n_CC, &
-                    RT_DOMAIN(did)%ChannK,&
+                    RT_DOMAIN(did)%ChannK, &
                     RT_DOMAIN(did)%RESHT, &
+                    RT_DOMAIN(did)%HRZAREA, RT_DOMAIN(did)%LAKEMAXH, &
+                    RT_DOMAIN(did)%WEIRH, RT_DOMAIN(did)%WEIRC, RT_DOMAIN(did)%WEIRL, &
+                    RT_DOMAIN(did)%ORIFICEC, RT_DOMAIN(did)%ORIFICEA, RT_DOMAIN(did)%ORIFICEE, &
                     RT_DOMAIN(did)%ZELEV, RT_DOMAIN(did)%CVOL, &
                     RT_DOMAIN(did)%NLAKES, RT_DOMAIN(did)%QLAKEI, RT_DOMAIN(did)%QLAKEO,&
                     RT_DOMAIN(did)%LAKENODE, rt_domain(did)%overland%properties%distance_to_neighbor, &
                     RT_DOMAIN(did)%QINFLOWBASE, RT_DOMAIN(did)%CHANXI, &
                     RT_DOMAIN(did)%CHANYJ, nlst(did)%channel_option, &
                     RT_DOMAIN(did)%RETDEP_CHAN, RT_DOMAIN(did)%NLINKSL, RT_DOMAIN(did)%LINKID, &
-                    RT_DOMAIN(did)%node_area  &
+                    RT_DOMAIN(did)%node_area, RT_DOMAIN(did)%LAKEIDX  &
 #ifdef MPP_LAND
                     ,RT_DOMAIN(did)%lake_index,RT_DOMAIN(did)%link_location,&
                     RT_DOMAIN(did)%mpp_nlinks,RT_DOMAIN(did)%nlinks_index, &
-                    RT_DOMAIN(did)%yw_mpp_nlinks  &
-                    , RT_DOMAIN(did)%LNLINKSL &
-                    , rt_domain(did)%gtoNode,rt_domain(did)%toNodeInd,rt_domain(did)%nToInd  &
+                    RT_DOMAIN(did)%yw_mpp_nlinks,  &
+                    RT_DOMAIN(did)%LNLINKSL, RT_DOMAIN(did)%LLINKID, &
+                    rt_domain(did)%gtoNode, rt_domain(did)%toNodeInd,rt_domain(did)%nToInd  &
 #endif
-                    , rt_domain(did)%CH_LNKRT_SL   &
-                    ,nlst(did)%GwBaseSwCRT, gw2d(did)%ho, gw2d(did)%qgw_chanrt, &
+                    , rt_domain(did)%CH_LNKRT_SL,   &
+                    nlst(did)%GwBaseSwCRT, gw2d(did)%ho, gw2d(did)%qgw_chanrt, &
                     nlst(did)%gwChanCondSw, nlst(did)%gwChanCondConstIn, &
                     nlst(did)%gwChanCondConstOut, rt_domain(did)%velocity, rt_domain(did)%qloss &
                     )
@@ -1579,6 +1583,11 @@ endif
 #ifdef WRF_HYDRO_NUDGING
         if(nlst(did)%CHANRTSWCRT .ne. 0) call init_stream_nudging
 #endif
+
+!#ifdef WRF_HYDRO_DIVERSIONS
+! TODO: should this check to make sure we have nudging on too? [RC]
+        call init_diversions(nlst(did)%diversions_file, nlst(did)%timeSlicePath)
+!#endif
 
 
 !    if (trim(nlst_rt(did)%restart_file) == "") then

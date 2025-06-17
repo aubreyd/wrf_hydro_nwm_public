@@ -1,0 +1,124 @@
+.. vim: syntax=rst
+.. include:: meta.rest
+
+.. image:: media/wrfhydro-banner.png
+    :align: center
+
+=========================================================
+The NCAR WRF-Hydro® Modeling System Technical Description
+=========================================================
+.. rst-class:: center
+
+    | Version |version_long|
+    |
+    | Originally Created:
+    | April 14, 2013
+    |
+    | Updated:
+    | January 17, 2025
+
+Until further notice, please cite the WRF-Hydro® modeling system as
+follows:
+
+Gochis, D.J., M. Barlage, R. Cabell, M. Casali, E. Dougherty, A. Dugger, T. Eidhammer, T. Enzminger,
+K. FitzGerald, F. Felfelani, A. Gaydos, L. Karsten, A. Mazrooei, M. McAllister, J. McCreight, A. McCluskey,
+N. Omani, A. RafieeiNasab, S. Rasmussen, L. Read, K. Sampson, I. Srivastava, D. Yates, W. Yu, and
+Y. Zhang (2025).
+*The WRF-Hydro® Modeling System Technical Description,* (Version 5.4).
+doi:`10.5281/zenodo.15040873`
+NCAR Technical Note. Available online at:
+https://wrf-hydro.readthedocs.io/en/latest/
+
+
+.. rubric:: Links:
+
+- `Project Website <https://ral.ucar.edu/projects/wrf_hydro>`_
+- `GitHub Repository <https://github.com/NCAR/wrf_hydro_nwm_public>`_
+
+.. rubric:: FORWARD
+
+This Technical Description describes the WRF-Hydro® model coupling
+architecture and physics options, released in Version 5.4 in January 2025.
+As the WRF-Hydro® modeling system is developed further, this document
+will be continuously enhanced and updated. Please send feedback to
+wrfhydro@ucar.edu.
+
+.. rubric:: Prepared by:
+
+David Gochis, Michael Barlage, Ryan Cabell, Matt Casali, Erin Dougherty, Aubrey Dugger, Trude
+Eidhammer, Tom Enzminger, Katelyn FitzGerald, Farshid Felfelani, Andy Gaydos, Amir Mazrooei, Molly McAllister,
+James McCreight, Alyssa McCluskey, Nina Omani, Arezoo RafieeiNasab, Soren Rasmussen, Laura Read, Kevin Sampson,
+Ishita Srivastava, David Yates, and Yongxin Zhang
+
+.. rubric:: Special Acknowledgments:
+
+Development of the NCAR WRF-Hydro system has been significantly enhanced
+through numerous collaborations. The following persons are graciously
+thanked for their contributions to this effort:
+
+- John McHenry and Carlie Coats, Baron Advanced Meteorological Services
+
+- Martyn Clark, Fei Chen, Cenlin He, Prasanth Valayamkunnath, Dan Rosen, Rocky Dunlap,
+  Alessandro Fanfarillo, National Center for Atmospheric Research
+
+- Zong-Liang Yang, Cedric David, Peirong Lin and David Maidment of the
+  University of Texas at Austin
+
+- Harald Kunstmann, Benjamin Fersch and Thomas Rummler of Karlsruhe
+  Institute of Technology, Garmisch-Partenkirchen, Germany
+
+- Alfonso Senatore, University of Calabria, Cosenza, Italy
+
+- Brian Cosgrove, Ed Clark, Fernando Salas, Trey Flowers, Zhengtao Cui, Xia Feng, Nels Frazier,
+  James Halgren, Don Johnson, Yuqiong Liu, Dave Mattern, Fred Ogden, Cham Phan, Mehdi Rezaeianzadeh,
+  and Tom Graziano of the National Oceanic and Atmospheric Administration Office of Water Prediction
+
+- Ismail Yucel, Middle East Technical University, Ankara, Turkey
+
+- Erick Fredj, The Jerusalem College of Technology, Jerusalem, Israel
+
+- Amir Givati, Surface water and Hydrometeorology Department, Israeli
+  Hydrological Service, Jerusalem.
+
+- Antonio Parodi, Fondazione CIMA - Centro Internazionale in Monitoraggio
+  Ambientale, Savona, Italy
+
+- Blair Greimann, Sedimentation and Hydraulics section, U.S. Bureau of
+  Reclamation
+
+- Z George Xue and Dongxiao Yin, Louisiana State University
+
+- Tim Lahmers and Sujay Kumar, NASA Goddard Space Flight Center
+
+Funding support for the development and application of the WRF-Hydro®
+modeling system has been provided by:
+
+- The National Science Foundation National Center for Atmospheric
+  Research
+
+- The U.S. National Weather Service
+
+- The Colorado Water Conservation Board
+
+- Baron Advanced Meteorological Services
+
+- National Aeronautics and Space Administration (NASA)
+
+- National Oceanic and Atmospheric Administration (NOAA) Office of Water
+  Prediction (OWP)
+
+- U.S. Geological Survey (USGS) Water Mission Area
+
+
+.. toctree::
+    :hidden:
+
+    Preface / Acknowledgements <self>
+    introduction
+    model-code-config
+    model-physics
+    nudging
+    model-inputs-preproc
+    model-outputs
+    references
+    appendices

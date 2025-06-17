@@ -2,7 +2,7 @@
 
 # Bash script is meant to be used by CMake. It downloads and extracts the
 # Croton, NY testcase to the CMake build Run directory. It then setups up the
-# files so ctest can run wrf_hydro.exe
+# files so ctest can run wrf_hydro
 
 # setup directory variables in script
 # match the input case to valid testcase_dir
@@ -38,11 +38,12 @@ test_file_dir=${binary_dir}/tests
 run_dir=${binary_dir}/Run
 
 # download testcase if not present
-croton_tarball=croton_NY_training_example_v5.2.tar.gz
+version=5.4
+croton_tarball=croton_NY_training_example_v${version}.tar.gz
 if [ ! -f ${test_file_dir}/${croton_tarball} ]
 then
     cd ${test_file_dir}
-    wget -nv https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v5.2.0/${croton_tarball}
+    wget -nv https://github.com/NCAR/wrf_hydro_nwm_public/releases/download/v${version}.0/${croton_tarball}
 fi
 
 # extract testcase

@@ -6,13 +6,13 @@ endif()
 
 
 # set project name and version numbers
-project(WRF_Hydro LANGUAGES Fortran)
-set(WRF_Hydro_VERSION_MAJOR 5)
-set(WRF_Hydro_VERSION_MINOR 3)
-set(WRF_Hydro_VERSION_PATCH 0)
-set(National_Water_Model_VERSION_MAJOR 3)
-set(National_Water_Model_VERSION_MINOR 0)
-set(National_Water_Model_VERSION_PATCH beta)
+project (WRF_Hydro LANGUAGES Fortran C)
+set (WRF_Hydro_VERSION_MAJOR 5)
+set (WRF_Hydro_VERSION_MINOR 4)
+set (WRF_Hydro_VERSION_PATCH 0)
+set (National_Water_Model_VERSION_MAJOR 3)
+set (National_Water_Model_VERSION_MINOR 1)
+set (National_Water_Model_VERSION_PATCH beta)
 
 # set cmake to work with MPI Fortran
 find_package(MPI REQUIRED)
@@ -43,10 +43,16 @@ enable_testing()
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/src/cmake-modules)
 
 # try to find the installed NETCDF library
-set(NETCDF_F90 "YES")
-set(NETCDF_F77 "YES")
-find_package(NetCDF REQUIRED)
-message("-- NetCDF Include Dir(s): ${NETCDF_INCLUDES_F77} ${NETCDF_INCLUDES_F90}")
+if (NOT TARGET netCDF::netcdff AND TARGET NetCDF::NetCDF_Fortran)
+   add_library(netCDF::netcdff ALIAS NetCDF::NetCDF_Fortran)
+endif()
+
+if (NOT TARGET netCDF::netcdff)
+   set(NETCDF_F90 "YES")
+   set(NETCDF_F77 "YES")
+   find_package(NetCDF REQUIRED)
+   message("-- NetCDF Include Dir(s): ${NETCDF_INCLUDES_F77} ${NETCDF_INCLUDES_F90}")
+endif()
 
 # set user controled enviorment variables
 set(HYDRO_LSM $ENV{HYDRO_LSM} CACHE STRING "Name of the Land Surface Model to Use")
@@ -194,6 +200,8 @@ if (WRF_HYDRO_NUOPC STREQUAL "1" )
 endif()
 
 option(BUILD_CROCUS "Build Crocus" ON)
+option(WRF_HYDRO_CREATE_EXE_SYMLINK "Create symlink wrfhydro.exe -> wrfhydro" ON)
+message("WRF_HYDRO_CREATE_EXE_SYMLINK = " ${WRF_HYDRO_CREATE_EXE_SYMLINK} )
 
 message("=============================================================")
 
@@ -211,7 +219,7 @@ elseif (CMAKE_Fortran_COMPILER_ID MATCHES "Intel.*")
         # set compile flags for ifort
         message( "-- Using ifort")
         set(CMAKE_Fortran_FLAGS "-fpp -w -ftz -align all -fno-alias -fp-model precise -FR -convert big_endian")
-        set(CMAKE_Fortran_FLAGS_RELEASE "-O2")
+        set(CMAKE_Fortran_FLAGS_RELEASE "-O2 -march=core-avx2")
         set(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -traceback")
 elseif ((CMAKE_Fortran_COMPILER_ID MATCHES "PGI.*") OR (CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC.*"))
         message("-- Using NVHPC / PGI")

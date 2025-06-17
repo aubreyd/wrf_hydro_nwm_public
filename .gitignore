@@ -5,6 +5,7 @@
 *.lst
 *~
 Makefile.comm
+docs/_build/
 src/lib/*
 src/macros
 src/HRLDAS/user_build_options
@@ -27,4 +28,5 @@ README.md
 *.log
 compile_options.sh
 .DS_Store
+.venv
 .vscode

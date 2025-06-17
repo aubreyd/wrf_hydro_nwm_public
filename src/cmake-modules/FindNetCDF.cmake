@@ -30,27 +30,28 @@ if (NETCDF_INCLUDES AND NETCDF_LIBRARIES)
   set (NETCDF_FIND_QUIETLY TRUE)
 endif (NETCDF_INCLUDES AND NETCDF_LIBRARIES)
 
-find_path (NETCDF_INCLUDES netcdf.h HINTS NETCDF_DIR "$ENV{NETCDF}/include" ENV NETCDF_DIR)
+find_path (NETCDF_INCLUDES netcdf.h HINTS NETCDF_DIR "$ENV{NETCDF}/include" ENV NETCDF_DIR ENV MPI_INCLUDE)
 
-find_path (NETCDF_MODULES netcdf.mod HINTS NETCDF_DIR "$ENV{NETCDF}/mod" ENV NETCDF_MOD "/usr/lib64/gfortran/modules")
+find_path (NETCDF_MODULES netcdf.mod HINTS NETCDF_DIR "$ENV{NETCDF}/mod" ENV NETCDF_MOD ENV MPI_FORTRAN_MOD_DIR "/usr/lib64/gfortran/modules")
 
-find_library(NETCDF_LIBRARIES NAMES netcdf PATHS "$ENV{NETCDF}/lib" ENV NETCDF_LIB)
+find_library(NETCDF_LIBRARIES NAMES netcdff PATHS "$ENV{NETCDF}" PATH_SUFFIXES lib lib64 ENV NETCDF_LIB ENV MPI_LIB)
 
-find_library (NETCDF_LIBRARIES_C NAMES netcdf PATHS "$ENV{NETCDF}/lib" ENV NETCDF_LIB)
+find_library (NETCDF_LIBRARIES_C NAMES netcdf PATHS "$ENV{NETCDF}" PATH_SUFFIXES lib lib64 ENV NETCDF_LIB ENV MPI_LIB)
 
 mark_as_advanced(NETCDF_LIBRARIES_C)
 
 set (NetCDF_has_interfaces "YES") # will be set to NO if we're missing any interfaces
 set (NetCDF_libs "${NETCDF_LIBRARIES_C}")
 
-get_filename_component (NetCDF_lib_dirs "${NETCDF_LIBRARIES_C}" PATH)
+get_filename_component(NETCDF_LIB_DIR "${NETCDF_LIBRARIES}" DIRECTORY)
+get_filename_component(NETCDF_LIB_DIR_C "${NETCDF_LIBRARIES_C}" DIRECTORY)
 
 macro (NetCDF_check_interface lang header libs)
   if (NETCDF_${lang})
     find_path (NETCDF_INCLUDES_${lang} NAMES ${header}
       HINTS "${NETCDF_INCLUDES}" "${NETCDF_MODULES}" NO_DEFAULT_PATH)
     find_library (NETCDF_LIBRARIES_${lang} NAMES ${libs}
-      HINTS "${NetCDF_lib_dirs}" NO_DEFAULT_PATH)
+      HINTS "${NETCDF_LIB_DIR}" "${NETCDF_LIB_DIR_C}" NO_DEFAULT_PATH)
     mark_as_advanced (NETCDF_INCLUDES_${lang} NETCDF_LIBRARIES_${lang})
     if (NETCDF_INCLUDES_${lang} AND NETCDF_LIBRARIES_${lang})
       list (INSERT NetCDF_libs 0 ${NETCDF_LIBRARIES_${lang}}) # prepend so that -lnetcdf is last
@@ -86,5 +87,27 @@ set (NETCDF_LIBRARIES ${NetCDF_libs} CACHE INTERNAL "All NetCDF libraries requir
 # all listed variables are TRUE
 include (FindPackageHandleStandardArgs)
 find_package_handle_standard_args (NetCDF DEFAULT_MSG NETCDF_LIBRARIES NETCDF_INCLUDES NetCDF_has_interfaces)
+
+if (NETCDF_FOUND AND NOT TARGET netCDF::netcdf)
+  add_library(netCDF::netcdf UNKNOWN IMPORTED)
+  set_target_properties(
+    netCDF::netcdf
+    PROPERTIES
+    IMPORTED_LOCATION "${NETCDF_LIBRARIES_C}"
+    IMPORTED_LINK_INTERFACE_LANGUAGES C
+    INTERFACE_INCLUDE_DIRECTORIES "${NETCDF_INCLUDES}"
+    )
+endif()
+if (NETCDF_FOUND AND NOT TARGET netCDF::netcdff)
+  add_library(netCDF::netcdff UNKNOWN IMPORTED)
+  set_target_properties(
+    netCDF::netcdff
+    PROPERTIES
+    IMPORTED_LOCATION "${NETCDF_LIBRARIES_F90}"
+    IMPORTED_LINK_INTERFACE_LANGUAGES Fortran
+    INTERFACE_INCLUDE_DIRECTORIES "${NETCDF_MODULES}"
+    )
+  target_link_libraries(netCDF::netcdff INTERFACE netCDF::netcdf)
+endif()
 
 mark_as_advanced (NETCDF_LIBRARIES NETCDF_INCLUDES)
