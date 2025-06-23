@@ -1224,8 +1224,8 @@ module module_NoahMP_hrldas_driver
                       SSI_2D,SNOWRETFAC_2D,TAU0_2D,RSURFSNOW_2D,SCAMAX_2D, &
                       BEDROCKLYR_2D)
 
-    !ADCHANGE: For now, if not runoff option 3 overwrite bedrock layer with nsoil.               
-    if (IOPT_RUN .eq. 3) then
+    !ADCHANGE: For now, if not runoff option 3 or 7 overwrite bedrock layer with nsoil.               
+    if (IOPT_RUN .eq. 3 .or. IOPT_RUN .eq. 7) then
        !ADCHANGE: Hard-code soil params below bedrock to be effectively null                        
        do kloop = 1, NSOIL                                                                                
          where (BEDROCKLYR_2D .lt. kloop) 
@@ -1238,7 +1238,7 @@ module module_NoahMP_hrldas_driver
          end where
        enddo
     else
-       print *, "OPT_RUN is not 3 so setting all layers as hydrologically active."
+       print *, "OPT_RUN is not 3 or 7 so setting all layers as hydrologically active."
        BEDROCKLYR_2D = NSOIL 
     endif
 

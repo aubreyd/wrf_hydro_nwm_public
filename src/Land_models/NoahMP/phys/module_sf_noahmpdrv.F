@@ -849,7 +849,7 @@ CONTAINS
        parameters%smcwlt = max(min(parameters%smcwlt, parameters%smcref), 0.0)
        parameters%smcdry = max(min(parameters%smcdry, parameters%smcref), 0.0)
 
-       if (IOPT_RUN .eq. 3) then
+       if (IOPT_RUN .eq. 3 .or. IOPT_RUN .eq. 7) then
          !ADCHANGE: Limit nroot to bedrock layer.
          parameters%nroot = min(parameters%nroot, parameters%bedrocklyr)
          !ADCHANGE: Hard-code soil params below bedrock to be effectively null

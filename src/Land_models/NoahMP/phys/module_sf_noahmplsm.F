@@ -7640,7 +7640,7 @@ ENDIF   ! CROPTYPE == 0
     PRUNOFF = 0.0
     RUNSRF  = 0.0
 
-    DO IZ=1,NSOIL_HYDRO-2
+    DO IZ=1,max(NSOIL_HYDRO-2,1)
        IF ((SMC(IZ)-parameters%SMCREF(IZ)) .GT. 0.) THEN ! soil moisture greater than field capacity
           SM     = SM + (SMC(IZ) - parameters%SMCREF(IZ) )*(-1)*ZSOIL(IZ) !m
           WM     = WM + (parameters%SMCREF(IZ)*(-1)*ZSOIL(IZ))            !m
