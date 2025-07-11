@@ -857,8 +857,8 @@ CONTAINS
          parameters%smcref((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
          parameters%smcwlt((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
          parameters%smcdry((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
-         parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
+         parameters%dksat((parameters%bedrocklyr+1) : NSOIL) = 1.e-20
+         parameters%dwsat((parameters%bedrocklyr+1) : NSOIL) = 1.e-20
          SMC((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
          SMH2O((parameters%bedrocklyr+1) : NSOIL) = 1.e-9
        else
