@@ -8,7 +8,7 @@ cftime==1.0.3.4
 chardet==3.0.4
 cloudpickle==1.2.1
 DateTime==4.3
-deepdiff==6.2.3
+deepdiff==8.6.1
 f90nml==1.2
 gdown==5.1.0
 idna==3.7
@@ -26,12 +26,12 @@ pytest-html==3.0.0
 pytest-metadata==1.8.0
 python-dateutil==2.8.0
 pytz==2019.2
-requests==2.32.0
-setuptools==70.0.0
+requests==2.32.4
+setuptools==78.1.1
 six==1.12.0
 soupsieve==1.9.3
 toolz==0.10.0
-urllib3==1.26.19
+urllib3==2.6.3
 wrfhydropy==0.0.19
 xarray==0.19
 zipp==3.19.1
