@@ -45,6 +45,7 @@ module module_persistence_levelpool_hybrid
         procedure :: init => hybrid_init
         procedure :: destroy => hybrid_destroy
         procedure :: run => run_hybrid_reservoir
+        procedure :: set_coefficients => set_coefficients_hybrid
 
     end type persistence_levelpool_hybrid
 
@@ -453,5 +454,15 @@ contains
 #endif
 
     end subroutine run_hybrid_reservoir
+
+    subroutine set_coefficients_hybrid(this, weir_coefficient, orifice_coefficient)
+        class(persistence_levelpool_hybrid), intent(inout) :: this
+        real, intent(in) :: weir_coefficient
+        real, intent(in) :: orifice_coefficient
+        if (associated(this%state%levelpool_ptr)) then
+            this%state%levelpool_ptr%properties%weir_coeffecient = weir_coefficient
+            this%state%levelpool_ptr%properties%orifice_coefficient = orifice_coefficient
+        end if
+    end subroutine set_coefficients_hybrid
 
 end module module_persistence_levelpool_hybrid

@@ -40,6 +40,7 @@ module module_rfc_forecasts
         procedure :: init => rfc_forecasts_init
         procedure :: destroy => rfc_forecasts_destroy
         procedure :: run => run_rfc_forecasts_reservoir
+        procedure :: set_coefficients => set_coefficients_rfc
 
     end type rfc_forecasts
 
@@ -433,5 +434,15 @@ contains
 #endif
 
     end subroutine run_rfc_forecasts_reservoir
+
+    subroutine set_coefficients_rfc(this, weir_coefficient, orifice_coefficient)
+        class(rfc_forecasts), intent(inout) :: this
+        real, intent(in) :: weir_coefficient
+        real, intent(in) :: orifice_coefficient
+        if (associated(this%state%levelpool_ptr)) then
+            this%state%levelpool_ptr%properties%weir_coeffecient = weir_coefficient
+            this%state%levelpool_ptr%properties%orifice_coefficient = orifice_coefficient
+        end if
+    end subroutine set_coefficients_rfc
 
 end module module_rfc_forecasts

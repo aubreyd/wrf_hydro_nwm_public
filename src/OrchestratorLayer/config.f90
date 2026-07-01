@@ -485,8 +485,10 @@ contains
       call hydro_stop('hydro.namelist ERROR: Invalid imperv_adj specified')
    endif
 
-   if( (self%water_temperature .lt. 0 ) .or. (self%water_temperature .gt. 1) ) then
-      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified')
+   ! 0=off, 1=full advection-diffusion (gridded routing only),
+   ! 2=equilibrium temperature (UDMP reach-based routing)
+   if( (self%water_temperature .lt. 0 ) .or. (self%water_temperature .gt. 2) ) then
+      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified (0,1,2)')
    endif
 
   end subroutine rt_nlst_check
