@@ -399,6 +399,8 @@ CONTAINS
         allocate( rt_domain(did)%WEIRL(NLAKES) )
         allocate( rt_domain(did)%DAML(NLAKES) )
         allocate( rt_domain(did)%ORIFICEC(NLAKES) )
+        allocate( rt_domain(did)%WEIRC_DOY(NLAKES, 365) )
+        allocate( rt_domain(did)%ORIFICEC_DOY(NLAKES, 365) )
         allocate( rt_domain(did)%ORIFICEA(NLAKES) )
         allocate( rt_domain(did)%ORIFICEE(NLAKES) )
 
@@ -410,6 +412,8 @@ CONTAINS
          rt_domain(did)%LAKEMAXH = 0.0
          rt_domain(did)%ELEVLAKE= 0.0
          rt_domain(did)%ORIFICEC = 0.0
+         rt_domain(did)%WEIRC_DOY = 0.0
+         rt_domain(did)%ORIFICEC_DOY = 0.0
          rt_domain(did)%ORIFICEA = 0.0
          rt_domain(did)%ORIFICEE = 0.0
          rt_domain(did)%reservoir_type = 1
@@ -737,7 +741,7 @@ subroutine LandRT_ini(did)
   use config_base, only: nlst, noah_lsm
   use module_RT_data, only: rt_domain
   use module_gw_gw2d_data, only: gw2d
-  use module_HYDRO_io, only: regrid_lowres_to_highres
+  use module_HYDRO_io, only: regrid_lowres_to_highres, read_lake_coeff_doy
 #ifdef HYDRO_D
   use module_HYDRO_io, only: output_lake_types
 #endif
@@ -977,6 +981,13 @@ subroutine LandRT_ini(did)
            end select
 
    end do
+
+   ! Read day-of-year varying weir/orifice coefficients from LAKEPARM
+   if (NLAKES_total .gt. 0) then
+       call read_lake_coeff_doy(nlst(did)%route_lake_f, &
+            rt_domain(did)%WEIRC_DOY, rt_domain(did)%ORIFICEC_DOY, &
+            rt_domain(did)%WEIRC, rt_domain(did)%ORIFICEC, NLAKES_total)
+   end if
 
    !-- Reza's code goes here to be initialized
    call fineWeathData%init (                      &
@@ -1941,6 +1952,7 @@ subroutine LandRT_ini(did)
    if(allocated(rt_domain(did)%ORIFICEC)) deallocate(rt_domain(did)%ORIFICEC)
    if(allocated(rt_domain(did)%ORIFICEA)) deallocate(rt_domain(did)%ORIFICEA)
    if(allocated(rt_domain(did)%LAKEMAXH)) deallocate(rt_domain(did)%LAKEMAXH)
+   ! WEIRC_DOY and ORIFICEC_DOY are retained (used each timestep in driveChannelRouting)
 
 end subroutine LandRT_ini
 

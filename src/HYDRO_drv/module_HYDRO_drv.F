@@ -49,6 +49,7 @@ module module_HYDRO_drv
 #endif
    use module_hydro_stop, only: HYDRO_stop
    use module_UDMAP, only: get_basn_area_nhd
+   use module_stream_temperature_eq, only: run_stream_temp_eq
    use netcdf
 
    implicit none
@@ -921,6 +922,8 @@ end subroutine driveGwBaseflow
 
        implicit none
        integer, intent(in) :: did
+       integer :: doy_lake, lake_idx, yr_doy, mo_doy, da_doy
+       integer, dimension(12) :: days_per_month
 
 !-------------------------------------------------------------------
 !-------------------------------------------------------------------
@@ -928,6 +931,23 @@ end subroutine driveGwBaseflow
 !-------------------------------------------------------------------
 
 if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
+
+   ! Update time-varying weir/orifice coefficients based on current day-of-year
+   if (rt_domain(did)%NLAKES .gt. 0 .and. allocated(rt_domain(did)%WEIRC_DOY)) then
+       read(nlst(did)%olddate(1:4),  '(I4)') yr_doy
+       read(nlst(did)%olddate(6:7),  '(I2)') mo_doy
+       read(nlst(did)%olddate(9:10), '(I2)') da_doy
+       days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
+       if (mod(yr_doy,4)==0 .and. (mod(yr_doy,100)/=0 .or. mod(yr_doy,400)==0)) &
+           days_per_month(2) = 29
+       doy_lake = sum(days_per_month(1:mo_doy-1)) + da_doy
+       doy_lake = max(1, min(365, doy_lake))
+       do lake_idx = 1, rt_domain(did)%NLAKES
+           call rt_domain(did)%reservoirs(lake_idx)%ptr%set_coefficients( &
+                rt_domain(did)%WEIRC_DOY(lake_idx, doy_lake), &
+                rt_domain(did)%ORIFICEC_DOY(lake_idx, doy_lake))
+       end do
+   end if
 
  if(nlst(did)%UDMP_OPT .eq. 1) then
      !!! for user defined Reach based Routing method.
@@ -967,6 +987,9 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        ,                                     nlst(did)%SUBRTSWCRT &
        , nlst(did)%channel_only , nlst(did)%channelBucket_only &
        , nlst(did)%channel_bypass )
+
+   ! Equilibrium stream temperature model (water_temperature=2, UDMP reach-based routing)
+   if (nlst(did)%water_temperature .eq. 2) call run_stream_temp_eq(did)
 
 else
     print *, "calling gridded drive_CHANNEL"

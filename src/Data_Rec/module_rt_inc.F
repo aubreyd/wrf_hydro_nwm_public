@@ -254,6 +254,8 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)    :: LAKEMAXH   !maximum depth (m)
   REAL, allocatable, DIMENSION(:)    :: WEIRC      !coeff of overtop weir
   REAL, allocatable, DIMENSION(:)    :: WEIRH      !depth of Lake coef
+  REAL, allocatable, DIMENSION(:,:)  :: WEIRC_DOY    !weir coeff by day-of-year (nlakes x 365)
+  REAL, allocatable, DIMENSION(:,:)  :: ORIFICEC_DOY !orifice coeff by day-of-year (nlakes x 365)
 
 
 

@@ -793,8 +793,8 @@ subroutine rt_nlst_check(nlst)
    if( (nlst%imperv_adj .lt. 0 ) .or. (nlst%imperv_adj .gt. 1) ) then
       call hydro_stop('hydro.namelist ERROR: Invalid imperv_adj specified')
    endif
-   if( (nlst%water_temperature .lt. 0 ) .or. (nlst%water_temperature .gt. 1) ) then
-      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified')
+   if( (nlst%water_temperature .lt. 0 ) .or. (nlst%water_temperature .gt. 2) ) then
+      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified (valid: 0=off, 1=full model, 2=equilibrium)')
    endif
    ! Only allow lakes to be ran with gridded routing or NWM routing
    if(len(trim(nlst%route_lake_f)) .ne. 0) then

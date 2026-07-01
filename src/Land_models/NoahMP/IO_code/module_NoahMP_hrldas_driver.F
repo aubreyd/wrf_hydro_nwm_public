@@ -28,6 +28,7 @@ module module_NoahMP_hrldas_driver
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
   USE modi_ini_csts
+  USE module_lsm_forcing, only: weather2d
 #ifdef MPP_LAND
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
   use module_mpp_land, only: check_land, node_info, numprocs
@@ -1996,6 +1997,18 @@ end subroutine land_driver_ini
      where(XLAND > 1.5 .and. IVGTYP == ISWATER) RAINBL_tmp     = 0.0
      where(XLAND > 1.5 .and. IVGTYP == ISWATER) SNOWBL         = 0.0
 
+     ! Capture forcing for stream temperature before noahmplsm consumes/modifies SWDOWN
+     if (.not. allocated(weather2d%T2))    allocate(weather2d%T2   (xstart:xend,ystart:yend))
+     if (.not. allocated(weather2d%short)) allocate(weather2d%short(xstart:xend,ystart:yend))
+     if (.not. allocated(weather2d%q2x))   allocate(weather2d%q2x  (xstart:xend,ystart:yend))
+     if (.not. allocated(weather2d%wind))  allocate(weather2d%wind (xstart:xend,ystart:yend))
+     if (.not. allocated(weather2d%sfcp))  allocate(weather2d%sfcp (xstart:xend,ystart:yend))
+     weather2d%T2    = T_PHY(:,1,:)
+     weather2d%short = SWDOWN
+     weather2d%q2x   = QV_CURR(:,1,:)
+     weather2d%wind  = sqrt(U_PHY(:,1,:)**2 + V_PHY(:,1,:)**2)
+     weather2d%sfcp  = P8W(:,1,:)
+
      QV_CURR(:,1,:) = QV_CURR(:,1,:)/(1.0 - QV_CURR(:,1,:))  ! Assuming input forcing are specific hum.;
                                                              ! WRF wants mixing ratio at driver level
      P8W(:,2,:)     = P8W(:,1,:)      ! WRF uses lowest two layers
@@ -2169,9 +2182,14 @@ end subroutine land_driver_ini
 
            where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
 
+           ! Pass top water-layer temperature from 1D lake physics to routing [K]
+           rt_domain(did)%LakeOutflowTemp(ilake) = &
+               sum(t_lake3d(:,1,:), mask = lake_id == lake_idx) / lake_grids(ilake)
+
            print *, "dhlake", (lake_precip(ilake)/lake_grids(ilake))*dtbl/3600./1000.,&
                               (lake_evap(ilake)/lake_grids(ilake)*3600)*dtbl/3600./1000.,&
                               lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
+           print *, "LakeOutflowTemp ilake T_lake1", ilake, rt_domain(did)%LakeOutflowTemp(ilake)
 
          end do
 
@@ -2211,9 +2229,10 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
+
      call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:), &
         SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,lake_precip, &
-        lake_evap,lake_netoutflow,lake_grids,nlakes,ix,jx,NSOIL) 
+        lake_evap,lake_netoutflow,lake_grids,nlakes,ix,jx,NSOIL)
 #endif
 
 ! Output for history

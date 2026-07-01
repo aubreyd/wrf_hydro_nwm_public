@@ -80,6 +80,7 @@ module module_reservoir
         ! it cannot be implemented for a base reservoir but only for
         ! a sub-type of reservoir.
         procedure (run_reservoir_interface), deferred :: run
+        procedure (set_coefficients_interface), deferred :: set_coefficients
 
     end type
 
@@ -109,6 +110,13 @@ module module_reservoir
             character(len=256), intent(out) :: assimilated_source_file ! source file of assimilated value
 
         end subroutine run_reservoir_interface
+
+        subroutine set_coefficients_interface(this, weir_coefficient, orifice_coefficient)
+            import reservoir
+            class(reservoir), intent(inout) :: this
+            real, intent(in) :: weir_coefficient
+            real, intent(in) :: orifice_coefficient
+        end subroutine set_coefficients_interface
 
     end interface
 

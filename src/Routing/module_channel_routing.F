@@ -1573,8 +1573,8 @@ end if
               !       MPI communication model.
 
               QLAKEIP(i) = QLAKEI(i)  !-- store total lake inflow for this timestep
-              !!AD: For now we hardcode lakes to have same outflow temperature as what is coming in 
-              LakeOutflowTemp(i) = LakeInflowUpstreamTemp(i)
+              ! LakeOutflowTemp(i) is set from 1D lake physics (t_lake3d top layer)
+              ! in module_NoahMP_hrldas_driver before routing is called.
               LAKE_NETOUTFLOW(i) = QLAKEI(i) + QLLAKE(i) - QLAKEO(i)
 
 if (localprint) then

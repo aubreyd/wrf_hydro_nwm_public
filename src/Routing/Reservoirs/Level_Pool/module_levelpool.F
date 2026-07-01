@@ -47,6 +47,7 @@ module module_levelpool
         procedure :: init => levelpool_init
         procedure :: destroy => levelpool_destroy
         procedure :: run => run_levelpool_reservoir
+        procedure :: set_coefficients => set_coefficients_levelpool
 
     end type levelpool
 
@@ -431,5 +432,13 @@ contains
     ! ----------------------------------------------------------------
     end subroutine LEVELPOOL_PHYSICS
     ! ----------------------------------------------------------------
+
+    subroutine set_coefficients_levelpool(this, weir_coefficient, orifice_coefficient)
+        class(levelpool), intent(inout) :: this
+        real, intent(in) :: weir_coefficient
+        real, intent(in) :: orifice_coefficient
+        this%properties%weir_coeffecient = weir_coefficient
+        this%properties%orifice_coefficient = orifice_coefficient
+    end subroutine set_coefficients_levelpool
 
 end module module_levelpool

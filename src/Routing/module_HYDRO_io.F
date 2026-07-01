@@ -9228,6 +9228,83 @@ subroutine read_route_lake_netcdf(route_lake_file,                         &
 end subroutine read_route_lake_netcdf
 
 !===================================================================================================
+! read_lake_coeff_doy: Read time-varying WeirC/OrificeC from LAKEPARM.nc
+!   If variables are 2-D (nlakes x 365), the full DOY table is stored.
+!   If variables are 1-D (static), the value is replicated across all 365 days.
+!   Falls back to static_weirc/static_orificec if the file cannot be opened.
+!===================================================================================================
+subroutine read_lake_coeff_doy(route_lake_file, WEIRC_DOY, ORIFICEC_DOY, &
+                               static_weirc, static_orificec, nlakes)
+    implicit none
+    character(len=*), intent(in)                       :: route_lake_file
+    real, intent(out), dimension(nlakes, 365)          :: WEIRC_DOY
+    real, intent(out), dimension(nlakes, 365)          :: ORIFICEC_DOY
+    real, intent(in),  dimension(nlakes)               :: static_weirc
+    real, intent(in),  dimension(nlakes)               :: static_orificec
+    integer, intent(in)                                :: nlakes
+
+    integer :: ncid, iret, varId, ndims, idoy
+
+    iret = nf90_open(trim(route_lake_file), NF90_NOWRITE, ncid)
+    if (iret /= NF90_NOERR) then
+        do idoy = 1, 365
+            WEIRC_DOY(:, idoy)    = static_weirc(:)
+            ORIFICEC_DOY(:, idoy) = static_orificec(:)
+        end do
+        return
+    end if
+
+    ! WeirC
+    iret = nf90_inq_varid(ncid, 'WeirC', varId)
+    if (iret == NF90_NOERR) then
+        iret = nf90_inquire_variable(ncid, varId, ndims=ndims)
+        if (iret == NF90_NOERR .and. ndims == 2) then
+            iret = nf90_get_var(ncid, varId, WEIRC_DOY)
+            if (iret /= NF90_NOERR) then
+                write(6,*) "read_lake_coeff_doy: WARNING - failed to read 2D WeirC, using static values"
+                do idoy = 1, 365
+                    WEIRC_DOY(:, idoy) = static_weirc(:)
+                end do
+            end if
+        else
+            do idoy = 1, 365
+                WEIRC_DOY(:, idoy) = static_weirc(:)
+            end do
+        end if
+    else
+        do idoy = 1, 365
+            WEIRC_DOY(:, idoy) = static_weirc(:)
+        end do
+    end if
+
+    ! OrificeC
+    iret = nf90_inq_varid(ncid, 'OrificeC', varId)
+    if (iret == NF90_NOERR) then
+        iret = nf90_inquire_variable(ncid, varId, ndims=ndims)
+        if (iret == NF90_NOERR .and. ndims == 2) then
+            iret = nf90_get_var(ncid, varId, ORIFICEC_DOY)
+            if (iret /= NF90_NOERR) then
+                write(6,*) "read_lake_coeff_doy: WARNING - failed to read 2D OrificeC, using static values"
+                do idoy = 1, 365
+                    ORIFICEC_DOY(:, idoy) = static_orificec(:)
+                end do
+            end if
+        else
+            do idoy = 1, 365
+                ORIFICEC_DOY(:, idoy) = static_orificec(:)
+            end do
+        end if
+    else
+        do idoy = 1, 365
+            ORIFICEC_DOY(:, idoy) = static_orificec(:)
+        end do
+    end if
+
+    iret = nf90_close(ncid)
+
+end subroutine read_lake_coeff_doy
+
+!===================================================================================================
 ! Program Names: get_1d_netcdf_real, get_1d_netcdf_int, get_1d_netcdf_text
 ! Author(s)/Contact(s): James L McCreight <jamesmcc><ucar><edu>
 ! Abstract: Read a variable of real or integer type from an open netcdf file, respectively.
