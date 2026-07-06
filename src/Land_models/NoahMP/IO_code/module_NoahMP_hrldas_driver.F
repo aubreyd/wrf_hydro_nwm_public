@@ -327,6 +327,19 @@ module module_NoahMP_hrldas_driver
   REAL,       ALLOCATABLE, DIMENSION(:,:,:)   ::  PSNOWHISTXY
 
 !------------------------------------------------------------------------
+! fSCA ML model variables
+!------------------------------------------------------------------------
+#ifdef WRF_HYDRO
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SFCTMPXY_DAILY, SFCTMPXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  LWDNXY_DAILY, LWDNXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SWDOWNXY_DAILY, SWDOWNXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  UUXY_DAILY, UUXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  VVXY_DAILY, VVXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_DAILY_TEMP
+  LOGICAL                                   ::  update_fsca
+  INTEGER                                   ::  ntimes_day
+#endif
+!------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
 !------------------------------------------------------------------------
 
@@ -944,6 +957,41 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( PSNOWDZXY      (XSTART:XEND,1:act_lev,YSTART:YEND) )
      ALLOCATE ( PSNOWHISTXY    (XSTART:XEND,1:act_lev,YSTART:YEND) )
    end if ! crocus_opt /= 0
+
+#ifdef WRF_HYDRO
+     ! fSCA ML model variables
+     ALLOCATE ( SFCTMPXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! daily average 2-m air temperature
+     ALLOCATE ( LWDNXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! daily average downward longwave radiation
+     ALLOCATE ( SWDOWNXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! daily average downward shortwave radiation
+     ALLOCATE ( UUXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component
+     ALLOCATE ( VVXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component
+     ALLOCATE ( PRCPXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation
+     ALLOCATE ( SFCTMPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average 2-m air temperature (temporary accumulator)
+     ALLOCATE ( LWDNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily average downward longwave radiation (temporary accumulator)
+     ALLOCATE ( SWDOWNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average downward shortwave radiation (temporary accumulator)
+     ALLOCATE ( UUXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component (temporary accumulator)
+     ALLOCATE ( VVXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component (temporary accumulator)
+     ALLOCATE ( PRCPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation (temporary accumulator)
+
+     ! Initialize daily values to bad values
+     SFCTMPXY_DAILY = undefined_real
+     LWDNXY_DAILY = undefined_real
+     SWDOWNXY_DAILY = undefined_real
+     UUXY_DAILY = undefined_real
+     VVXY_DAILY = undefined_real
+     PRCPXY_DAILY = undefined_real
+
+     ! Initialize aggregators to 0
+     SFCTMPXY_DAILY_TEMP = 0.0
+     LWDNXY_DAILY_TEMP = 0.0
+     SWDOWNXY_DAILY_TEMP = 0.0
+     UUXY_DAILY_TEMP = 0.0
+     VVXY_DAILY_TEMP = 0.0
+     PRCPXY_DAILY_TEMP = 0.0
+
+     ! Calculate number of model timesteps in a day for aggregators
+     ntimes_day = nint(86400/DTBL)
+#endif
 
 #ifdef WRF_HYDRO
    allocate( greenfrac   (XSTART:XEND,YSTART:YEND))
@@ -1656,6 +1704,7 @@ end subroutine land_driver_ini
     integer :: ihr
     integer :: imin
     integer :: isec
+    integer :: iprint, jprint
 
 !---------------------------------------------------------------------------------
 ! Read the forcing data.
@@ -1822,6 +1871,49 @@ end subroutine land_driver_ini
       CMXY = 0.1
     ENDIF
 
+   ! Generate running daily forcings for the fSCA ML model
+#ifdef WRF_HYDRO
+   if ( IOPT_ML_FSCA > 0 ) then
+     update_fsca = .FALSE.
+     ! At 00Z move temporary accumulators over to daily aggs and reset
+     if ( ITIME > 1 .and. ihr == 0 ) then 
+       SFCTMPXY_DAILY = SFCTMPXY_DAILY_TEMP
+       LWDNXY_DAILY = LWDNXY_DAILY_TEMP
+       SWDOWNXY_DAILY = SWDOWNXY_DAILY_TEMP
+       UUXY_DAILY = UUXY_DAILY_TEMP
+       VVXY_DAILY = VVXY_DAILY_TEMP
+       PRCPXY_DAILY = PRCPXY_DAILY_TEMP
+       SFCTMPXY_DAILY_TEMP = T_PHY(:,1,:)/real(ntimes_day)
+       LWDNXY_DAILY_TEMP = GLW/real(ntimes_day)
+       SWDOWNXY_DAILY_TEMP = SWDOWN/real(ntimes_day)
+       UUXY_DAILY_TEMP = U_PHY(:,1,:)/real(ntimes_day)
+       VVXY_DAILY_TEMP = V_PHY(:,1,:)/real(ntimes_day)
+       PRCPXY_DAILY_TEMP = RAINBL  ! already in mm
+       update_fsca = .TRUE.
+     else
+       SFCTMPXY_DAILY_TEMP = SFCTMPXY_DAILY_TEMP + T_PHY(:,1,:)/real(ntimes_day)
+       LWDNXY_DAILY_TEMP = LWDNXY_DAILY_TEMP + GLW/real(ntimes_day)
+       SWDOWNXY_DAILY_TEMP = SWDOWNXY_DAILY_TEMP + SWDOWN/real(ntimes_day)
+       UUXY_DAILY_TEMP = UUXY_DAILY_TEMP + U_PHY(:,1,:)/real(ntimes_day)
+       VVXY_DAILY_TEMP = VVXY_DAILY_TEMP + V_PHY(:,1,:)/real(ntimes_day)
+       PRCPXY_DAILY_TEMP = PRCPXY_DAILY_TEMP + RAINBL ! already in mm so we are just summing
+     end if
+   end if  ! end fSCA ML model variable calculations
+   iprint=30
+   jprint=3
+   print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
+   print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
+   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY_TEMP LWDNXY_DAILY_TEMP SWDOWNXY_DAILY_TEMP", SFCTMPXY_DAILY_TEMP(iprint,jprint), &
+                           LWDNXY_DAILY_TEMP(iprint,jprint), SWDOWNXY_DAILY_TEMP(iprint,jprint)
+   print *, "ADCHECK_DAILY: UUXY_DAILY_TEMP VVXY_DAILY_TEMP PRCPXY_DAILY_TEMP", UUXY_DAILY_TEMP(iprint,jprint), &
+                           VVXY_DAILY_TEMP(iprint,jprint), PRCPXY_DAILY_TEMP(iprint,jprint)
+   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
+                           LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
+   print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
+                           VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
+   print *, "ADCHECK_DAILY: update?", update_fsca
+#endif
+
 !------------------------------------------------------------------------
 ! Skip model call at t=1 since initial conditions are at start time; First model time is +1
 !------------------------------------------------------------------------
@@ -1895,6 +1987,9 @@ end subroutine land_driver_ini
                 , ACCPRCP=ACCPRCP,  ACCECAN=ACCECAN, ACCETRAN=ACCETRAN,  ACCEDIR=ACCEDIR  &
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
                 , XLONIN=XLONIN, IOPT_ML_FSCA=IOPT_ML_FSCA &
+                , SFCTMPXY_DAILY=SFCTMPXY_DAILY, LWDNXY_DAILY=LWDNXY_DAILY, SWDOWNXY_DAILY=SWDOWNXY_DAILY &
+                , UUXY_DAILY=UUXY_DAILY, VVXY_DAILY=VVXY_DAILY, PRCPXY_DAILY=PRCPXY_DAILY &
+                , update_fsca=update_fsca &
 #endif
                 )
 

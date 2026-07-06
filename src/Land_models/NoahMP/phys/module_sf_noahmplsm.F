@@ -419,8 +419,10 @@ contains
                    PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB        & ! OUT
 #ifdef WRF_HYDRO
                    ,SFCHEADRT                                                  & ! IN/OUT :
+                   , longitude, SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY  &        ! fSCA ML model
+                   , UU_DAILY, VV_DAILY, PRCP_DAILY &                            ! fSCA ML model 
+                   , update_fsca &                                               ! fSCA ML model
 #endif
-                   , longitude &
                    )
 
 ! --------------------------------------------------------------------------------------------------
@@ -478,6 +480,13 @@ contains
 
 #ifdef WRF_HYDRO
   REAL                           , INTENT(INOUT)    :: sfcheadrt
+  REAL                           , INTENT(IN)       :: SFCTMP_DAILY
+  REAL                           , INTENT(IN)       :: LWDN_DAILY
+  REAL                           , INTENT(IN)       :: SWDOWN_DAILY
+  REAL                           , INTENT(IN)       :: UU_DAILY
+  REAL                           , INTENT(IN)       :: VV_DAILY
+  REAL                           , INTENT(IN)       :: PRCP_DAILY
+  LOGICAL                        , INTENT(IN)       :: update_fsca
 #endif
 
 ! input/output : need arbitary intial values
@@ -535,7 +544,7 @@ contains
   REAL                           , INTENT(OUT)   :: APAR   !photosyn active energy by canopy (w/m2)
   REAL                           , INTENT(OUT)   :: SAV    !solar rad absorbed by veg. (w/m2)
   REAL                           , INTENT(OUT)   :: SAG    !solar rad absorbed by ground (w/m2)
-  REAL                           , INTENT(OUT)   :: FSNO   !snow cover fraction on the ground (-)
+  REAL                           , INTENT(INOUT)   :: FSNO   !snow cover fraction on the ground (-)
   REAL                           , INTENT(OUT)   :: FVEG   !green vegetation fraction [0.0-1.0]
   REAL                           , INTENT(OUT)   :: ALBEDO !surface albedo [-]
   REAL                                           :: ERRWAT !water error [kg m{-2}]
@@ -783,8 +792,13 @@ contains
                  Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV   ,CHB     , & !out
                  EMISSI ,PAH    ,                                 &
                  SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF, &
-                 CHUC,CHV2,CHB2, & !out
-                 SWDOWN, JULIAN, longitude & ! ml_fSCA variables
+                 CHUC,CHV2,CHB2 & !out
+#ifdef WRF_HYDRO
+                 , JULIAN, longitude &                      ! ml_fSCA variables
+                 , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & ! ml_fSCA variables
+                 , UU_DAILY, VV_DAILY, PRCP_DAILY &         ! ml_fSCA variables
+                 , update_fsca &
+#endif
     )                                            !out
 !jref:end
 
@@ -1540,9 +1554,16 @@ ENDIF   ! CROPTYPE == 0
                      FSRG   ,RSSUN  ,RSSHA  ,ALBSND  ,ALBSNI,BGAP   ,WGAP,TGV,TGB,&
                      Q1     ,Q2V    ,Q2B    ,Q2E    ,CHV  ,CHB, EMISSI,PAH  ,&
 		     SHG,SHC,SHB,EVG,EVB,GHV,GHB,IRG,IRC,IRB,TR,EVC,CHLEAF,&
-                     CHUC,CHV2,CHB2, &!)   !out
-                     SWDOWN, JULIAN, longitude &
-                     ) ! ml_fSCA additions
+                     CHUC,CHV2,CHB2 &!)   !out
+#ifdef WRF_HYDRO
+! start ml_fSCA additions
+                     , JULIAN, longitude  &
+                     , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & 
+                     , UU_DAILY, VV_DAILY, PRCP_DAILY &
+                     , update_fsca &
+#endif
+                     )
+! end ml_fSCA additions
 !jref:end
 
 ! --------------------------------------------------------------------------------------------------
@@ -1640,7 +1661,7 @@ ENDIF   ! CROPTYPE == 0
   REAL   , DIMENSION(-NSNOW+1:    0), INTENT(OUT)   :: SNICEV !partial volume ice [m3/m3]
   REAL   , DIMENSION(-NSNOW+1:    0), INTENT(OUT)   :: SNLIQV !partial volume liq. water [m3/m3]
   REAL   , DIMENSION(-NSNOW+1:    0), INTENT(OUT)   :: EPORE  !effective porosity [m3/m3]
-  REAL                              , INTENT(OUT)   :: FSNO   !snow cover fraction (-)
+  REAL                              , INTENT(INOUT)   :: FSNO   !snow cover fraction (-)
   REAL                              , INTENT(OUT)   :: QMELT  !snowmelt [mm/s]
   REAL                              , INTENT(OUT)   :: PONDING!pounding at ground [mm]
   REAL                              , INTENT(OUT)   :: SAV    !solar rad. absorbed by veg. (w/m2)
@@ -1709,10 +1730,17 @@ ENDIF   ! CROPTYPE == 0
   REAL,                               INTENT(OUT)   :: EMISSI
   REAL,                               INTENT(OUT)   :: PAH    !precipitation advected heat - total (W/m2)
 
-  real, intent(in) :: SWDOWN !downward solar [w/m2]
+#ifdef WRF_HYDRO
   real, intent(in) :: JULIAN !Julian day of year (floating point)
   real, intent(in) :: longitude
-
+  real, intent(in) :: SFCTMP_DAILY ! daily average 2-m air temperature [K]
+  real, intent(in) :: LWDN_DAILY   ! daily average downward longwave radiation [W/m2]
+  real, intent(in) :: SWDOWN_DAILY ! daily average downward shortwave radiation [W/m2]
+  real, intent(in) :: UU_DAILY     ! daily average u-component windspeed [m/s]
+  real, intent(in) :: VV_DAILY     ! daily average v-component windspeed [m/s]
+  real, intent(in) :: PRCP_DAILY   ! daily total precipitation [mm]
+  logical, intent(in) :: update_fsca ! flag whether to update fSCA
+#endif
 
 ! local
   INTEGER                                           :: IZ     !do-loop index
@@ -1805,6 +1833,7 @@ ENDIF   ! CROPTYPE == 0
 
   real :: day_of_water_year, day
   real, parameter  :: slope_dummy = -1, aspect_dummy = -1
+  real :: FSNO_PREV
 
 ! ---------------------------------------------------------------------------------------------------
 ! initialize fluxes from veg. fraction
@@ -1841,23 +1870,60 @@ ENDIF   ! CROPTYPE == 0
 
 ! ground snow cover fraction [Niu and Yang, 2007, JGR]
 
+     FSNO_PREV = FSNO
      FSNO = 0.
      IF(SNOWH.GT.0.)  THEN
          BDSNO    = SNEQV / SNOWH
          FMELT    = (BDSNO/100.)**parameters%MFSNO
+     if (iloc == 30 .and. jloc == 3 ) then
+       print *, "ADCHECK_ENERGY_INIT: SNOWH FSNO_PREV", SNOWH, FSNO_PREV
+     endif
+#ifdef WRF_HYDRO
          if (opt_ml_fsca == 1) then
-            day = floor(julian)
-            if (day == 366) day = 365
-            day_of_water_year = doy_to_dowy(day)
-            print *, "day =", day, "dowy =", day_of_water_year
-
-            call ml_fSCA(FSNO, &
-                 SFCTMP, LWDN, SWDOWN, UU, VV, &
+           ! Call the ML model if:
+           !    (1) we are at the start of the day OR
+           !    (2) we have snow but no fSCA AND the daily met variables have been calculated
+           if ( update_fsca .or. ( FSNO_PREV == 0. .and. SFCTMP_DAILY < 1e36 ) ) then
+             day = floor(julian)
+             if (day == 366) day = 365
+             day_of_water_year = doy_to_dowy(day)
+             if (iloc == 30 .and. jloc == 3 ) then
+               print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
+               print *, "day =", day, "dowy =", day_of_water_year
+               print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
+               print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
+             endif
+             call ml_fSCA(FSNO, &
+                 SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY, UU_DAILY, VV_DAILY, &
                  day_of_water_year, &
                  ZREF, slope_dummy, aspect_dummy, lat, longitude)
-         else
+             if (iloc == 30 .and. jloc == 3 ) then
+               print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
+             endif
+           ! if we have no previous value for fSCA AND no daily met variables, then revert to old method
+           else if ( FSNO_PREV == 0. .and. SFCTMP_DAILY > 1e36 ) then 
+             FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
+             if (iloc == 30 .and. jloc == 3 ) then
+               print *, "ADCHECK_ENERGY_ML: Reverting to old method"
+               print *, "ADCHECK_ENERGY_ML: FSNO_POST_REVERT", FSNO
+             endif
+           else ! carry over previous fSCA when snow is present
+             FSNO = FSNO_PREV
+           if (iloc == 30 .and. jloc == 3 ) then
+               print *, "ADCHECK_ENERGY_ML: Using previous timestep value"
+               print *, "ADCHECK_ENERGY_ML: FSNO_POST_PREV", FSNO
+             endif
+           endif ! end update_fSCA
+         else ! don't use fSCA ML model
+#endif
             FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
+            if (iloc == 30 .and. jloc == 3 ) then
+              print *, "ADCHECK_ENERGY_ORIG: Original fSCA"
+              print *, "ADCHECK_ENERGY_ORIG: FSNO_POST_ORIG", FSNO
+            endif
+#ifdef WRF_HYDRO
          end if
+#endif
      ENDIF
 
 ! ground roughness length

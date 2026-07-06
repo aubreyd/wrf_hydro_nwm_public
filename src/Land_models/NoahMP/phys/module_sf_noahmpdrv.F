@@ -67,7 +67,10 @@ CONTAINS
 #ifdef WRF_HYDRO
                , ACCPRCP,  ACCECAN, ACCETRAN,   ACCEDIR        &         ! NEW output accumulator variables
                , SOILSAT_TOP, SOILSAT, SOILICE, SNOWT_AVG      &         ! NEW soil saturation and snow temp
-               , XLONIN, IOPT_ML_FSCA &
+               , XLONIN, IOPT_ML_FSCA &                                  ! fSCA ML model variables
+               , SFCTMPXY_DAILY, LWDNXY_DAILY, SWDOWNXY_DAILY &          ! fSCA ML model variables
+               , UUXY_DAILY, VVXY_DAILY, PRCPXY_DAILY &                  ! fSCA ML model variables
+               , update_fsca &                                           ! fSCA ML model variables
 #endif
                )
 !----------------------------------------------------------------
@@ -296,8 +299,16 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(INOUT) ::  SOILSAT     ! soil saturation column integrated [fraction]
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(INOUT) ::  SOILICE     ! fraction of soil moisture that is ice [fraction]
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(INOUT) ::  SNOWT_AVG   ! average snowpack temperature (by layer mass) [K]
+    ! fSCA ML model variables:
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  XLONIN    ! longitude [rad]
     INTEGER,                                         OPTIONAL, INTENT(IN   ) ::  IOPT_ML_FSCA ! fSCA ML option (0->none; 1->on)
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  SFCTMPXY_DAILY  ! average daily 2-m air temperature [K]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  LWDNXY_DAILY    ! average daily downward longwave radiation [W/m2]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  SWDOWNXY_DAILY  ! average daily downward shortwave radiation [W/m2]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  UUXY_DAILY      ! average daily u-component wind [m/s]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  VVXY_DAILY      ! average daily v-component wind [m/s]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  PRCPXY_DAILY    ! average total precipitation [mm]
+    LOGICAL,                                         OPTIONAL, INTENT(IN   ) ::  update_fsca     ! flag whether to update fSCA
 #endif
 
 ! 1D equivalent of 2D/3D fields
@@ -329,6 +340,15 @@ CONTAINS
     REAL                                :: PRCPGRPL     ! graupel entering land model [mm]           ! MB/AN : v3.7
     REAL                                :: PRCPHAIL     ! hail entering land model [mm]              ! MB/AN : v3.7
     REAL                                :: PRCPOTHR     ! other precip, e.g. fog [mm]                ! MB/AN : v3.7
+
+#ifdef WRF_HYDRO
+    REAL                                :: SFCTMP_DAILY  ! average daily 2-m air temperature [K]
+    REAL                                :: LWDN_DAILY    ! average daily downward longwave radiation [W/m2]
+    REAL                                :: SWDOWN_DAILY  ! average daily downward shortwave radiation [W/m2]
+    REAL                                :: UU_DAILY      ! average daily u-component wind [m/s]
+    REAL                                :: VV_DAILY      ! average daily v-component wind [m/s]
+    REAL                                :: PRCP_DAILY    ! average total precipitation [mm]
+#endif
 
 ! INOUT (with generic LSM equivalent)
 
@@ -743,6 +763,7 @@ CONTAINS
        SWE                   = SNOW    (I,J)                ! snow water equivalent [mm]
        SNDPTH                = SNOWH   (I,J)                ! snow depth [m]
        QSFC1D                = QSFC    (I,J)
+       FSNO                  = SNOWC   (I,J) 
 
 ! INOUT (with no Noah LSM equivalent)
 
@@ -779,6 +800,15 @@ CONTAINS
        SMCWTD                = SMCWTDXY(I,J)
        RECH                  = 0.
        DEEPRECH              = 0.
+
+#ifdef WRF_HYDRO
+       SFCTMP_DAILY = SFCTMPXY_DAILY(I,J)
+       LWDN_DAILY = LWDNXY_DAILY(I,J)
+       SWDOWN_DAILY = SWDOWNXY_DAILY(I,J)
+       UU_DAILY = UUXY_DAILY(I,J)
+       VV_DAILY = VVXY_DAILY(I,J)
+       PRCP_DAILY = PRCPXY_DAILY(I,J)
+#endif
 
        SLOPETYP     = 1                               ! set underground runoff slope term
        IST          = 1                               ! MP surface type: 1 = land; 2 = lake
@@ -1306,8 +1336,11 @@ CONTAINS
             PAHG    , PAHB    , PAH     , LAISUN  , LAISHA  , RB        &
 #ifdef WRF_HYDRO
             , sfcheadrt(i,j)                               &
-#endif
             , longitude &
+            , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY &
+            , UU_DAILY, VV_DAILY, PRCP_DAILY &
+            , update_fsca &
+#endif
             )            ! OUT :
 
             QFX(I,J) = ECAN + ESOIL + ETRAN
