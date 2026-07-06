@@ -1890,12 +1890,13 @@ ENDIF   ! CROPTYPE == 0
              if (iloc == 30 .and. jloc == 3 ) then
                print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
                print *, "day =", day, "dowy =", day_of_water_year
+               print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
                print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
                print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
              endif
              call ml_fSCA(FSNO, &
                  SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY, UU_DAILY, VV_DAILY, &
-                 day_of_water_year, &
+                 day_of_water_year, PRCP_DAILY, &
                  ZREF, slope_dummy, aspect_dummy, lat, longitude)
              if (iloc == 30 .and. jloc == 3 ) then
                print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
