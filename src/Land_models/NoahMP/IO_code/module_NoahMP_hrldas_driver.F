@@ -330,14 +330,20 @@ module module_NoahMP_hrldas_driver
 ! fSCA ML model variables
 !------------------------------------------------------------------------
 #ifdef WRF_HYDRO
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SFCTMPXY_DAILY, SFCTMPXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  LWDNXY_DAILY, LWDNXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SWDOWNXY_DAILY, SWDOWNXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  UUXY_DAILY, UUXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  VVXY_DAILY, VVXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_DAILY_TEMP
+  ! SFCTMPXY_DAILY etc. hold a trailing 24-hour running mean (running total for
+  ! precip), refreshed every hour from a 24-slot ring buffer of hourly values.
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SFCTMPXY_DAILY, SFCTMPXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  LWDNXY_DAILY, LWDNXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SWDOWNXY_DAILY, SWDOWNXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  UUXY_DAILY, UUXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  VVXY_DAILY, VVXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_HOUR_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:,:) ::  SFCTMPXY_HOURLY, LWDNXY_HOURLY, SWDOWNXY_HOURLY
+  REAL,       ALLOCATABLE, DIMENSION(:,:,:) ::  UUXY_HOURLY, VVXY_HOURLY, PRCPXY_HOURLY
   LOGICAL                                   ::  update_fsca
-  INTEGER                                   ::  ntimes_day
+  INTEGER                                   ::  nsteps_per_hour
+  INTEGER                                   ::  hour_ptr
+  INTEGER                                   ::  nhours_filled
 #endif
 !------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
@@ -960,20 +966,26 @@ module module_NoahMP_hrldas_driver
 
 #ifdef WRF_HYDRO
      ! fSCA ML model variables
-     ALLOCATE ( SFCTMPXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! daily average 2-m air temperature
-     ALLOCATE ( LWDNXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! daily average downward longwave radiation
-     ALLOCATE ( SWDOWNXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! daily average downward shortwave radiation
-     ALLOCATE ( UUXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component
-     ALLOCATE ( VVXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component
-     ALLOCATE ( PRCPXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation
-     ALLOCATE ( SFCTMPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average 2-m air temperature (temporary accumulator)
-     ALLOCATE ( LWDNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily average downward longwave radiation (temporary accumulator)
-     ALLOCATE ( SWDOWNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average downward shortwave radiation (temporary accumulator)
-     ALLOCATE ( UUXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component (temporary accumulator)
-     ALLOCATE ( VVXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component (temporary accumulator)
-     ALLOCATE ( PRCPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation (temporary accumulator)
+     ALLOCATE ( SFCTMPXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! trailing 24-hr running mean 2-m air temperature
+     ALLOCATE ( LWDNXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! trailing 24-hr running mean downward longwave radiation
+     ALLOCATE ( SWDOWNXY_DAILY (XSTART:XEND,YSTART:YEND) )    ! trailing 24-hr running mean downward shortwave radiation
+     ALLOCATE ( UUXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! trailing 24-hr running mean u wind component
+     ALLOCATE ( VVXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! trailing 24-hr running mean v wind component
+     ALLOCATE ( PRCPXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! trailing 24-hr running total precipitation
+     ALLOCATE ( SFCTMPXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )    ! current-hour 2-m air temperature accumulator
+     ALLOCATE ( LWDNXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )      ! current-hour downward longwave radiation accumulator
+     ALLOCATE ( SWDOWNXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )    ! current-hour downward shortwave radiation accumulator
+     ALLOCATE ( UUXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )        ! current-hour u wind component accumulator
+     ALLOCATE ( VVXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )        ! current-hour v wind component accumulator
+     ALLOCATE ( PRCPXY_HOUR_TEMP (XSTART:XEND,YSTART:YEND) )      ! current-hour total precipitation accumulator
+     ALLOCATE ( SFCTMPXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )    ! ring buffer of last 24 hourly means
+     ALLOCATE ( LWDNXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )
+     ALLOCATE ( SWDOWNXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )
+     ALLOCATE ( UUXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )
+     ALLOCATE ( VVXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )
+     ALLOCATE ( PRCPXY_HOURLY (XSTART:XEND,YSTART:YEND,24) )
 
-     ! Initialize daily values to bad values
+     ! Initialize running values to bad values until a full 24 hours of history exists
      SFCTMPXY_DAILY = undefined_real
      LWDNXY_DAILY = undefined_real
      SWDOWNXY_DAILY = undefined_real
@@ -981,16 +993,24 @@ module module_NoahMP_hrldas_driver
      VVXY_DAILY = undefined_real
      PRCPXY_DAILY = undefined_real
 
-     ! Initialize aggregators to 0
-     SFCTMPXY_DAILY_TEMP = 0.0
-     LWDNXY_DAILY_TEMP = 0.0
-     SWDOWNXY_DAILY_TEMP = 0.0
-     UUXY_DAILY_TEMP = 0.0
-     VVXY_DAILY_TEMP = 0.0
-     PRCPXY_DAILY_TEMP = 0.0
+     ! Initialize aggregators and ring buffers to 0
+     SFCTMPXY_HOUR_TEMP = 0.0
+     LWDNXY_HOUR_TEMP = 0.0
+     SWDOWNXY_HOUR_TEMP = 0.0
+     UUXY_HOUR_TEMP = 0.0
+     VVXY_HOUR_TEMP = 0.0
+     PRCPXY_HOUR_TEMP = 0.0
+     SFCTMPXY_HOURLY = 0.0
+     LWDNXY_HOURLY = 0.0
+     SWDOWNXY_HOURLY = 0.0
+     UUXY_HOURLY = 0.0
+     VVXY_HOURLY = 0.0
+     PRCPXY_HOURLY = 0.0
+     hour_ptr = 1
+     nhours_filled = 0
 
-     ! Calculate number of model timesteps in a day for aggregators
-     ntimes_day = nint(86400/DTBL)
+     ! Calculate number of model timesteps in an hour for the hourly aggregators
+     nsteps_per_hour = nint(3600/DTBL)
 #endif
 
 #ifdef WRF_HYDRO
@@ -1871,47 +1891,63 @@ end subroutine land_driver_ini
       CMXY = 0.1
     ENDIF
 
-   ! Generate running daily forcings for the fSCA ML model
+   ! Generate running daily (trailing 24-hr) forcings for the fSCA ML model
 #ifdef WRF_HYDRO
    if ( IOPT_ML_FSCA > 0 ) then
      update_fsca = .FALSE.
-     ! At 00Z move temporary accumulators over to daily aggs and reset
-     if ( ITIME > 1 .and. ihr == 0 ) then 
-       SFCTMPXY_DAILY = SFCTMPXY_DAILY_TEMP
-       LWDNXY_DAILY = LWDNXY_DAILY_TEMP
-       SWDOWNXY_DAILY = SWDOWNXY_DAILY_TEMP
-       UUXY_DAILY = UUXY_DAILY_TEMP
-       VVXY_DAILY = VVXY_DAILY_TEMP
-       PRCPXY_DAILY = PRCPXY_DAILY_TEMP
-       SFCTMPXY_DAILY_TEMP = T_PHY(:,1,:)/real(ntimes_day)
-       LWDNXY_DAILY_TEMP = GLW/real(ntimes_day)
-       SWDOWNXY_DAILY_TEMP = SWDOWN/real(ntimes_day)
-       UUXY_DAILY_TEMP = U_PHY(:,1,:)/real(ntimes_day)
-       VVXY_DAILY_TEMP = V_PHY(:,1,:)/real(ntimes_day)
-       PRCPXY_DAILY_TEMP = RAINBL  ! already in mm
-       update_fsca = .TRUE.
-     else
-       SFCTMPXY_DAILY_TEMP = SFCTMPXY_DAILY_TEMP + T_PHY(:,1,:)/real(ntimes_day)
-       LWDNXY_DAILY_TEMP = LWDNXY_DAILY_TEMP + GLW/real(ntimes_day)
-       SWDOWNXY_DAILY_TEMP = SWDOWNXY_DAILY_TEMP + SWDOWN/real(ntimes_day)
-       UUXY_DAILY_TEMP = UUXY_DAILY_TEMP + U_PHY(:,1,:)/real(ntimes_day)
-       VVXY_DAILY_TEMP = VVXY_DAILY_TEMP + V_PHY(:,1,:)/real(ntimes_day)
-       PRCPXY_DAILY_TEMP = PRCPXY_DAILY_TEMP + RAINBL ! already in mm so we are just summing
+     ! Accumulate sub-hourly instantaneous samples toward the current hour's mean/total
+     SFCTMPXY_HOUR_TEMP = SFCTMPXY_HOUR_TEMP + T_PHY(:,1,:)/real(nsteps_per_hour)
+     LWDNXY_HOUR_TEMP   = LWDNXY_HOUR_TEMP   + GLW/real(nsteps_per_hour)
+     SWDOWNXY_HOUR_TEMP = SWDOWNXY_HOUR_TEMP + SWDOWN/real(nsteps_per_hour)
+     UUXY_HOUR_TEMP     = UUXY_HOUR_TEMP     + U_PHY(:,1,:)/real(nsteps_per_hour)
+     VVXY_HOUR_TEMP     = VVXY_HOUR_TEMP     + V_PHY(:,1,:)/real(nsteps_per_hour)
+     PRCPXY_HOUR_TEMP   = PRCPXY_HOUR_TEMP   + RAINBL  ! already in mm; running hourly total
+
+     ! At the top of each hour, close the completed hour into its slot in the
+     ! 24-slot ring buffer, then refresh the trailing 24-hr running mean/total.
+     if ( ITIME > 0 .and. imin == 0 .and. isec == 0 ) then
+       SFCTMPXY_HOURLY(:,:,hour_ptr) = SFCTMPXY_HOUR_TEMP
+       LWDNXY_HOURLY(:,:,hour_ptr)   = LWDNXY_HOUR_TEMP
+       SWDOWNXY_HOURLY(:,:,hour_ptr) = SWDOWNXY_HOUR_TEMP
+       UUXY_HOURLY(:,:,hour_ptr)     = UUXY_HOUR_TEMP
+       VVXY_HOURLY(:,:,hour_ptr)     = VVXY_HOUR_TEMP
+       PRCPXY_HOURLY(:,:,hour_ptr)   = PRCPXY_HOUR_TEMP
+
+       nhours_filled = min(nhours_filled + 1, 24)
+       hour_ptr = mod(hour_ptr, 24) + 1
+
+       if ( nhours_filled == 24 ) then
+         SFCTMPXY_DAILY = sum(SFCTMPXY_HOURLY, DIM=3) / 24.0
+         LWDNXY_DAILY   = sum(LWDNXY_HOURLY,   DIM=3) / 24.0
+         SWDOWNXY_DAILY = sum(SWDOWNXY_HOURLY, DIM=3) / 24.0
+         UUXY_DAILY     = sum(UUXY_HOURLY,     DIM=3) / 24.0
+         VVXY_DAILY     = sum(VVXY_HOURLY,     DIM=3) / 24.0
+         PRCPXY_DAILY   = sum(PRCPXY_HOURLY,   DIM=3)          ! trailing 24-hr total
+         update_fsca = .TRUE.
+       end if
+
+       iprint=30
+       jprint=3
+       print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
+       print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
+       print *, "ADCHECK_DAILY: SFCTMPXY_HOUR_TEMP LWDNXY_HOUR_TEMP SWDOWNXY_HOUR_TEMP", SFCTMPXY_HOUR_TEMP(iprint,jprint), &
+                           LWDNXY_HOUR_TEMP(iprint,jprint), SWDOWNXY_HOUR_TEMP(iprint,jprint)
+       print *, "ADCHECK_DAILY: UUXY_HOUR_TEMP VVXY_HOUR_TEMP PRCPXY_HOUR_TEMP", UUXY_HOUR_TEMP(iprint,jprint), &
+                           VVXY_HOUR_TEMP(iprint,jprint), PRCPXY_HOUR_TEMP(iprint,jprint)
+       print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
+                           LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
+       print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
+                           VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
+       print *, "ADCHECK_DAILY: update?", update_fsca
+
+       SFCTMPXY_HOUR_TEMP = 0.0
+       LWDNXY_HOUR_TEMP   = 0.0
+       SWDOWNXY_HOUR_TEMP = 0.0
+       UUXY_HOUR_TEMP     = 0.0
+       VVXY_HOUR_TEMP     = 0.0
+       PRCPXY_HOUR_TEMP   = 0.0
      end if
    end if  ! end fSCA ML model variable calculations
-   iprint=30
-   jprint=3
-   print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
-   print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
-   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY_TEMP LWDNXY_DAILY_TEMP SWDOWNXY_DAILY_TEMP", SFCTMPXY_DAILY_TEMP(iprint,jprint), &
-                           LWDNXY_DAILY_TEMP(iprint,jprint), SWDOWNXY_DAILY_TEMP(iprint,jprint)
-   print *, "ADCHECK_DAILY: UUXY_DAILY_TEMP VVXY_DAILY_TEMP PRCPXY_DAILY_TEMP", UUXY_DAILY_TEMP(iprint,jprint), &
-                           VVXY_DAILY_TEMP(iprint,jprint), PRCPXY_DAILY_TEMP(iprint,jprint)
-   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
-                           LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
-   print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
-                           VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
-   print *, "ADCHECK_DAILY: update?", update_fsca
 #endif
 
 !------------------------------------------------------------------------
