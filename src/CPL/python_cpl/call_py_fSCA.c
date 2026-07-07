@@ -8,7 +8,8 @@ static PyObject *pFunc = NULL;
 
 void py_ml_fSCA_scalar(double *fSCA,
                        const double *T2D, const double *LWDOWN, const double *SWDOWN,
-                       const double *U2D, const double *V2D, const double *day_of_year, const double *accumulated_RAINRATE,
+                       const double *U2D, const double *V2D, const double *day_of_year, 
+                       const double *accumulated_RAINRATE,
                        const double *HGT, const double *slope, const double *aspect,
                        const double *lat, const double *lon)
 {
@@ -45,8 +46,9 @@ void py_ml_fSCA_scalar(double *fSCA,
 
     // Build args as Python floats
     PyObject *pArgs = Py_BuildValue(
-        "(ddddddddddd)",
-        *T2D, *LWDOWN, *SWDOWN, *U2D, *V2D, *day_of_year, *accumulated_RAINRATE,
+        "(dddddddddddd)",
+        *T2D, *LWDOWN, *SWDOWN, *U2D, *V2D, *day_of_year,
+        *accumulated_RAINRATE,
         *HGT, *slope, *aspect, *lat, *lon
     );
     if (!pArgs) {
@@ -87,7 +89,8 @@ void py_ml_fSCA_scalar(double *fSCA,
 
 void py_ml_fSCA_array(double *fSCA,
                 const double *T2D, const double *LWDOWN, const double *SWDOWN,
-                const double *U2D, const double *V2D, const double *day_of_year, const double *accumulated_RAINRATE,
+                const double *U2D, const double *V2D, const double *day_of_year, 
+                const double *accumulated_RAINRATE,
                 const double *HGT, const double *slope, const double *aspect,
                 const double *lat, const double *lon,
                 const int *nx, const int *ny) {
@@ -129,7 +132,8 @@ void py_ml_fSCA_array(double *fSCA,
     PyObject *arr_U2D = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)U2D);
     PyObject *arr_V2D = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)V2D);
     PyObject *arr_day_of_year = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)day_of_year);
-    PyObject *arr_accumulated_RAINRATE = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)accumulated_RAINRATE);
+    PyObject *arr_accumulated_RAINRATE = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, 
+                    (void*)accumulated_RAINRATE);
     PyObject *arr_HGT = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)HGT);
     PyObject *arr_slope = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)slope);
     PyObject *arr_aspect = PyArray_SimpleNewFromData(1, dims, NPY_DOUBLE, (void*)aspect);
@@ -148,7 +152,8 @@ void py_ml_fSCA_array(double *fSCA,
 
     Py_DECREF(pArgs);
     Py_DECREF(arr_T2D); Py_DECREF(arr_LWDOWN); Py_DECREF(arr_SWDOWN);
-    Py_DECREF(arr_U2D); Py_DECREF(arr_V2D); Py_DECREF(arr_day_of_year); Py_DECREF(arr_accumulated_RAINRATE);
+    Py_DECREF(arr_U2D); Py_DECREF(arr_V2D); Py_DECREF(arr_day_of_year); 
+    Py_DECREF(arr_accumulated_RAINRATE);
     Py_DECREF(arr_HGT); Py_DECREF(arr_slope); Py_DECREF(arr_aspect);
     Py_DECREF(arr_lat); Py_DECREF(arr_lon);
 

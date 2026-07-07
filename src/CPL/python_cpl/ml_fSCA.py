@@ -137,14 +137,16 @@ def get_slope(lat, lon, tol=1e-12):
         raise ValueError("Matched cell has NaN aspect.")
     return val
 
-def ml_fSCA_scalar(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE,
+def ml_fSCA_scalar(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, 
+                accumulated_RAINRATE,
                 HGT, slope, aspect, lat, lon):
     model = init_model()
 
     # --- Define inputs ---
     # Was (time, lat, lon), but we are passing one time period at a time
     # Must be (lat, lon)
-    dynamic_vars = ['T2D', 'LWDOWN', 'SWDOWN', 'U2D', 'V2D', 'day_of_year', 'accumulated_RAINRATE']
+    dynamic_vars = ['T2D', 'LWDOWN', 'SWDOWN', 'U2D', 'V2D', 'day_of_year', 
+                    'accumulated_RAINRATE']
     # Must be (lat, lon)
     static_vars = ['HGT', 'slope', "aspect", "lat", "lon"]
     target_var = 'fSCA'
@@ -181,14 +183,16 @@ def ml_fSCA_scalar(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, accumulated_RAINR
     return fSCA
 
 
-def ml_fSCA_array(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE,
+def ml_fSCA_array(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, 
+                accumulated_RAINRATE,
                 HGT, slope, aspect, lat, lon, nx, ny):
     model = init_model()
 
     # --- Define inputs ---
     # Was (time, lat, lon), but we are passing one time period at a time
     # Must be (lat, lon)
-    dynamic_vars = ['T2D', 'LWDOWN', 'SWDOWN', 'U2D', 'V2D', 'day_of_year', 'accumulated_RAINRATE']
+    dynamic_vars = ['T2D', 'LWDOWN', 'SWDOWN', 'U2D', 'V2D', 'day_of_year', 
+                    'accumulated_RAINRATE']
     # Must be (lat, lon)
     static_vars = ['HGT', 'slope', "aspect", "lat", "lon"]
     target_var = 'fSCA'

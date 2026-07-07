@@ -9,7 +9,8 @@ module call_py_fSCA
        use, intrinsic :: iso_c_binding, only: c_double, c_int
        real(c_double), dimension(nx, ny), intent(inout) :: fSCA
        real(c_double), dimension(nx, ny), intent(in) :: T2D, LWDOWN, &
-            SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, HGT, slope, aspect, lat, lon
+            SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, &
+            HGT, slope, aspect, lat, lon
        integer(c_int), intent(in) :: nx, ny
      end subroutine py_ml_fSCA_array
 
@@ -19,7 +20,8 @@ module call_py_fSCA
        use, intrinsic :: iso_c_binding, only: c_double, c_int
        real(c_double), intent(inout) :: fSCA
        real(c_double), intent(in) :: T2D, LWDOWN, &
-            SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, HGT, slope, aspect, lat, lon
+            SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, &
+            HGT, slope, aspect, lat, lon
      end subroutine py_ml_fSCA_scalar
 
   end interface
@@ -30,13 +32,15 @@ module call_py_fSCA
   end interface
 
 contains
-  subroutine ml_fSCA_array(fSCA, T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, &
+  subroutine ml_fSCA_array(fSCA, T2D, LWDOWN, SWDOWN, U2D, V2D, &
+                day_of_year, accumulated_RAINRATE, &
                 HGT, slope, aspect, lat, lon, nx, ny)
     real, dimension(nx, ny), intent(inout) :: fSCA
     real, dimension(nx, ny), intent(in) :: T2D, LWDOWN, &
          SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, HGT, slope, aspect, lat, lon
     integer, intent(in) :: nx, ny
-    real(c_double), dimension(nx, ny)  :: FSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c, accumulated_RAINRATE_c
+    real(c_double), dimension(nx, ny)  :: FSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c
+    real(c_double), dimension(nx, ny)  :: accumulated_RAINRATE_c
     real(c_double), dimension(nx, ny)  :: HGT_c, lat_c, lon_c
     real(c_double), dimension(nx, ny)  :: aspect_c
     real(c_double), dimension(nx, ny)  :: slope_c, day_of_year_c
@@ -59,19 +63,23 @@ contains
     ny_c = real(ny, c_double)
 
     call py_ml_fSCA_array(fSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c, &
-              day_of_year_c, accumulated_RAINRATE_c, HGT_c, slope_c, aspect_c, lat_c, lon_c, nx_c, ny_c)
+              day_of_year_c, accumulated_RAINRATE_c, &
+              HGT_c, slope_c, aspect_c, lat_c, lon_c, nx_c, ny_c)
 
     fSCA = real(fSCA_c)
     if (any(fSCA == -1.0)) error stop "py_ml_fSCA returned bad value"
 
   end subroutine ml_fSCA_array
 
-  subroutine ml_fSCA_scalar(fSCA, T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, &
+  subroutine ml_fSCA_scalar(fSCA, T2D, LWDOWN, SWDOWN, U2D, V2D, &
+                day_of_year, accumulated_RAINRATE, &
                 HGT, slope, aspect, lat, lon)
     real, intent(inout) :: fSCA
     real, intent(in) :: T2D, LWDOWN, &
-         SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, HGT, slope, aspect, lat, lon
-    real(c_double)  :: FSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c, accumulated_RAINRATE_c
+         SWDOWN, U2D, V2D, day_of_year, accumulated_RAINRATE, &
+         HGT, slope, aspect, lat, lon
+    real(c_double)  :: FSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c
+    real(c_double)  :: accumulated_RAINRATE_c
     real(c_double)  :: HGT_c, lat_c, lon_c
     real(c_double)  :: aspect_c
     real(c_double)  :: slope_c
@@ -92,7 +100,8 @@ contains
     lon_c = real(lon, c_double)
 
     call py_ml_fSCA_scalar(fSCA_c, T2D_c, LWDOWN_c, SWDOWN_c, U2D_c, V2D_c, &
-              day_of_year_c, accumulated_RAINRATE_c, HGT_c, slope_c, aspect_c, lat_c, lon_c)
+              day_of_year_c, accumulated_RAINRATE_c, &
+              HGT_c, slope_c, aspect_c, lat_c, lon_c)
 
     fSCA = real(fSCA_c)
     if (fSCA == -1.0) error stop "py_ml_fSCA returned bad value"
