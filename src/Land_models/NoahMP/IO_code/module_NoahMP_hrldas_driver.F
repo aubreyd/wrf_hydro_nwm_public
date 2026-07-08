@@ -2033,6 +2033,7 @@ end subroutine land_driver_ini
                 , SFCTMPXY_DAILY=SFCTMPXY_DAILY, LWDNXY_DAILY=LWDNXY_DAILY, SWDOWNXY_DAILY=SWDOWNXY_DAILY &
                 , UUXY_DAILY=UUXY_DAILY, VVXY_DAILY=VVXY_DAILY, PRCPXY_DAILY_CUMSUM=PRCPXY_DAILY_CUMSUM &
                 , day_of_water_year=day_of_water_year, update_fsca=update_fsca &
+                , terrainxy=terrain &
 #endif
                 )
 

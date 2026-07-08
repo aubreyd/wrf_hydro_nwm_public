@@ -409,7 +409,7 @@ contains
                    ,SFCHEADRT                                                  & ! IN/OUT :
                    , longitude, SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY  &        ! fSCA ML model
                    , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &                     ! fSCA ML model 
-                   , day_of_water_year, update_fsca &                            ! fSCA ML model
+                   , day_of_water_year, update_fsca, elev &                      ! fSCA ML model
 #endif
                    )
 
@@ -476,6 +476,7 @@ contains
   REAL                           , INTENT(IN)       :: PRCP_DAILY_CUMSUM
   REAL                           , INTENT(IN)       :: day_of_water_year
   LOGICAL                        , INTENT(IN)       :: update_fsca
+  REAL                           , INTENT(IN)       :: elev
 #endif
 
 ! input/output : need arbitary intial values
@@ -786,7 +787,7 @@ contains
                  , JULIAN, longitude &                      ! ml_fSCA variables
                  , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & ! ml_fSCA variables
                  , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &  ! ml_fSCA variables
-                 , day_of_water_year, update_fsca &
+                 , day_of_water_year, update_fsca, elev &
 #endif
     )                                            !out
 !jref:end
@@ -1549,7 +1550,7 @@ ENDIF   ! CROPTYPE == 0
                      , JULIAN, longitude  &
                      , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & 
                      , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &
-                     , day_of_water_year, update_fsca &
+                     , day_of_water_year, update_fsca, elev &
 #endif
                      )
 ! end ml_fSCA additions
@@ -1730,6 +1731,7 @@ ENDIF   ! CROPTYPE == 0
   real, intent(in) :: PRCP_DAILY_CUMSUM   ! water year cumulative precipitation [mm]
   real, intent(in) :: day_of_water_year   ! day of water year
   logical, intent(in) :: update_fsca ! flag whether to update fSCA
+  real, intent(in) :: elev         ! surface elevation [m]
 #endif
 
 ! local
@@ -1875,15 +1877,15 @@ ENDIF   ! CROPTYPE == 0
            if ( update_fsca .or. ( FSNO_PREV == 0. .and. SFCTMP_DAILY < 1e36 ) ) then
              !if (iloc == 30 .and. jloc == 3 ) then
              !  print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
-             !  print *, "day =", day, "dowy =", day_of_water_year
-             !  print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
+             !  print *, "dowy =", day_of_water_year
+             !  print *, "zref =", ZREF, "elev =", elev, "lat =", lat, "lon =", longitude
              !  print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
              !  print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
              !endif
              call ml_fSCA(FSNO, &
                  SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY, UU_DAILY, VV_DAILY, &
                  day_of_water_year, PRCP_DAILY_CUMSUM, &
-                 ZREF, slope_dummy, aspect_dummy, lat, longitude)
+                 elev, slope_dummy, aspect_dummy, lat, longitude)
              !if (iloc == 30 .and. jloc == 3 ) then
              !  print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
              !endif
