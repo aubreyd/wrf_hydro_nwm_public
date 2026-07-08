@@ -65,6 +65,7 @@ module module_NoahMP_hrldas_driver
   INTEGER                                 ::  ITIMESTEP ! timestep number
   INTEGER                                 ::  YR        ! 4-digit year
   REAL                                    ::  JULIAN_IN ! Julian day
+  REAL                                    ::  doy, day_of_water_year
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  COSZEN    ! cosine zenith angle
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  XLAT_URB2D! latitude [rad]
   REAL,    ALLOCATABLE, DIMENSION(:,:,:)  ::  DZ8W      ! thickness of atmo layers [m]
@@ -335,7 +336,7 @@ module module_NoahMP_hrldas_driver
   REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  SWDOWNXY_DAILY, SWDOWNXY_DAILY_TEMP
   REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  UUXY_DAILY, UUXY_DAILY_TEMP
   REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  VVXY_DAILY, VVXY_DAILY_TEMP
-  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_DAILY_TEMP
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_DAILY_TEMP, PRCPXY_DAILY_CUMSUM
   LOGICAL                                   ::  update_fsca
   INTEGER                                   ::  ntimes_day
 #endif
@@ -432,6 +433,30 @@ module module_NoahMP_hrldas_driver
   integer :: xstart, xend, ystart, yend !convenience variables
 
   contains
+
+  pure function is_leap_year(year) result(res)
+    implicit none
+    integer, intent(in) :: year
+    logical :: res
+    res = (mod(year, 4) == 0 .and. mod(year, 100) /= 0) .or. mod(year, 400) == 0
+  end function is_leap_year
+
+  pure function doy_to_dowy(doy, year) result(dowy)
+    real, intent(in) :: doy
+    integer, intent(in) :: year
+    real :: dowy, start_doy
+    ! Oct 1 is day 274 in a non-leap year (275 in a leap year)
+    if (is_leap_year(year)) then
+      start_doy = 275  ! todo: adjust for leap years separately if needed
+    else
+      start_doy = 274
+    endif
+    if (doy >= start_doy) then
+        dowy = doy - start_doy + 1
+    else   
+       dowy = doy + (365 - start_doy + 1)
+    end if   
+  end function doy_to_dowy
 
   subroutine land_driver_ini(NTIME_out, state, wrfits,wrfite,wrfjts,wrfjte)
      use module_HYDRO_drv, only: HYDRO_ini
@@ -966,6 +991,7 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( UUXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component
      ALLOCATE ( VVXY_DAILY (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component
      ALLOCATE ( PRCPXY_DAILY (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation
+     ALLOCATE ( PRCPXY_DAILY_CUMSUM (XSTART:XEND,YSTART:YEND) )    ! running water year cumulative daily precipitation
      ALLOCATE ( SFCTMPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average 2-m air temperature (temporary accumulator)
      ALLOCATE ( LWDNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily average downward longwave radiation (temporary accumulator)
      ALLOCATE ( SWDOWNXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )    ! daily average downward shortwave radiation (temporary accumulator)
@@ -988,6 +1014,7 @@ module module_NoahMP_hrldas_driver
      UUXY_DAILY_TEMP = 0.0
      VVXY_DAILY_TEMP = 0.0
      PRCPXY_DAILY_TEMP = 0.0
+     PRCPXY_DAILY_CUMSUM = 0.0
 
      ! Calculate number of model timesteps in a day for aggregators
      ntimes_day = nint(86400/DTBL)
@@ -1864,6 +1891,15 @@ end subroutine land_driver_ini
        endif
     endif
 
+   ! julian_in is actually the diff btw doy 1 and today, so need to add 1 to get actual doy
+   doy = floor(JULIAN_IN+1) 
+   if (doy == 366) doy = 365
+   day_of_water_year = doy_to_dowy(doy, yr)
+
+   !print *, "ADCHECK_DATES: olddate", OLDDATE
+   !print *, "ADCHECK_DATES: yr iday ihr", yr, iday, ihr
+   !print *, "ADCHECK_DATES: julian doy wyd", julian_in, doy, day_of_water_year
+
     IF (ITIME == 1 .AND. .NOT. RESTART_FLAG ) THEN
       EAHXY = (P8W(:,1,:)*QV_CURR(:,1,:))/(0.622+QV_CURR(:,1,:)) ! Initial guess only.
       TAHXY = T_PHY(:,1,:)                                       ! Initial guess only.
@@ -1889,6 +1925,11 @@ end subroutine land_driver_ini
        UUXY_DAILY_TEMP = U_PHY(:,1,:)/real(ntimes_day)
        VVXY_DAILY_TEMP = V_PHY(:,1,:)/real(ntimes_day)
        PRCPXY_DAILY_TEMP = RAINBL  ! already in mm
+       if (day_of_water_year == 1) then
+         PRCPXY_DAILY_CUMSUM = PRCPXY_DAILY
+       else
+         PRCPXY_DAILY_CUMSUM = PRCPXY_DAILY_CUMSUM + PRCPXY_DAILY
+       endif
        update_fsca = .TRUE.
      else
        SFCTMPXY_DAILY_TEMP = SFCTMPXY_DAILY_TEMP + T_PHY(:,1,:)/real(ntimes_day)
@@ -1899,19 +1940,21 @@ end subroutine land_driver_ini
        PRCPXY_DAILY_TEMP = PRCPXY_DAILY_TEMP + RAINBL ! already in mm so we are just summing
      end if
    end if  ! end fSCA ML model variable calculations
-   iprint=30
-   jprint=3
-   print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
-   print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
-   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY_TEMP LWDNXY_DAILY_TEMP SWDOWNXY_DAILY_TEMP", SFCTMPXY_DAILY_TEMP(iprint,jprint), &
-                           LWDNXY_DAILY_TEMP(iprint,jprint), SWDOWNXY_DAILY_TEMP(iprint,jprint)
-   print *, "ADCHECK_DAILY: UUXY_DAILY_TEMP VVXY_DAILY_TEMP PRCPXY_DAILY_TEMP", UUXY_DAILY_TEMP(iprint,jprint), &
-                           VVXY_DAILY_TEMP(iprint,jprint), PRCPXY_DAILY_TEMP(iprint,jprint)
-   print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
-                           LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
-   print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
-                           VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
-   print *, "ADCHECK_DAILY: update?", update_fsca
+
+   !iprint=30
+   !jprint=3
+   !print *, "ADCHECK_DAILY: ITIME IHR WYD", ITIME, IHR, day_of_water_year
+   !print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
+   !print *, "ADCHECK_DAILY: SFCTMPXY_DAILY_TEMP LWDNXY_DAILY_TEMP SWDOWNXY_DAILY_TEMP", SFCTMPXY_DAILY_TEMP(iprint,jprint), &
+   !                        LWDNXY_DAILY_TEMP(iprint,jprint), SWDOWNXY_DAILY_TEMP(iprint,jprint)
+   !print *, "ADCHECK_DAILY: UUXY_DAILY_TEMP VVXY_DAILY_TEMP PRCPXY_DAILY_TEMP", UUXY_DAILY_TEMP(iprint,jprint), &
+   !                        VVXY_DAILY_TEMP(iprint,jprint), PRCPXY_DAILY_TEMP(iprint,jprint)
+   !print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
+   !                        LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
+   !print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
+   !                        VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
+   !print *, "ADCHECK_DAILY: PRCPXY_DAILY_CUMSUM", PRCPXY_DAILY_CUMSUM(iprint,jprint)
+   !print *, "ADCHECK_DAILY: update?", update_fsca
 #endif
 
 !------------------------------------------------------------------------
@@ -1988,8 +2031,8 @@ end subroutine land_driver_ini
                 , SOILSAT_TOP=SOILSAT_TOP, SOILSAT=SOILSAT, SOILICE=SOILICE, SNOWT_AVG=SNOWT_AVG      &
                 , XLONIN=XLONIN, IOPT_ML_FSCA=IOPT_ML_FSCA &
                 , SFCTMPXY_DAILY=SFCTMPXY_DAILY, LWDNXY_DAILY=LWDNXY_DAILY, SWDOWNXY_DAILY=SWDOWNXY_DAILY &
-                , UUXY_DAILY=UUXY_DAILY, VVXY_DAILY=VVXY_DAILY, PRCPXY_DAILY=PRCPXY_DAILY &
-                , update_fsca=update_fsca &
+                , UUXY_DAILY=UUXY_DAILY, VVXY_DAILY=VVXY_DAILY, PRCPXY_DAILY_CUMSUM=PRCPXY_DAILY_CUMSUM &
+                , day_of_water_year=day_of_water_year, update_fsca=update_fsca &
 #endif
                 )
 

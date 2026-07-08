@@ -374,18 +374,6 @@ contains
 !
 !== begin noahmp_sflx ==============================================================================
 
-  pure function doy_to_dowy(doy) result(dowy)
-    real, intent(in) :: doy
-    real :: dowy, start_doy
-    ! Oct 1 is day 274 in a non-leap year (275 in a leap year)
-    start_doy = 274  ! todo: adjust for leap years separately if needed
-    if (doy >= start_doy) then
-        dowy = doy - start_doy + 1
-    else
-       dowy = doy + (365 - start_doy + 1)
-    end if
-  end function doy_to_dowy
-
   SUBROUTINE NOAHMP_SFLX (parameters, &
                    ILOC    , JLOC    , LAT     , YEARLEN , JULIAN  , COSZ    , & ! IN : Time/Space-related
                    DT      , DX      , DZ8W    , NSOIL   , ZSOIL   , NSNOW   , & ! IN : Model configuration
@@ -420,8 +408,8 @@ contains
 #ifdef WRF_HYDRO
                    ,SFCHEADRT                                                  & ! IN/OUT :
                    , longitude, SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY  &        ! fSCA ML model
-                   , UU_DAILY, VV_DAILY, PRCP_DAILY &                            ! fSCA ML model 
-                   , update_fsca &                                               ! fSCA ML model
+                   , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &                     ! fSCA ML model 
+                   , day_of_water_year, update_fsca &                            ! fSCA ML model
 #endif
                    )
 
@@ -485,7 +473,8 @@ contains
   REAL                           , INTENT(IN)       :: SWDOWN_DAILY
   REAL                           , INTENT(IN)       :: UU_DAILY
   REAL                           , INTENT(IN)       :: VV_DAILY
-  REAL                           , INTENT(IN)       :: PRCP_DAILY
+  REAL                           , INTENT(IN)       :: PRCP_DAILY_CUMSUM
+  REAL                           , INTENT(IN)       :: day_of_water_year
   LOGICAL                        , INTENT(IN)       :: update_fsca
 #endif
 
@@ -796,8 +785,8 @@ contains
 #ifdef WRF_HYDRO
                  , JULIAN, longitude &                      ! ml_fSCA variables
                  , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & ! ml_fSCA variables
-                 , UU_DAILY, VV_DAILY, PRCP_DAILY &         ! ml_fSCA variables
-                 , update_fsca &
+                 , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &  ! ml_fSCA variables
+                 , day_of_water_year, update_fsca &
 #endif
     )                                            !out
 !jref:end
@@ -1559,8 +1548,8 @@ ENDIF   ! CROPTYPE == 0
 ! start ml_fSCA additions
                      , JULIAN, longitude  &
                      , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY & 
-                     , UU_DAILY, VV_DAILY, PRCP_DAILY &
-                     , update_fsca &
+                     , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &
+                     , day_of_water_year, update_fsca &
 #endif
                      )
 ! end ml_fSCA additions
@@ -1738,7 +1727,8 @@ ENDIF   ! CROPTYPE == 0
   real, intent(in) :: SWDOWN_DAILY ! daily average downward shortwave radiation [W/m2]
   real, intent(in) :: UU_DAILY     ! daily average u-component windspeed [m/s]
   real, intent(in) :: VV_DAILY     ! daily average v-component windspeed [m/s]
-  real, intent(in) :: PRCP_DAILY   ! daily total precipitation [mm]
+  real, intent(in) :: PRCP_DAILY_CUMSUM   ! water year cumulative precipitation [mm]
+  real, intent(in) :: day_of_water_year   ! day of water year
   logical, intent(in) :: update_fsca ! flag whether to update fSCA
 #endif
 
@@ -1831,7 +1821,6 @@ ENDIF   ! CROPTYPE == 0
   REAL, PARAMETER                   :: PSIWLT = -150.  !metric potential for wilting point (m)
   REAL, PARAMETER                   :: Z0     = 0.002  ! Bare-soil roughness length (m) (i.e., under the canopy)
 
-  real :: day_of_water_year, day
   real, parameter  :: slope_dummy = -1, aspect_dummy = -1
   real :: FSNO_PREV
 
@@ -1875,53 +1864,50 @@ ENDIF   ! CROPTYPE == 0
      IF(SNOWH.GT.0.)  THEN
          BDSNO    = SNEQV / SNOWH
          FMELT    = (BDSNO/100.)**parameters%MFSNO
-     if (iloc == 30 .and. jloc == 3 ) then
-       print *, "ADCHECK_ENERGY_INIT: SNOWH FSNO_PREV", SNOWH, FSNO_PREV
-     endif
+     !if (iloc == 30 .and. jloc == 3 ) then
+     !  print *, "ADCHECK_ENERGY_INIT: SNOWH FSNO_PREV", SNOWH, FSNO_PREV
+     !endif
 #ifdef WRF_HYDRO
          if (opt_ml_fsca == 1) then
            ! Call the ML model if:
            !    (1) we are at the start of the day OR
            !    (2) we have snow but no fSCA AND the daily met variables have been calculated
            if ( update_fsca .or. ( FSNO_PREV == 0. .and. SFCTMP_DAILY < 1e36 ) ) then
-             day = floor(julian)
-             if (day == 366) day = 365
-             day_of_water_year = doy_to_dowy(day)
-             if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
-               print *, "day =", day, "dowy =", day_of_water_year
-               print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
-               print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
-               print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !  print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
+             !  print *, "day =", day, "dowy =", day_of_water_year
+             !  print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
+             !  print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
+             !  print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
+             !endif
              call ml_fSCA(FSNO, &
                  SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY, UU_DAILY, VV_DAILY, &
-                 day_of_water_year, PRCP_DAILY, &
+                 day_of_water_year, PRCP_DAILY_CUMSUM, &
                  ZREF, slope_dummy, aspect_dummy, lat, longitude)
-             if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !  print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
+             !endif
            ! if we have no previous value for fSCA AND no daily met variables, then revert to old method
            else if ( FSNO_PREV == 0. .and. SFCTMP_DAILY > 1e36 ) then 
              FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
-             if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: Reverting to old method"
-               print *, "ADCHECK_ENERGY_ML: FSNO_POST_REVERT", FSNO
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !  print *, "ADCHECK_ENERGY_ML: Reverting to old method"
+             !  print *, "ADCHECK_ENERGY_ML: FSNO_POST_REVERT", FSNO
+             !endif
            else ! carry over previous fSCA when snow is present
              FSNO = FSNO_PREV
-           if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: Using previous timestep value"
-               print *, "ADCHECK_ENERGY_ML: FSNO_POST_PREV", FSNO
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !    print *, "ADCHECK_ENERGY_ML: Using previous timestep value"
+             !    print *, "ADCHECK_ENERGY_ML: FSNO_POST_PREV", FSNO
+             !endif
            endif ! end update_fSCA
          else ! don't use fSCA ML model
 #endif
             FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
-            if (iloc == 30 .and. jloc == 3 ) then
-              print *, "ADCHECK_ENERGY_ORIG: Original fSCA"
-              print *, "ADCHECK_ENERGY_ORIG: FSNO_POST_ORIG", FSNO
-            endif
+            !if (iloc == 30 .and. jloc == 3 ) then
+            !  print *, "ADCHECK_ENERGY_ORIG: Original fSCA"
+            !  print *, "ADCHECK_ENERGY_ORIG: FSNO_POST_ORIG", FSNO
+            !endif
 #ifdef WRF_HYDRO
          end if
 #endif

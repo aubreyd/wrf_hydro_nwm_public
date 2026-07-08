@@ -69,8 +69,8 @@ CONTAINS
                , SOILSAT_TOP, SOILSAT, SOILICE, SNOWT_AVG      &         ! NEW soil saturation and snow temp
                , XLONIN, IOPT_ML_FSCA &                                  ! fSCA ML model variables
                , SFCTMPXY_DAILY, LWDNXY_DAILY, SWDOWNXY_DAILY &          ! fSCA ML model variables
-               , UUXY_DAILY, VVXY_DAILY, PRCPXY_DAILY &                  ! fSCA ML model variables
-               , update_fsca &                                           ! fSCA ML model variables
+               , UUXY_DAILY, VVXY_DAILY, PRCPXY_DAILY_CUMSUM &           ! fSCA ML model variables
+               , day_of_water_year, update_fsca &                        ! fSCA ML model variables
 #endif
                )
 !----------------------------------------------------------------
@@ -307,7 +307,8 @@ CONTAINS
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  SWDOWNXY_DAILY  ! average daily downward shortwave radiation [W/m2]
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  UUXY_DAILY      ! average daily u-component wind [m/s]
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  VVXY_DAILY      ! average daily v-component wind [m/s]
-    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  PRCPXY_DAILY    ! average total precipitation [mm]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  PRCPXY_DAILY_CUMSUM ! cumulative water year precipitation [mm]
+    REAL,                                            OPTIONAL, INTENT(IN   ) ::  day_of_water_year
     LOGICAL,                                         OPTIONAL, INTENT(IN   ) ::  update_fsca     ! flag whether to update fSCA
 #endif
 
@@ -347,7 +348,7 @@ CONTAINS
     REAL                                :: SWDOWN_DAILY  ! average daily downward shortwave radiation [W/m2]
     REAL                                :: UU_DAILY      ! average daily u-component wind [m/s]
     REAL                                :: VV_DAILY      ! average daily v-component wind [m/s]
-    REAL                                :: PRCP_DAILY    ! average total precipitation [mm]
+    REAL                                :: PRCP_DAILY_CUMSUM    ! water year cumulative precipitation [mm]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -807,7 +808,7 @@ CONTAINS
        SWDOWN_DAILY = SWDOWNXY_DAILY(I,J)
        UU_DAILY = UUXY_DAILY(I,J)
        VV_DAILY = VVXY_DAILY(I,J)
-       PRCP_DAILY = PRCPXY_DAILY(I,J)
+       PRCP_DAILY_CUMSUM = PRCPXY_DAILY_CUMSUM(I,J)
 #endif
 
        SLOPETYP     = 1                               ! set underground runoff slope term
@@ -1338,8 +1339,8 @@ CONTAINS
             , sfcheadrt(i,j)                               &
             , longitude &
             , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY &
-            , UU_DAILY, VV_DAILY, PRCP_DAILY &
-            , update_fsca &
+            , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &
+            , day_of_water_year, update_fsca &
 #endif
             )            ! OUT :
 
