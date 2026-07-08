@@ -1926,19 +1926,19 @@ end subroutine land_driver_ini
          update_fsca = .TRUE.
        end if
 
-       iprint=30
-       jprint=3
-       print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
-       print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
-       print *, "ADCHECK_DAILY: SFCTMPXY_HOUR_TEMP LWDNXY_HOUR_TEMP SWDOWNXY_HOUR_TEMP", SFCTMPXY_HOUR_TEMP(iprint,jprint), &
-                           LWDNXY_HOUR_TEMP(iprint,jprint), SWDOWNXY_HOUR_TEMP(iprint,jprint)
-       print *, "ADCHECK_DAILY: UUXY_HOUR_TEMP VVXY_HOUR_TEMP PRCPXY_HOUR_TEMP", UUXY_HOUR_TEMP(iprint,jprint), &
-                           VVXY_HOUR_TEMP(iprint,jprint), PRCPXY_HOUR_TEMP(iprint,jprint)
-       print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
-                           LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
-       print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
-                           VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
-       print *, "ADCHECK_DAILY: update?", update_fsca
+       !iprint=30
+       !jprint=3
+       !print *, "ADCHECK_DAILY: ITIME IHR", ITIME, IHR
+       !print *, "ADCHECK_DAILY: T_PHY GLW SWDOWN", T_PHY(iprint,1,jprint), GLW(iprint,jprint), SWDOWN(iprint,jprint)
+       !print *, "ADCHECK_DAILY: SFCTMPXY_HOUR_TEMP LWDNXY_HOUR_TEMP SWDOWNXY_HOUR_TEMP", SFCTMPXY_HOUR_TEMP(iprint,jprint), &
+       !                    LWDNXY_HOUR_TEMP(iprint,jprint), SWDOWNXY_HOUR_TEMP(iprint,jprint)
+       !print *, "ADCHECK_DAILY: UUXY_HOUR_TEMP VVXY_HOUR_TEMP PRCPXY_HOUR_TEMP", UUXY_HOUR_TEMP(iprint,jprint), &
+       !                    VVXY_HOUR_TEMP(iprint,jprint), PRCPXY_HOUR_TEMP(iprint,jprint)
+       !print *, "ADCHECK_DAILY: SFCTMPXY_DAILY LWDNXY_DAILY SWDOWNXY_DAILY", SFCTMPXY_DAILY(iprint,jprint), &
+       !                    LWDNXY_DAILY(iprint,jprint), SWDOWNXY_DAILY(iprint,jprint)
+       !print *, "ADCHECK_DAILY: UUXY_DAILY VVXY_DAILY PRCPXY_DAILY", UUXY_DAILY(iprint,jprint), &
+       !                    VVXY_DAILY(iprint,jprint), PRCPXY_DAILY(iprint,jprint)
+       !print *, "ADCHECK_DAILY: update?", update_fsca
 
        SFCTMPXY_HOUR_TEMP = 0.0
        LWDNXY_HOUR_TEMP   = 0.0

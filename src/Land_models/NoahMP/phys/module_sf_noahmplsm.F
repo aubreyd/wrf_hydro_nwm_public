@@ -1875,9 +1875,9 @@ ENDIF   ! CROPTYPE == 0
      IF(SNOWH.GT.0.)  THEN
          BDSNO    = SNEQV / SNOWH
          FMELT    = (BDSNO/100.)**parameters%MFSNO
-     if (iloc == 30 .and. jloc == 3 ) then
-       print *, "ADCHECK_ENERGY_INIT: SNOWH FSNO_PREV", SNOWH, FSNO_PREV
-     endif
+     !if (iloc == 30 .and. jloc == 3 ) then
+     !  print *, "ADCHECK_ENERGY_INIT: SNOWH FSNO_PREV", SNOWH, FSNO_PREV
+     !endif
 #ifdef WRF_HYDRO
          if (opt_ml_fsca == 1) then
            ! Call the ML model if:
@@ -1887,20 +1887,20 @@ ENDIF   ! CROPTYPE == 0
              day = floor(julian)
              if (day == 366) day = 365
              day_of_water_year = doy_to_dowy(day)
-             if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
-               print *, "day =", day, "dowy =", day_of_water_year
-               print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
-               print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
-               print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !  print *, "ADCHECK_ENERGY_ML: Updating fSCA using ML model"
+             !  print *, "day =", day, "dowy =", day_of_water_year
+             !  print *, "zref =", ZREF, "lat =", lat, "lon =", longitude
+             !  print *, "ADCHECK_ENERGY_ML: SFCTMP LWDN SWDN", SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY
+             !  print *, "ADCHECK_ENERGY_ML: UU VV PRCP", UU_DAILY, VV_DAILY, PRCP_DAILY
+             !endif
              call ml_fSCA(FSNO, &
                  SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY, UU_DAILY, VV_DAILY, &
                  day_of_water_year, PRCP_DAILY, &
                  ZREF, slope_dummy, aspect_dummy, lat, longitude)
-             if (iloc == 30 .and. jloc == 3 ) then
-               print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
-             endif
+             !if (iloc == 30 .and. jloc == 3 ) then
+             !  print *, "ADCHECK_ENERGY_ML: FSNO_POST_ML", FSNO
+             !endif
            ! if we have no previous value for fSCA AND no daily met variables, then revert to old method
            else if ( FSNO_PREV == 0. .and. SFCTMP_DAILY > 1e36 ) then 
              FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
@@ -1918,10 +1918,10 @@ ENDIF   ! CROPTYPE == 0
          else ! don't use fSCA ML model
 #endif
             FSNO = parameters%SCAMAX * TANH( SNOWH /(2.5* Z0 * FMELT))
-            if (iloc == 30 .and. jloc == 3 ) then
-              print *, "ADCHECK_ENERGY_ORIG: Original fSCA"
-              print *, "ADCHECK_ENERGY_ORIG: FSNO_POST_ORIG", FSNO
-            endif
+            !if (iloc == 30 .and. jloc == 3 ) then
+            !  print *, "ADCHECK_ENERGY_ORIG: Original fSCA"
+            !  print *, "ADCHECK_ENERGY_ORIG: FSNO_POST_ORIG", FSNO
+            !endif
 #ifdef WRF_HYDRO
          end if
 #endif
