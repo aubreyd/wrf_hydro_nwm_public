@@ -10,12 +10,12 @@ from xgboost import XGBRegressor, Booster
 
 initialized = False
 model = None
-slope = None
-aspect = None
-lat_s = None
-lat_a = None
-lon_s = None
-lon_a = None
+#slope = None
+#aspect = None
+#lat_s = None
+#lat_a = None
+#lon_s = None
+#lon_a = None
 
 
 def init_ml_object():
@@ -100,12 +100,12 @@ def init_slope():
     return slope, lat, lon
 
 def init_model():
-    global initialized, model, aspect, slope, lat_a, lat_s, lon_a, lon_s
+    global initialized, model #, aspect, slope, lat_a, lat_s, lon_a, lon_s
     print("Initializing XGBoost Model")
     if (not initialized):
         model = init_ml_object()
-        aspect, lat_a, lon_a = init_aspect()
-        slope, lat_s, lon_s = init_slope()
+        #aspect, lat_a, lon_a = init_aspect()
+        #slope, lat_s, lon_s = init_slope()
         initialized = True
     return model
 
@@ -151,8 +151,8 @@ def ml_fSCA_scalar(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year,
     static_vars = ['HGT', 'slope', "aspect", "lat", "lon"]
     target_var = 'fSCA'
 
-    slope = get_slope(lat, lon)
-    aspect = get_aspect(lat, lon)
+    #slope = get_slope(lat, lon)
+    #aspect = get_aspect(lat, lon)
 
     features = np.array([[
         T2D,
@@ -200,8 +200,8 @@ def ml_fSCA_array(T2D, LWDOWN, SWDOWN, U2D, V2D, day_of_year,
 
     # slope = get_slope(lat, lon)
     # aspect = get_aspect(lat, lon)
-    error_s ="get_slope and get_aspect need to be implemented for arrays"
-    raise ValueError(error_s)
+    #error_s ="get_slope and get_aspect need to be implemented for arrays"
+    #raise ValueError(error_s)
 
     npoints = nx * ny
     features = np.stack([

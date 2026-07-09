@@ -569,7 +569,8 @@ contains
        ystart, yend,                                                   &
        iswater, islake, vegtyp, soltyp, terrain, tbot_2d, latitude,    &
        longitude, xland, seaice, msftx, msfty, &
-       local_crocus_opt, glacinfo, glact, vis_icealb)
+       local_crocus_opt, glacinfo, glact, vis_icealb, &
+       slope, aspect)
     implicit none
     character(len=*),          intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
@@ -588,6 +589,8 @@ contains
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: msfty
     real,    dimension(:,:), intent(inout), allocatable :: glact
     real,    dimension(:,:), intent(inout), allocatable :: vis_icealb
+    real,    dimension(xstart:xend,ystart:yend), optional, intent(out) :: slope
+    real,    dimension(xstart:xend,ystart:yend), optional, intent(out) :: aspect
 
     character(len=256) :: units
     integer :: ierr
@@ -665,6 +668,16 @@ contains
     call get_landuse_or_glacinfo_netcdf("landuse",ncid, xdum , units, xstart, xend, ystart, yend, FATAL, ierr)
     vegtyp = nint(xdum)
     ! print*, 'vegtyp(xstart,ystart) = ', vegtyp(xstart,ystart)
+
+    ! Get Terrain Slope (slope)
+    if ( present(slope) ) then
+      call get_2d_netcdf("slope", ncid, slope,   units, xstart, xend, ystart, yend, FATAL, ierr)
+    endif
+
+    ! Get Terrain Aspect (aspect)
+    if ( present(aspect) ) then
+      call get_2d_netcdf("aspect", ncid, aspect,   units, xstart, xend, ystart, yend, FATAL, ierr)
+    endif
 
     ! Get Glacier info (glacinfo)
     ! - crocus_opt = 0 : don't read in

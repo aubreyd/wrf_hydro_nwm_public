@@ -70,7 +70,8 @@ CONTAINS
                , XLONIN, IOPT_ML_FSCA &                                  ! fSCA ML model variables
                , SFCTMPXY_DAILY, LWDNXY_DAILY, SWDOWNXY_DAILY &          ! fSCA ML model variables
                , UUXY_DAILY, VVXY_DAILY, PRCPXY_DAILY_CUMSUM &           ! fSCA ML model variables
-               , day_of_water_year, update_fsca, terrainxy &             ! fSCA ML model variables
+               , day_of_water_year, update_fsca  &                       ! fSCA ML model variables 
+               , terrainxy, slopexy, aspectxy    &                       ! fSCA ML model variables
 #endif
                )
 !----------------------------------------------------------------
@@ -311,6 +312,8 @@ CONTAINS
     REAL,                                            OPTIONAL, INTENT(IN   ) ::  day_of_water_year
     LOGICAL,                                         OPTIONAL, INTENT(IN   ) ::  update_fsca     ! flag whether to update fSCA
     REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  terrainxy    ! surface elevation [m]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  slopexy      ! surface slope [?]
+    REAL,    DIMENSION( ims:ime,          jms:jme ), OPTIONAL, INTENT(IN   ) ::  aspectxy     ! surface aspect [?]
 #endif
 
 ! 1D equivalent of 2D/3D fields
@@ -350,7 +353,9 @@ CONTAINS
     REAL                                :: UU_DAILY      ! average daily u-component wind [m/s]
     REAL                                :: VV_DAILY      ! average daily v-component wind [m/s]
     REAL                                :: PRCP_DAILY_CUMSUM    ! water year cumulative precipitation [mm]
-    REAL                                :: ELEV          ! surface elevation [m]
+    REAL                                :: elev          ! surface elevation [m]
+    REAL                                :: slope         ! surface slope [?]
+    REAL                                :: aspect        ! surface aspect [?]
 #endif
 
 ! INOUT (with generic LSM equivalent)
@@ -811,7 +816,9 @@ CONTAINS
        UU_DAILY = UUXY_DAILY(I,J)
        VV_DAILY = VVXY_DAILY(I,J)
        PRCP_DAILY_CUMSUM = PRCPXY_DAILY_CUMSUM(I,J)
-       ELEV = TERRAINXY(I,J)
+       elev = terrainxy(I,J)
+       slope = slopexy(I,J)
+       aspect = aspectxy(I,J)
 #endif
 
        SLOPETYP     = 1                               ! set underground runoff slope term
@@ -1343,7 +1350,8 @@ CONTAINS
             , longitude &
             , SFCTMP_DAILY, LWDN_DAILY, SWDOWN_DAILY &
             , UU_DAILY, VV_DAILY, PRCP_DAILY_CUMSUM &
-            , day_of_water_year, update_fsca, elev &
+            , day_of_water_year, update_fsca &
+            , elev, slope, aspect &
 #endif
             )            ! OUT :
 

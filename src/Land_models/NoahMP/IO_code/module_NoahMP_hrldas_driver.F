@@ -339,6 +339,7 @@ module module_NoahMP_hrldas_driver
   REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  PRCPXY_DAILY, PRCPXY_DAILY_TEMP, PRCPXY_DAILY_CUMSUM
   LOGICAL                                   ::  update_fsca
   INTEGER                                   ::  ntimes_day
+  REAL,       ALLOCATABLE, DIMENSION(:,:)   ::  slope, aspect
 #endif
 !------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
@@ -998,6 +999,8 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( UUXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average u wind component (temporary accumulator)
      ALLOCATE ( VVXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )        ! daily average v wind component (temporary accumulator)
      ALLOCATE ( PRCPXY_DAILY_TEMP (XSTART:XEND,YSTART:YEND) )      ! daily total precipitation (temporary accumulator)
+     ALLOCATE ( slope (XSTART:XEND,YSTART:YEND) )                  ! slope 
+     ALLOCATE ( aspect (XSTART:XEND,YSTART:YEND) )                 ! aspect 
 
      ! Initialize daily values to bad values
      SFCTMPXY_DAILY = undefined_real
@@ -1006,6 +1009,8 @@ module module_NoahMP_hrldas_driver
      UUXY_DAILY = undefined_real
      VVXY_DAILY = undefined_real
      PRCPXY_DAILY = undefined_real
+     slope = undefined_real
+     aspect = undefined_real
 
      ! Initialize aggregators to 0
      SFCTMPXY_DAILY_TEMP = 0.0
@@ -1214,12 +1219,25 @@ module module_NoahMP_hrldas_driver
 ! Read Landuse Type and Soil Texture and Other Information
 !----------------------------------------------------------------------
 
+#ifdef WRF_HYDRO
+  if ( IOPT_ML_FSCA > 0 ) then
+  CALL READLAND_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, &
+                       YEND,   ISWATER,    ISLAKE,   IVGTYP, &
+                       ISLTYP, TERRAIN,    TMN,      XLAT_URB2D, &
+                       XLONIN, XLAND,      SEAICE,   MSFTX, &
+                       MSFTY,  crocus_opt, GLACINFO, GLACT, &
+                       VIS_ICEALB, slope=slope, aspect=aspect)
+  else
+#endif
   CALL READLAND_HRLDAS(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, &
                        YEND,   ISWATER,    ISLAKE,   IVGTYP, &
                        ISLTYP, TERRAIN,    TMN,      XLAT_URB2D, &
                        XLONIN, XLAND,      SEAICE,   MSFTX, &
                        MSFTY,  crocus_opt, GLACINFO, GLACT, &
                        VIS_ICEALB)
+#ifdef WRF_HYDRO
+  endif
+#endif
 
   WHERE(SEAICE > 0.0) XICE = 1.0
 
@@ -2033,7 +2051,7 @@ end subroutine land_driver_ini
                 , SFCTMPXY_DAILY=SFCTMPXY_DAILY, LWDNXY_DAILY=LWDNXY_DAILY, SWDOWNXY_DAILY=SWDOWNXY_DAILY &
                 , UUXY_DAILY=UUXY_DAILY, VVXY_DAILY=VVXY_DAILY, PRCPXY_DAILY_CUMSUM=PRCPXY_DAILY_CUMSUM &
                 , day_of_water_year=day_of_water_year, update_fsca=update_fsca &
-                , terrainxy=terrain &
+                , terrainxy=terrain, slopexy=slope, aspectxy=aspect &
 #endif
                 )
 
