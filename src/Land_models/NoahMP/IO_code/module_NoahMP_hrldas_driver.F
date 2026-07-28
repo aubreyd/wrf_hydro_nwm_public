@@ -1452,6 +1452,21 @@ module module_NoahMP_hrldas_driver
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "RIVERBEDXY" ,RIVERBEDXY )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "EQZWT"      ,EQZWT      )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PEXPXY"     ,PEXPXY     )
+#ifdef WRF_HYDRO
+     if(checkRstV("SFCTMPXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCTMPXY_DAILY", SFCTMPXY_DAILY)
+     if(checkRstV("SFCTMPXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SFCTMPXY_DAILY_TEMP", SFCTMPXY_DAILY_TEMP)
+     if(checkRstV("LWDNXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LWDNXY_DAILY", LWDNXY_DAILY)
+     if(checkRstV("LWDNXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LWDNXY_DAILY_TEMP", LWDNXY_DAILY_TEMP)
+     if(checkRstV("SWDOWNXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SWDOWNXY_DAILY", SWDOWNXY_DAILY)
+     if(checkRstV("SWDOWNXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SWDOWNXY_DAILY_TEMP", SWDOWNXY_DAILY_TEMP)
+     if(checkRstV("UUXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UUXY_DAILY", UUXY_DAILY)
+     if(checkRstV("UUXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "UUXY_DAILY_TEMP", UUXY_DAILY_TEMP)
+     if(checkRstV("VVXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VVXY_DAILY", VVXY_DAILY)
+     if(checkRstV("VVXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "VVXY_DAILY_TEMP", VVXY_DAILY_TEMP)
+     if(checkRstV("PRCPXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY", PRCPXY_DAILY)
+     if(checkRstV("PRCPXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY_TEMP", PRCPXY_DAILY_TEMP)
+     if(checkRstV("PRCPXY_DAILY_CUMSUM") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY_CUMSUM", PRCPXY_DAILY_CUMSUM)
+#endif
   else  !  rst_bi_in
 #ifdef MPP_LAND
      call mpp_land_bcast_char(19,OLDDATE(1:19))
@@ -2542,6 +2557,21 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,RIVERBEDXY , "RIVERBEDXY"  )
   call add_to_restart(ncid,EQZWT , "EQZWT"  )
   call add_to_restart(ncid,PEXPXY , "PEXPXY"  )
+#ifdef WRF_HYDRO
+  call add_to_restart(ncid,SFCTMPXY_DAILY     , "SFCTMPXY_DAILY"     )
+  call add_to_restart(ncid,SFCTMPXY_DAILY_TEMP, "SFCTMPXY_DAILY_TEMP")
+  call add_to_restart(ncid,LWDNXY_DAILY       , "LWDNXY_DAILY"       )
+  call add_to_restart(ncid,LWDNXY_DAILY_TEMP  , "LWDNXY_DAILY_TEMP"  )
+  call add_to_restart(ncid,SWDOWNXY_DAILY     , "SWDOWNXY_DAILY"     )
+  call add_to_restart(ncid,SWDOWNXY_DAILY_TEMP, "SWDOWNXY_DAILY_TEMP")
+  call add_to_restart(ncid,UUXY_DAILY         , "UUXY_DAILY"         )
+  call add_to_restart(ncid,UUXY_DAILY_TEMP    , "UUXY_DAILY_TEMP"    )
+  call add_to_restart(ncid,VVXY_DAILY         , "VVXY_DAILY"         )
+  call add_to_restart(ncid,VVXY_DAILY_TEMP    , "VVXY_DAILY_TEMP"    )
+  call add_to_restart(ncid,PRCPXY_DAILY       , "PRCPXY_DAILY"       )
+  call add_to_restart(ncid,PRCPXY_DAILY_TEMP  , "PRCPXY_DAILY_TEMP"  )
+  call add_to_restart(ncid,PRCPXY_DAILY_CUMSUM, "PRCPXY_DAILY_CUMSUM")
+#endif
 
 #ifdef MPP_LAND
   if(my_id .eq. io_id) then
@@ -2951,6 +2981,21 @@ subroutine define_rst_variables(ncid, state)
   call define_rst_var(ncid,RIVERBEDXY , "RIVERBEDXY"  )
   call define_rst_var(ncid,EQZWT , "EQZWT"  )
   call define_rst_var(ncid,PEXPXY , "PEXPXY"  )
+#ifdef WRF_HYDRO
+  call define_rst_var(ncid,SFCTMPXY_DAILY     , "SFCTMPXY_DAILY"     )
+  call define_rst_var(ncid,SFCTMPXY_DAILY_TEMP, "SFCTMPXY_DAILY_TEMP")
+  call define_rst_var(ncid,LWDNXY_DAILY       , "LWDNXY_DAILY"       )
+  call define_rst_var(ncid,LWDNXY_DAILY_TEMP  , "LWDNXY_DAILY_TEMP"  )
+  call define_rst_var(ncid,SWDOWNXY_DAILY     , "SWDOWNXY_DAILY"     )
+  call define_rst_var(ncid,SWDOWNXY_DAILY_TEMP, "SWDOWNXY_DAILY_TEMP")
+  call define_rst_var(ncid,UUXY_DAILY         , "UUXY_DAILY"         )
+  call define_rst_var(ncid,UUXY_DAILY_TEMP    , "UUXY_DAILY_TEMP"    )
+  call define_rst_var(ncid,VVXY_DAILY         , "VVXY_DAILY"         )
+  call define_rst_var(ncid,VVXY_DAILY_TEMP    , "VVXY_DAILY_TEMP"    )
+  call define_rst_var(ncid,PRCPXY_DAILY       , "PRCPXY_DAILY"       )
+  call define_rst_var(ncid,PRCPXY_DAILY_TEMP  , "PRCPXY_DAILY_TEMP"  )
+  call define_rst_var(ncid,PRCPXY_DAILY_CUMSUM, "PRCPXY_DAILY_CUMSUM")
+#endif
       ierr = nf90_enddef(ncid)
       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_2d_float() - "// &
                              "Problem nf90_enddef")
