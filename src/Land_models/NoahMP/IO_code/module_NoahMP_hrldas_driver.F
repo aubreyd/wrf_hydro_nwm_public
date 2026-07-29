@@ -1466,6 +1466,7 @@ module module_NoahMP_hrldas_driver
      if(checkRstV("PRCPXY_DAILY") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY", PRCPXY_DAILY)
      if(checkRstV("PRCPXY_DAILY_TEMP") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY_TEMP", PRCPXY_DAILY_TEMP)
      if(checkRstV("PRCPXY_DAILY_CUMSUM") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "PRCPXY_DAILY_CUMSUM", PRCPXY_DAILY_CUMSUM)
+     if(checkRstV("SNOWC") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SNOWC", SNOWC)
 #endif
   else  !  rst_bi_in
 #ifdef MPP_LAND
@@ -1497,6 +1498,7 @@ module module_NoahMP_hrldas_driver
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
                      fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
                      )
+
   else  ! for none restart
 
      restart_flag = .FALSE.
@@ -1945,7 +1947,7 @@ end subroutine land_driver_ini
    if ( IOPT_ML_FSCA > 0 ) then
      update_fsca = .FALSE.
      ! At 00Z move temporary accumulators over to daily aggs and reset
-     if ( ITIME > 1 .and. ihr == 0 ) then 
+     if ( (ITIME > 1 .and. ihr == 0) .or. (ITIME == 1 .and. ihr == 0 .and. RESTART_FLAG)) then 
        SFCTMPXY_DAILY = SFCTMPXY_DAILY_TEMP
        LWDNXY_DAILY = LWDNXY_DAILY_TEMP
        SWDOWNXY_DAILY = SWDOWNXY_DAILY_TEMP
@@ -2571,6 +2573,7 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,PRCPXY_DAILY       , "PRCPXY_DAILY"       )
   call add_to_restart(ncid,PRCPXY_DAILY_TEMP  , "PRCPXY_DAILY_TEMP"  )
   call add_to_restart(ncid,PRCPXY_DAILY_CUMSUM, "PRCPXY_DAILY_CUMSUM")
+  call add_to_restart(ncid,SNOWC, "SNOWC")
 #endif
 
 #ifdef MPP_LAND
@@ -2995,6 +2998,7 @@ subroutine define_rst_variables(ncid, state)
   call define_rst_var(ncid,PRCPXY_DAILY       , "PRCPXY_DAILY"       )
   call define_rst_var(ncid,PRCPXY_DAILY_TEMP  , "PRCPXY_DAILY_TEMP"  )
   call define_rst_var(ncid,PRCPXY_DAILY_CUMSUM, "PRCPXY_DAILY_CUMSUM")
+  call define_rst_var(ncid,SNOWC, "SNOWC")
 #endif
       ierr = nf90_enddef(ncid)
       call error_handler(ierr, "In module_hrldas_netcdf_io.F add_to_restart_2d_float() - "// &
