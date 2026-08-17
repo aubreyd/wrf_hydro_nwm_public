@@ -251,6 +251,11 @@ module module_rt_inc
   !!! define land surface grid variables
       REAL,    allocatable, DIMENSION(:,:,:) :: SMC,STC,SH2OX
       REAL,    allocatable, DIMENSION(:,:)   :: SMCMAX1,SMCWLT1,SMCREF1
+      ! Persistent backing buffers for the smcratio1-4 NUOPC import fields
+      ! (MPAS -> hydro soil moisture ratio). ESMF_FieldCreate binds farray=
+      ! directly to this memory and reads/writes it on every regrid, so it
+      ! must be real, persistent storage rather than a computed expression.
+      REAL,    allocatable, DIMENSION(:,:)   :: SMCRATIO1_BUF,SMCRATIO2_BUF,SMCRATIO3_BUF,SMCRATIO4_BUF
       INTEGER, allocatable, DIMENSION(:,:)   :: VEGTYP
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
       !REAL,    allocatable, DIMENSION(:)   :: SLDPTH

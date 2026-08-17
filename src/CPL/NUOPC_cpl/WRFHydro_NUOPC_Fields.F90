@@ -66,16 +66,19 @@ module wrfhydro_nuopc_fields
   ! logical, parameter :: EXPORT_SH20 = .false.
 
 
-  type(cap_fld_type),target,dimension(22) :: cap_fld_list = (/          &
-    cap_fld_type("inst_total_soil_moisture_content","smc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
-    cap_fld_type("inst_soil_moisture_content","slc", &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
-    cap_fld_type("inst_soil_temperature","stc", &
-                 "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
+  type(cap_fld_type),target,dimension(21) :: cap_fld_list = (/          &
+    !cap_fld_type("inst_total_soil_moisture_ratio","smcratio", &
+    !             "-", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             IMPORT_F, EXPORT_F, 1.0d0, 3),         &
+    !cap_fld_type("inst_total_soil_moisture_content_returned","smcret", &
+    !             "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             IMPORT_F, EXPORT_F, 0.20d0, 3),         &
+    !cap_fld_type("inst_soil_moisture_content","slc", &
+    !             "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             TMP_IMPORT_T, TMP_EXPORT_T, 0.20d0, 3),         &
+    !cap_fld_type("inst_soil_temperature","stc", &
+    !             "K     ", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             TMP_IMPORT_T, EXPORT_F, 288.d0, 3),             &
     cap_fld_type("liquid_fraction_of_soil_moisture_layer_1","sh2ox1", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
                  "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
@@ -92,22 +95,39 @@ module wrfhydro_nuopc_fields
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
                  "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_SH20, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_1","smc1", &
+    ! MPAS -> hydro leg: import-only, carries the current/previous smois
+    ! ratio computed on the MPAS side.
+    cap_fld_type("soil_moisture_ratio_layer_1","smcratio1", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_2","smc2", &
+                 "-", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_T, EXPORT_F, 1.0d0),         &
+    cap_fld_type("soil_moisture_ratio_layer_2","smcratio2", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_3","smc3", &
+                 "-", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_T, EXPORT_F, 1.0d0),         &
+    cap_fld_type("soil_moisture_ratio_layer_3","smcratio3", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
-                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
-    cap_fld_type("soil_moisture_fraction_layer_4","smc4", &
+                 "-", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_T, EXPORT_F, 1.0d0),         &
+    cap_fld_type("soil_moisture_ratio_layer_4","smcratio4", &
                  ! "m3 m-3", ESMF_REGRIDMETHOD_BILINEAR, &
+                 "-", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_T, EXPORT_F, 1.0d0),         &
+    ! hydro -> MPAS leg: export-only, carries WRF-Hydro's actual (real, not
+    ! ratio) soil moisture. Distinct name/standard name from smc1-4 so the
+    ! two directions never share a field or its backing memory.
+    cap_fld_type("soil_moisture_fraction_layer_1_returned","smcret1", &
                  "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_T, EXPORT_SMC, 0.20d0),         &
+                 IMPORT_F, EXPORT_SMC, 0.20d0),         &
+    cap_fld_type("soil_moisture_fraction_layer_2_returned","smcret2", &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_F, EXPORT_SMC, 0.20d0),         &
+    cap_fld_type("soil_moisture_fraction_layer_3_returned","smcret3", &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_F, EXPORT_SMC, 0.20d0),         &
+    cap_fld_type("soil_moisture_fraction_layer_4_returned","smcret4", &
+                 "m3 m-3", ESMF_REGRIDMETHOD_CONSERVE, &
+                 IMPORT_F, EXPORT_SMC, 0.20d0),         &
     cap_fld_type("soil_temperature_layer_1","stc1", &
                  "K", ESMF_REGRIDMETHOD_CONSERVE, &
                  IMPORT_T, EXPORT_F, 288.d0),                 &
@@ -138,18 +158,18 @@ module wrfhydro_nuopc_fields
     cap_fld_type("soil_column_drainage","soldrain", &
                  "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
                  ! "mm    ", ESMF_REGRIDMETHOD_BILINEAR, &
-                 IMPORT_T, EXPORT_F, 0.00d0),             &
+                 IMPORT_T, EXPORT_F, 0.00d0)             &
     ! FOOBAR: double check this is ok
     ! these two accumulated variables break during runtime
     ! it could be they are pointing to the same variable
     ! as infxsrt and soldrain on the MPAS side
-    cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 IMPORT_F, EXPORT_F, 0.00d0),             &
-    cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
-                 "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
-                 ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
-                 IMPORT_F, EXPORT_F, 0.00d0)              &
+    !cap_fld_type("surface_runoff_accumulated","sfcrunoff", &
+    !             "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             IMPORT_F, EXPORT_F, 0.00d0),             &
+    !cap_fld_type("subsurface_runoff_accumulated","udrunoff", &
+    !             "mm    ", ESMF_REGRIDMETHOD_CONSERVE, &
+    !             ! IMPORT_F, EXPORT_SMC, 0.00d0)              &
+    !             IMPORT_F, EXPORT_F, 0.00d0)              &
     /)
 
   public cap_fld_list
@@ -486,31 +506,33 @@ contains
     character(*), parameter :: method = "lsm_forcings"
 
     ! total soil moisture content
-    call ESMF_StateGet(importState,itemSearch="smc", itemCount=s_smc, rc=rc)
+    !call ESMF_StateGet(importState,itemSearch="smcratio", itemCount=s_smc, rc=rc)
+    !call check(rc, __LINE__, file)
+    call ESMF_StateGet(importState,itemSearch="smcratio1",itemCount=s_smc1, rc=rc)
     call check(rc, __LINE__, file)
-    call ESMF_StateGet(importState,itemSearch="smc1",itemCount=s_smc1, rc=rc)
+    call ESMF_StateGet(importState,itemSearch="smcratio2",itemCount=s_smc2, rc=rc)
     call check(rc, __LINE__, file)
-    call ESMF_StateGet(importState,itemSearch="smc2",itemCount=s_smc2, rc=rc)
+    call ESMF_StateGet(importState,itemSearch="smcratio3",itemCount=s_smc3, rc=rc)
     call check(rc, __LINE__, file)
-    call ESMF_StateGet(importState,itemSearch="smc3",itemCount=s_smc3, rc=rc)
+    call ESMF_StateGet(importState,itemSearch="smcratio4",itemCount=s_smc4, rc=rc)
     call check(rc, __LINE__, file)
-    call ESMF_StateGet(importState,itemSearch="smc4",itemCount=s_smc4, rc=rc)
-    call check(rc, __LINE__, file)
-    if (s_smc.gt.0) then
-      c_smc = NUOPC_IsConnected(importState, fieldName="smc")
-    elseif ((s_smc1.gt.0) .and. (s_smc2.gt.0) .and. &
+    !if (s_smc.gt.0) then
+    !  c_smc = NUOPC_IsConnected(importState, fieldName="smcratio")
+    !elseif ((s_smc1.gt.0) .and. (s_smc2.gt.0) .and. &
+    !        (s_smc3.gt.0) .and. (s_smc4.gt.0)) then
+    if ((s_smc1.gt.0) .and. (s_smc2.gt.0) .and. &
             (s_smc3.gt.0) .and. (s_smc4.gt.0)) then
-      c_smc = (NUOPC_IsConnected(importState, fieldName="smc1") .and. &
-               NUOPC_IsConnected(importState, fieldName="smc2") .and. &
-               NUOPC_IsConnected(importState, fieldName="smc3") .and. &
-               NUOPC_IsConnected(importState, fieldName="smc4"))
+      c_smc = (NUOPC_IsConnected(importState, fieldName="smcratio1") .and. &
+               NUOPC_IsConnected(importState, fieldName="smcratio2") .and. &
+               NUOPC_IsConnected(importState, fieldName="smcratio3") .and. &
+               NUOPC_IsConnected(importState, fieldName="smcratio4"))
     else
       c_smc = .false.
     end if
 
     ! liquid soil moisture content
-    call ESMF_StateGet(importState,itemSearch="slc", itemCount=s_slc, rc=rc)
-    call check(rc, __LINE__, file)
+    !call ESMF_StateGet(importState,itemSearch="slc", itemCount=s_slc, rc=rc)
+    !call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="sh2ox1",itemCount=s_slc1, rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="sh2ox2",itemCount=s_slc2, rc=rc)
@@ -519,9 +541,11 @@ contains
     call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="sh2ox4",itemCount=s_slc4, rc=rc)
     call check(rc, __LINE__, file)
-    if (s_slc.gt.0) then
-      c_slc = NUOPC_IsConnected(importState, fieldName="slc")
-    elseif ((s_slc1.gt.0) .and. (s_slc2.gt.0) .and. &
+    !if (s_slc.gt.0) then
+    !  c_slc = NUOPC_IsConnected(importState, fieldName="slc")
+    !elseif ((s_slc1.gt.0) .and. (s_slc2.gt.0) .and. &
+    !        (s_slc3.gt.0) .and. (s_slc4.gt.0)) then
+    if ((s_slc1.gt.0) .and. (s_slc2.gt.0) .and. &
             (s_slc3.gt.0) .and. (s_slc4.gt.0)) then
       c_slc = (NUOPC_IsConnected(importState, fieldName="sh2ox1") .and. &
                NUOPC_IsConnected(importState, fieldName="sh2ox2") .and. &
@@ -532,8 +556,8 @@ contains
     end if
 
     ! soil temperature
-    call ESMF_StateGet(importState,itemSearch="stc", itemCount=s_stc, rc=rc)
-    call check(rc, __LINE__, file)
+    !call ESMF_StateGet(importState,itemSearch="stc", itemCount=s_stc, rc=rc)
+    !call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="stc1",itemCount=s_stc1, rc=rc)
     call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="stc2",itemCount=s_stc2, rc=rc)
@@ -542,9 +566,11 @@ contains
     call check(rc, __LINE__, file)
     call ESMF_StateGet(importState,itemSearch="stc4",itemCount=s_stc4, rc=rc)
     call check(rc, __LINE__, file)
-    if (s_stc.gt.0) then
-      c_stc = NUOPC_IsConnected(importState, fieldName="stc")
-    elseif ((s_stc1.gt.0) .and. (s_stc2.gt.0) .and. &
+    !if (s_stc.gt.0) then
+    !  c_stc = NUOPC_IsConnected(importState, fieldName="stc")
+    !elseif ((s_stc1.gt.0) .and. (s_stc2.gt.0) .and. &
+    !        (s_stc3.gt.0) .and. (s_stc4.gt.0)) then
+    if ((s_stc1.gt.0) .and. (s_stc2.gt.0) .and. &
             (s_stc3.gt.0) .and. (s_stc4.gt.0)) then
       c_stc = (NUOPC_IsConnected(importState, fieldName="stc1") .and. &
                NUOPC_IsConnected(importState, fieldName="stc2") .and. &
@@ -1114,24 +1140,30 @@ contains
     ! print *, "filed_create_grid fld_name = ", trim(fld_name)
     if (memflg .eq. MEMORY_POINTER) then
       select case (trim(fld_name))
-        case ('smc')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%smc(:,:,:), gridToFieldMap=(/1,2/), &
-            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
-        case ('slc')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%sh2ox(:,:,:), gridToFieldMap=(/1,2/), &
-            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
-        case ('stc')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%stc(:,:,:), gridToFieldMap=(/1,2/), &
-            ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
+        !case ('smcratio')
+        !  field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !    farray=rt_domain(did)%smc(:,:,:)*0.0+1.0, gridToFieldMap=(/1,2/), &
+        !    ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+        !    indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !  call check(rc, __LINE__, file)
+        !case ('smcret')
+        !  field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !    farray=rt_domain(did)%smc(:,:,:), gridToFieldMap=(/1,2/), &
+        !    ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+        !    indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !  call check(rc, __LINE__, file)
+        !case ('slc')
+        !  field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !    farray=rt_domain(did)%sh2ox(:,:,:), gridToFieldMap=(/1,2/), &
+        !    ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+        !    indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !  call check(rc, __LINE__, file)
+        !case ('stc')
+        !  field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+        !    farray=rt_domain(did)%stc(:,:,:), gridToFieldMap=(/1,2/), &
+        !    ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
+        !    indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+        !  call check(rc, __LINE__, file)
         case ('sh2ox1')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%sh2ox(:,:,1), &
@@ -1152,24 +1184,48 @@ contains
             farray=rt_domain(did)%sh2ox(:,:,4), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-        case ('smc1')
+        case ('smcratio1')
            ! print *, "rt_domain(did)%smc(1:2,1:2,1) = ", rt_domain(did)%smc(1:2,1:2,1)
 
+           rt_domain(did)%smcratio1_buf = 1.0
            field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%smc(:,:,1), &
+            farray=rt_domain(did)%smcratio1_buf, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
            call check(rc, __LINE__, file)
-        case ('smc2')
+        case ('smcratio2')
+          rt_domain(did)%smcratio2_buf = 1.0
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%smcratio2_buf, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          call check(rc, __LINE__, file)
+        case ('smcratio3')
+          rt_domain(did)%smcratio3_buf = 1.0
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%smcratio3_buf, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          call check(rc, __LINE__, file)
+        case ('smcratio4')
+          rt_domain(did)%smcratio4_buf = 1.0
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%smcratio4_buf, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          call check(rc, __LINE__, file)
+        case ('smcret1')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%smc(:,:,1), &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          call check(rc, __LINE__, file)
+        case ('smcret2')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,2), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-        case ('smc3')
+        case ('smcret3')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,3), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           call check(rc, __LINE__, file)
-        case ('smc4')
+        case ('smcret4')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             farray=rt_domain(did)%smc(:,:,4), &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
@@ -1235,24 +1291,24 @@ contains
             ! grid%sfcheadrt(its:ite,jts:jte) = &
             !   rt_domain(did)%overland%control%surface_water_head_lsm
 
-       case ('sfcrunoff')
-
-          ! rt_domain(did)%overland%control%surface_water_head_lsm(:,:) = &
-          !      -776
-
-          ! 102 x 60
-          ! print *, shape(rt_domain(did)%overland%control%surface_water_head_lsm(:,:))
-          stop "this should not be accessed"
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
-       case ('udrunoff')
-          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
-            ! farray=rt_domain(did)%udrunoff(:,:), &
-            farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
-            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
-          call check(rc, __LINE__, file)
+       !case ('sfcrunoff')
+       !
+       !   ! rt_domain(did)%overland%control%surface_water_head_lsm(:,:) = &
+       !   !      -776
+       !
+       !   ! 102 x 60
+       !   ! print *, shape(rt_domain(did)%overland%control%surface_water_head_lsm(:,:))
+       !   stop "this should not be accessed"
+       !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+       !     farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
+       !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+       !   call check(rc, __LINE__, file)
+       !case ('udrunoff')
+       !   field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+       !     ! farray=rt_domain(did)%udrunoff(:,:), &
+       !     farray=rt_domain(did)%overland%control%surface_water_head_lsm(:,:), &
+       !     indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+       !   call check(rc, __LINE__, file)
        case default
           call ESMF_LogSetError(ESMF_FAILURE, &
             msg=method//": Field hookup missing: "//trim(fld_name), &
@@ -1261,7 +1317,7 @@ contains
       end select
     elseif (memflg .eq. MEMORY_COPY) then
       select case (trim(fld_name))
-        case ('smc','slc','stc')
+        case ('smcratio','smcret','slc','stc')
           field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
             typekind=ESMF_TYPEKIND_FIELD, gridToFieldMap=(/1,2/), &
             ungriddedLBound=(/1/), ungriddedUBound=(/nlst(did)%nsoil/), &
@@ -1505,12 +1561,12 @@ contains
           return
         end if
         select case (ItemNameList(n))
-          case ('smc')
-            rt_domain(did)%smc = farrayPtr3d
-          case ('slc')
-            rt_domain(did)%sh2ox = farrayPtr3d
-          case ('stc')
-            rt_domain(did)%stc = farrayPtr3d
+          !case ('smcratio')
+          !  rt_domain(did)%smc = rt_domain(did)%smc * farrayPtr3d
+          !case ('slc')
+          !  rt_domain(did)%sh2ox = farrayPtr3d
+          !case ('stc')
+          !  rt_domain(did)%stc = farrayPtr3d
           case ('sh2ox1')
             rt_domain(did)%sh2ox(:,:,1) = farrayPtr2d
           case ('sh2ox2')
@@ -1519,14 +1575,18 @@ contains
             rt_domain(did)%sh2ox(:,:,3) = farrayPtr2d
           case ('sh2ox4')
             rt_domain(did)%sh2ox(:,:,4) = farrayPtr2d
-          case ('smc1')
-            rt_domain(did)%smc(:,:,1) = farrayPtr2d
-          case ('smc2')
-            rt_domain(did)%smc(:,:,2) = farrayPtr2d
-          case ('smc3')
-            rt_domain(did)%smc(:,:,3) = farrayPtr2d
-          case ('smc4')
-            rt_domain(did)%smc(:,:,4) = farrayPtr2d
+          case ('smcratio1')
+            ! Incoming field is the MPAS current/previous smois ratio; apply it
+            ! to the existing hydro smc value rather than overwriting it.
+            print *, "ADCHECK: smc1_pre=", rt_domain(did)%smc(50,50,1), "ratio1=", farrayPtr2d(50,50)
+            rt_domain(did)%smc(:,:,1) = rt_domain(did)%smc(:,:,1) * farrayPtr2d
+            print *, "ADCHECK: smc1_post=", rt_domain(did)%smc(50,50,1)
+          case ('smcratio2')
+            rt_domain(did)%smc(:,:,2) = rt_domain(did)%smc(:,:,2) * farrayPtr2d
+          case ('smcratio3')
+            rt_domain(did)%smc(:,:,3) = rt_domain(did)%smc(:,:,3) * farrayPtr2d
+          case ('smcratio4')
+            rt_domain(did)%smc(:,:,4) = rt_domain(did)%smc(:,:,4) * farrayPtr2d
           case ('smcmax1')
             rt_domain(did)%smcmax1 = farrayPtr2d
           case ('stc1')
@@ -1546,12 +1606,12 @@ contains
             rt_domain(did)%infxsrt = farrayPtr2d
           case ('soldrain')
             rt_domain(did)%soldrain = farrayPtr2d
-          case ('sfcrunoff')
-             print *, "WRFH: check state_copy_tohyd for sfcrunoff is correct"
-             rt_domain(did)%infxsrt = farrayPtr2d
-          case ('udrunoff')
-             print *, "WRFH: check state_copy_tohyd for udrunoff is correct"
-            rt_domain(did)%soldrain = farrayPtr2d
+          !case ('sfcrunoff')
+          !   print *, "WRFH: check state_copy_tohyd for sfcrunoff is correct"
+          !   rt_domain(did)%infxsrt = farrayPtr2d
+          !case ('udrunoff')
+          !   print *, "WRFH: check state_copy_tohyd for udrunoff is correct"
+          !  rt_domain(did)%soldrain = farrayPtr2d
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1623,12 +1683,12 @@ contains
           return
         end if
         select case (ItemNameList(n))
-          case ('smc')
-            farrayPtr3d = rt_domain(did)%smc
-          case ('slc')
-            farrayPtr3d = rt_domain(did)%sh2ox
-          case ('stc')
-            farrayPtr3d = rt_domain(did)%stc
+          !case ('smcret')
+          !  farrayPtr3d = rt_domain(did)%smc
+          !case ('slc')
+          !  farrayPtr3d = rt_domain(did)%sh2ox
+          !case ('stc')
+          !  farrayPtr3d = rt_domain(did)%stc
           case ('sh2ox1')
             farrayPtr2d = rt_domain(did)%sh2ox(:,:,1)
           case ('sh2ox2')
@@ -1637,13 +1697,14 @@ contains
             farrayPtr2d = rt_domain(did)%sh2ox(:,:,3)
           case ('sh2ox4')
             farrayPtr2d = rt_domain(did)%sh2ox(:,:,4)
-          case ('smc1')
+          case ('smcret1')
             farrayPtr2d = rt_domain(did)%smc(:,:,1)
-          case ('smc2')
+            print *, "ADCHECK: smc1_export=", rt_domain(did)%smc(50,50,1)
+          case ('smcret2')
             farrayPtr2d = rt_domain(did)%smc(:,:,2)
-          case ('smc3')
+          case ('smcret3')
             farrayPtr2d = rt_domain(did)%smc(:,:,3)
-          case ('smc4')
+          case ('smcret4')
             farrayPtr2d = rt_domain(did)%smc(:,:,4)
           case ('smcmax1')
             farrayPtr2d = rt_domain(did)%smcmax1
@@ -1663,13 +1724,13 @@ contains
             farrayPtr2d = rt_domain(did)%infxsrt
           case ('soldrain')
             farrayPtr2d = rt_domain(did)%soldrain
-          case ('sfcrunoff')
-             print *, "WRFH: check state_copy_frhyd for sfcrunoff is correct"
-             ! farrayPtr2d = rt_domain(did)%infxsrt ! original
-             farrayPtr2d = rt_domain(did)%overland%control%surface_water_head_lsm(:,:)
-          case ('udrunoff')
-             print *, "WRFH: check state_copy_frhyd for udrunoff is correct"
-             farrayPtr2d = rt_domain(did)%soldrain
+          !case ('sfcrunoff')
+          !   print *, "WRFH: check state_copy_frhyd for sfcrunoff is correct"
+          !   ! farrayPtr2d = rt_domain(did)%infxsrt ! original
+          !   farrayPtr2d = rt_domain(did)%overland%control%surface_water_head_lsm(:,:)
+          !case ('udrunoff')
+          !   print *, "WRFH: check state_copy_frhyd for udrunoff is correct"
+          !   farrayPtr2d = rt_domain(did)%soldrain
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=method//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1721,12 +1782,14 @@ contains
       if (itemTypeList(n) == ESMF_STATEITEM_FIELD) then
         missng = .FALSE.
         select case (ItemNameList(n))
-          case ('smc')
-            missng = any(rt_domain(did)%smc.eq.chkVal)
-          case ('slc')
-            missng = any(rt_domain(did)%sh2ox.eq.chkVal)
-          case ('stc')
-            missng = any(rt_domain(did)%stc.eq.chkVal)
+          !case ('smcratio')
+          !  missng = any(rt_domain(did)%smc.eq.chkVal)
+          !case ('smcret')
+          !  missng = any(rt_domain(did)%smc.eq.chkVal)
+          !case ('slc')
+          !  missng = any(rt_domain(did)%sh2ox.eq.chkVal)
+          !case ('stc')
+          !  missng = any(rt_domain(did)%stc.eq.chkVal)
           case ('sh2ox1')
             missng = any(rt_domain(did)%sh2ox(:,:,1).eq.chkVal)
           case ('sh2ox2')
@@ -1735,13 +1798,21 @@ contains
             missng = any(rt_domain(did)%sh2ox(:,:,3).eq.chkVal)
           case ('sh2ox4')
             missng = any(rt_domain(did)%sh2ox(:,:,4).eq.chkVal)
-          case ('smc1')
+          case ('smcratio1')
             missng = any(rt_domain(did)%smc(:,:,1).eq.chkVal)
-          case ('smc2')
+          case ('smcratio2')
             missng = any(rt_domain(did)%smc(:,:,2).eq.chkVal)
-          case ('smc3')
+          case ('smcratio3')
             missng = any(rt_domain(did)%smc(:,:,3).eq.chkVal)
-          case ('smc4')
+          case ('smcratio4')
+            missng = any(rt_domain(did)%smc(:,:,4).eq.chkVal)
+          case ('smcret1')
+            missng = any(rt_domain(did)%smc(:,:,1).eq.chkVal)
+          case ('smcret2')
+            missng = any(rt_domain(did)%smc(:,:,2).eq.chkVal)
+          case ('smcret3')
+            missng = any(rt_domain(did)%smc(:,:,3).eq.chkVal)
+          case ('smcret4')
             missng = any(rt_domain(did)%smc(:,:,4).eq.chkVal)
           case ('smcmax1')
             missng = any(rt_domain(did)%smcmax1.eq.chkVal)
@@ -1821,15 +1892,18 @@ contains
           stateName=itemNameList(n), fillValue=filVal, rc=rc)
         call check(rc, __LINE__, file)
         select case (itemNameList(n))
-          case ('smc')
-            where (rt_domain(did)%smc.eq.chkVal) &
-              rt_domain(did)%smc = filVal
-          case ('slc')
-            where (rt_domain(did)%sh2ox.eq.chkVal) &
-              rt_domain(did)%sh2ox = filVal
-          case ('stc')
-            where (rt_domain(did)%stc.eq.chkVal) &
-              rt_domain(did)%stc = filVal
+          !case ('smcratio')
+          !  where (rt_domain(did)%smc.eq.chkVal) &
+          !    rt_domain(did)%smc = filVal
+          !case ('smcret')
+          !  where (rt_domain(did)%smc.eq.chkVal) &
+          !    rt_domain(did)%smc = filVal
+          !case ('slc')
+          !  where (rt_domain(did)%sh2ox.eq.chkVal) &
+          !    rt_domain(did)%sh2ox = filVal
+          !case ('stc')
+          !  where (rt_domain(did)%stc.eq.chkVal) &
+          !    rt_domain(did)%stc = filVal
           case ('sh2ox1')
             where (rt_domain(did)%sh2ox(:,:,1).eq.chkVal) &
               rt_domain(did)%sh2ox(:,:,1) = filVal
@@ -1842,16 +1916,28 @@ contains
           case ('sh2ox4')
             where (rt_domain(did)%sh2ox(:,:,4).eq.chkVal) &
               rt_domain(did)%sh2ox(:,:,4) = filVal
-          case ('smc1')
+          case ('smcratio1')
             where (rt_domain(did)%smc(:,:,1).eq.chkVal) &
               rt_domain(did)%smc(:,:,1) = filVal
-          case ('smc2')
+          case ('smcratio2')
             where (rt_domain(did)%smc(:,:,2).eq.chkVal) &
               rt_domain(did)%smc(:,:,2) = filVal
-          case ('smc3')
+          case ('smcratio3')
             where (rt_domain(did)%smc(:,:,3).eq.chkVal) &
               rt_domain(did)%smc(:,:,3) = filVal
-          case ('smc4')
+          case ('smcratio4')
+            where (rt_domain(did)%smc(:,:,4).eq.chkVal) &
+              rt_domain(did)%smc(:,:,4) = filVal
+          case ('smcret1')
+            where (rt_domain(did)%smc(:,:,1).eq.chkVal) &
+              rt_domain(did)%smc(:,:,1) = filVal
+          case ('smcret2')
+            where (rt_domain(did)%smc(:,:,2).eq.chkVal) &
+              rt_domain(did)%smc(:,:,2) = filVal
+          case ('smcret3')
+            where (rt_domain(did)%smc(:,:,3).eq.chkVal) &
+              rt_domain(did)%smc(:,:,3) = filVal
+          case ('smcret4')
             where (rt_domain(did)%smc(:,:,4).eq.chkVal) &
               rt_domain(did)%smc(:,:,4) = filVal
           case ('smcmax1')

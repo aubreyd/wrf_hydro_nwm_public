@@ -751,11 +751,11 @@ contains
   end subroutine read_mesh_var_and_regrid_i
 
   subroutine wrfhydro_write_full_resolution_file(wrfhydro_grid, wrfhydro_mesh, &
-       regrid_handle_con, regrid_handle_nn_stod, regrid_handle_nn_dtos)
+       regrid_handle_bl, regrid_handle_nn_stod, regrid_handle_nn_dtos)
     use netcdf
     type(ESMF_Grid), intent(in) :: wrfhydro_grid
     type(ESMF_Mesh), intent(in) :: wrfhydro_mesh
-    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_con
+    type(ESMF_RouteHandle), intent(inout) :: regrid_handle_bl
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_stod
     type(ESMF_RouteHandle), intent(inout) :: regrid_handle_nn_dtos
     ! type(ESMF_Mesh)            :: wrfhydro_mesh
@@ -837,11 +837,11 @@ contains
          regrid_handle_nn_stod, srcPtr, dstPtr, f_src, f_dst)
     ! bilinear regridding
     call read_mesh_var_and_regrid('ter', hgt, ncid, nCells, &
-         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('latCell', lat, ncid, nCells, &
-         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
     call read_mesh_var_and_regrid('lonCell', lon, ncid, nCells, &
-         regrid_handle_con, srcPtr, dstPtr, f_src, f_dst)
+         regrid_handle_bl, srcPtr, dstPtr, f_src, f_dst)
 
     stat = nf90_close(ncid)
     call check_nf(stat)

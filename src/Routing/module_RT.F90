@@ -231,6 +231,14 @@ CONTAINS
   ! allocate land surface grid variables
   allocate( rt_domain(did)%SMC  (IX,JX,NSOIL) )
             rt_domain(did)%SMC   = 0.25
+  allocate( rt_domain(did)%SMCRATIO1_BUF (IX,JX) )
+            rt_domain(did)%SMCRATIO1_BUF = 1.0
+  allocate( rt_domain(did)%SMCRATIO2_BUF (IX,JX) )
+            rt_domain(did)%SMCRATIO2_BUF = 1.0
+  allocate( rt_domain(did)%SMCRATIO3_BUF (IX,JX) )
+            rt_domain(did)%SMCRATIO3_BUF = 1.0
+  allocate( rt_domain(did)%SMCRATIO4_BUF (IX,JX) )
+            rt_domain(did)%SMCRATIO4_BUF = 1.0
   allocate( rt_domain(did)%SICE (IX,JX,NSOIL) )
             rt_domain(did)%SICE  = 0.
   ! allocate( rt_domain(did)%dist_lsm (ixrt,jxrt,9) )
