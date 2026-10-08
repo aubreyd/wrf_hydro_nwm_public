@@ -2108,8 +2108,10 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
 
 ! initialize soil liquid water content SH2O
 
+#ifdef SPATIAL_SOIL
        ! AD additional check for bedrock implementation: make sure initial SM does not exceed porosity
        where (SMOIS > SMCMAX_3D) SMOIS = SMCMAX_3D
+#endif
 
        DO J = jts , jtf
           DO I = its , itf
