@@ -7377,8 +7377,14 @@ ENDIF   ! CROPTYPE == 0
           IF(OPT_RUN == 5)SMXWTD=SMCWTD*SH2O(NSOIL_HYDRO)/SMC(NSOIL_HYDRO)  !same liquid fraction as in the bottom layer
     END IF
 
+    QDRAIN = 0.0
+
+    ! ADCHANGE: When BEDROCKLYR = 1 the single active layer is both top and bottom,
+    ! so it must take the bottom-boundary branch (QDRAIN) and must not reference
+    ! layer 2 (below bedrock). Previously QDRAIN was left unset and layer 1 drained
+    ! into layer 2, breaking the water balance.
     DO K = 1, NSOIL_HYDRO
-       IF(K == 1) THEN
+       IF(K == 1 .AND. K < NSOIL_HYDRO) THEN
           DENOM(K) = - ZSOIL (K)
           TEMP1    = - ZSOIL (K+1)
           DDZ(K)   = 2.0 / TEMP1
@@ -7392,7 +7398,11 @@ ENDIF   ! CROPTYPE == 0
           WFLUX(K) = WDF(K  ) * DSMDZ(K  ) + WCND(K  )         &
                    - WDF(K-1) * DSMDZ(K-1) - WCND(K-1) + ETRANI(K)
        ELSE
-          DENOM(K) = (ZSOIL(K-1) - ZSOIL(K))
+          IF (K == 1) THEN
+             DENOM(K) = - ZSOIL(K)
+          ELSE
+             DENOM(K) = (ZSOIL(K-1) - ZSOIL(K))
+          END IF
           IF(OPT_RUN == 1 .or. OPT_RUN == 2) THEN
              QDRAIN   = 0.
           END IF
@@ -7413,12 +7423,16 @@ ENDIF   ! CROPTYPE == 0
              DSMDZ(K) = 2.0 * (SMX(K) - SMXBOT) / TEMP1
              QDRAIN   = WDF(K  ) * DSMDZ(K  ) + WCND(K  )
           END IF
-          WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN
+          IF (K == 1) THEN
+             WFLUX(K) = - PDDUM + ETRANI(K) + QSEVA + QDRAIN
+          ELSE
+             WFLUX(K) = -(WDF(K-1)*DSMDZ(K-1))-WCND(K-1)+ETRANI(K) + QDRAIN
+          END IF
        END IF
     END DO
 
     DO K = 1, NSOIL_HYDRO
-       IF(K == 1) THEN
+       IF(K == 1 .AND. K < NSOIL_HYDRO) THEN
           AI(K)    =   0.0
           BI(K)    =   WDF(K  ) * DDZ(K  ) / DENOM(K)
           CI(K)    = - BI (K)
@@ -7427,7 +7441,11 @@ ENDIF   ! CROPTYPE == 0
           CI(K)    = - WDF(K  ) * DDZ(K  ) / DENOM(K)
           BI(K)    = - ( AI (K) + CI (K) )
        ELSE
-          AI(K)    = - WDF(K-1) * DDZ(K-1) / DENOM(K)
+          IF (K == 1) THEN
+             AI(K) = 0.0
+          ELSE
+             AI(K) = - WDF(K-1) * DDZ(K-1) / DENOM(K)
+          END IF
           CI(K)    = 0.0
           BI(K)    = - ( AI (K) + CI (K) )
        END IF
@@ -7553,7 +7571,9 @@ ENDIF   ! CROPTYPE == 0
     WPLUS        = MAX((SH2O(1)-EPORE), 0.0) * DZSNSO(1)
     SH2O(1)      = MIN(EPORE,SH2O(1))
 
-   IF(WPLUS > 0.0) THEN
+   ! ADCHANGE: With BEDROCKLYR = 1 there is no active layer below to take the excess;
+   ! leave it in WPLUS so SOILWATER returns it as saturation-excess runoff (RSAT).
+   IF(WPLUS > 0.0 .AND. NSOIL_HYDRO > 1) THEN
     SH2O(2)      = SH2O(2) + WPLUS/DZSNSO(2)
     DO K = 2,NSOIL_HYDRO-1
       EPORE        = MAX ( 1.E-4 , ( parameters%SMCMAX(K) - SICE(K) ) )
