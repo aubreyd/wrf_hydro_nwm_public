@@ -156,6 +156,11 @@ contains
 
 
    DO bas=1,numbasns     ! Loop for GW bucket calcs...
+      ! qout_spill is added to qout_gwsubbas below for every bucket option, but
+      ! only the exponential branches set it; zero it here so pass-through
+      ! (GWBASESWCRT=2) does not add an uninitialized value.
+      qout_spill = 0.
+      z_gw_spill = 0.
       if(nhdBuckMask(bas) .eq. 1) then     ! if the basn is masked
 
          if(channelBucket_only .eq. 0) then
@@ -357,6 +362,11 @@ contains
 !!!Loop through GW basins to adjust for inflow/outflow
 
    DO bas=1,numbasns     ! Loop for GW bucket calcs...
+     ! qout_spill is added to qout_gwsubbas below for every bucket option, but
+     ! only the exponential branch sets it; zero it here so pass-through
+     ! (GWBASESWCRT=2) does not add an uninitialized value.
+     qout_spill = 0.
+     z_gw_spill = 0.
 ! #ifdef MPP_LAND
 !      if(ct_bas(bas) .gt. 0) then
 ! #endif
