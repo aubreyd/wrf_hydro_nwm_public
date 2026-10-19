@@ -9,6 +9,7 @@ MODULE module_sf_noahmpdrv
   USE NoahmpIOVarType
   USE NoahmpIOVarInitMod, ONLY: NoahmpIOVarInitDefault
   USE NoahmpReadTableMod, ONLY: NoahmpReadTable
+  USE GroundWaterMmfMod,  ONLY: WTABLE_mmf_noahmp_v5 => WTABLE_mmf_noahmp
   ! Namelist-derived physics options now come straight from the NoahMP
   ! submodule's own namelist reader (see namelist_migration_plan.md) instead
   ! of being unpacked into individual dummy arguments by the WRF-Hydro driver
@@ -3120,4 +3121,65 @@ END  SUBROUTINE EQSMOISTURE
 !------------------------------------------------------------------------------------------
 !------------------------------------------------------------------------------------------
 !
+! ==================================================================================================
+  SUBROUTINE NOAHMP_WTABLE_MMF (NSOIL     ,XLAND    ,XICE    ,XICE_THRESHOLD  ,ISICE ,& !in
+                                ISLTYP    ,SMOISEQ  ,DZS     ,WTDDT                  ,& !in
+                                FDEPTH    ,AREA     ,TOPO    ,ISURBAN ,IVGTYP        ,& !in
+                                RIVERCOND ,RIVERBED ,EQWTD   ,PEXP                   ,& !in
+                                SMOIS     ,SH2OXY   ,SMCWTD  ,WTD  ,QRF              ,& !inout
+                                DEEPRECH  ,QSPRING  ,QSLAT   ,QRFS ,QSPRINGS  ,RECH  ,& !inout
+                                ids,ide, jds,jde, kds,kde,                    &
+                                ims,ime, jms,jme, kms,kme,                    &
+                                its,ite, jts,jte, kts,kte                     )
+! ----------------------------------------------------------------------
+! Per-timestep MMF groundwater (lateral flow, groundwater-river exchange,
+! water table update) using the Noah-MP v5 GroundWaterMmfMod. Same argument
+! list as the legacy module_sf_noahmp_groundwater WTABLE_mmf_noahmp; the v5
+! routine reads its soil parameters (BEXP/DKSAT/PSISAT/SMCMAX/SMCWLT_TABLE)
+! and urban category from the NoahmpIO_sub bridge, which must already have
+! been initialized by the first NOAHMPLSM call.
+! ----------------------------------------------------------------------
+  IMPLICIT NONE
+! ----------------------------------------------------------------------
+    INTEGER,  INTENT(IN   )   ::     ids,ide, jds,jde, kds,kde,  &
+         &                           ims,ime, jms,jme, kms,kme,  &
+         &                           its,ite, jts,jte, kts,kte
+    REAL,   INTENT(IN)        ::     WTDDT
+    REAL,   INTENT(IN)        ::     XICE_THRESHOLD
+    INTEGER,  INTENT(IN   )   ::     ISICE
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN) :: XLAND, XICE
+    INTEGER, DIMENSION( ims:ime, jms:jme ), INTENT(IN) :: ISLTYP, IVGTYP
+    INTEGER, INTENT(IN)       ::     NSOIL
+    INTEGER, INTENT(IN)       ::     ISURBAN
+    REAL,    DIMENSION( ims:ime, 1:NSOIL, jms:jme ), INTENT(IN) :: SMOISEQ
+    REAL,    DIMENSION( 1:NSOIL ), INTENT(IN) :: DZS
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(IN) :: FDEPTH, AREA, TOPO, EQWTD, PEXP, &
+                                                          RIVERBED, RIVERCOND
+    REAL,    DIMENSION( ims:ime, 1:NSOIL, jms:jme ), INTENT(INOUT) :: SMOIS, SH2OXY
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(INOUT) :: WTD, SMCWTD, DEEPRECH, QSLAT, &
+                                                             QRFS, QSPRINGS, RECH
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(OUT)   :: QRF, QSPRING
+! local
+    REAL,    DIMENSION( ims:ime, jms:jme ) :: QLAT   ! lateral flow this call [m] (not kept)
+
+    IF (.NOT. submodule_initialized) &
+       CALL wrf_error_fatal('NOAHMP_WTABLE_MMF called before the NoahmpIO_sub bridge was initialized')
+
+    ! v5 uses NoahmpIO%ISURBAN (set from the setup file header in HRLDAS);
+    ! the bridge never sets it otherwise.
+    NoahmpIO_sub%ISURBAN = ISURBAN
+
+    CALL WTABLE_mmf_noahmp_v5 (NoahmpIO_sub,                                         &
+                               NSOIL     ,XLAND    ,XICE    ,XICE_THRESHOLD,         &
+                               ISICE     ,ISLTYP   ,SMOISEQ ,DZS     ,WTDDT  ,       &
+                               FDEPTH    ,AREA     ,TOPO    ,ISURBAN ,IVGTYP ,       &
+                               RIVERCOND ,RIVERBED ,EQWTD   ,PEXP            ,       &
+                               SMOIS     ,SH2OXY   ,SMCWTD  ,WTD  , QLAT, QRF,       &
+                               DEEPRECH  ,QSPRING  ,QSLAT   ,QRFS ,QSPRINGS  ,RECH , &
+                               ids,ide, jds,jde, kds,kde,                            &
+                               ims,ime, jms,jme, kms,kme,                            &
+                               its,ite, jts,jte, kts,kte                             )
+
+  END SUBROUTINE NOAHMP_WTABLE_MMF
+
 END MODULE module_sf_noahmpdrv

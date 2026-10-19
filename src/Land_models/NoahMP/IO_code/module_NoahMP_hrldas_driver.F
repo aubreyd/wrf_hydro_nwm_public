@@ -1,8 +1,7 @@
 module module_NoahMP_hrldas_driver
 
   USE module_hrldas_netcdf_io
-  USE module_sf_noahmp_groundwater
-  USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm
+  USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm, noahmp_wtable_mmf
   USE module_date_utilities
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
@@ -1910,7 +1909,8 @@ end subroutine land_driver_ini
            CALL wrf_message('calling WTABLE' )
 
 !gmm update wtable from lateral flow and shed water to rivers
-           CALL WTABLE_MMF_NOAHMP(                                        &
+!    (Noah-MP v5 GroundWaterMmfMod, via the bridge in module_sf_noahmpdrv)
+           CALL NOAHMP_WTABLE_MMF(                                        &
 	       NUM_SOIL_LAYERS,  XLAND, XICE,       XICE_THRESHOLD, ISICE,    &
                ISLTYP,      SMOISEQ,    DZS,        WTDDT,                &
                FDEPTHXY,    AREAXY,     TERRAIN,    ISURBAN,    IVGTYP,   &
