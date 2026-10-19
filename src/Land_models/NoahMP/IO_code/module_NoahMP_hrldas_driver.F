@@ -8,7 +8,7 @@ module module_NoahMP_hrldas_driver
   USE modi_ini_csts
 #ifdef MPP_LAND
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
-  use module_mpp_land, only: check_land, node_info, numprocs
+  use module_mpp_land, only: check_land, node_info, numprocs, my_id, IO_id
   use module_cpl_land, only: cpl_land_init, fatal_error_stop
   !use mpi
 #endif
@@ -1246,6 +1246,30 @@ module module_NoahMP_hrldas_driver
     ! the restart file.
     CALL READ_MMF_RUNOFF(noah_lsm%hrldas_setup_file, XSTART, XEND, YSTART, YEND,&
                          FDEPTHXY,EQZWT,RECHCLIM,RIVERBEDXY)
+
+    ! WTDDT is used as the flux-integration time (DELTAT) inside the MMF
+    ! routines, so make it equal the actual time between calls, STEPWTD*DTBL.
+    ! Otherwise, e.g. with the 30-minute default and NOAH_TIMESTEP = 3600,
+    ! STEPWTD = 1 but each call only integrates 1800 s of fluxes.
+    STEPWTD = max(nint(WTDDT*60./DTBL), 1)
+    WTDDT   = STEPWTD*DTBL/60.
+
+#ifdef WRF_HYDRO
+    ! MMF groundwater discharge (QRF) is handed to the baseflow bucket through
+    ! soldrain (see land_driver_exe); only the pass-through bucket sends it to
+    ! the channels unchanged.
+    if (nlst(did)%GWBASESWCRT /= 2) then
+#ifdef MPP_LAND
+       if (my_id == IO_id) then
+#endif
+       write(*,'(" ***** WARNING: RUNOFF_OPTION = 5 (MMF) with GWBASESWCRT = ", I0, &
+                 "; use GWBASESWCRT = 2 (pass-through) to route MMF baseflow (QRF) to channels unchanged.")') &
+             nlst(did)%GWBASESWCRT
+#ifdef MPP_LAND
+       endif
+#endif
+    endif
+#endif
   end if
 
 !----------------------------------------------------------------------
@@ -1905,6 +1929,14 @@ end subroutine land_driver_ini
           call system_clock(count=count_after_sflx, count_rate=clock_rate)
           sflx_count_sum = sflx_count_sum + ( count_after_sflx - count_before_sflx )
 
+#ifdef WRF_HYDRO
+! With MMF, the column's subsurface runoff (RUNSB -> soldrain) is bottom
+! drainage that MMF keeps as recharge to the water table, so it must not also
+! go to the baseflow bucket. soldrain is replaced by QRF below on steps when
+! the MMF update runs, and is zero otherwise.
+  IF(noah_lsm%RUNOFF_OPTION.EQ.5) soldrain = 0.0
+#endif
+
   IF(noah_lsm%RUNOFF_OPTION.EQ.5.AND.MOD(ITIME,STEPWTD).EQ.0)THEN
            CALL wrf_message('calling WTABLE' )
 
@@ -1921,6 +1953,17 @@ end subroutine land_driver_ini
                IDS,IDE, JDS,JDE, KDS,KDE,                                 &
                IMS,IME, JMS,JME, KMS,KME,                                 &
                ITS,ITE, JTS,JTE, KTS,KTE )
+
+#ifdef WRF_HYDRO
+! Hand MMF groundwater fluxes (m per groundwater step) to WRF-Hydro routing:
+! QRF (groundwater to rivers) becomes the bucket input, and QSPRING (seepage
+! at the surface) is added to the surface water passed to overland routing.
+! Same land mask as WTABLE_mmf_noahmp; QSPRING is undefined elsewhere.
+           WHERE (XLAND-1.5 < 0. .AND. XICE < XICE_THRESHOLD .AND. IVGTYP /= ISICE)
+              soldrain = QRFXY*1000.
+              infxsrt  = infxsrt + QSPRINGXY*1000.
+           ENDWHERE
+#endif
 
  ENDIF
 
