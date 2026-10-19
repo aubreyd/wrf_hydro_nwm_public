@@ -722,16 +722,18 @@ contains
   subroutine read_mmf_runoff(wrfinput_flnm,                            &
        xstart, xend,                                                   &
        ystart, yend,                                                   &
-       zwt,eqzwt,riverbed,rivercond,pexp,fdepth)
+       fdepth,eqzwt,rechclim,riverbed)
+    ! Reads the MMF groundwater input fields in the Noah-MP v5 / HRLDAS
+    ! format. ZWT, RIVERCOND and PEXP are no longer read; they are derived
+    ! from these fields in GROUNDWATER_INIT (cold start) or read from the
+    ! restart file.
     implicit none
     character(len=*),          intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: zwt
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: eqzwt
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: riverbed
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: rivercond
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: pexp
-    real,    dimension(xstart:xend,ystart:yend), intent(out) :: fdepth
+    real,    dimension(xstart:xend,ystart:yend), intent(out) :: fdepth   ! transmissivity e-folding depth [m]
+    real,    dimension(xstart:xend,ystart:yend), intent(out) :: eqzwt    ! equilibrium water table depth [m]
+    real,    dimension(xstart:xend,ystart:yend), intent(out) :: rechclim ! climatological recharge [mm/yr]
+    real,    dimension(xstart:xend,ystart:yend), intent(out) :: riverbed ! riverbed elevation [m above sea level]
 
     character(len=256) :: units
     integer :: ierr
@@ -769,23 +771,17 @@ contains
             " - Problem opening wrfinput file."
     endif
 
-    ! Get water table depth (ZWT)
-    call get_2d_netcdf("ZWT", ncid, zwt,  units, xstart, xend, ystart, yend, FATAL, ierr)
+    ! Get transmissivity e-folding depth (FDEPTH)
+    call get_2d_netcdf("FDEPTH", ncid, fdepth,  units, xstart, xend, ystart, yend, FATAL, ierr)
 
     ! Get equilibrium water table depth (EQZWT)
     call get_2d_netcdf("EQZWT", ncid, eqzwt,  units, xstart, xend, ystart, yend, FATAL, ierr)
 
-    ! Get equilibrium water table depth (RIVERBED)
+    ! Get climatological recharge (RECHCLIM)
+    call get_2d_netcdf("RECHCLIM", ncid, rechclim,  units, xstart, xend, ystart, yend, FATAL, ierr)
+
+    ! Get riverbed elevation (RIVERBED)
     call get_2d_netcdf("RIVERBED", ncid, riverbed,  units, xstart, xend, ystart, yend, FATAL, ierr)
-
-    ! Get equilibrium water table depth (RIVERCOND)
-    call get_2d_netcdf("RIVERCOND", ncid, rivercond,  units, xstart, xend, ystart, yend, FATAL, ierr)
-
-    ! Get equilibrium water table depth (PEXP)
-    call get_2d_netcdf("PEXP", ncid, pexp,  units, xstart, xend, ystart, yend, FATAL, ierr)
-
-    ! Get equilibrium water table depth (FDEPTH)
-    call get_2d_netcdf("FDEPTH", ncid, fdepth,  units, xstart, xend, ystart, yend, FATAL, ierr)
 
     ! Close the NetCDF file
     ierr = nf90_close(ncid)

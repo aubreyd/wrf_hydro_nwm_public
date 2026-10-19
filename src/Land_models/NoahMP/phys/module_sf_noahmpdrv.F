@@ -2358,7 +2358,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
        its,ite, jts,jte, kts,kte,                &
        smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy, dx, dy, msftx, msfty,&     ! Optional groundwater
        wtddt    ,stepwtd  ,dt       ,qrfsxy     ,qspringsxy  , qslatxy    ,  &      ! Optional groundwater
-       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy            )    ! Optional groundwater
+       fdepthxy ,ht     ,riverbedxy ,eqzwt     ,rivercondxy ,pexpxy  ,rechclim )    ! Optional groundwater
 
   USE NOAHMP_TABLES
 
@@ -2441,10 +2441,11 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) , OPTIONAL :: areaxy      !grid cell area [m2]
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: FDEPTHXY    !efolding depth for transmissivity (m)
     REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: HT          !terrain height (m)
-    REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: RIVERBEDXY  !riverbed depth (m)
-    REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: EQZWT       !equilibrium water table depth (m)
-    REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: RIVERCONDXY !river conductance
-    REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: PEXPXY      !factor for river conductance
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) , OPTIONAL :: RIVERBEDXY  !riverbed elevation (m, in) / depth below surface (m, out)
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) , OPTIONAL :: EQZWT       !equilibrium water table depth (m)
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) , OPTIONAL :: RIVERCONDXY !river conductance (computed)
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(INOUT) , OPTIONAL :: PEXPXY      !factor for river conductance (computed)
+    REAL, DIMENSION(ims:ime,jms:jme), INTENT(IN) , OPTIONAL :: RECHCLIM    !climatological recharge (mm/yr)
 
     INTEGER,  INTENT(INOUT) , OPTIONAL :: STEPWTD
     REAL, INTENT(IN) , OPTIONAL :: DT, WTDDT
@@ -2676,7 +2677,8 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
             PRESENT(riverbedxy)  .AND. &
             PRESENT(eqzwt)       .AND. &
             PRESENT(rivercondxy) .AND. &
-            PRESENT(pexpxy)            ) THEN
+            PRESENT(pexpxy)      .AND. &
+            PRESENT(rechclim)          ) THEN
 
              STEPWTD = nint(WTDDT*60./DT)
              STEPWTD = max(STEPWTD,1)
@@ -2684,6 +2686,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
               CALL groundwater_init ( &
       &       nsoil, zsoil , dzs  ,isltyp, ivgtyp,wtddt , &
       &       fdepthxy, ht, riverbedxy, eqzwt, rivercondxy, pexpxy , areaxy, zwtxy,   &
+      &       rechclim,                                     &
       &       smois,sh2o, smoiseq, smcwtdxy, deeprechxy, rechxy, qslatxy, qrfsxy, qspringsxy, &
       &       ids,ide, jds,jde, kds,kde,                    &
       &       ims,ime, jms,jme, kms,kme,                    &
@@ -2806,6 +2809,7 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     SUBROUTINE GROUNDWATER_INIT (   &
             &            NSOIL , ZSOIL , DZS, ISLTYP, IVGTYP, WTDDT , &
             &            FDEPTH, TOPO, RIVERBED, EQWTD, RIVERCOND, PEXP , AREA ,WTD ,  &
+            &            RECHCLIM,                                     &
             &            SMOIS,SH2O, SMOISEQ, SMCWTDXY, DEEPRECHXY, RECHXY ,  &
             &            QSLATXY, QRFSXY, QSPRINGSXY,                  &
             &            ids,ide, jds,jde, kds,kde,                    &
@@ -2816,6 +2820,9 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
   USE NOAHMP_TABLES, ONLY : BEXP_TABLE,SMCMAX_TABLE,PSISAT_TABLE,SMCWLT_TABLE,DWSAT_TABLE,DKSAT_TABLE, &
                                 ISURBAN_TABLE, ISICE_TABLE ,ISWATER_TABLE
   USE module_sf_noahmp_groundwater, ONLY : LATERALFLOW
+#ifdef MPP_LAND
+  USE module_mpp_land, ONLY : mpp_land_max_int1
+#endif
 
 ! ----------------------------------------------------------------------
   IMPLICIT NONE
@@ -2828,7 +2835,8 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     REAL,   INTENT(IN)                               ::     WTDDT
     REAL,    INTENT(IN), DIMENSION(1:NSOIL)          :: ZSOIL,DZS
     INTEGER, INTENT(IN), DIMENSION(ims:ime, jms:jme) :: ISLTYP, IVGTYP
-    REAL,    INTENT(IN), DIMENSION(ims:ime, jms:jme) :: FDEPTH, TOPO, RIVERBED, EQWTD, RIVERCOND, PEXP , AREA
+    REAL,    INTENT(IN), DIMENSION(ims:ime, jms:jme) :: FDEPTH, TOPO, AREA, RECHCLIM
+    REAL,    INTENT(INOUT), DIMENSION(ims:ime, jms:jme) :: RIVERBED, EQWTD, RIVERCOND, PEXP
     REAL,    INTENT(INOUT), DIMENSION(ims:ime, jms:jme) :: WTD
     REAL,     DIMENSION( ims:ime , 1:nsoil, jms:jme ), &
          &    INTENT(INOUT)   ::                          SMOIS, &
@@ -2842,10 +2850,10 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
                                                            QRFSXY, &
                                                            QSPRINGSXY
 ! local
-    INTEGER  :: I,J,K,ITER,itf,jtf
+    INTEGER  :: I,J,K,ITER,itf,jtf,NITER,NCOUNT
     REAL :: BEXP,SMCMAX,PSISAT,SMCWLT,DWSAT,DKSAT
     REAL :: FRLIQ,SMCEQDEEP
-    REAL :: DELTAT,RCOND
+    REAL :: DELTAT,RCOND,TOTWATER
     REAL :: AA,BBB,CC,DD,DX,FUNC,DFUNC,DDZ,EXPON,SMC,FLUX
     REAL, DIMENSION(1:NSOIL) :: SMCEQ
     REAL,      DIMENSION( ims:ime, jms:jme )    :: QLAT, QRF
@@ -2855,15 +2863,82 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
        itf=min0(ite,ide-1)
        jtf=min0(jte,jde-1)
 
-!first compute lateral flow and flow to rivers to initialize deep soil moisture
-
-    DELTAT = WTDDT * 60. !timestep in seconds for this calculation
-
     WHERE(IVGTYP.NE.ISWATER_TABLE.AND.IVGTYP.NE.ISICE_TABLE)
          LANDMASK=1
     ELSEWHERE
          LANDMASK=-1
     ENDWHERE
+
+! Derive WTD, RIVERCOND and PEXP from EQWTD, RECHCLIM and RIVERBED, following
+! NoahmpGroundwaterInitMain in Noah-MP v5 (drivers/hrldas/NoahmpGroundwaterInitMod.F90).
+! On input RIVERBED is an elevation (m above sea level); on output it is a depth
+! below the surface (m, <= 0). Under MPP_LAND, LATERALFLOW exchanges tile halos
+! and NCOUNT is reduced across ranks so all ranks iterate (and call the
+! collective halo exchange) the same number of times.
+
+    PEXP = 1.0
+    DELTAT = 365. * 24. * 3600. ! 1 year
+
+! read just the raw aggregated water table from hi-res map, so that it is better compatible with topography
+    WTD = EQWTD
+    NCOUNT = 0
+
+    DO NITER = 1, 500
+       IF ( (NCOUNT > 0) .OR. (NITER == 1) ) THEN
+          QLAT = 0.
+          CALL LATERALFLOW(ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA       &
+                          ,ids,ide,jds,jde,kds,kde                      &
+                          ,ims,ime,jms,jme,kms,kme                      &
+                          ,its,ite,jts,jte,kts,kte                      )
+          NCOUNT = 0
+          DO J=jts,jtf
+             DO I=its,itf
+                IF(LANDMASK(I,J).GT.0)THEN
+                   IF(QLAT(I,J) .GT. 1.E-2)THEN
+                      NCOUNT = NCOUNT + 1
+                      WTD(I,J) = MIN(WTD(I,J)+0.25, 0.)
+                   ENDIF
+                ENDIF
+             ENDDO
+          ENDDO
+#ifdef MPP_LAND
+          call mpp_land_max_int1(NCOUNT)
+#endif
+       ENDIF
+    ENDDO
+
+    EQWTD = WTD
+
+! after adjusting, where qlat > 1cm/year now wtd is at the surface.
+! it may still happen that qlat + rech > 0 and eqwtd-rbed <0. There the wtd can
+! rise to the surface (poor drainage) but the et will then increase.
+
+! now, calculate river conductivity
+    DO J=jts,jtf
+       DO I=its,itf
+          DDZ = EQWTD(I,J) - ( RIVERBED(I,J) - TOPO(I,J) )
+! dont allow riverbed above water table
+          IF(DDZ .LT. 0.)THEN
+             RIVERBED(I,J) = TOPO(I,J) + EQWTD(I,J)
+             DDZ = 0.
+          ENDIF
+          TOTWATER = AREA(I,J) * ( QLAT(I,J) + RECHCLIM(I,J)*0.001 ) / DELTAT
+          IF(TOTWATER .GT. 0.)THEN
+             RIVERCOND(I,J) = TOTWATER / MAX(DDZ,0.05)
+          ELSE
+             RIVERCOND(I,J) = 0.01
+! make riverbed equal to eqwtd, otherwise qrf might be too big...
+             RIVERBED(I,J) = TOPO(I,J) + EQWTD(I,J)
+          ENDIF
+       ENDDO
+    ENDDO
+
+! make riverbed to be height down from the surface instead of above sea level
+    RIVERBED = MIN( RIVERBED - TOPO, 0. )
+
+!now recompute lateral flow and flow to rivers to initialize deep soil moisture
+
+    DELTAT = WTDDT * 60. !timestep in seconds for this calculation
 
 !Calculate lateral flow
 

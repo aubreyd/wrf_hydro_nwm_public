@@ -291,6 +291,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  MSFTX
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  MSFTY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  EQZWT
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RECHCLIM    ! climatological recharge [mm/yr]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RIVERBEDXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  RIVERCONDXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  PEXPXY
@@ -909,6 +910,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( MSFTX       (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( MSFTY       (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( EQZWT       (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( RECHCLIM    (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( RIVERBEDXY  (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( RIVERCONDXY (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( PEXPXY      (XSTART:XEND,YSTART:YEND) )  !
@@ -1108,6 +1110,7 @@ module module_NoahMP_hrldas_driver
   MSFTX      = undefined_real
   MSFTY      = undefined_real
   EQZWT      = undefined_real
+  RECHCLIM   = undefined_real
   RIVERBEDXY = undefined_real
   RIVERCONDXY= undefined_real
   PEXPXY     = undefined_real
@@ -1238,12 +1241,12 @@ module module_NoahMP_hrldas_driver
 !------------------------------------------------------------------------
 
   if (noah_lsm%runoff_option == 5) then
-    ! mmf_runoff_file was removed from the namelist (dead field: it was always
-    ! forced blank here even before the namelist migration -- see
-    ! namelist_migration_plan.md). This call was already non-functional with
-    ! runoff_option==5; preserved as-is, now passing the same blank literal.
-    CALL READ_MMF_RUNOFF(" ", XSTART, XEND, YSTART, YEND,&
-                         ZWTXY,EQZWT,RIVERBEDXY,RIVERCONDXY,PEXPXY,FDEPTHXY)
+    ! Noah-MP v5 / HRLDAS-style MMF inputs, read from HRLDAS_SETUP_FILE.
+    ! ZWT, RIVERCOND and PEXP are derived from these in GROUNDWATER_INIT on a
+    ! cold start; on restart they (and the adjusted EQZWT/RIVERBED) come from
+    ! the restart file.
+    CALL READ_MMF_RUNOFF(noah_lsm%hrldas_setup_file, XSTART, XEND, YSTART, YEND,&
+                         FDEPTHXY,EQZWT,RECHCLIM,RIVERBEDXY)
   end if
 
 !----------------------------------------------------------------------
@@ -1389,7 +1392,7 @@ module module_NoahMP_hrldas_driver
                   its,ite, jts,jte, kts,kte                 &  ! tile
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
-                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy ,rechclim    &
                      )
   else  ! for none restart
 
@@ -1487,7 +1490,7 @@ module module_NoahMP_hrldas_driver
                   its,ite, jts,jte, kts,kte                 &  ! tile
                      ,smoiseq  ,smcwtdxy ,rechxy   ,deeprechxy, areaxy ,dx, dy, msftx, msfty,&
                      wtddt    ,stepwtd  ,dtbl  ,qrfsxy ,qspringsxy  ,qslatxy,                  &
-                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy              &
+                     fdepthxy ,terrain ,riverbedxy ,eqzwt ,rivercondxy ,pexpxy ,rechclim    &
                      )
 
       TAUSSXY = 0.0   ! Need to be added to _INIT later
