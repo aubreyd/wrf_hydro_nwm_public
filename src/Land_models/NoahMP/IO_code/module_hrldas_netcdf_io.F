@@ -854,36 +854,37 @@ contains
 
 !---------------------------------------------------------------------------------------------------------
 
-  subroutine read_imperv(spatial_filename, xstart, xend, ystart, yend, imperv_2d)
+  subroutine read_imperv(wrfinput_flnm, xstart, xend, ystart, yend, imperv_2d)
+
+    ! Impervious fraction (0-1) from the geogrid IMPERV field (percent impervious)
+    ! carried in the setup (wrfinput) file.
 
     implicit none
-    character(len=*),          intent(in)  :: spatial_filename
+    character(len=*),          intent(in)  :: wrfinput_flnm
     integer,                   intent(in)  :: xstart, xend, ystart, yend
     real,    dimension(xstart:xend,ystart:yend), intent(out) :: imperv_2d
 
-    character(len=24)  :: name
     character(len=256) :: units
-    integer :: ierr,iret, varid
+    integer :: ierr
     integer :: ncid
-    real, dimension(xstart:xend,ystart:yend) :: xdum
 !------------------------------------------------------------------------------------------------------
 
-    ierr = nf90_open(spatial_filename, NF90_NOWRITE, ncid)
+#ifdef _PARALLEL_
+    ierr = nf90_open_par(wrfinput_flnm, NF90_NOWRITE, HYDRO_COMM_WORLD, MPI_INFO_NULL, ncid)
+#else
+    ierr = nf90_open(wrfinput_flnm, NF90_NOWRITE, ncid)
+#endif
     if (ierr /= 0) then
-       write(*,'("FATAL ERROR: In read_imperv():  Problem opening soil file: ''", A, "''")') trim(spatial_filename)
+       write(*,'("FATAL ERROR: In read_imperv():  Problem opening wrfinput file: ''", A, "''")') trim(wrfinput_flnm)
        stop
     endif
 
-    name = "imperv"
-    iret = nf90_inq_varid(ncid,  trim(name),  varid)
-    if (iret /= 0) then
-      print*, 'ncid = ', ncid
-      write(*,*) "FATAL ERROR: In read_imperv():  Problem finding variable '"//trim(name)//"' in NetCDF file: " // trim(spatial_filename)
-      stop
-    endif
+    call get_2d_netcdf("IMPERV", ncid, imperv_2d, units, xstart, xend, ystart, yend, FATAL, ierr)
 
-    iret = nf90_get_var(ncid, varid, imperv_2d, start=(/xstart,ystart/), count=(/xend-xstart+1,yend-ystart+1/))
-!
+    ! percent -> fraction; missing or out-of-range values are treated as pervious
+    where ( (imperv_2d < 0.0) .or. (imperv_2d > 100.0) ) imperv_2d = 0.0
+    imperv_2d = imperv_2d * 0.01
+
     ! Close the NetCDF file
     ierr = nf90_close(ncid)
     if (ierr /= 0) stop "FATAL ERROR: In module_hrldas_netcdf_io.F read_imperv() -  NF90_CLOSE"

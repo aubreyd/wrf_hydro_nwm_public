@@ -1526,6 +1526,11 @@ CONTAINS
          noahmp_col%config%domain%GridIndexI = I
          noahmp_col%config%domain%GridIndexJ = J
 
+         ! Impervious surface option and per-cell fraction (IMPERV_2D is zero
+         ! unless IMPERV_OPTION is 1 or 2); set directly, not via NoahmpIO_sub
+         noahmp_col%config%nmlist%OptImpervious = IOPT_IMPERV
+         noahmp_col%water%param%ImpervFracSfc   = IMPERV_2D(I,J)
+
          ! Forward spatial DOMAIN/soilproperties values into submodule param fields.
          ! The submodule's *VarInTransfer routines populate these from SOILPARM/GENPARM
          ! table lookups by default; we override here with the per-cell spatial values

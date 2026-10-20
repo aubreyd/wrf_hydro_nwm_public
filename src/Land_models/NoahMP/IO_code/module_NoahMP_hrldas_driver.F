@@ -1230,12 +1230,18 @@ module module_NoahMP_hrldas_driver
                              AXAJ_2D,BXAJ_2D,XXAJ_2D)
     end if
 
-    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then
-        CALL READ_IMPERV(noah_lsm%SPATIAL_FILENAME,XSTART, XEND, YSTART, YEND, &
-                             IMPERV_2D)
-    end if
-
 #endif
+
+!------------------------------------------------------------------------
+! Impervious fraction for IMPERV_OPTION 1 and 2, from the geogrid IMPERV
+! field (percent) in the setup file
+!------------------------------------------------------------------------
+
+    IMPERV_2D = 0.0
+    if (noah_lsm%imperv_option > 0 .and. noah_lsm%imperv_option < 9) then
+        CALL READ_IMPERV(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, YEND, &
+                         IMPERV_2D)
+    end if
 
 !------------------------------------------------------------------------
 ! For IOPT_RUN = 5 (MMF groundwater), read in necessary extra fields
