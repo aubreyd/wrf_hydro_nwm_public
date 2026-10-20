@@ -3128,13 +3128,15 @@ END  SUBROUTINE EQSMOISTURE
                                 RIVERCOND ,RIVERBED ,EQWTD   ,PEXP                   ,& !in
                                 SMOIS     ,SH2OXY   ,SMCWTD  ,WTD  ,QRF              ,& !inout
                                 DEEPRECH  ,QSPRING  ,QSLAT   ,QRFS ,QSPRINGS  ,RECH  ,& !inout
+                                QLAT                                         ,& !out
                                 ids,ide, jds,jde, kds,kde,                    &
                                 ims,ime, jms,jme, kms,kme,                    &
                                 its,ite, jts,jte, kts,kte                     )
 ! ----------------------------------------------------------------------
 ! Per-timestep MMF groundwater (lateral flow, groundwater-river exchange,
 ! water table update) using the Noah-MP v5 GroundWaterMmfMod. Same argument
-! list as the legacy module_sf_noahmp_groundwater WTABLE_mmf_noahmp; the v5
+! list as the legacy module_sf_noahmp_groundwater WTABLE_mmf_noahmp plus QLAT
+! (lateral flow this call [m], returned for output); the v5
 ! routine reads its soil parameters (BEXP/DKSAT/PSISAT/SMCMAX/SMCWLT_TABLE)
 ! and urban category from the NoahmpIO_sub bridge, which must already have
 ! been initialized by the first NOAHMPLSM call.
@@ -3158,9 +3160,7 @@ END  SUBROUTINE EQSMOISTURE
     REAL,    DIMENSION( ims:ime, 1:NSOIL, jms:jme ), INTENT(INOUT) :: SMOIS, SH2OXY
     REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(INOUT) :: WTD, SMCWTD, DEEPRECH, QSLAT, &
                                                              QRFS, QSPRINGS, RECH
-    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(OUT)   :: QRF, QSPRING
-! local
-    REAL,    DIMENSION( ims:ime, jms:jme ) :: QLAT   ! lateral flow this call [m] (not kept)
+    REAL,    DIMENSION( ims:ime, jms:jme ), INTENT(OUT)   :: QRF, QSPRING, QLAT
 
     IF (.NOT. submodule_initialized) &
        CALL wrf_error_fatal('NOAHMP_WTABLE_MMF called before the NoahmpIO_sub bridge was initialized')

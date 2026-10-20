@@ -301,6 +301,7 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QRFXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QSPRINGXY
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QSLATXY
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  QLATXY    ! lateral flow per groundwater call [m] (output only)
   REAL                                    ::  WTDDT  = 30.0    ! frequency of groundwater call [minutes]
   INTEGER                                 ::  STEPWTD = 1      ! step of groundwater call
 
@@ -920,6 +921,7 @@ module module_NoahMP_hrldas_driver
   ALLOCATE ( QRFXY       (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( QSPRINGXY   (XSTART:XEND,YSTART:YEND) )  !
   ALLOCATE ( QSLATXY     (XSTART:XEND,YSTART:YEND) )  !
+  ALLOCATE ( QLATXY      (XSTART:XEND,YSTART:YEND) )  !
 
 !------------------------------------------------------------------------
 
@@ -1120,6 +1122,7 @@ module module_NoahMP_hrldas_driver
   QRFXY      = undefined_real
   QSPRINGXY  = undefined_real
   QSLATXY    = undefined_real
+  QLATXY     = undefined_real
   CHSTARXY   = undefined_real
   Z0         = undefined_real
   ZNT        = undefined_real
@@ -1950,6 +1953,7 @@ end subroutine land_driver_ini
                SMOIS,       SH2O,       SMCWTDXY,   ZWTXY,                &
 	       QRFXY,       DEEPRECHXY, QSPRINGXY,                        &
                QSLATXY,     QRFSXY,     QSPRINGSXY, RECHXY,               &
+               QLATXY,                                                    &
                IDS,IDE, JDS,JDE, KDS,KDE,                                 &
                IMS,IME, JMS,JME, KMS,KME,                                 &
                ITS,ITE, JTS,JTE, KTS,KTE )
@@ -2308,6 +2312,20 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_ICE,IVGTYP,115)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,FLOW_SNOW,IVGTYP,116)
    end if ! crocus_opt /= 0
+   ! MMF groundwater. Per-call fluxes (m) are written in mm so they keep
+   ! precision under LDASOUT integer packing; RECH and the accumulations are
+   ! already mm.
+   if (noah_lsm%runoff_option == 5) then
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,SMCWTDXY,IVGTYP,117)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,RECHXY,IVGTYP,118)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,m_to_mm(DEEPRECHXY),IVGTYP,119)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QRFSXY,IVGTYP,120)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,m_to_mm(QRFXY),IVGTYP,121)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSPRINGSXY,IVGTYP,122)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,m_to_mm(QSPRINGXY),IVGTYP,123)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,QSLATXY,IVGTYP,124)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,m_to_mm(QLATXY),IVGTYP,125)
+   end if ! runoff_option == 5
 #endif /* WRF_HYDRO */
 
 !#ifdef WRF_HYDRO
@@ -2848,6 +2866,19 @@ subroutine define_rst_variables(ncid, state)
                              "Problem nf90_close")
 
    end subroutine define_rst_variables
+
+!===============================================================================
+! Convert m to mm for output, leaving undefined_real (non-land) points as-is so
+! they are still written as missing instead of overflowing.
+   elemental real function m_to_mm(x)
+      implicit none
+      real, intent(in) :: x
+      if (abs(x) < 1.e30) then
+         m_to_mm = x * 1000.
+      else
+         m_to_mm = x
+      endif
+   end function m_to_mm
 
 end module module_NoahMP_hrldas_driver
 

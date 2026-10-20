@@ -1227,7 +1227,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              1,1,1,&               !105-107
                              1,1,1,&               !108-110
                              1,1,1,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,&               !114-116
+                             1,1,1,&               !117-119 MMF groundwater
+                             1,1,1,&               !120-122
+                             1,1,1]                !123-125
 
   else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
@@ -1246,7 +1249,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,&               !114-116
+                             0,0,0,&               !117-119 MMF groundwater
+                             0,0,0,&               !120-122
+                             0,0,0]                !123-125
 
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
@@ -1265,7 +1271,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,&               !114-116
+                             0,0,0,&               !117-119 MMF groundwater
+                             0,0,0,&               !120-122
+                             0,0,0]                !123-125
 
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
@@ -1284,7 +1293,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,&               !114-116
+                             0,0,0,&               !117-119 MMF groundwater
+                             0,0,0,&               !120-122
+                             0,0,0]                !123-125
 
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
@@ -1303,7 +1315,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              0,0,0,&               !108-110
                              0,0,0,&               !111-113
-                             0,0,0]                !114
+                             0,0,0,&               !114-116
+                             0,0,0,&               !117-119 MMF groundwater
+                             0,0,0,&               !120-122
+                             0,0,0]                !123-125
 
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
@@ -1322,7 +1337,10 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              1,1,0,&               !108-110
                              1,0,0,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,&               !114-116
+                             1,1,1,&               !117-119 MMF groundwater
+                             1,1,1,&               !120-122
+                             1,1,1]                !123-125
 
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
@@ -1341,23 +1359,32 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
                              0,0,0,&               !105-107
                              1,1,0,&               !108-110
                              1,0,0,&               !111-113
-                             1,1,1]                !114
+                             1,1,1,&               !114-116
+                             0,0,0,&               !117-119 MMF groundwater
+                             0,0,0,&               !120-122
+                             0,0,0]                !123-125
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
 
    ! ! If crocus is off, these should not be outputted
    if (noah_lsm%crocus_opt == 0) then
-      fileMeta%outFlag(101) = 0
-      fileMeta%outFlag(102) = 0
-      fileMeta%outFlag(103) = 0
-      fileMeta%outFlag(104) = 0
-      fileMeta%outFlag(108) = 0
-      fileMeta%outFlag(109) = 0
-      fileMeta%outFlag(111) = 0
-      fileMeta%outFlag(114) = 0
-      fileMeta%outFlag(115) = 0
-      fileMeta%outFlag(116) = 0
+      fileMeta%outFlag(99:116) = 0
+   end if
+
+   ! MMF groundwater variables only exist with RUNOFF_OPTION = 5
+   if (noah_lsm%runoff_option /= 5) then
+      fileMeta%outFlag(117:125) = 0
+   end if
+
+   ! The driver only calls the Crocus (99-116) and MMF (117-125) variables when
+   ! those options are on, so numVars is the last index it calls; the file is
+   ! closed after that variable.
+   if (noah_lsm%runoff_option == 5) then
+      fileMeta%numVars = numLdasVars            ! 125
+   else if (noah_lsm%crocus_opt /= 0) then
+      fileMeta%numVars = numLdasVars_mmf_off    ! 116
+   else
       fileMeta%numVars = numLdasVars_crocus_off ! 98
    end if
 
