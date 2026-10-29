@@ -989,7 +989,22 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
        , nlst(did)%channel_bypass )
 
    ! Equilibrium stream temperature model (water_temperature=2, UDMP reach-based routing)
-   if (nlst(did)%water_temperature .eq. 2) call run_stream_temp_eq(did)
+   if (nlst(did)%water_temperature .eq. 2) then
+      ! Only the gridded drive_CHANNEL fills InflowLand/InflowGw; the UDMP
+      ! driver leaves them at their zero init, making lateral water thermally
+      ! invisible to the stream model. Wire the reach-based lateral fluxes
+      ! (per-reach m3/s, populated when output_channelBucket_influx is 1 or 2)
+      ! so surface runoff and bucket baseflow carry heat into the mixing.
+      if ((nlst(did)%output_channelBucket_influx .eq. 1 .or.  &
+           nlst(did)%output_channelBucket_influx .eq. 2) .and. &
+          rt_domain(did)%NLINKSL .gt. 0) then
+         rt_domain(did)%InflowLand(1:rt_domain(did)%NLINKSL) = &
+              rt_domain(did)%qSfcLatRunoff(1:rt_domain(did)%NLINKSL)
+         rt_domain(did)%InflowGw(1:rt_domain(did)%NLINKSL) = &
+              rt_domain(did)%qBucket(1:rt_domain(did)%NLINKSL)
+      end if
+      call run_stream_temp_eq(did)
+   end if
 
 else
     print *, "calling gridded drive_CHANNEL"

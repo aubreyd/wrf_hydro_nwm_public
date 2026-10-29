@@ -294,6 +294,7 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
    REAL,    allocatable, DIMENSION(:)   :: NetRad
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
+   REAL,    allocatable, DIMENSION(:)   :: T_air_smooth   ! 24-h EMA of air temperature [C] (water_temperature=2)
    REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
    REAL,    allocatable, DIMENSION(:)   :: InflowLand
@@ -301,6 +302,7 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstreamTemp
    REAL,    allocatable, DIMENSION(:)   :: Outflow
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
+   REAL,    allocatable, DIMENSION(:)   :: LakeOutletDepth      !lake outlet withdrawal depth below surface (m)
    REAL,    allocatable, DIMENSION(:)   :: CVOLTMP
 
    ! NEW FOR module_channel_routing.F

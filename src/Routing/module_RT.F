@@ -474,6 +474,7 @@ CONTAINS
         allocate( rt_domain(did)%SFCP_1D(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
         allocate( rt_domain(did)%T_QSUM_prev(nsizes) )
+        allocate( rt_domain(did)%T_air_smooth(nsizes) )
         allocate( rt_domain(did)%NetRad(nsizes) )
         allocate( rt_domain(did)%NetRad_prev(nsizes) )
         allocate( rt_domain(did)%XS_Peremeter (nsizes) )
@@ -488,6 +489,7 @@ CONTAINS
         allocate( rt_domain(did)%InflowUpstreamTemp(nsizes) )
         allocate( rt_domain(did)%Outflow(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
+        allocate( rt_domain(did)%LakeOutletDepth(nlakes) )
         allocate( rt_domain(did)%CVOLTMP(nsizes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
@@ -501,6 +503,9 @@ CONTAINS
         rt_domain(did)%SFCP_1D            = 0.
         rt_domain(did)%T_QSUM             = 10.
         rt_domain(did)%T_QSUM_prev        = 10.
+        ! Sentinel: run_stream_temp_eq seeds the EMA from forcing on first use
+        ! unless a restart file has already populated this array.
+        rt_domain(did)%T_air_smooth       = -9999.
         rt_domain(did)%NetRad             = 0.
         rt_domain(did)%NetRad_prev        = 0.
         rt_domain(did)%XS_Peremeter       = 0.
@@ -515,6 +520,8 @@ CONTAINS
         rt_domain(did)%InflowUpstreamTemp = 10.
         rt_domain(did)%Outflow            = 0.
         rt_domain(did)%LakeOutflowTemp    = 10.
+        ! 0 = surface withdrawal; LandRT_ini overwrites from LAKEPARM
+        rt_domain(did)%LakeOutletDepth    = 0.
         rt_domain(did)%CVOLTMP            = 0.
 
         if( nlst(did)%channel_option .eq. 2 ) then
@@ -741,7 +748,8 @@ subroutine LandRT_ini(did)
   use config_base, only: nlst, noah_lsm
   use module_RT_data, only: rt_domain
   use module_gw_gw2d_data, only: gw2d
-  use module_HYDRO_io, only: regrid_lowres_to_highres, read_lake_coeff_doy
+  use module_HYDRO_io, only: regrid_lowres_to_highres, read_lake_coeff_doy, &
+                             read_lake_outlet_depth
 #ifdef HYDRO_D
   use module_HYDRO_io, only: output_lake_types
 #endif
@@ -987,6 +995,12 @@ subroutine LandRT_ini(did)
        call read_lake_coeff_doy(nlst(did)%route_lake_f, &
             rt_domain(did)%WEIRC_DOY, rt_domain(did)%ORIFICEC_DOY, &
             rt_domain(did)%WEIRC, rt_domain(did)%ORIFICEC, NLAKES_total)
+
+       ! Lake outlet (withdrawal) depth for outflow temperature sampling:
+       ! optional LAKEPARM 'OutletDepth' [m below surface], else WeirE - OrificeE
+       call read_lake_outlet_depth(nlst(did)%route_lake_f, &
+            rt_domain(did)%LakeOutletDepth, rt_domain(did)%WEIRH, &
+            rt_domain(did)%ORIFICEE, NLAKES_total)
    end if
 
    !-- Reza's code goes here to be initialized

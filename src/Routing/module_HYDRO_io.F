@@ -5988,6 +5988,9 @@ end subroutine mpp_output_chrt
          iret = nf90_def_var(ncid, "hlink", NF90_FLOAT, (/dimid_links/), varid)
          iret = nf90_def_var(ncid, "qlink1", NF90_FLOAT, (/dimid_links/), varid)
          iret = nf90_def_var(ncid, "qlink2", NF90_FLOAT, (/dimid_links/), varid)
+         ! EMA air temperature state for the equilibrium stream temperature model
+         if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) &
+              iret = nf90_def_var(ncid, "T_air_smooth", NF90_FLOAT, (/dimid_links/), varid)
          if(nlst(did)%channel_option .eq. 3) &
               iret = nf90_def_var(ncid, "cvol", NF90_FLOAT, (/dimid_links/), varid)
          if(rt_domain(did)%nlakes .gt. 0) then
@@ -6137,6 +6140,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
               ,rt_domain(did)%gnlinksl &
 #endif
               )
+
+         ! EMA air temperature state for the equilibrium stream temperature model
+         if(nlst(did)%water_temperature .eq. 2) then
+            call w_rst_crt_reach(ncid,rt_domain(did)%T_air_smooth, "T_air_smooth"  &
+#ifdef MPP_LAND
+                 ,rt_domain(did)%gnlinksl &
+#endif
+                 )
+         endif
 
 !! JLM If someone really wants the accumulated fluxes in the restart file, you can add them back.
 !! But Calculate accQLateral locally
@@ -6912,6 +6924,12 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          call read_rst_crt_reach_nc(ncid,rt_domain(did)%HLINK,"hlink",rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
          call read_rst_crt_reach_nc(ncid,rt_domain(did)%QLINK(:,1),"qlink1",rt_domain(did)%GNLINKSL)
          call read_rst_crt_reach_nc(ncid,rt_domain(did)%QLINK(:,2),"qlink2",rt_domain(did)%GNLINKSL)
+         ! EMA air temperature state (equilibrium stream temperature model).
+         ! Non-fatal: restart files written before this variable existed leave
+         ! the -9999 sentinel in place and the EMA re-seeds from forcing.
+         if(nlst(did)%water_temperature .eq. 2) &
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%T_air_smooth,"T_air_smooth", &
+                                         rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
          !call read_rst_crt_reach_nc(ncid,rt_domain(did)%CVOL,"cvol",rt_domain(did)%GNLINKSL)
          !if(nlst_rt(did)%UDMP_OPT .eq. 1) then
          ! read in the statistic value
@@ -9303,6 +9321,56 @@ subroutine read_lake_coeff_doy(route_lake_file, WEIRC_DOY, ORIFICEC_DOY, &
     iret = nf90_close(ncid)
 
 end subroutine read_lake_coeff_doy
+
+!===================================================================================================
+! read_lake_outlet_depth: Per-lake outlet (withdrawal) depth below the lake surface [m],
+!   used to sample the 1-D lake temperature profile for the outflow temperature.
+!   Priority: optional LAKEPARM variable 'OutletDepth' (1-D, m below surface); for lakes
+!   where it is absent or negative, derive as WeirE - OrificeE (orifice depth below the
+!   weir crest, i.e. below normal full pool), clamped to >= 0.  A result of 0 reproduces
+!   the legacy surface-layer withdrawal.
+!   Called on all ranks (each opens the file), like read_lake_coeff_doy.
+!===================================================================================================
+subroutine read_lake_outlet_depth(route_lake_file, outlet_depth, weir_e, orifice_e, nlakes)
+    implicit none
+    character(len=*), intent(in)               :: route_lake_file
+    real, intent(out), dimension(nlakes)       :: outlet_depth
+    real, intent(in),  dimension(nlakes)       :: weir_e     ! weir crest elevation (m ASL)
+    real, intent(in),  dimension(nlakes)       :: orifice_e  ! orifice elevation (m ASL)
+    integer, intent(in)                        :: nlakes
+
+    integer :: ncid, iret, varId, k, ndims
+    real, dimension(nlakes) :: file_depth
+
+    ! Default: orifice depth below the weir crest (normal full pool)
+    outlet_depth = max(0.0, weir_e - orifice_e)
+
+    ! Optional explicit override from LAKEPARM
+    iret = nf90_open(trim(route_lake_file), NF90_NOWRITE, ncid)
+    if (iret /= NF90_NOERR) return
+
+    iret = nf90_inq_varid(ncid, 'OutletDepth', varId)
+    if (iret == NF90_NOERR) then
+        iret = nf90_inquire_variable(ncid, varId, ndims=ndims)
+        if (iret == NF90_NOERR .and. ndims == 1) then
+            iret = nf90_get_var(ncid, varId, file_depth)
+            if (iret == NF90_NOERR) then
+                do k = 1, nlakes
+                    if (file_depth(k) .ge. 0.0) outlet_depth(k) = file_depth(k)
+                end do
+            else
+                write(6,*) "read_lake_outlet_depth: WARNING - failed to read OutletDepth, " // &
+                           "using WeirE - OrificeE"
+            end if
+        else
+            write(6,*) "read_lake_outlet_depth: WARNING - OutletDepth is not 1-D, " // &
+                       "using WeirE - OrificeE"
+        end if
+    end if
+
+    iret = nf90_close(ncid)
+
+end subroutine read_lake_outlet_depth
 
 !===================================================================================================
 ! Program Names: get_1d_netcdf_real, get_1d_netcdf_int, get_1d_netcdf_text
