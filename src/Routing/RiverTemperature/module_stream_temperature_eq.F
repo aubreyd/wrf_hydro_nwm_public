@@ -27,21 +27,22 @@
 !     Reaches marked TYPEL=1 (reservoir pour points) receive their temperature from the
 !     1-D CLM lake model: T = LakeOutflowTemp(k) - 273.15 [°C].
 !
-! MPI / cross-rank temperature (Approach B):
-!   drive_CHANNEL_RSL decomposes the domain spatially: each rank owns a rectangular tile.
-!   The push pattern (accumulate Q*T into the downstream reach) cannot cross rank boundaries
-!   within a single timestep.  The fix used here is a 1-timestep lag:
+! Upstream inflow / MPI (pull pattern, mirrors drive_CHANNEL_RSL):
+!   In UDMP mode TO_NODE holds the downstream ComID (read from Route_Link `to`),
+!   NOT a local array index, so a push via TO_NODE is impossible.  Instead each
+!   reach PULLS its upstream contributions exactly the way the flow routing does:
 !
-!     1. At the start of each call, T_QSUM_prev is saved (these are the values that were
-!        communicated across ranks by MPP_CHANNEL_COM_REAL at the end of the previous step).
-!     2. Q_acc / QT_acc are pre-seeded for ALL reaches (local + remote) using T_QSUM_prev.
-!        Remote upstream reaches will never have their contribution updated this timestep,
-!        so they retain T_QSUM_prev — a 1-step lag which is negligible at hourly dt.
-!     3. The ORDER loop iterates only over local reaches (yw_mpp_nlinks / nlinks_index in
-!        MPP mode); each local reach pushes the DELTA Q*(T_out - T_QSUM_prev) to replace
-!        its pre-seeded contribution with the freshly computed T_out.
-!     4. After the loop, MPP_CHANNEL_COM_REAL synchronizes T_QSUM across rank boundaries
-!        so that the pre-seed for the next timestep carries correct cross-rank temperatures.
+!     1. gbcastReal2 gathers the local per-reach outflow QLINK(:,1) and the
+!        previous-timestep temperature T_QSUM_prev into the compacted global
+!        to-node index space (size rt_domain%nToInd) that gtoNode points into.
+!     2. For each local reach i (1..NLINKSL), the upstream links are
+!        m = gtoNode(i, n+1), n = 1..gtoNode(i,1); their Q and Q*T are summed
+!        into Q_acc(i)/QT_acc(i).
+!     3. Upstream temperatures therefore carry a 1-timestep lag (T_QSUM_prev),
+!        which is rank-count independent and negligible at hourly dt.
+!
+!   Serial mode uses the same 1-step lag with the O(n^2) LINKID==TO_NODE match
+!   that drive_CHANNEL_RSL uses in its non-MPP branch.
 !
 ! Coupling:
 !   - Calls fineWeathData%runWeatherDisagg() to obtain reach-scale met forcing from the
@@ -62,7 +63,7 @@ module module_stream_temperature_eq
    use module_RT_data,            only: rt_domain
    use disaggregateWeatherModule, only: fineWeathData
 #ifdef MPP_LAND
-   use module_mpp_land,           only: MPP_CHANNEL_COM_REAL
+   use module_mpp_reachls,        only: gbcastReal2
 #endif
 
    implicit none
@@ -74,8 +75,14 @@ module module_stream_temperature_eq
    real, parameter :: c_p_w      = 4182.0   ! water specific heat [J/kg/°C]
 
    ! --- Default model parameters (can be promoted to namelist later) ---
-   real, parameter :: K_exchange = 150.0    ! bulk surface heat exchange coeff [W/m2/°C]
+   real, parameter :: K_exchange =  50.0    ! bulk surface heat exchange coeff [W/m2/°C]
                                             ! Controls relaxation rate: K_rate = K_exchange/(rho_w*c_p*depth)
+                                            ! Bracketed against the USGS gauges: 150 relaxed the Cannonsville
+                                            ! release to equilibrium within 10 km (tailwaters +8 °C), while 25
+                                            ! held the cold anomaly too long and left the far-field mainstem
+                                            ! 3-7 °C too cold.  No single K satisfies both ends, since
+                                            ! K_rate scales as 1/depth and the modeled West Branch depth
+                                            ! (0.22-0.32 m) is biased shallow.
    real, parameter :: K_sw       = 400.0    ! SW equilibrium coefficient [W/m2/°C]
                                             ! Controls solar contribution to T_e = T_air + SW_net/K_sw
                                             ! Higher value -> smaller diurnal solar swing in T_e
@@ -88,6 +95,14 @@ module module_stream_temperature_eq
    real, parameter :: min_depth  =  0.02    ! minimum depth for relaxation [m]
    real, parameter :: min_flow   =  1.0e-4  ! minimum flow for mixing    [m3/s]
 
+   ! --- 24-hour EMA smoothing of T_air for equilibrium temperature ---
+   ! Removes the sub-daily diurnal cycle from T_e while preserving synoptic
+   ! weather variations.  EMA_alpha = DT / tau is computed at runtime from the
+   ! namelist timestep so the e-folding time stays 24 hours at any DT.
+   ! State lives in rt_domain(did)%T_air_smooth (per-domain, restart-persisted);
+   ! entries still at the -9999 sentinel are seeded from current forcing.
+   real, parameter :: T_smooth_tau = 86400.0              ! e-folding time [s]
+
 contains
 
    !---------------------------------------------------------------------------
@@ -99,30 +114,27 @@ contains
    subroutine run_stream_temp_eq(did)
       integer, intent(in) :: did
 
-      integer :: i, iorder, k, j_down
-      integer :: nlinks, nlakes, maxorder, nsoil
-#ifdef MPP_LAND
-      integer :: iyw
-#endif
+      integer :: i, k, n, m
+      integer :: nlinks, nlinksl, nlakes, nsoil
 
       real    :: T_air_i, SW_net_i, T_e_i, T_in_i, T_out_i
       real    :: K_rate, travel_time, depth_i, vel_i, Q_this
       real    :: Q_total_i, QT_total_i, albedo_i, shade_i
       real    :: Tair_fallback, SW_fallback   ! domain-mean forcing for unmapped reaches
+      real    :: T_air_raw_i                  ! per-reach instantaneous T_air before smoothing [°C]
+      real    :: EMA_alpha                    ! EMA weight = DT / T_smooth_tau
 
-      real, allocatable :: Q_acc(:)         ! upstream flow accumulated at each reach [m3/s]
-      real, allocatable :: QT_acc(:)        ! upstream Q*T accumulated at each reach  [m3/s * °C]
+      real,    allocatable :: Q_acc(:)       ! upstream flow accumulated at each reach [m3/s]
+      real,    allocatable :: QT_acc(:)      ! upstream Q*T accumulated at each reach  [m3/s * °C]
+#ifdef MPP_LAND
+      real,    allocatable :: gQup(:)        ! upstream outflow in global to-node index space [m3/s]
+      real,    allocatable :: gTup(:)        ! previous-step temperature, same index space    [°C]
+#endif
 
       nlinks   = rt_domain(did)%NLINKS
+      nlinksl  = rt_domain(did)%NLINKSL      ! local reach count (UDMP link space)
       nlakes   = rt_domain(did)%NLAKES
       nsoil    = noah_lsm%nsoil
-
-      ! In MPP mode rt_domain%MAXORDER is a domain-wide fill value (-9999), not
-      ! the local-partition maximum.  Compute maxorder from the local ORDER array.
-      maxorder = 0
-      do i = 1, nlinks
-         if (rt_domain(did)%ORDER(i) .gt. maxorder) maxorder = rt_domain(did)%ORDER(i)
-      end do
 
       ! -----------------------------------------------------------------------
       ! Step 1: Disaggregate gridded met forcing to reach scale.
@@ -173,27 +185,68 @@ contains
       SW_fallback   = sum(max(0.0, weather2d%short))        / real(size(weather2d%short))
 
       ! -----------------------------------------------------------------------
-      ! Allocate accumulators.  In MPP mode, also save T_QSUM from the previous
-      ! timestep (already communicated across ranks) and pre-seed Q_acc/QT_acc
-      ! for ALL reaches so that cross-rank upstream contributions enter as a
-      ! 1-timestep lag rather than being dropped entirely (see module header).
+      ! Step 1c: Update 24-hour EMA of T_air per reach.
+      !   EMA_alpha is derived from the namelist timestep so the 24-h e-folding
+      !   time is independent of DT.  Reaches still at the -9999 allocation
+      !   sentinel (cold start, or restart file without T_air_smooth) are
+      !   seeded from current forcing; reaches restored from a restart file
+      !   continue their EMA seamlessly.
+      ! -----------------------------------------------------------------------
+      EMA_alpha = min(1.0, nlst(did)%DT / T_smooth_tau)
+
+      do i = 1, nlinks
+         if (rt_domain(did)%Tair_fine_1D(i) .gt. 200.0 .and. &
+             rt_domain(did)%Tair_fine_1D(i) .lt. 350.0) then
+            T_air_raw_i = rt_domain(did)%Tair_fine_1D(i) - 273.15
+         else
+            T_air_raw_i = Tair_fallback - 273.15
+         end if
+         T_air_raw_i = min(T_max, max(T_min, T_air_raw_i))
+         if (rt_domain(did)%T_air_smooth(i) .lt. -100.0) then
+            rt_domain(did)%T_air_smooth(i) = T_air_raw_i
+         else
+            rt_domain(did)%T_air_smooth(i) = EMA_alpha * T_air_raw_i &
+                                           + (1.0 - EMA_alpha) * rt_domain(did)%T_air_smooth(i)
+         end if
+      end do
+
+      ! -----------------------------------------------------------------------
+      ! Upstream inflow pull (see module header).  For each local reach,
+      ! accumulate upstream outflow Q and Q*T_prev the same way the flow
+      ! routing does: via gtoNode into the globally gathered arrays (MPP), or
+      ! via the LINKID==TO_NODE ComID match (serial).  TO_NODE holds ComIDs in
+      ! UDMP mode and must never be used as an array index.
       ! -----------------------------------------------------------------------
       allocate(Q_acc(nlinks),  source=0.0)
       allocate(QT_acc(nlinks), source=0.0)
 
 #ifdef MPP_LAND
-      ! Pre-seed: walk every reach (including remote cross-rank reaches whose
-      ! QLINK is valid after drive_CHANNEL_RSL's MPP_CHANNEL_COM_REAL) and
-      ! push its previous-timestep temperature to its downstream accumulator.
-      ! rt_domain(did)%T_QSUM_prev holds T_QSUM as communicated at the end of
-      ! the previous timestep, so cross-rank upstream temperatures are included.
-      do i = 1, nlinks
-         j_down = int(rt_domain(did)%TO_NODE(i))
-         if (j_down .ge. 1 .and. j_down .le. nlinks) then
-            Q_this         = max(0.0, rt_domain(did)%QLINK(i,1))
-            Q_acc(j_down)  = Q_acc(j_down)  + Q_this
-            QT_acc(j_down) = QT_acc(j_down) + Q_this * rt_domain(did)%T_QSUM_prev(i)
-         end if
+      allocate(gQup(max(1, rt_domain(did)%nToInd)), source=0.0)
+      allocate(gTup(max(1, rt_domain(did)%nToInd)), source=0.0)
+      call gbcastReal2(rt_domain(did)%toNodeInd, rt_domain(did)%nToInd, &
+                       rt_domain(did)%QLINK(1:nlinksl,1), nlinksl, gQup)
+      call gbcastReal2(rt_domain(did)%toNodeInd, rt_domain(did)%nToInd, &
+                       rt_domain(did)%T_QSUM_prev(1:nlinksl), nlinksl, gTup)
+      do i = 1, nlinksl
+         do n = 1, int(rt_domain(did)%gtoNode(i,1))
+            m = int(rt_domain(did)%gtoNode(i,n+1))
+            if (gQup(m) .gt. 0.0) then
+               Q_acc(i)  = Q_acc(i)  + gQup(m)
+               QT_acc(i) = QT_acc(i) + gQup(m) * gTup(m)
+            end if
+         end do
+      end do
+      deallocate(gQup, gTup)
+#else
+      do m = 1, nlinksl
+         Q_this = max(0.0, rt_domain(did)%QLINK(m,1))
+         if (Q_this .le. 0.0) cycle
+         do i = 1, nlinksl
+            if (rt_domain(did)%LINKID(i) .eq. rt_domain(did)%TO_NODE(m)) then
+               Q_acc(i)  = Q_acc(i)  + Q_this
+               QT_acc(i) = QT_acc(i) + Q_this * rt_domain(did)%T_QSUM_prev(m)
+            end if
+         end do
       end do
 #endif
 
@@ -219,19 +272,17 @@ contains
                         rt_domain(did)%T_QSUM(i) = lake_t - 273.15
                      else
                         ! Fallback: equilibrium temperature at the pour-point location
+                        ! (24-h smoothed T_air, same T_e formula as regular reaches)
                         if (rt_domain(did)%Tair_fine_1D(i) .gt. 200.0 .and. &
                             rt_domain(did)%Tair_fine_1D(i) .lt. 350.0) then
-                           T_air_i  = rt_domain(did)%Tair_fine_1D(i) - 273.15
                            SW_net_i = max(0.0, rt_domain(did)%SolarRad_fine_1D(i))
                         else
-                           T_air_i  = Tair_fallback - 273.15
                            SW_net_i = SW_fallback
                         end if
-                        T_air_i  = min(T_max, max(T_min, T_air_i))
                         albedo_i = min(1.0, max(0.0, rt_domain(did)%S_Albedo(i)))
                         shade_i  = min(1.0, max(0.0, rt_domain(did)%F_Shade(i)))
                         SW_net_i = SW_net_i * (1.0 - albedo_i) * (1.0 - shade_i)
-                        T_e_i    = T_air_i + SW_net_i / K_sw
+                        T_e_i    = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
                         rt_domain(did)%T_QSUM(i) = min(T_max, max(T_min, T_e_i))
                      end if
                   end associate
@@ -241,51 +292,20 @@ contains
       end if
 
       ! -----------------------------------------------------------------------
-      ! Step 3: Route temperature downstream reach by reach (topological order).
-      !
-      !   "Push" pattern: after computing T_out for reach i, we update the
-      !   downstream reach's accumulator.
-      !
-      !   MPP mode (see module header for full explanation):
-      !     Q_acc/QT_acc are pre-seeded from T_QSUM_prev for all reaches.
-      !     The ORDER loop iterates only over local reaches (nlinks_index).
-      !     Each local reach pushes the DELTA Q*(T_out - T_prev) rather than
-      !     Q*T_out, so the pre-seeded cross-rank contribution is preserved
-      !     for reaches whose upstream is on a different rank.
-      !
-      !   Serial mode: standard Q*T push (identical to pre-MPP behavior).
+      ! Step 3: Compute each reach's temperature from its (pulled) upstream
+      !   inflow, lateral inflows, and exponential relaxation toward the local
+      !   equilibrium temperature.  Upstream temperatures carry a 1-timestep
+      !   lag (module header), so a single unordered pass suffices — no
+      !   topological ordering and no downstream pushes.
       !
       !   Lateral inflows (surface runoff + groundwater) enter at T_air as a
       !   first-order approximation.  A future improvement would use soil
       !   temperature (TSLB) for groundwater once NoahMP state is coupled in.
       ! -----------------------------------------------------------------------
-      do iorder = 1, maxorder
+         do i = 1, nlinksl
 
-#ifdef MPP_LAND
-         do iyw = 1, rt_domain(did)%yw_mpp_nlinks
-            i = rt_domain(did)%nlinks_index(iyw)
-#else
-         do i = 1, nlinks
-#endif
-
-            if (rt_domain(did)%ORDER(i) .ne. iorder) cycle
-
-            ! --- Lake reaches: temperature already set in Step 2; just push ---
-            if (rt_domain(did)%TYPEL(i) .eq. 1) then
-               j_down = int(rt_domain(did)%TO_NODE(i))
-               if (j_down .ge. 1 .and. j_down .le. nlinks) then
-                  Q_this = max(0.0, rt_domain(did)%QLINK(i,1))
-#ifdef MPP_LAND
-                  ! Replace pre-seeded T_QSUM_prev contribution with Step 2 lake temp
-                  QT_acc(j_down) = QT_acc(j_down) &
-                                 + Q_this * (rt_domain(did)%T_QSUM(i) - rt_domain(did)%T_QSUM_prev(i))
-#else
-                  Q_acc(j_down)  = Q_acc(j_down)  + Q_this
-                  QT_acc(j_down) = QT_acc(j_down) + Q_this * rt_domain(did)%T_QSUM(i)
-#endif
-               end if
-               cycle
-            end if
+            ! --- Lake reaches: temperature already set in Step 2 ---
+            if (rt_domain(did)%TYPEL(i) .eq. 1) cycle
 
             ! --- Met forcing at this reach (K → °C) ---
             ! Use domain-mean fallback for reaches with invalid disaggregation
@@ -304,8 +324,9 @@ contains
             shade_i  = min(1.0, max(0.0, rt_domain(did)%F_Shade(i)))
             SW_net_i = SW_net_i * (1.0 - albedo_i) * (1.0 - shade_i)
 
-            ! --- Equilibrium temperature ---
-            T_e_i = T_air_i + SW_net_i / K_sw
+            ! --- Equilibrium temperature (24-hr smoothed T_air suppresses diurnal) ---
+            ! T_air_i (instantaneous) is retained below for lateral inflow temperature.
+            T_e_i = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
             T_e_i = min(T_max, max(T_min, T_e_i))
 
             ! --- Inflow temperature (volume-weighted mixing) ---
@@ -341,39 +362,13 @@ contains
 
             rt_domain(did)%T_QSUM(i) = T_out_i
 
-            ! --- Push outflow temperature to downstream reach accumulator ---
-            j_down = int(rt_domain(did)%TO_NODE(i))
-            if (j_down .ge. 1 .and. j_down .le. nlinks) then
-               Q_this = max(0.0, rt_domain(did)%QLINK(i,1))
-#ifdef MPP_LAND
-               ! Replace pre-seeded T_QSUM_prev contribution with current T_out_i.
-               ! Q_acc(j_down) is already correct from the pre-seed; only QT needs updating.
-               QT_acc(j_down) = QT_acc(j_down) + Q_this * (T_out_i - rt_domain(did)%T_QSUM_prev(i))
-#else
-               Q_acc(j_down)  = Q_acc(j_down)  + Q_this
-               QT_acc(j_down) = QT_acc(j_down) + Q_this * T_out_i
-#endif
-            end if
-
-#ifdef MPP_LAND
-         end do   ! iyw
-#else
          end do   ! i
-#endif
-      end do      ! iorder
 
       deallocate(Q_acc, QT_acc)
-#ifdef MPP_LAND
-      ! Synchronize T_QSUM across rank boundaries so the next timestep's pre-seed
-      ! carries correct cross-rank temperatures.
-      call MPP_CHANNEL_COM_REAL(rt_domain(did)%Link_location,  &
-                                 rt_domain(did)%IXRT,           &
-                                 rt_domain(did)%JXRT,           &
-                                 rt_domain(did)%T_QSUM,         &
-                                 nlinks, 99)
-      ! Store communicated T_QSUM for use as pre-seed on the next timestep.
+
+      ! Save this timestep's temperatures: next call gathers them as the
+      ! (1-step lagged) upstream inflow temperatures.
       rt_domain(did)%T_QSUM_prev = rt_domain(did)%T_QSUM
-#endif
 
    end subroutine run_stream_temp_eq
 
