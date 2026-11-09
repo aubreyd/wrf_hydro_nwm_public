@@ -1105,7 +1105,6 @@ end subroutine weather_2D_inputs_destroy
 
      end if
 
-     print *, "K = ", K
 
 !!!DJG CONSTant, idealized forcing...
      if(FORC_TYP.eq.4) then
@@ -2410,7 +2409,6 @@ character(len=4) nwxst_t
 logical :: fexist
 logical :: firstTimeStep = .TRUE.
 
-print *, "lsm_dt = ", lsm_dt
 
 inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
@@ -2457,9 +2455,6 @@ end if
 !!!DJG HRLDAS Forcing with minute format filename (NOTE: precip must be in mm/s!!!)
 if(FORC_TYP.eq.2) then
 
-#ifdef HYDRO_D
-  print *, "HYDRO DEBUG TEST TLE"
-#endif
 !!Create forcing data filename...
    call geth_newdate(out_date,olddate,nint(dt))
    inflnm = trim(indir)//"/"//&

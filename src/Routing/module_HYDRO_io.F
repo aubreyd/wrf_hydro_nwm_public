@@ -8584,7 +8584,6 @@ end subroutine read_routelink
         route_link_f_r = adjustr(route_link_f)
         lenRouteLinkFR = len(route_link_f_r)
         routeLinkNetcdf = route_link_f_r( (lenRouteLinkFR-2):lenRouteLinkFR) .eq. '.nc'
-        print *, "routelinknetcdf = ", routeLinkNetcdf
         !! is RouteLake file netcdf (*.nc) or .TBL
         route_lake_f_r = adjustr(route_lake_f)
         lenRouteLakeFR = len(route_lake_f_r)
@@ -8593,9 +8592,6 @@ end subroutine read_routelink
 #ifdef MPP_LAND
        tmpQLINK = 0
        tmpGages = gageMiss
-
-       print *, "my_id=",my_id
-       print *, "IO_id=",IO_id
 
        if(my_id .eq. IO_id) then
 
@@ -8615,7 +8611,6 @@ end subroutine read_routelink
           allocate(tmpChannK(GNLINKSL))
 
           if(routeLinkNetcdf) then
-            print *, "calling read_route_link_netcdf"
 
              call read_route_link_netcdf(                                &
                   route_link_f,                                          &

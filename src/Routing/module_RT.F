@@ -1597,7 +1597,6 @@ subroutine LandRT_ini(did)
 
      else       !-- parameterize according to order of diffusion scheme, or if read from hi res file, use its value
                 !--  put condition within the if/then structure, which will assign a value if something is missing in hi res
-        print *, "setting channel widths for diffusion scheme"
         do j=1,rt_domain(did)%NLINKS
            if (rt_domain(did)%ORDER(j) .eq. 1) then    !-- smallest stream reach
               if(rt_domain(did)%Bw(j) .eq. 0.0) then

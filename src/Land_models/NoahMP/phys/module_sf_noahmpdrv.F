@@ -1408,13 +1408,11 @@ end subroutine NoahMP_vectorizing_tools_destroy
 
 !Added by Biswas
             soldrain_t(i,j) = TSLB(i,NSOIL,j)
-            print *, "SOLDRAIN_T :",soldrain_t(i,j)
             if(SNOWH(i,j) .gt. 0.0) then
              infxsrt_t(i,j) = 273.15
             else
              infxsrt_t(i,j) = TGXY(i,j)
             endif
-            print *, "INFXSRT :",infxsrt_t(i,j)
 
 #endif
 

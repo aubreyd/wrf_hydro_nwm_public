@@ -2244,10 +2244,6 @@ end subroutine land_driver_ini
            lake_t_sum(ilake)   = t_sum
            lake_t_ncell(ilake) = ncell_lk
 
-           print *, "dhlake", (lake_precip(ilake)/lake_grids(ilake))*dtbl/3600./1000.,&
-                              (lake_evap(ilake)/lake_grids(ilake)*3600)*dtbl/3600./1000.,&
-                              lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
-
          end do
 
          ! Reduce the outlet-temperature sums across ranks: a lake's cells live
@@ -2263,8 +2259,10 @@ end subroutine land_driver_ini
            if (lake_t_ncell(ilake) .gt. 0) then
               rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum(ilake) / real(lake_t_ncell(ilake))
            end if
+#ifdef HYDRO_D
            print *, "LakeOutflowTemp ilake z_out T", ilake, &
                 rt_domain(did)%LakeOutletDepth(ilake), rt_domain(did)%LakeOutflowTemp(ilake)
+#endif
          end do
 
          ! mask lake output variables:

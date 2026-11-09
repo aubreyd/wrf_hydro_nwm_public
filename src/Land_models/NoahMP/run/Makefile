@@ -54,7 +54,6 @@ ifeq ($(BUILD_CROCUS), 1)
 else
         OBJS := $(filter-out ../phys/surfex/module_snowcro.o, $(OBJS))
 endif
->>>>>>> ed447756667a24a9fca645e2e6ff122c410e8db5
 
 CMD = hrldas.exe
 all:	$(CMD)

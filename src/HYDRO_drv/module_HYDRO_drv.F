@@ -729,7 +729,6 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
    end if !! channel_only == 0
 
    ! step 5) river channel physics
-   print *, "calling driveChannelRouting"
    call driveChannelRouting(did)
 #ifdef HYDRO_D
    call system_clock(count=clock_count_2, count_rate=clock_rate)
@@ -1016,7 +1015,6 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
    end if
 
 else
-    print *, "calling gridded drive_CHANNEL"
     call drive_CHANNEL(did, RT_DOMAIN(did)%latval,RT_DOMAIN(did)%lonval, &
        RT_DOMAIN(did)%timestep_flag,RT_DOMAIN(did)%IXRT,RT_DOMAIN(did)%JXRT, &
        nlst(did)%SUBRTSWCRT, rt_domain(did)%subsurface%state%qsubrt, &
@@ -1068,14 +1066,10 @@ endif
 #ifdef HYDRO_D
 #ifndef NCEP_WCOSS
            write(6,*) "*****yw******end drive_CHANNEL "
-           write(6,*) "1lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
-           !RT_DOMAIN(did)%LAKE_NETOUTFLOW,
 #else
            write(78,*) "*****yw******end drive_CHANNEL "
-           write(6,*) "2lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
 #endif
 #endif
-           write(6,*) "3lake_netoutflow in drive_CHAN",RT_DOMAIN(did)%QLAKEI
 
       end subroutine driveChannelRouting
 
