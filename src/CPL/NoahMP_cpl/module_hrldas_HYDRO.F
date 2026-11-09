@@ -171,14 +171,14 @@ CONTAINS
            nlst(did)%channelBucket_only .eq. 0        ) then
            ! decompose the hrldas 1-d data into routing domain
            
-           call sum_real1d(lake_precip, nlakes)
-           call sum_real1d(lake_evap, nlakes)
-           !call sum_real1d(lake_netoutflow, nlakes) !probably don't need
-           !call sum_int1d(lake_grids, nlakes)
+           ! lake_precip/lake_evap arrive as whole-lake sums and lake_grids as the
+           ! whole-lake cell count (already reduced across ranks in the Noah-MP
+           ! driver), so these are lake-mean values, identical on every rank.
+           ! lake_netoutflow is a whole-lake flux [m3/s] from routing and is
+           ! passed through unchanged.
            where(lake_grids > 0) lake_precip = lake_precip / lake_grids
            where(lake_grids > 0) lake_evap = lake_evap / lake_grids
-           where(lake_grids > 0) lake_netoutflow = lake_netoutflow / lake_grids
-           
+
            RT_DOMAIN(did)%STC = STC
            RT_DOMAIN(did)%SMC = SMC
            RT_DOMAIN(did)%SH2OX = SH2OX

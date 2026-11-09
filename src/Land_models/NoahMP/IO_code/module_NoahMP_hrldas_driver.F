@@ -2192,22 +2192,12 @@ end subroutine land_driver_ini
 #endif
          do ilake = 1, nlakes
            
-           ! find ID for this lake:
+           ! find ID for this lake.  These are sums over this rank's tile only;
+           ! they are reduced across ranks after the loop.
            lake_idx = rt_domain(did)%lakeidm(ilake)
            lake_grids(ilake) = count(mask = lake_id == lake_idx)
            lake_precip(ilake) = sum(rainbl, mask = lake_id == lake_idx)
            lake_evap(ilake)   = sum(qfx, mask = lake_id == lake_idx)
-           
-           ! update lake depth based on based on net (P-ET+resnetoutflow) at surface
-           ! lake_precip units converted from mm/s to m
-           ! lake_evap units converted from kg/m2/s to m
-           ! lake outflow m^3/s converted to meters for each lake pixel
-           ! dtbl is time step in seconds
-           lake_dh_avg(ilake) = (lake_precip(ilake)/lake_grids(ilake) &
-                - lake_evap(ilake)*3600./lake_grids(ilake))*dtbl/3600./1000.& 
-                + lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
-
-           where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
 
            ! Pass water temperature from 1D lake physics to routing [K], sampled
            ! at the lake's outlet (withdrawal) depth below the surface.  Each
@@ -2255,6 +2245,33 @@ end subroutine land_driver_ini
          call sum_real1d(lake_t_sum, nlakes)
          call sum_int1d(lake_t_ncell, nlakes)
 #endif
+
+         ! Reduce lake cell counts and P/E sums across ranks so every rank holds
+         ! whole-lake totals.  The coupler (hrldas_cpl_HYDRO) divides these by
+         ! lake_grids to get lake-mean P and E for the level-pool reservoirs;
+         ! the reservoir arrays must be identical on all ranks because
+         ! updateLake_seq adds each rank's deviation from the IO rank's values.
+#ifdef MPP_LAND
+         call sum_int1d(lake_grids, nlakes)
+         call sum_real1d(lake_precip, nlakes)
+         call sum_real1d(lake_evap, nlakes)
+#endif
+
+         ! update lake depth based on net (P-ET+resnetoutflow) at surface
+         ! lake_precip: sum of RAINBL [mm per LSM step]; lake_evap: sum of QFX [kg/m2/s]
+         ! lake_netoutflow: whole-lake net inflow from routing [m3/s]
+         ! NOTE (unit issues, not yet fixed): the precip term is only correct for
+         ! dtbl = 3600 s, and the netoutflow term is a rate (m/s) not multiplied by dtbl.
+         do ilake = 1, nlakes
+           if (lake_grids(ilake) .gt. 0) then
+              lake_idx = rt_domain(did)%lakeidm(ilake)
+              lake_dh_avg(ilake) = (lake_precip(ilake)/lake_grids(ilake) &
+                   - lake_evap(ilake)*3600./lake_grids(ilake))*dtbl/3600./1000. &
+                   + lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
+              where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
+           end if
+         end do
+
          do ilake = 1, nlakes
            if (lake_t_ncell(ilake) .gt. 0) then
               rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum(ilake) / real(lake_t_ncell(ilake))
