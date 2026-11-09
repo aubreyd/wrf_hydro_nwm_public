@@ -151,8 +151,8 @@ module module_NoahMP_hrldas_driver
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  SNOWNCV   ! non-covective snow forcing (subset of rainncv) [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  GRAUPELNCV! non-convective graupel forcing (subset of rainncv) [mm]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  HAILNCV   ! non-convective hail forcing (subset of rainncv) [mm]
-  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAKERAINOUT  ! precipitation over lakes [mm]
-  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAKEEVAPOUT  ! evaporation from lakes [mm]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAKERAINOUT  ! precipitation over lakes [mm/h]
+  REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAKEEVAPOUT  ! evaporation from lakes [mm/h]
   REAL,    ALLOCATABLE, DIMENSION(:,:)    ::  LAKEDEPTHOUT ! lake depth [m]
 ! New spatially varying fields
 
@@ -400,7 +400,10 @@ module module_NoahMP_hrldas_driver
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_evap
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_netoutflow
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_grids
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_dh_avg      ! average change in lake water level due to P and ET (m)
+  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_dh_avg      ! change in lake water level this LSM step, from the level-pool reservoir (m)
+  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_resht_prev  ! level-pool water elevation at the previous LSM step (m)
+  LOGICAL                                :: lake_resht_init = .false.
+  REAL   , PARAMETER                     :: lake_min_depth = 1.0  ! floor on 1-D lake model depth (m)
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum       ! per-lake sum of outlet-depth temperature over this rank's cells (K)
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell     ! per-lake count of this rank's lake cells
 
@@ -1783,12 +1786,14 @@ endif
    allocate(lake_netoutflow(nlakes))
    allocate(lake_grids(nlakes))
    allocate(lake_dh_avg(nlakes))
+   allocate(lake_resht_prev(nlakes))
    allocate(lake_t_sum(nlakes))
    allocate(lake_t_ncell(nlakes))
    lake_precip = 0.0
    lake_evap   = 0.0
    lake_grids  = 0
    lake_dh_avg = 0.0
+   lake_resht_prev = 0.0
    lake_netoutflow = 0.0
    lake_t_sum   = 0.0
    lake_t_ncell = 0
@@ -2257,20 +2262,31 @@ end subroutine land_driver_ini
          call sum_real1d(lake_evap, nlakes)
 #endif
 
-         ! update lake depth based on net (P-ET+resnetoutflow) at surface
-         ! lake_precip: sum of RAINBL [mm per LSM step]; lake_evap: sum of QFX [kg/m2/s]
-         ! lake_netoutflow: whole-lake net inflow from routing [m3/s]
-         ! NOTE (unit issues, not yet fixed): the precip term is only correct for
-         ! dtbl = 3600 s, and the netoutflow term is a rate (m/s) not multiplied by dtbl.
-         do ilake = 1, nlakes
-           if (lake_grids(ilake) .gt. 0) then
-              lake_idx = rt_domain(did)%lakeidm(ilake)
-              lake_dh_avg(ilake) = (lake_precip(ilake)/lake_grids(ilake) &
-                   - lake_evap(ilake)*3600./lake_grids(ilake))*dtbl/3600./1000. &
-                   + lake_netoutflow(ilake)/(dx**2 * lake_grids(ilake))
-              where(lake_id == lake_idx) lakedepth2d = lakedepth2d + lake_dh_avg(ilake)
-           end if
-         end do
+         ! Update the 1-D lake model depth to follow the level-pool reservoir.
+         ! The level pool is the single lake water balance (inflow - outflow
+         ! + P - E, with P and E from this lake model passed via the coupler);
+         ! the lake model's depth is shifted by the reservoir's water-elevation
+         ! change since the previous LSM step.  RESHT is synchronized across
+         ! ranks after routing, so every rank applies the same change.  The
+         ! reference elevation is initialized on the first call (cold start or
+         ! restart) with no depth change, so no extra restart state is needed.
+         if (allocated(rt_domain(did)%RESHT)) then
+            if (size(rt_domain(did)%RESHT) .ge. nlakes) then
+               if (.not. lake_resht_init) then
+                  lake_resht_prev(1:nlakes) = rt_domain(did)%RESHT(1:nlakes)
+                  lake_resht_init = .true.
+               end if
+               do ilake = 1, nlakes
+                  lake_dh_avg(ilake) = rt_domain(did)%RESHT(ilake) - lake_resht_prev(ilake)
+                  lake_resht_prev(ilake) = rt_domain(did)%RESHT(ilake)
+                  if (lake_grids(ilake) .gt. 0) then
+                     lake_idx = rt_domain(did)%lakeidm(ilake)
+                     where(lake_id == lake_idx) &
+                        lakedepth2d = max(lake_min_depth, lakedepth2d + lake_dh_avg(ilake))
+                  end if
+               end do
+            end if
+         end if
 
          do ilake = 1, nlakes
            if (lake_t_ncell(ilake) .gt. 0) then
@@ -2284,9 +2300,9 @@ end subroutine land_driver_ini
 
          ! mask lake output variables:
          LAKERAINOUT = -9999.0
-         where(IVGTYP == 28) LAKERAINOUT = RAINBL * dtbl / 3600.0 ! to convert from mm/s to mm in the LDASOUT file
+         where(IVGTYP == 28) LAKERAINOUT = RAINBL * 3600.0 / dtbl ! RAINBL [mm per step] -> mm/h in the LDASOUT file
          LAKEEVAPOUT = -9999.0
-         where(IVGTYP == 28) LAKEEVAPOUT = QFX * 3600.0 * dtbl / 3600.0 ! to convert from kg/m2/s to mm in the LDASOUT file
+         where(IVGTYP == 28) LAKEEVAPOUT = QFX * 3600.0 ! QFX [kg/m2/s] -> mm/h in the LDASOUT file
          LAKEDEPTHOUT = -9999.0
          where(IVGTYP == 28) LAKEDEPTHOUT = lakedepth2d
          ENDIF

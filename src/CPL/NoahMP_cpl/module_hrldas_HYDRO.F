@@ -176,7 +176,10 @@ CONTAINS
            ! driver), so these are lake-mean values, identical on every rank.
            ! lake_netoutflow is a whole-lake flux [m3/s] from routing and is
            ! passed through unchanged.
-           where(lake_grids > 0) lake_precip = lake_precip / lake_grids
+           ! Units passed to the reservoirs: lake_precip [mm/h] (converted from
+           ! mm per LSM step), lake_evap [kg/m2/s]; the level-pool scheme applies
+           ! both per channel substep as rate*dt/3600 [mm].
+           where(lake_grids > 0) lake_precip = lake_precip / lake_grids * 3600.0 / nlst(did)%dt
            where(lake_grids > 0) lake_evap = lake_evap / lake_grids
 
            RT_DOMAIN(did)%STC = STC

@@ -154,7 +154,7 @@ contains
         real, intent(in)    :: previous_timestep_inflow ! cubic meters per second (cms)
         real, intent(in)    :: inflow                   ! cubic meters per second (cms)
         real, intent(in)    :: lateral_inflow           ! cubic meters per second (cms)
-        real, intent(in)    :: lake_evap, lake_precip   ! kg/m2/s and mm
+        real, intent(in)    :: lake_evap, lake_precip   ! kg/m2/s and mm/h
         real, intent(inout) :: water_elevation          ! meters
         real, intent(out)   :: outflow                  ! cubic meters per second (cms)
         real, intent(in)    :: routing_period           ! seconds
@@ -235,7 +235,7 @@ contains
         real, intent(OUT)   :: qo1     ! outflow at current timestep
         real, intent(IN)    :: ql      ! lateral inflow
         real, intent(IN)    :: ar      ! area of reservoir (km^2)
-        real, intent(IN)    :: lakep   ! precip on lake surface (mm)
+        real, intent(IN)    :: lakep   ! precip on lake surface (mm/h)
         real, intent(IN)    :: lakeet  ! evap from lake surface (kg/m2/s)
         real, intent(IN)    :: we      ! bottom of weir elevation
         real, intent(IN)    :: wc      ! weir coeff.
@@ -278,7 +278,7 @@ contains
            !H = Htmp                  ! Set new lake water elevation to incoming lake el.
 		   ! Set new lake water elevation to incoming lake el.
 		   ! and update based on net (P-ET) at surface
-		   ! lakep (precip) units converted from mm to m
+		   ! lakep (precip) [mm/h] and lakeet (evap) [kg/m2/s] applied over dt [s], converted to m
 		   ! lakeet (evap) units converted from kg/m2/s to m
 		   H = Htmp + (lakep - lakeet*3600.)*dt/3600./1000.
 
@@ -379,7 +379,7 @@ contains
            dh = (dh1/4.) + (0.75*dh3)
            !H = H + dh
 		   ! update H based on net (P-ET) at surface
-		   ! lakep (precip) units converted from mm to m
+		   ! lakep (precip) [mm/h] and lakeet (evap) [kg/m2/s] applied over dt [s], converted to m
 		   ! lakeet (evap) units converted from kg/m2/s to m
 		   H = H + dh + (lakep - lakeet*3600.)*dt/3600./1000.
 		   !write(*,*) 'Test LAKE_P, LAKE_ET'

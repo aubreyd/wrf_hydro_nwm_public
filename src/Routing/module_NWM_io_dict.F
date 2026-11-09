@@ -1238,7 +1238,7 @@ subroutine initLdasDict(ldasOutDict,procId,diagFlag)
                             "g m-2s-1 C","g m-2s-1 C","umol CO2 m-2 s-1","W m-2","mm", & !86-90
                             "mm","1","1","1","K", &                            !91-95
                             "-","-","mm s-1", &                                !96-98
-                            "mm","mm","m","K","-", &                           !99-103 (WRF-Lake)
+                            "mm h-1","mm h-1","m","K","-", &                   !99-103 (WRF-Lake)
                             "-","m","-", &                                     !104-106 (Crocus)
                             "kg/(m2 s)","m","kg m-2",&                         !107-109 (Crocus)
                             "m","-","days since snowfall",&                    !110-112 (Crocus)
@@ -1941,7 +1941,7 @@ subroutine initLakeDict(lakeOutDict,procId,diagFlag)
    lakeOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','lake_precip','lake_evap']
    lakeOutDict%longName(:) = [character(len=64) :: 'Lake Inflow','Lake Outflow', &
         'Lake Precipitation','Lake Evaporation']
-   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1', 'mm', 'mm']
+   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1', 'mm h-1', 'mm h-1']
    lakeOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude', &
         'latitude longitude','latitude longitude','latitude longitude']
    lakeOutDict%scaleFactor(:) = [0.01,0.01,0.01,0.01]

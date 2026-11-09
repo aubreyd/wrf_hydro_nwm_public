@@ -4950,11 +4950,11 @@ end subroutine mpp_output_chrt
 
 !     !- precipitation over lake
       iret = nf90_def_var(ncid, "lake_precip", NF90_FLOAT, (/dimdata/), varid)
-      iret = nf90_put_att(ncid, varid, 'units', 'mm')
+      iret = nf90_put_att(ncid, varid, 'units', 'mm h-1')
 
 !     !- evaporation lake
       iret = nf90_def_var(ncid, "lake_evap", NF90_FLOAT, (/dimdata/), varid)
-      iret = nf90_put_att(ncid, varid, 'units', 'mm')
+      iret = nf90_put_att(ncid, varid, 'units', 'mm h-1')
 
      !-- station  id
      ! define character-position dimension for strings of max length 6
