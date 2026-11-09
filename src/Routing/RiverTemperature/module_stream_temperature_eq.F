@@ -18,9 +18,10 @@
 !     K_rate       = K_e / (rho_w * c_p * depth)              [1/s]
 !     travel_time  = reach_length / velocity                   [s]
 !
-!   Inflow temperature (volume-weighted mixing, push-accumulation pattern):
-!     T_in = [sum(Q_j * T_j, upstream j) + T_air*(Q_land + Q_gw)] /
+!   Inflow temperature (volume-weighted mixing):
+!     T_in = [sum(Q_j * T_j, upstream j) + T_air*Q_land + T_gw*Q_gw] /
 !            [sum(Q_j, upstream j)        + Q_land + Q_gw]
+!     (T_air instantaneous; T_gw a fixed parameter below)
 !     Headwater (no upstream inflow): T_in = T_e
 !
 !   Lake outlets:
@@ -45,8 +46,9 @@
 !   that drive_CHANNEL_RSL uses in its non-MPP branch.
 !
 ! Coupling:
-!   - Calls fineWeathData%runWeatherDisagg() to obtain reach-scale met forcing from the
-!     existing disaggregation infrastructure (same as water_temperature=1 path).
+!   - Reach-scale met forcing (T2, downward SW) is the catchment area-weighted mean
+!     from the UDMP spatialweights mapping (module_UDMAP::UDMP_grid2reach_mean),
+!     the same mapping used to aggregate land runoff to reaches.
 !   - Reads from and writes to rt_domain(did)%T_QSUM, which is already output to CHRTOUT.
 !   - Enabled via hydro.namelist: water_temperature = 2
 !
@@ -59,11 +61,13 @@
 module module_stream_temperature_eq
 
    use module_lsm_forcing,        only: weather2d
-   use config_base,               only: noah_lsm, nlst
+   use config_base,               only: nlst
    use module_RT_data,            only: rt_domain
-   use disaggregateWeatherModule, only: fineWeathData
+   use module_UDMAP,              only: UDMP_grid2reach_mean
+   use module_hydro_stop,         only: HYDRO_stop
 #ifdef MPP_LAND
    use module_mpp_reachls,        only: gbcastReal2
+   use module_mpp_land,           only: left_id, down_id, sum_double
 #endif
 
    implicit none
@@ -115,7 +119,7 @@ contains
       integer, intent(in) :: did
 
       integer :: i, k, n, m
-      integer :: nlinks, nlinksl, nlakes, nsoil
+      integer :: nlinksl, nlakes, ixrt, jxrt
 
       real    :: T_air_i, SW_net_i, T_e_i, T_in_i, T_out_i
       real    :: K_rate, travel_time, depth_i, vel_i, Q_this
@@ -123,6 +127,8 @@ contains
       real    :: Tair_fallback, SW_fallback   ! domain-mean forcing for unmapped reaches
       real    :: T_air_raw_i                  ! per-reach instantaneous T_air before smoothing [°C]
       real    :: EMA_alpha                    ! EMA weight = DT / T_smooth_tau
+      real*8  :: sumT, sumSW, ncnt            ! global sums for the fallback mean
+      real,    allocatable :: T2_rt(:,:), SW_rt(:,:)  ! forcing on the routing grid
 
       real,    allocatable :: Q_acc(:)       ! upstream flow accumulated at each reach [m3/s]
       real,    allocatable :: QT_acc(:)      ! upstream Q*T accumulated at each reach  [m3/s * °C]
@@ -131,58 +137,59 @@ contains
       real,    allocatable :: gTup(:)        ! previous-step temperature, same index space    [°C]
 #endif
 
-      nlinks   = rt_domain(did)%NLINKS
       nlinksl  = rt_domain(did)%NLINKSL      ! local reach count (UDMP link space)
       nlakes   = rt_domain(did)%NLAKES
-      nsoil    = noah_lsm%nsoil
+
+      if (nlst(did)%UDMP_OPT .ne. 1) then
+         call hydro_stop("run_stream_temp_eq: water_temperature=2 requires UDMP_OPT=1")
+      end if
 
       ! -----------------------------------------------------------------------
-      ! Step 1: Disaggregate gridded met forcing to reach scale.
-      !         Populates Tair_fine_1D, SolarRad_fine_1D, etc. in rt_domain.
-      !         TMN_temp/TG_temp/TSLB_temp are currently zero (not yet coupled
-      !         from NoahMP state), so TSLB_1D_fine will also be zero; we use
-      !         T_air as a first-order groundwater temperature proxy instead.
+      ! Step 1: Reach-scale met forcing.
+      !   Air temperature [K] and downward shortwave [W/m2] for each reach are
+      !   the area-weighted means over the reach's catchment, using the same
+      !   spatialweights (UDMP) mapping that aggregates land runoff to reaches.
+      !   The LSM-grid fields are first copied onto the routing grid with the
+      !   same index/halo convention as RunOffDisag, so they line up with the
+      !   mapping's cell_i/cell_j.  Results go into Tair_fine_1D and
+      !   SolarRad_fine_1D (1:nlinksl); reaches with no catchment polygon are
+      !   set to 0 so the validity checks below route them to the fallback.
+      !
+      !   (Previously this used runWeatherDisagg with CHANXI/CHANYJ, which in
+      !   UDMP mode index channel *pixels* in raster order, not reaches, so
+      !   each reach received forcing from an unrelated pixel in its rank's
+      !   subdomain.)
       ! -----------------------------------------------------------------------
-      call fineWeathData%runWeatherDisagg(                                       &
-               rt_domain(did)%IX,                                                &
-               rt_domain(did)%JX,                                                &
-               rt_domain(did)%IXRT,                                              &
-               rt_domain(did)%JXRT,                                              &
-               weather2d%T2,                                                     &
-               weather2d%short,                                                  &
-               weather2d%q2x,                                                    &
-               weather2d%wind,                                                   &
-               weather2d%sfcp,                                                   &
-               nlinks,                                                           &
-               rt_domain(did)%overland%streams_and_lakes%CH_NETRT,               &
-               rt_domain(did)%CHANXI,                                            &
-               rt_domain(did)%CHANYJ,                                            &
-               rt_domain(did)%overland%streams_and_lakes%lake_mask,              &
-               rt_domain(did)%TMN_temp,                                          &
-               rt_domain(did)%TG_temp,                                           &
-               rt_domain(did)%TSLB_temp,                                         &
-               nsoil,                                                            &
-               nlst(did)%AGGFACTRT,                                              &
-               rt_domain(did)%Tair_fine_1D,                                      &
-               rt_domain(did)%SolarRad_fine_1D,                                  &
-               rt_domain(did)%RelH_fine_1D,                                      &
-               rt_domain(did)%windSpd_fine_1D,                                   &
-               rt_domain(did)%TMN_1D_fine,                                       &
-               rt_domain(did)%TG_1D_fine,                                        &
-               rt_domain(did)%TSLB_1D_fine,                                      &
-               rt_domain(did)%SFCP_1D                                            &
-               )
+      ixrt = rt_domain(did)%IXRT
+      jxrt = rt_domain(did)%JXRT
+      allocate(T2_rt(ixrt,jxrt), SW_rt(ixrt,jxrt))
+      call lsm_to_routing_grid(weather2d%T2,    T2_rt, nlst(did)%AGGFACTRT, &
+                               rt_domain(did)%IX, rt_domain(did)%JX)
+      call lsm_to_routing_grid(weather2d%short, SW_rt, nlst(did)%AGGFACTRT, &
+                               rt_domain(did)%IX, rt_domain(did)%JX)
+      ! SW can legitimately be 0 (night); only negative/fill values are excluded,
+      ! via the fill threshold.  Cells never written by the copy keep -9999.
+      call UDMP_grid2reach_mean(T2_rt, rt_domain(did)%Tair_fine_1D(1:nlinksl),     &
+                                fill_thresh=150.0, missing_val=0.0)
+      call UDMP_grid2reach_mean(SW_rt, rt_domain(did)%SolarRad_fine_1D(1:nlinksl), &
+                                fill_thresh=0.0,   missing_val=0.0)
+      deallocate(T2_rt, SW_rt)
 
       ! -----------------------------------------------------------------------
-      ! Step 1b: Compute domain-mean Tair and SW as fallback for reaches whose
-      !          disaggregation mapping is invalid (Tair_fine_1D outside the
-      !          physically plausible 200-350 K range: either 0 K unfilled or
-      !          a large fill value from an unmapped grid cell).
-      !          Use the gridded weather2d fields directly — always correctly
-      !          populated from HRLDAS forcing regardless of routing grid mapping.
+      ! Step 1b: Domain-mean Tair and SW as fallback for reaches with no
+      !          catchment in the mapping (Tair_fine_1D left at 0).  Summed
+      !          across all ranks so every rank uses the same global mean.
       ! -----------------------------------------------------------------------
-      Tair_fallback = sum(weather2d%T2)                     / real(size(weather2d%T2))
-      SW_fallback   = sum(max(0.0, weather2d%short))        / real(size(weather2d%short))
+      sumT  = dble(sum(weather2d%T2))
+      sumSW = dble(sum(max(0.0, weather2d%short)))
+      ncnt  = dble(size(weather2d%T2))
+#ifdef MPP_LAND
+      call sum_double(sumT)
+      call sum_double(sumSW)
+      call sum_double(ncnt)
+#endif
+      Tair_fallback = real(sumT  / ncnt)
+      SW_fallback   = real(sumSW / ncnt)
 
       ! -----------------------------------------------------------------------
       ! Step 1c: Update 24-hour EMA of T_air per reach.
@@ -194,7 +201,7 @@ contains
       ! -----------------------------------------------------------------------
       EMA_alpha = min(1.0, nlst(did)%DT / T_smooth_tau)
 
-      do i = 1, nlinks
+      do i = 1, nlinksl
          if (rt_domain(did)%Tair_fine_1D(i) .gt. 200.0 .and. &
              rt_domain(did)%Tair_fine_1D(i) .lt. 350.0) then
             T_air_raw_i = rt_domain(did)%Tair_fine_1D(i) - 273.15
@@ -217,8 +224,8 @@ contains
       ! via the LINKID==TO_NODE ComID match (serial).  TO_NODE holds ComIDs in
       ! UDMP mode and must never be used as an array index.
       ! -----------------------------------------------------------------------
-      allocate(Q_acc(nlinks),  source=0.0)
-      allocate(QT_acc(nlinks), source=0.0)
+      allocate(Q_acc(max(1,nlinksl)),  source=0.0)
+      allocate(QT_acc(max(1,nlinksl)), source=0.0)
 
 #ifdef MPP_LAND
       allocate(gQup(max(1, rt_domain(did)%nToInd)), source=0.0)
@@ -262,7 +269,7 @@ contains
       !         leaving the outlet stuck at the 10 °C initialisation value.
       ! -----------------------------------------------------------------------
       if (nlakes .gt. 0) then
-         do i = 1, nlinks
+         do i = 1, nlinksl
             if (rt_domain(did)%TYPEL(i) .eq. 1) then
                k = rt_domain(did)%LAKEIDX(i)
                if (k .ge. 1 .and. k .le. nlakes) then
@@ -298,9 +305,8 @@ contains
       !   lag (module header), so a single unordered pass suffices — no
       !   topological ordering and no downstream pushes.
       !
-      !   Lateral inflows (surface runoff + groundwater) enter at T_air as a
-      !   first-order approximation.  A future improvement would use soil
-      !   temperature (TSLB) for groundwater once NoahMP state is coupled in.
+      !   Lateral inflows: surface runoff at T_air, groundwater at fixed T_gw.
+      !   A future improvement would take these from Noah-MP.
       ! -----------------------------------------------------------------------
          do i = 1, nlinksl
 
@@ -330,9 +336,8 @@ contains
             T_e_i = min(T_max, max(T_min, T_e_i))
 
             ! --- Inflow temperature (volume-weighted mixing) ---
-            ! Q_acc(i) holds upstream channel inflow (from pre-seed in MPP mode,
-            ! or from the ORDER-loop push in serial mode).  Both lateral
-            ! inflows enter at local air/groundwater temperature.
+            ! Q_acc(i) holds upstream channel inflow (pulled above).  Surface
+            ! runoff enters at instantaneous T_air, bucket flow at T_gw.
             Q_total_i  = Q_acc(i)                                               &
                        + max(0.0, rt_domain(did)%InflowLand(i))                 &
                        + max(0.0, rt_domain(did)%InflowGw(i))
@@ -371,5 +376,36 @@ contains
       rt_domain(did)%T_QSUM_prev = rt_domain(did)%T_QSUM
 
    end subroutine run_stream_temp_eq
+
+   !---------------------------------------------------------------------------
+   ! lsm_to_routing_grid: copy an LSM-grid field onto the routing grid
+   !   (nearest/replicate), using the same fine-grid index and MPI halo
+   !   convention as RunOffDisag in module_HYDRO_drv, so that the result lines
+   !   up with the UDMP mapping indices.  Cells not covered keep -9999.
+   !---------------------------------------------------------------------------
+   subroutine lsm_to_routing_grid(fld_lsm, fld_rt, aggfactrt, ix, jx)
+      real,    intent(in)  :: fld_lsm(:,:)
+      real,    intent(out) :: fld_rt(:,:)
+      integer, intent(in)  :: aggfactrt, ix, jx
+      integer :: i, j, ax, ay, ii, jj
+
+      fld_rt = -9999.0
+      do j = 1, jx
+         do i = 1, ix
+            do ay = aggfactrt-1, 0, -1
+               do ax = aggfactrt-1, 0, -1
+                  ii = i*aggfactrt - ax
+                  jj = j*aggfactrt - ay
+#ifdef MPP_LAND
+                  if (left_id .ge. 0) ii = ii + 1
+                  if (down_id .ge. 0) jj = jj + 1
+#endif
+                  if (ii .le. size(fld_rt,1) .and. jj .le. size(fld_rt,2)) &
+                     fld_rt(ii,jj) = fld_lsm(i,j)
+               end do
+            end do
+         end do
+      end do
+   end subroutine lsm_to_routing_grid
 
 end module module_stream_temperature_eq

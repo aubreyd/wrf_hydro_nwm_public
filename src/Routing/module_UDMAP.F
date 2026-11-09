@@ -573,6 +573,67 @@ contains
 
       end subroutine get_basn_area_nhd
 
+      !------------------------------------------------------------------------
+      ! UDMP_grid2reach_mean: area-weighted mean of a routing-grid field over
+      !   each reach's catchment, using the same spatialweights mapping
+      !   (cell_i/cell_j, cellWeight, cellArea) that aggregates land runoff to
+      !   reaches.  Numerator and denominator are reduced separately across
+      !   ranks (catchments can straddle subdomains), then divided.
+      !   Grid cells with fld < fill_thresh are treated as missing and skipped.
+      !   Reaches with no valid catchment area are returned as missing_val.
+      !   Collective in MPP mode: every rank must call it.
+      !
+      !   fld      (in)  routing-grid field on the local subdomain (ixrt,jxrt)
+      !   reachVal (out) per-reach mean in the local reach decomposition (nlinksl)
+      !------------------------------------------------------------------------
+      subroutine UDMP_grid2reach_mean(fld, reachVal, fill_thresh, missing_val)
+         implicit none
+         real, dimension(:,:), intent(in)  :: fld
+         real, dimension(:),   intent(out) :: reachVal
+         real,                 intent(in)  :: fill_thresh, missing_val
+
+         real*8, allocatable, dimension(:) :: lnum, lden
+         real,   allocatable, dimension(:) :: gnum, gden
+         real*8  :: a
+         integer :: k, m, n
+
+         n = size(reachVal)
+         allocate(lnum(max(1,LNUMRSL)), lden(max(1,LNUMRSL)))
+         allocate(gnum(max(1,n)), gden(max(1,n)))
+         lnum = 0.d0
+         lden = 0.d0
+         gnum = 0.0
+         gden = 0.0
+
+         do k = 1, LNUMRSL
+            do m = 1, LUDRSL(k)%ncell
+               if (fld(LUDRSL(k)%cell_i(m), LUDRSL(k)%cell_j(m)) .lt. fill_thresh) cycle
+               a = dble(LUDRSL(k)%cellWeight(m)) * dble(LUDRSL(k)%cellArea(m))
+               lnum(k) = lnum(k) + a * dble(fld(LUDRSL(k)%cell_i(m), LUDRSL(k)%cell_j(m)))
+               lden(k) = lden(k) + a
+            end do
+         end do
+
+#ifdef MPP_LAND
+         call updateLinkV(lnum, gnum)
+         call updateLinkV(lden, gden)
+#else
+         gnum(1:min(n,LNUMRSL)) = real(lnum(1:min(n,LNUMRSL)))
+         gden(1:min(n,LNUMRSL)) = real(lden(1:min(n,LNUMRSL)))
+#endif
+
+         do k = 1, n
+            if (gden(k) .gt. 0.0) then
+               reachVal(k) = gnum(k) / gden(k)
+            else
+               reachVal(k) = missing_val
+            end if
+         end do
+
+         deallocate(lnum, lden, gnum, gden)
+
+      end subroutine UDMP_grid2reach_mean
+
       subroutine get_nprocs_map(ix,jx,bufi,bufj,nprocs_map,ndata)
           implicit none
           integer,dimension(:)  :: bufi, bufj,nprocs_map
