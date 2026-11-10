@@ -545,6 +545,16 @@ MODULE module_sf_lake
 
 !    lat  = lat*pie/180  ! [radian]
 
+    ! imelt and frac_iceold are set by ShalLakeTemperature only for the snow
+    ! layers that exist at that point; a snow layer created afterwards in
+    ! ShalLakeHydrology (snl 0 -> -1) gets frac_iceold but not imelt, and
+    ! SnowCompaction tests imelt on it.  These are locals here (persistent
+    ! per-column arrays in CLM), so without this the test read the value left
+    ! by the previously computed lake cell, making lake snow depend on cell
+    ! order, MPI decomposition and restarts.
+    imelt(:,:)       = 0
+    frac_iceold(:,:) = 0._r8
+
     if (prec(1)> 0.) then
         if ( forc_t(1) > (tfrz + tcrit)) then
             forc_rain(1) = prec(1)

@@ -10,7 +10,7 @@ Three checks, each optional (pass '-' to skip a pair):
 2) Restart identity: a continuous run and a run restarted from one of its
    restart files.  Every output variable listed below and every variable in
    the RESTART / HYDRO_RST files both runs wrote must be bit-identical, except
-   those listed in KNOWN_RESTART_DIFFS (pre-existing, not from these changes).
+   those listed in KNOWN_RESTART_DIFFS (not from the lake/stream temperature code).
 
 3) HYDRO_RST contents: lake_inflow_temp (K) and lake_resht_lsm (m) are present
    in the last HYDRO_RST of the continuous run, and lake_inflow_temp is in the
@@ -29,13 +29,11 @@ import netCDF4 as nc
 OUT_VARS = [('*.CHRTOUT_DOMAIN1', ['streamflow', 'riverTemp']),
             ('*.LAKEOUT_DOMAIN1', ['water_sfc_elev', 'outflow']),
             ('*.LDASOUT_DOMAIN1', ['TG', 'SOIL_T', 'SNEQV', 'LAKE_T3D', 'LAKE_DEPTH2D'])]
-# Restart differences present before these changes (also with the previous
-# build); lake snow/ice layer state and two hydro diagnostics.  The snow/ice
-# differences are float rounding-level and can reach the lake surface
-# temperature of a snow-covered cell (LAKE_T_GRND, one rounding step in DRB).
-KNOWN_RESTART_DIFFS = {'LAKE_SNOWP', 'LAKE_H2OSNO', 'LAKE_T_SOILSNOW', 'LAKE_T_GRND', 'LAKE_H2OSOI_ICE',
-                       'LAKE_H2OSOI_LIQ', 'LAKE_Z', 'LAKE_DZ', 'LAKE_ICEFRAC', 'LAKE_ZI',
-                       'LAKE_ICE3D', 'qstrmvolrt', 'lake_evap'}
+# Restart differences not caused by the lake or stream temperature code:
+# qstrmvolrt (routing-grid channel inflow accumulator) differs after a
+# restart.  The lake snow/ice state differences seen earlier (uninitialized
+# imelt in the 1-D lake model) are fixed and are no longer tolerated.
+KNOWN_RESTART_DIFFS = {'qstrmvolrt'}
 
 
 def wrfinput(run):
