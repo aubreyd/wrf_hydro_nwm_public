@@ -310,6 +310,11 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: T_Kexch        ! bulk surface heat exchange coefficient [W/m2/C]
    REAL,    allocatable, DIMENSION(:)   :: T_Ksw          ! shortwave equilibrium coefficient [W/m2/C]
    REAL,    allocatable, DIMENSION(:)   :: T_TauTair      ! air temperature smoothing e-folding time [s]
+   ! Per-reach stream temperature diagnostics written to CHRTOUT [C] (-9999 = not applicable)
+   REAL,    allocatable, DIMENSION(:)   :: T_eq_diag      ! equilibrium temperature
+   REAL,    allocatable, DIMENSION(:)   :: T_up_diag      ! flow-weighted upstream inflow temperature
+   REAL,    allocatable, DIMENSION(:)   :: T_lat_diag     ! surface (non-bucket) lateral inflow temperature
+   REAL,    allocatable, DIMENSION(:)   :: T_gwin_diag    ! groundwater (bucket) inflow temperature
    REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
    REAL,    allocatable, DIMENSION(:)   :: InflowLand

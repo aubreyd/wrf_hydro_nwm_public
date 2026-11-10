@@ -374,7 +374,17 @@ contains
       !   outflow temperature (fixed T_gw fallback).
       !   A future improvement would take these from Noah-MP.
       ! -----------------------------------------------------------------------
+         ! Diagnostics (output only): reset, then filled with the values used below.
+         rt_domain(did)%T_eq_diag(1:nlinksl)   = -9999.0
+         rt_domain(did)%T_up_diag(1:nlinksl)   = -9999.0
+         rt_domain(did)%T_lat_diag(1:nlinksl)  = -9999.0
+         rt_domain(did)%T_gwin_diag(1:nlinksl) = -9999.0
+
          do i = 1, nlinksl
+
+            ! Flow-weighted upstream inflow temperature (for lake pour-point
+            ! reaches this is the lake inflow temperature)
+            if (Q_acc(i) .gt. 0.0) rt_domain(did)%T_up_diag(i) = QT_acc(i) / Q_acc(i)
 
             ! --- Lake reaches: temperature already set in Step 2 ---
             if (rt_domain(did)%TYPEL(i) .eq. 1) cycle
@@ -448,6 +458,10 @@ contains
 
             rt_domain(did)%T_QSUM(i) = T_out_i
 
+            rt_domain(did)%T_eq_diag(i)   = T_e_i
+            rt_domain(did)%T_lat_diag(i)  = T_land_i
+            rt_domain(did)%T_gwin_diag(i) = T_gw_i
+
          end do   ! i
 
       deallocate(Q_acc, QT_acc, T_lat)
@@ -502,6 +516,15 @@ contains
       if (.not. allocated(rt_domain(did)%T_Kexch))   allocate(rt_domain(did)%T_Kexch(max(1,nlinksl)))
       if (.not. allocated(rt_domain(did)%T_Ksw))     allocate(rt_domain(did)%T_Ksw(max(1,nlinksl)))
       if (.not. allocated(rt_domain(did)%T_TauTair)) allocate(rt_domain(did)%T_TauTair(max(1,nlinksl)))
+      ! Diagnostics for CHRTOUT (written whenever water_temperature = 2)
+      if (.not. allocated(rt_domain(did)%T_eq_diag))   allocate(rt_domain(did)%T_eq_diag(max(1,nlinksl)))
+      if (.not. allocated(rt_domain(did)%T_up_diag))   allocate(rt_domain(did)%T_up_diag(max(1,nlinksl)))
+      if (.not. allocated(rt_domain(did)%T_lat_diag))  allocate(rt_domain(did)%T_lat_diag(max(1,nlinksl)))
+      if (.not. allocated(rt_domain(did)%T_gwin_diag)) allocate(rt_domain(did)%T_gwin_diag(max(1,nlinksl)))
+      rt_domain(did)%T_eq_diag   = -9999.0
+      rt_domain(did)%T_up_diag   = -9999.0
+      rt_domain(did)%T_lat_diag  = -9999.0
+      rt_domain(did)%T_gwin_diag = -9999.0
       allocate(lval(max(1,nlinksl)))
 
       ncid = -1

@@ -18,17 +18,17 @@ module module_NWM_io_dict
 implicit none
 
 ! Declare parameter values for module.
-integer, parameter :: numChVars = 12
+integer, parameter :: numChVars = 17
 integer, parameter :: numLdasVars = 121
 ! Note: if more ldas variables are added the logic will need to be changed in
 !       module_NWM_io.F:output_NoahMP_NWM for when to close the restart file
 integer, parameter :: numLdasVars_crocus_off = 103
 integer, parameter :: numRtDomainVars = 5
-integer, parameter :: numLakeVars = 4
+integer, parameter :: numLakeVars = 6
 integer, parameter :: numChGrdVars = 6
 integer, parameter :: numLsmVars = 14
 integer, parameter :: numChObsVars = 1
-integer, parameter :: numGwVars = 4
+integer, parameter :: numGwVars = 5
 integer :: i
 !integer :: nsoil = nlst_rt(1)%nsoil
 integer :: nsoil
@@ -755,7 +755,8 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
    !                            "qBtmVertRunoff","AccSfcLatRunoff","accBucket"/)
    chrtOutDict%varNames(:) = [character(len=64) :: "streamflow","nudge","q_lateral","velocity",&
                               "Head","qSfcLatRunoff","qBucket",&
-                              "qBtmVertRunoff","AccSfcLatRunoff","accBucket","qloss", "riverTemp"]
+                              "qBtmVertRunoff","AccSfcLatRunoff","accBucket","qloss", "riverTemp", &
+                              "T_eq","T_airSmooth","T_upstream","T_lateral","T_gwInflow"]
    chrtOutDict%longName(:) = [character(len=64) :: "River Flow","Amount of stream flow alteration",&
                               "Runoff into channel reach","River Velocity",&
                               "River Stage","Runoff from terrain routing",&
@@ -763,34 +764,47 @@ subroutine initChrtDict(chrtOutDict,diagFlag,procId)
                               "Runoff from bottom of soil to bucket",&
                               "Accumulated runoff from terrain routing",&
                               "Accumulated runoff from gw bucket",&
-                              "Channel Infiltration", "River Temperature"]
+                              "Channel Infiltration", "River Temperature", &
+                              "Equilibrium water temperature", &
+                              "Smoothed air temperature", &
+                              "Upstream inflow temperature", &
+                              "Surface lateral inflow temperature", &
+                              "Groundwater bucket inflow temperature"]
    chrtOutDict%units(:) = [character(len=64) :: "m3 s-1","m3 s-1","m3 s-1","m s-1",&
                                                 "meter","m3 s-1","m3 s-1",&
-                                                "m3","m3","m3","m3 s-1","deg. C"]
+                                                "m3","m3","m3","m3 s-1","deg. C", &
+                                                "deg. C","deg. C","deg. C","deg. C","deg. C"]
    chrtOutDict%coordNames(:) = [character(len=64) :: "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
                                  "latitude longitude","latitude longitude",&
-                                 "latitude longitude","latitude longitude"]
+                                 "latitude longitude","latitude longitude",&
+                                 "latitude longitude","latitude longitude",&
+                                 "latitude longitude","latitude longitude",&
+                                 "latitude longitude"]
    chrtOutDict%scaleFactor(:) = [0.01,0.01,0.1,0.01,0.01,0.00001,0.00001,0.001,&
-                                 0.01,0.01,0.1,0.1]
+                                 0.01,0.01,0.1,0.1,0.01,0.01,0.01,0.01,0.01]
    chrtOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,&
-                               0.0,0.0,0.0]
+                               0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
    ! Initialize all output flags to 0. Modify (if absolutely necessary) in the
    ! output subroutine.
-   chrtOutDict%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,0,0]
-   chrtOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1]
+   chrtOutDict%outFlag(:) = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+   chrtOutDict%timeZeroFlag(:) = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
    chrtOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
-                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
+                              -9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
    chrtOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
+                                 -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
                                  -9999.0,-9999.0,-9999.0,-9999.0,-9999.0,&
                                  -9999.0,-9999.0]
    chrtOutDict%validMinDbl(:) = [0.0d0, -50000.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, &
-                                  0.0d0, 0.0d0, 0.0d0, 0.0d0]
+                                  0.0d0, 0.0d0, 0.0d0, 0.0d0, &
+                                  -100.0d0, -100.0d0, -100.0d0, -100.0d0, -100.0d0]
    chrtOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, 50000.0d0, &
                                   20000.0d0, 20000.0d0, 20000.0d0, 50000.0d0, &
-                                  50000.0d0, 50000.0d0, 50000.0d0]
+                                  50000.0d0, 50000.0d0, 50000.0d0, &
+                                  100.0d0, 100.0d0, 100.0d0, 100.0d0, 100.0d0]
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numChVars
@@ -1938,20 +1952,23 @@ subroutine initLakeDict(lakeOutDict,procId,diagFlag)
    lakeOutDict%lonUnits = "degrees_east"
    lakeOutDict%lonStName = "longitude"
 
-   lakeOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','lake_precip','lake_evap']
+   lakeOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','lake_precip','lake_evap', &
+        'T_inflow','T_outflow']
    lakeOutDict%longName(:) = [character(len=64) :: 'Lake Inflow','Lake Outflow', &
-        'Lake Precipitation','Lake Evaporation']
-   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1', 'mm h-1', 'mm h-1']
+        'Lake Precipitation','Lake Evaporation', &
+        'Lake inflow temperature','Lake outflow temperature at the outlet depth']
+   lakeOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1', 'mm h-1', 'mm h-1', 'deg. C', 'deg. C']
    lakeOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude', &
-        'latitude longitude','latitude longitude','latitude longitude']
-   lakeOutDict%scaleFactor(:) = [0.01,0.01,0.01,0.01]
-   lakeOutDict%addOffset(:) = [0.0,0.0,0.0,0.0]
-   lakeOutDict%outFlag(:) = [0,0,0,0]
-   lakeOutDict%timeZeroFlag(:) = [1,1,1,1]
-   lakeOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   lakeOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   lakeOutDict%validMinDbl(:) = [-10000.0d0, -10000.0d0, 0.0d0, 0.0d0]
-   lakeOutDict%validMaxDbl(:) = [10000.0d0, 10000.0d0, 10000.0d0, 10000.0d0]
+        'latitude longitude','latitude longitude','latitude longitude', &
+        'latitude longitude','latitude longitude']
+   lakeOutDict%scaleFactor(:) = [0.01,0.01,0.01,0.01,0.01,0.01]
+   lakeOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0,0.0]
+   lakeOutDict%outFlag(:) = [0,0,0,0,0,0]
+   lakeOutDict%timeZeroFlag(:) = [1,1,1,1,1,1]
+   lakeOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   lakeOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   lakeOutDict%validMinDbl(:) = [-10000.0d0, -10000.0d0, 0.0d0, 0.0d0, -100.0d0, -100.0d0]
+   lakeOutDict%validMaxDbl(:) = [10000.0d0, 10000.0d0, 10000.0d0, 10000.0d0, 100.0d0, 100.0d0]
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
@@ -2770,18 +2787,19 @@ subroutine initGwDict(gwOutDict)
    !gwOutDict%lonUnits = "degrees_east"
    !gwOutDict%lonStName = "longitude"
 
-   gwOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','loss','depth']
-   gwOutDict%longName(:) = [character(len=64) :: 'Bucket Inflow','Bucket Outflow','Bucket Loss','Bucket Depth']
-   gwOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1','m3 s-1','mm']
+   gwOutDict%varNames(:) = [character(len=64) :: 'inflow','outflow','loss','depth','T_bucket']
+   gwOutDict%longName(:) = [character(len=64) :: 'Bucket Inflow','Bucket Outflow','Bucket Loss','Bucket Depth', &
+        'Bucket water temperature (outflow temperature)']
+   gwOutDict%units(:) = [character(len=64) :: 'm3 s-1','m3 s-1','m3 s-1','mm','deg. C']
    !gwOutDict%coordNames(:) = [character(len=64) :: 'latitude longitude','latitude longitude','latitude longitude','latitude longitude']
-   gwOutDict%scaleFactor(:) = [0.001,0.001,0.001,0.1]
-   gwOutDict%addOffset(:) = [0.0,0.0,0.0,0.0]
-   gwOutDict%outFlag(:) = [0,0,0,0]
-   gwOutDict%timeZeroFlag(:) = [0,0,0,1]
-   gwOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   gwOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0]
-   gwOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0]
-   gwOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 10000.0d0]
+   gwOutDict%scaleFactor(:) = [0.001,0.001,0.001,0.1,0.01]
+   gwOutDict%addOffset(:) = [0.0,0.0,0.0,0.0,0.0]
+   gwOutDict%outFlag(:) = [0,0,0,0,0]
+   gwOutDict%timeZeroFlag(:) = [0,0,0,1,1]
+   gwOutDict%fillReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   gwOutDict%missingReal(:) = [-9999.0,-9999.0,-9999.0,-9999.0,-9999.0]
+   gwOutDict%validMinDbl(:) = [0.0d0, 0.0d0, 0.0d0, 0.0d0, -100.0d0]
+   gwOutDict%validMaxDbl(:) = [50000.0d0, 50000.0d0, 50000.0d0, 10000.0d0, 100.0d0]
 
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.

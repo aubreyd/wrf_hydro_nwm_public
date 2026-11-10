@@ -139,6 +139,11 @@ subroutine output_chrt_NWM(domainId)
    integer, allocatable, dimension(:,:) :: varMetaInt
    integer(kind=int64), allocatable, dimension(:,:) :: varMetaInt8
    real, allocatable, dimension(:) :: g_riverTemp, g_riverTempOut  ! Added by Reza
+   ! Stream temperature diagnostics (variables 13-17): T_eq, T_airSmooth,
+   ! T_upstream, T_lateral, T_gwInflow [C]
+   real, allocatable, dimension(:,:) :: g_tdiag, g_tdiagOut
+   logical :: tdiagOn
+   integer :: kTd
 
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
@@ -189,25 +194,25 @@ subroutine output_chrt_NWM(domainId)
    ! OWP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    if (nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0,1] !Reza updated these arrays; size=12
+      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0,1,0,0,0,0,0] !Reza updated these arrays; size=12
    else if (nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0]
+      fileMeta%outFlag(:) = [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -219,6 +224,12 @@ subroutine output_chrt_NWM(domainId)
       fileMeta%outFlag(4) = 0
       fileMeta%outFlag(5) = 0
    endif
+
+   ! Stream temperature diagnostics: always written with the equilibrium
+   ! stream temperature model (water_temperature = 2, reach-based routing).
+   tdiagOn = (nlst(domainId)%water_temperature .eq. 2 .and. nlst(domainId)%channel_option .ne. 3)
+   if (tdiagOn) tdiagOn = allocated(rt_domain(domainId)%T_eq_diag)
+   if (tdiagOn) fileMeta%outFlag(13:17) = 1
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
@@ -232,6 +243,13 @@ subroutine output_chrt_NWM(domainId)
       else
          gsize = rt_domain(domainId)%gnlinks
       endif
+      if(myId .eq. 0) then
+         allocate(g_tdiag(gsize,5), g_tdiagOut(gsize,5))
+      else
+         allocate(g_tdiag(1,5), g_tdiagOut(1,5))
+      endif
+      g_tdiag = -9999.0
+      g_tdiagOut = -9999.0
 
       if(myId .eq. 0) then
          ! Allocate memory for output.
@@ -359,6 +377,13 @@ subroutine output_chrt_NWM(domainId)
          call ReachLS_write_io(velocityLocal,g_velocity)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
          call ReachLS_write_io(RT_DOMAIN(domainId)%T_QSUM,g_riverTemp)
+         if (tdiagOn) then
+            call ReachLS_write_io(RT_DOMAIN(domainId)%T_eq_diag,    g_tdiag(:,1))
+            call ReachLS_write_io(RT_DOMAIN(domainId)%T_air_smooth, g_tdiag(:,2))
+            call ReachLS_write_io(RT_DOMAIN(domainId)%T_up_diag,    g_tdiag(:,3))
+            call ReachLS_write_io(RT_DOMAIN(domainId)%T_lat_diag,   g_tdiag(:,4))
+            call ReachLS_write_io(RT_DOMAIN(domainId)%T_gwin_diag,  g_tdiag(:,5))
+         endif
          ! Optional outputs
          if(nudgeFlag .eq. 1)then
 #ifdef WRF_HYDRO_NUDGING
@@ -476,6 +501,16 @@ subroutine output_chrt_NWM(domainId)
       g_QLateral = RT_DOMAIN(domainId)%QLateral
       g_velocity = RT_DOMAIN(domainId)%velocity
       g_riverTemp =  RT_DOMAIN(domainId)%T_QSUM
+      allocate(g_tdiag(gsize,5), g_tdiagOut(gsize,5))
+      g_tdiag = -9999.0
+      g_tdiagOut = -9999.0
+      if (tdiagOn) then
+         g_tdiag(:,1) = RT_DOMAIN(domainId)%T_eq_diag(1:gsize)
+         g_tdiag(:,2) = RT_DOMAIN(domainId)%T_air_smooth(1:gsize)
+         g_tdiag(:,3) = RT_DOMAIN(domainId)%T_up_diag(1:gsize)
+         g_tdiag(:,4) = RT_DOMAIN(domainId)%T_lat_diag(1:gsize)
+         g_tdiag(:,5) = RT_DOMAIN(domainId)%T_gwin_diag(1:gsize)
+      endif
       ! Optional outputs
       if(nudgeFlag .eq. 1)then
 #ifdef WRF_HYDRO_NUDGING
@@ -612,6 +647,7 @@ subroutine output_chrt_NWM(domainId)
             g_orderOut(iTmp) = g_order(indTmp)
             g_zelevOut(iTmp) = g_zelev(indTmp)
             g_riverTempOut(iTmp) = g_riverTemp(indTmp)
+            if (tdiagOn) g_tdiagOut(iTmp,:) = g_tdiag(indTmp,:)
             if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
                g_qlossOut(iTmp) = g_qloss(indTmp)
             end if
@@ -633,6 +669,7 @@ subroutine output_chrt_NWM(domainId)
          g_orderOut = g_order
          g_zelevOut = g_zelev
          g_riverTempOut = g_riverTemp
+         if (tdiagOn) g_tdiagOut = g_tdiag
          if(nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
             g_qlossOut = g_qloss
          end if
@@ -681,6 +718,9 @@ subroutine output_chrt_NWM(domainId)
          varOutReal(11,:) = PACK(g_qlossOut,g_outInd == 1)
       end if
       varOutReal(12,:) = PACK(g_riverTempOut,g_outInd == 1)
+      do kTd = 1, 5
+         varOutReal(12+kTd,:) = PACK(g_tdiagOut(:,kTd),g_outInd == 1)
+      end do
 
       varMetaReal(1,:) = PACK(g_chlatOut,g_outInd == 1)
       varMetaReal(2,:) = PACK(g_chlonOut,g_outInd == 1)
@@ -1054,7 +1094,9 @@ subroutine output_chrt_NWM(domainId)
    deallocate(g_accBucket)
    deallocate(strFlowLocal)
    deallocate(velocityLocal)
-   deallocate(g_riverTempOut)   
+   deallocate(g_riverTempOut)
+   if (allocated(g_tdiag)) deallocate(g_tdiag)
+   if (allocated(g_tdiagOut)) deallocate(g_tdiagOut)   
    if (allocated(qlossLocal)) then
       deallocate(qlossLocal)
    end if
@@ -2417,6 +2459,9 @@ subroutine output_lakes_NWM(domainId,iGrid)
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_lakeLat,g_lakeLon,g_lakeElev
    real, allocatable, dimension(:) :: g_lakeInflow,g_lakeOutflow
+   ! Lake inflow / outflow temperatures [C] (water_temperature = 2); identical on all ranks
+   real, allocatable, dimension(:,:) :: g_lakeT, g_lakeTOut
+   logical :: lakeTOn
    real, allocatable, dimension(:) :: g_lakePrcp,g_lakeEvap
    real, allocatable, dimension(:) :: g_lakeType
    real, allocatable, dimension(:) :: g_lake_assimilated_value
@@ -2478,25 +2523,25 @@ subroutine output_lakes_NWM(domainId,iGrid)
 
    if(nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,1,1,1]
+      fileMeta%outFlag(:) = [1,1,1,1,0,0]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -2704,6 +2749,35 @@ subroutine output_lakes_NWM(domainId,iGrid)
       varOutReal(2,:) = g_lakeOutflowOut(:)
       varOutReal(3,:) = g_lakePrcpOut(:)
       varOutReal(4,:) = g_lakeEvapOut(:)
+
+      ! Lake inflow / outflow temperatures: always written with the equilibrium
+      ! stream temperature model (water_temperature = 2).  K -> C; -9999 where
+      ! unset (e.g. no inflow yet).
+      lakeTOn = (nlst(domainId)%water_temperature .eq. 2)
+      if (lakeTOn) lakeTOn = allocated(rt_domain(domainId)%LakeInflowTemp) .and. &
+                             allocated(rt_domain(domainId)%LakeOutflowTemp)
+      varOutReal(5:6,:) = -9999.0
+      if (lakeTOn) then
+         fileMeta%outFlag(5:6) = 1
+         allocate(g_lakeT(gSize,2), g_lakeTOut(gSize,2))
+         g_lakeT(:,1) = rt_domain(domainId)%LakeInflowTemp(1:gSize)
+         g_lakeT(:,2) = rt_domain(domainId)%LakeOutflowTemp(1:gSize)
+         where (g_lakeT .gt. 200.0 .and. g_lakeT .lt. 400.0)
+            g_lakeT = g_lakeT - 273.15
+         elsewhere
+            g_lakeT = -9999.0
+         end where
+         if (ascFlag .eq. 1) then
+            do iTmp=1,gSize
+               g_lakeTOut(iTmp,:) = g_lakeT(chIndArray(iTmp)+1,:)
+            end do
+         else
+            g_lakeTOut = g_lakeT
+         endif
+         varOutReal(5,:) = g_lakeTOut(:,1)
+         varOutReal(6,:) = g_lakeTOut(:,2)
+         deallocate(g_lakeT, g_lakeTOut)
+      endif
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -5232,6 +5306,8 @@ subroutine output_gw_NWM(domainId,iGrid)
    integer :: gnbasns
    ! Allocatable arrays to hold output variables.
    real, allocatable, dimension(:) :: g_qin_gwsubbas,g_qout_gwsubbas,g_qloss_gwsubbas,g_z_gwsubbas
+   real, allocatable, dimension(:) :: g_T_bucket, l_T_bucket   ! bucket water temperature [C]
+   logical :: tBuckOn
    integer(kind=int64), allocatable, dimension(:) :: g_basnsInd
    real, allocatable, dimension(:,:) :: varOutReal   ! Array holding output variables in real format
    integer, allocatable, dimension(:) :: varOutInt ! Array holding output variables after
@@ -5275,25 +5351,25 @@ subroutine output_gw_NWM(domainId,iGrid)
 
    if(nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 2) then
       ! Short Range
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 3) then
       ! Medium Range
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 4) then
       ! Long Range
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 5) then
       ! Retrospective
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else if(nlst(1)%io_config_outputs .eq. 6) then
       ! Diagnostics
-      fileMeta%outFlag(:) = [1,1,0,1]
+      fileMeta%outFlag(:) = [1,1,0,1,0]
    else
       call nwmCheck(diagFlag,1,'ERROR: Invalid IOC flag provided by namelist file.')
    endif
@@ -5303,6 +5379,20 @@ subroutine output_gw_NWM(domainId,iGrid)
 
    gnbasns = rt_domain(domainId)%gnumbasns
    gSize = gnbasns
+
+   ! Bucket water temperature: always written with the equilibrium stream
+   ! temperature model (water_temperature = 2).  K -> C; -9999 where unset.
+   tBuckOn = (nlst(domainId)%water_temperature .eq. 2)
+   if (tBuckOn) tBuckOn = allocated(rt_domain(domainId)%z_gwsubbas_t)
+   if (tBuckOn) then
+      fileMeta%outFlag(5) = 1
+      allocate(l_T_bucket(size(rt_domain(domainId)%z_gwsubbas_t)))
+      where (rt_domain(domainId)%z_gwsubbas_t .gt. 200.0 .and. rt_domain(domainId)%z_gwsubbas_t .lt. 350.0)
+         l_T_bucket = rt_domain(domainId)%z_gwsubbas_t - 273.15
+      elsewhere
+         l_T_bucket = -9999.0
+      end where
+   endif
 
    ! Collect and assemble local groundwater bucket arrays to a global array for
    ! output.
@@ -5314,7 +5404,9 @@ subroutine output_gw_NWM(domainId,iGrid)
          allocate(g_qloss_gwsubbas(rt_domain(domainId)%gnumbasns))
          allocate(g_z_gwsubbas(rt_domain(domainId)%gnumbasns))
          allocate(g_basnsInd(rt_domain(domainId)%gnumbasns))
+         allocate(g_T_bucket(rt_domain(domainId)%gnumbasns))
       else
+         allocate(g_T_bucket(1))
          allocate(g_qin_gwsubbas(1))
          allocate(g_qout_gwsubbas(1))
          allocate(g_qloss_gwsubbas(1))
@@ -5332,6 +5424,7 @@ subroutine output_gw_NWM(domainId,iGrid)
          !ADCHANGE: Note units conversion from m to mm for UPDMP=1 only
          call ReachLS_write_io(rt_domain(domainId)%z_gwsubbas*1000.,g_z_gwsubbas)
          call ReachLS_write_io(rt_domain(domainId)%linkid,g_basnsInd)
+         if (tBuckOn) call ReachLS_write_io(l_T_bucket,g_T_bucket)
          if(nlst(domainId)%bucket_loss .eq. 1) then
             fileMeta%outFlag(3) = 1
             call ReachLS_write_io(rt_domain(domainId)%qloss_gwsubbas,g_qloss_gwsubbas)
@@ -5345,6 +5438,8 @@ subroutine output_gw_NWM(domainId,iGrid)
                                rt_domain(domainId)%basnsInd,g_z_gwsubbas)
          call gw_write_io_int(rt_domain(domainId)%numbasns,rt_domain(domainId)%basnsInd, &
                               rt_domain(domainId)%basnsInd,g_basnsInd)
+         if (tBuckOn) call gw_write_io_real(rt_domain(domainId)%numbasns,l_T_bucket,  &
+                                            rt_domain(domainId)%basnsInd,g_T_bucket)
          if(nlst(domainId)%bucket_loss .eq. 1) then
              fileMeta%outFlag(3) = 1
              call gw_write_io_real(rt_domain(domainId)%numbasns,rt_domain(domainId)%qloss_gwsubbas, &
@@ -5366,6 +5461,9 @@ subroutine output_gw_NWM(domainId,iGrid)
       !ADCHANGE: Note units conversion from m to mm for UPDMP=1 only
       if(nlst(domainId)%UDMP_OPT .eq. 1) g_z_gwsubbas = g_z_gwsubbas * 1000.
       g_basnsInd = rt_domain(domainId)%linkid
+      allocate(g_T_bucket(rt_domain(domainId)%gnumbasns))
+      g_T_bucket = -9999.0
+      if (tBuckOn) g_T_bucket = l_T_bucket(1:rt_domain(domainId)%gnumbasns)
       if(nlst(domainId)%bucket_loss .eq. 1) then
          fileMeta%outFlag(3) = 1
          g_qloss_gwsubbas = rt_domain(domainId)%qloss_gwsubbas
@@ -5430,6 +5528,11 @@ subroutine output_gw_NWM(domainId,iGrid)
       varOutReal(2,:) = g_qout_gwsubbas
       varOutReal(3,:) = g_qloss_gwsubbas
       varOutReal(4,:) = g_z_gwsubbas
+      if (tBuckOn) then
+         varOutReal(5,:) = g_T_bucket
+      else
+         varOutReal(5,:) = -9999.0
+      endif
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -5642,6 +5745,8 @@ subroutine output_gw_NWM(domainId,iGrid)
    deallocate(g_qloss_gwsubbas)
    deallocate(g_z_gwsubbas)
    deallocate(g_basnsInd)
+   if (allocated(g_T_bucket)) deallocate(g_T_bucket)
+   if (allocated(l_T_bucket)) deallocate(l_T_bucket)
 end subroutine output_gw_NWM
 
 subroutine postDiagMsg(diagFlag,diagMsg)
