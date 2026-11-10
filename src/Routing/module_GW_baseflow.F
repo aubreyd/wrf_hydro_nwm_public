@@ -54,7 +54,9 @@ contains
         LNLINKSL,                         &
         basns_area,                       &
         nhdBuckMask,   bucket_loss,       &
-        channelBucket_only )
+        channelBucket_only,               &
+        track_temp,    runoff2x_t_in,     &
+        z_gwsubbas_t,  qout_gwsubbas_t )
 
    use module_UDMAP, only: LNUMRSL, LUDRSL
 
@@ -86,6 +88,21 @@ contains
    real, dimension(numbasns)                         :: net_perc
    integer, dimension(numbasns)                      :: nhdBuckMask
 
+   ! --- Water temperature tracking (water_temperature=2) ---
+   ! Well-mixed bucket: drainage enters at the Noah-MP bottom soil layer
+   ! temperature (runoff2x_t_in, K) and mixes with the stored water by volume;
+   ! outflow and spill leave at the bucket temperature.  All temperatures in K.
+   logical, intent(in)                               :: track_temp
+   real, intent(in),    dimension(ix,jx)             :: runoff2x_t_in   ! drainage temperature [K]
+   real, intent(inout), dimension(:)                 :: z_gwsubbas_t    ! bucket water temperature [K]
+   real, intent(inout), dimension(:)                 :: qout_gwsubbas_t ! bucket outflow temperature [K]
+   real, dimension(ixrt,jxrt)                        :: runoff2x_t
+   real*8,  dimension(LNLINKSL) :: LQheat, LQvolT, LTsoil_num, LTsoil_den
+   real, dimension(numbasns)    :: net_heat, net_volT, Tsoil_num, Tsoil_den
+   real    :: T_in, z_old, dz_in, vol
+   real, parameter :: T_valid_lo = 200.0, T_valid_hi = 350.0   ! plausible water/soil temperature [K]
+   real, parameter :: T_unset    = -9999.0                     ! sentinel: bucket temperature not yet set
+
    integer                                           :: i,j,bas, k, m, ii,jj
 
    integer :: AGGFACYRT, AGGFACTRT, AGGFACXRT, IXXRT, JYYRT
@@ -112,6 +129,7 @@ contains
 
 !Assign local value of runoff2 (drainage) for flux caluclation to buckets...
 
+        if (track_temp) runoff2x_t = 0.0   ! cells not covered stay invalid (0 K)
         do J=1,JX
         do I=1,IX
              do AGGFACYRT=AGGFACTRT-1,0,-1
@@ -140,6 +158,7 @@ contains
                   runoff2x(IXXRT,JYYRT)=runoff2x_in(i,j)*area_lsm(I,J)     &
                       *INFXSWGT(IXXRT,JYYRT)/cellArea(IXXRT,JYYRT)
                endif
+               if (track_temp) runoff2x_t(IXXRT,JYYRT) = runoff2x_t_in(i,j)
              enddo
              enddo
         enddo
@@ -147,14 +166,26 @@ contains
 
 
        LQLateral = 0
+       LQheat = 0; LQvolT = 0; LTsoil_num = 0; LTsoil_den = 0
        do k = 1, LNUMRSL
               ! get from land grid runoff
                do m = 1, LUDRSL(k)%ncell
                    ii =  LUDRSL(k)%cell_i(m)
                    jj =  LUDRSL(k)%cell_j(m)
                    if(ii .gt. 0 .and. jj .gt. 0) then
-                           LQLateral(k) = LQLateral(k)+runoff2x(ii,jj)*LUDRSL(k)%cellWeight(m) * mm_to_m &
-                               *cellArea(ii,jj)
+                           vol = runoff2x(ii,jj)*LUDRSL(k)%cellWeight(m) * mm_to_m *cellArea(ii,jj)
+                           LQLateral(k) = LQLateral(k) + vol
+                           if (track_temp) then
+                              if (runoff2x_t(ii,jj) .gt. T_valid_lo .and. runoff2x_t(ii,jj) .lt. T_valid_hi) then
+                                 ! drainage volume-weighted temperature (heat / volume)
+                                 LQheat(k) = LQheat(k) + dble(vol) * dble(runoff2x_t(ii,jj))
+                                 LQvolT(k) = LQvolT(k) + dble(vol)
+                                 ! area-weighted soil temperature (seeds a bucket with no prior state)
+                                 LTsoil_num(k) = LTsoil_num(k) + dble(LUDRSL(k)%cellWeight(m)*cellArea(ii,jj)) &
+                                                                 * dble(runoff2x_t(ii,jj))
+                                 LTsoil_den(k) = LTsoil_den(k) + dble(LUDRSL(k)%cellWeight(m)*cellArea(ii,jj))
+                              end if
+                           end if
                    endif
                end do
        end do
@@ -162,9 +193,19 @@ contains
 
 #ifdef MPP_LAND
        call updateLinkV(LQLateral, net_perc)      ! m^3
-
+       if (track_temp) then
+          ! Reduce numerators and denominators separately (catchments can span
+          ! ranks), then divide per bucket below.
+          call updateLinkV(LQheat,     net_heat)
+          call updateLinkV(LQvolT,     net_volT)
+          call updateLinkV(LTsoil_num, Tsoil_num)
+          call updateLinkV(LTsoil_den, Tsoil_den)
+       end if
 #else
        net_perc = LQLateral        ! m^3
+       if (track_temp) then
+          net_heat = LQheat; net_volT = LQvolT; Tsoil_num = LTsoil_num; Tsoil_den = LTsoil_den
+       end if
 #endif
 
     endif !! if channelBucket_only .eq. 0 else
@@ -187,7 +228,28 @@ contains
          end if
 
          ! !Adjust level of GW depth...(conceptual GW bucket units (mm))
+         z_old = max(0.0, real(z_gwsubbas(bas)))
+         dz_in = max(0.0, net_perc(bas) / basns_area(bas))
          z_gwsubbas(bas) = z_gwsubbas(bas) + net_perc(bas) / basns_area(bas)   ! m
+
+         ! --- Bucket water temperature: volume-weighted mixing of the inflow ---
+         T_in = T_unset
+         if (track_temp) then
+            if (channelBucket_only .eq. 0) then
+               if (net_volT(bas) .gt. 0.0) T_in = net_heat(bas) / net_volT(bas)
+               ! Seed a bucket with no temperature yet (cold start, or restart
+               ! file without z_gwsubbas_t) from its catchment's soil temperature.
+               if (z_gwsubbas_t(bas) .lt. T_valid_lo .and. Tsoil_den(bas) .gt. 0.0) &
+                  z_gwsubbas_t(bas) = Tsoil_num(bas) / Tsoil_den(bas)
+            end if
+            if (T_in .gt. T_valid_lo .and. dz_in .gt. 0.0) then
+               if (z_gwsubbas_t(bas) .lt. T_valid_lo .or. z_old .le. 0.0) then
+                  z_gwsubbas_t(bas) = T_in
+               else
+                  z_gwsubbas_t(bas) = (z_old*z_gwsubbas_t(bas) + dz_in*T_in) / (z_old + dz_in)
+               end if
+            end if
+         end if
 
          ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          !Calculate baseflow as a function of GW bucket depth...
@@ -244,6 +306,16 @@ contains
                qout_gwsubbas(bas) = qin_gwsubbas(bas)/DT  !steady-state model...(m^3/s)
 
           end if    ! End if for bucket model discharge type....
+
+          ! Outflow (and spill) leave at the well-mixed bucket temperature; a
+          ! pass-through bucket passes this step's inflow temperature.
+          if (track_temp) then
+             if (GWBASESWCRT .eq. 2 .and. T_in .gt. T_valid_lo) then
+                qout_gwsubbas_t(bas) = T_in
+             else
+                qout_gwsubbas_t(bas) = z_gwsubbas_t(bas)
+             end if
+          end if
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -6028,6 +6028,9 @@ end subroutine mpp_output_chrt
 
             if(nlst(did)%UDMP_OPT .eq. 1) then
                iret = nf90_def_var(ncid, "z_gwsubbas", NF90_FLOAT, (/dimid_links/), varid)
+               ! bucket water temperature [K] (equilibrium stream temperature model)
+               if(nlst(did)%water_temperature .eq. 2) &
+                    iret = nf90_def_var(ncid, "z_gwsubbas_t", NF90_FLOAT, (/dimid_links/), varid)
             else
                iret = nf90_def_var(ncid, "z_gwsubbas", NF90_FLOAT, (/dimid_basns/), varid)
                iret = nf90_def_var(ncid, "z_gwsubbas_t", NF90_FLOAT, (/dimid_basns/), varid)
@@ -6260,6 +6263,13 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
                  ,rt_domain(did)%gnlinksl  &
 #endif
                  )
+            if(nlst(did)%water_temperature .eq. 2) then
+               call w_rst_crt_reach(ncid,rt_domain(did)%z_gwsubbas_t, "z_gwsubbas_t"  &
+#ifdef MPP_LAND
+                    ,rt_domain(did)%gnlinksl  &
+#endif
+                    )
+            endif
          else
             call w_rst_gwbucket_real(ncid,rt_domain(did)%numbasns,rt_domain(did)%gnumbasns, &
                  rt_domain(did)%basnsInd, rt_domain(did)%z_gwsubbas,"z_gwsubbas" )
@@ -6980,6 +6990,11 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
       if(nlst(did)%channel_only .eq. 0) then
          if(nlst(did)%UDMP_OPT .eq. 1) then
             call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas,"z_gwsubbas",rt_domain(did)%GNLINKSL)
+            ! Non-fatal: older restart files leave the -9999 sentinel, and the
+            ! bucket temperature is re-seeded from the catchment soil temperature.
+            if(nlst(did)%water_temperature .eq. 2) &
+                 call read_rst_crt_reach_nc(ncid,rt_domain(did)%z_gwsubbas_t,"z_gwsubbas_t", &
+                                            rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
          else
             call read_rst_gwbucket_real(ncid,rt_domain(did)%z_gwsubbas,rt_domain(did)%numbasns,&
                  rt_domain(did)%gnumbasns,rt_domain(did)%basnsInd, "z_gwsubbas")

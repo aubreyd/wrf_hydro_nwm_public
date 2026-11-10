@@ -826,7 +826,9 @@ subroutine driveGwBaseflow(did)
 #endif
                     rt_domain(did)%basns_area,                                    &
               rt_domain(did)%nhdBuckMask,   nlst(did)%bucket_loss,       &
-              nlst(did)%channelBucket_only )
+              nlst(did)%channelBucket_only,                                &
+              (nlst(did)%water_temperature .eq. 2), RT_DOMAIN(did)%SOLDRAIN_T, &
+              RT_DOMAIN(did)%z_gwsubbas_t,  RT_DOMAIN(did)%qout_gwsubbas_t )
 
             else
                 call simp_gw_buck(RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx,RT_DOMAIN(did)%ixrt,&

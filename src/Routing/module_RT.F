@@ -1391,12 +1391,19 @@ subroutine LandRT_ini(did)
 
      allocate (rt_domain(did)%qout_gwsubbas (rt_domain(did)%nlinksL))
      rt_domain(did)%qout_gwsubbas = 0
+     ! Bucket outflow temperature [K] per reach (water_temperature=2); -9999 = not set
+     allocate (rt_domain(did)%qout_gwsubbas_t (rt_domain(did)%nlinksL))
+     rt_domain(did)%qout_gwsubbas_t = -9999.
      ! use different baseflow for NHDPlus
      if (nlst(did)%GWBASESWCRT.ge.1) then
         rt_domain(did)%numbasns = rt_domain(did)%NLINKSL
         RT_DOMAIN(did)%gnumbasns = rt_domain(did)%gNLINKSL
 
         allocate (rt_domain(did)%z_gwsubbas (rt_domain(did)%numbasns  ))
+        ! Bucket water temperature [K]; -9999 sentinel is seeded from the catchment
+        ! soil temperature on first use unless a restart file provides it.
+        allocate (rt_domain(did)%z_gwsubbas_t (rt_domain(did)%numbasns  ))
+        rt_domain(did)%z_gwsubbas_t = -9999.
         allocate (rt_domain(did)%nhdBuckMask(rt_domain(did)%numbasns  ))  ! default is -999
 
         allocate (rt_domain(did)%qin_gwsubbas (rt_domain(did)%numbasns))

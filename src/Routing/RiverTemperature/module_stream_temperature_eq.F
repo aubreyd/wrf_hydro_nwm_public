@@ -19,9 +19,11 @@
 !     travel_time  = reach_length / velocity                   [s]
 !
 !   Inflow temperature (volume-weighted mixing):
-!     T_in = [sum(Q_j * T_j, upstream j) + T_air*Q_land + T_gw*Q_gw] /
+!     T_in = [sum(Q_j * T_j, upstream j) + T_air*Q_land + T_bucket*Q_gw] /
 !            [sum(Q_j, upstream j)        + Q_land + Q_gw]
-!     (T_air instantaneous, floored at 0 °C as liquid runoff; T_gw a fixed parameter below)
+!     (T_air instantaneous, floored at 0 °C as liquid runoff; T_bucket the groundwater
+!      bucket outflow temperature tracked in simp_gw_buck_nhd, falling back to the fixed
+!      T_gw parameter below where no bucket temperature is available)
 !
 !   All water temperatures are clamped to [0, 40] °C.  There is no river ice
 !   physics, so water is held at freezing when T_e or inflows would go below 0 °C.
@@ -93,7 +95,8 @@ module module_stream_temperature_eq
    real, parameter :: K_sw       = 400.0    ! SW equilibrium coefficient [W/m2/°C]
                                             ! Controls solar contribution to T_e = T_air + SW_net/K_sw
                                             ! Higher value -> smaller diurnal solar swing in T_e
-   real, parameter :: T_gw       =  12.0    ! groundwater inflow temperature [°C]
+   real, parameter :: T_gw       =  12.0    ! fallback groundwater inflow temperature [°C],
+                                            ! used only where no bucket temperature exists
                                             ! ~mean annual air temperature for DRB; buffers diurnal swing
 
    ! --- Physical bounds ---
@@ -127,6 +130,7 @@ contains
       integer :: nlinksl, nlakes, ixrt, jxrt
 
       real    :: T_air_i, SW_net_i, T_e_i, T_in_i, T_out_i
+      real    :: T_gw_i                       ! groundwater inflow temperature at this reach [°C]
       real    :: K_rate, travel_time, depth_i, vel_i, Q_this
       real    :: Q_total_i, QT_total_i, albedo_i, shade_i
       real    :: Tair_fallback, SW_fallback   ! domain-mean forcing for unmapped reaches
@@ -310,7 +314,8 @@ contains
       !   lag (module header), so a single unordered pass suffices — no
       !   topological ordering and no downstream pushes.
       !
-      !   Lateral inflows: surface runoff at T_air, groundwater at fixed T_gw.
+      !   Lateral inflows: surface runoff at T_air, groundwater at the bucket
+      !   outflow temperature (fixed T_gw fallback).
       !   A future improvement would take these from Noah-MP.
       ! -----------------------------------------------------------------------
          do i = 1, nlinksl
@@ -342,13 +347,23 @@ contains
 
             ! --- Inflow temperature (volume-weighted mixing) ---
             ! Q_acc(i) holds upstream channel inflow (pulled above).  Surface
-            ! runoff enters at instantaneous T_air, bucket flow at T_gw.
+            ! runoff enters at instantaneous T_air, bucket flow at the bucket
+            ! outflow temperature (K -> °C), or T_gw where none is available.
+            T_gw_i = T_gw
+            if (allocated(rt_domain(did)%qout_gwsubbas_t)) then
+               if (i .le. size(rt_domain(did)%qout_gwsubbas_t)) then
+                  if (rt_domain(did)%qout_gwsubbas_t(i) .gt. 200.0 .and. &
+                      rt_domain(did)%qout_gwsubbas_t(i) .lt. 350.0) &
+                     T_gw_i = rt_domain(did)%qout_gwsubbas_t(i) - 273.15
+               end if
+            end if
+            T_gw_i = min(T_max, max(T_water_min, T_gw_i))
             Q_total_i  = Q_acc(i)                                               &
                        + max(0.0, rt_domain(did)%InflowLand(i))                 &
                        + max(0.0, rt_domain(did)%InflowGw(i))
             QT_total_i = QT_acc(i)                                              &
                        + max(T_water_min, T_air_i) * max(0.0, rt_domain(did)%InflowLand(i)) &
-                       + T_gw    * max(0.0, rt_domain(did)%InflowGw(i))
+                       + T_gw_i  * max(0.0, rt_domain(did)%InflowGw(i))
 
             if (Q_total_i .gt. min_flow) then
                T_in_i = QT_total_i / Q_total_i
