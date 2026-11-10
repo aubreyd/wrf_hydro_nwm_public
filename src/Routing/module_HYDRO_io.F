@@ -5994,8 +5994,12 @@ end subroutine mpp_output_chrt
          iret = nf90_def_var(ncid, "qlink1", NF90_FLOAT, (/dimid_links/), varid)
          iret = nf90_def_var(ncid, "qlink2", NF90_FLOAT, (/dimid_links/), varid)
          ! EMA air temperature state for the equilibrium stream temperature model
-         if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) &
+         if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) then
               iret = nf90_def_var(ncid, "T_air_smooth", NF90_FLOAT, (/dimid_links/), varid)
+              ! reach water temperature at the end of the step [C]; the stream model uses it
+              ! as the (1-step lagged) upstream inflow temperature on the next step
+              iret = nf90_def_var(ncid, "T_QSUM_prev", NF90_FLOAT, (/dimid_links/), varid)
+         endif
          if(nlst(did)%channel_option .eq. 3) &
               iret = nf90_def_var(ncid, "cvol", NF90_FLOAT, (/dimid_links/), varid)
          if(rt_domain(did)%nlakes .gt. 0) then
@@ -6158,6 +6162,11 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          ! EMA air temperature state for the equilibrium stream temperature model
          if(nlst(did)%water_temperature .eq. 2) then
             call w_rst_crt_reach(ncid,rt_domain(did)%T_air_smooth, "T_air_smooth"  &
+#ifdef MPP_LAND
+                 ,rt_domain(did)%gnlinksl &
+#endif
+                 )
+            call w_rst_crt_reach(ncid,rt_domain(did)%T_QSUM_prev, "T_QSUM_prev"  &
 #ifdef MPP_LAND
                  ,rt_domain(did)%gnlinksl &
 #endif
@@ -6951,9 +6960,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          ! EMA air temperature state (equilibrium stream temperature model).
          ! Non-fatal: restart files written before this variable existed leave
          ! the -9999 sentinel in place and the EMA re-seeds from forcing.
-         if(nlst(did)%water_temperature .eq. 2) &
+         if(nlst(did)%water_temperature .eq. 2) then
               call read_rst_crt_reach_nc(ncid,rt_domain(did)%T_air_smooth,"T_air_smooth", &
                                          rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
+              ! Reach water temperature (upstream inflow temperature for the first step).
+              ! Non-fatal: older restart files keep the 10 C initialization.
+              call read_rst_crt_reach_nc(ncid,rt_domain(did)%T_QSUM_prev,"T_QSUM_prev", &
+                                         rt_domain(did)%GNLINKSL,fatalErr=.FALSE.)
+              rt_domain(did)%T_QSUM = rt_domain(did)%T_QSUM_prev
+         endif
          !call read_rst_crt_reach_nc(ncid,rt_domain(did)%CVOL,"cvol",rt_domain(did)%GNLINKSL)
          !if(nlst_rt(did)%UDMP_OPT .eq. 1) then
          ! read in the statistic value

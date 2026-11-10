@@ -192,9 +192,14 @@ contains
                                 fill_thresh=0.0,   missing_val=0.0)
       deallocate(T2_rt, SW_rt)
 
+      ! Reaches with no catchment polygon (no mapped cells) take the forcing of
+      ! their upstream reach(es); see fill_forcing_from_upstream.
+      call fill_forcing_from_upstream(did, nlinksl)
+
       ! -----------------------------------------------------------------------
-      ! Step 1b: Domain-mean Tair and SW as fallback for reaches with no
-      !          catchment in the mapping (Tair_fine_1D left at 0).  Summed
+      ! Step 1b: Domain-mean Tair and SW as last-resort fallback for reaches
+      !          with no catchment and no upstream reach with forcing (e.g.
+      !          zero-flow headwater stubs; Tair_fine_1D still 0).  Summed
       !          across all ranks so every rank uses the same global mean.
       ! -----------------------------------------------------------------------
       sumT  = dble(sum(weather2d%T2))
@@ -419,6 +424,104 @@ contains
       rt_domain(did)%T_QSUM_prev = rt_domain(did)%T_QSUM
 
    end subroutine run_stream_temp_eq
+
+   !---------------------------------------------------------------------------
+   ! fill_forcing_from_upstream: reaches with no catchment in the spatialweights
+   !   mapping (Tair_fine_1D outside 200-350 K after the catchment average) take
+   !   the air temperature and shortwave of their upstream reach(es): an average
+   !   weighted by upstream outflow QLINK(:,1), or an equal-weight average when
+   !   all upstream outflows are zero.  Repeated passes fill chains of reaches
+   !   without catchments.  New values are staged and applied after each pass,
+   !   so the result is independent of reach order and MPI rank count.  Reaches
+   !   with no upstream reach carrying forcing are left unset (the caller then
+   !   uses the domain-mean fallback).  Collective in MPP mode.
+   !---------------------------------------------------------------------------
+   subroutine fill_forcing_from_upstream(did, nlinksl)
+      integer, intent(in) :: did, nlinksl
+      integer, parameter  :: max_pass = 5
+      real,    parameter  :: T_lo = 200.0, T_hi = 350.0
+      real,    allocatable :: newT(:), newS(:)
+#ifdef MPP_LAND
+      real,    allocatable :: gQ(:), gT(:), gS(:)
+#endif
+      real*8  :: nmiss, nfill
+      real    :: wsum, wT, wS, esum, eT, eS, w, Tu, Su
+      integer :: pass, i, n, m
+
+      allocate(newT(max(1,nlinksl)), newS(max(1,nlinksl)))
+#ifdef MPP_LAND
+      allocate(gQ(max(1,rt_domain(did)%nToInd)), gT(max(1,rt_domain(did)%nToInd)), &
+               gS(max(1,rt_domain(did)%nToInd)))
+#endif
+      do pass = 1, max_pass
+         nmiss = 0.d0
+         do i = 1, nlinksl
+            if (.not. valid(rt_domain(did)%Tair_fine_1D(i))) nmiss = nmiss + 1.d0
+         end do
+#ifdef MPP_LAND
+         call sum_double(nmiss)
+#endif
+         if (nmiss .le. 0.d0) exit
+
+#ifdef MPP_LAND
+         if (pass .eq. 1) &
+            call gbcastReal2(rt_domain(did)%toNodeInd, rt_domain(did)%nToInd, &
+                             rt_domain(did)%QLINK(1:nlinksl,1), nlinksl, gQ)
+         call gbcastReal2(rt_domain(did)%toNodeInd, rt_domain(did)%nToInd, &
+                          rt_domain(did)%Tair_fine_1D(1:nlinksl), nlinksl, gT)
+         call gbcastReal2(rt_domain(did)%toNodeInd, rt_domain(did)%nToInd, &
+                          rt_domain(did)%SolarRad_fine_1D(1:nlinksl), nlinksl, gS)
+#endif
+         newT(1:max(1,nlinksl)) = -1.0
+         nfill = 0.d0
+         do i = 1, nlinksl
+            if (valid(rt_domain(did)%Tair_fine_1D(i))) cycle
+            wsum = 0.0; wT = 0.0; wS = 0.0; esum = 0.0; eT = 0.0; eS = 0.0
+#ifdef MPP_LAND
+            do n = 1, int(rt_domain(did)%gtoNode(i,1))
+               m  = int(rt_domain(did)%gtoNode(i,n+1))
+               Tu = gT(m); Su = gS(m); w = max(0.0, gQ(m))
+#else
+            do m = 1, nlinksl
+               if (rt_domain(did)%TO_NODE(m) .ne. rt_domain(did)%LINKID(i)) cycle
+               Tu = rt_domain(did)%Tair_fine_1D(m); Su = rt_domain(did)%SolarRad_fine_1D(m)
+               w  = max(0.0, rt_domain(did)%QLINK(m,1))
+#endif
+               if (.not. valid(Tu)) cycle
+               wsum = wsum + w;   wT = wT + w*Tu;   wS = wS + w*max(0.0,Su)
+               esum = esum + 1.0; eT = eT + Tu;     eS = eS + max(0.0,Su)
+            end do
+            if (esum .gt. 0.0) then
+               if (wsum .gt. 0.0) then
+                  newT(i) = wT / wsum;  newS(i) = wS / wsum
+               else
+                  newT(i) = eT / esum;  newS(i) = eS / esum
+               end if
+               nfill = nfill + 1.d0
+            end if
+         end do
+         do i = 1, nlinksl
+            if (newT(i) .gt. 0.0) then
+               rt_domain(did)%Tair_fine_1D(i)     = newT(i)
+               rt_domain(did)%SolarRad_fine_1D(i) = newS(i)
+            end if
+         end do
+#ifdef MPP_LAND
+         call sum_double(nfill)
+#endif
+         if (nfill .le. 0.d0) exit
+      end do
+
+      deallocate(newT, newS)
+#ifdef MPP_LAND
+      deallocate(gQ, gT, gS)
+#endif
+   contains
+      logical function valid(t)
+         real, intent(in) :: t
+         valid = (t .gt. T_lo .and. t .lt. T_hi)
+      end function valid
+   end subroutine fill_forcing_from_upstream
 
    !---------------------------------------------------------------------------
    ! lsm_to_routing_grid: copy an LSM-grid field onto the routing grid
