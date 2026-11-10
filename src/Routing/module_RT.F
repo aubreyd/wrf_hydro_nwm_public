@@ -499,6 +499,8 @@ CONTAINS
         allocate( rt_domain(did)%Outflow(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeOutletDepth(nlakes) )
+        allocate( rt_domain(did)%LakeInflowTemp(nlakes) )
+        allocate( rt_domain(did)%LakeArea(nlakes) )
         allocate( rt_domain(did)%LakeReshtLSM(nlakes) )
         allocate( rt_domain(did)%CVOLTMP(nsizes) )
 
@@ -532,6 +534,11 @@ CONTAINS
         rt_domain(did)%LakeOutflowTemp    = 10.
         ! 0 = surface withdrawal; LandRT_ini overwrites from LAKEPARM
         rt_domain(did)%LakeOutletDepth    = 0.
+        ! Sentinel: no inflow heat is added to the 1-D lake model until the
+        ! stream temperature model (or a restart file) sets this.
+        rt_domain(did)%LakeInflowTemp     = -9999.
+        ! LandRT_ini copies LAKEPARM LkArea here
+        rt_domain(did)%LakeArea           = 0.
         ! Reference elevation for the 1-D lake depth update (set by the LSM
         ! driver; restart-persisted so a restart applies the same depth change)
         rt_domain(did)%LakeReshtLSM       = -9999.
@@ -1014,6 +1021,10 @@ subroutine LandRT_ini(did)
        call read_lake_outlet_depth(nlst(did)%route_lake_f, &
             rt_domain(did)%LakeOutletDepth, rt_domain(did)%WEIRH, &
             rt_domain(did)%ORIFICEE, NLAKES_total)
+
+       ! Lake surface area for the 1-D lake model's inflow heat; HRZAREA is
+       ! deallocated below once the reservoir objects hold their parameters.
+       if (allocated(rt_domain(did)%LakeArea)) rt_domain(did)%LakeArea = rt_domain(did)%HRZAREA(1:NLAKES_total)
    end if
 
    !-- Reza's code goes here to be initialized

@@ -313,6 +313,8 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: Outflow
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
    REAL,    allocatable, DIMENSION(:)   :: LakeOutletDepth      !lake outlet withdrawal depth below surface (m)
+   REAL,    allocatable, DIMENSION(:)   :: LakeInflowTemp       !lake inflow flow-weighted temperature (K), -9999 = unset
+   REAL,    allocatable, DIMENSION(:)   :: LakeArea             !lake surface area (km^2), kept after HRZAREA is deallocated
    REAL,    allocatable, DIMENSION(:)   :: LakeReshtLSM         !level-pool elevation at the previous LSM step (m), -9999 = unset
    REAL,    allocatable, DIMENSION(:)   :: CVOLTMP
 

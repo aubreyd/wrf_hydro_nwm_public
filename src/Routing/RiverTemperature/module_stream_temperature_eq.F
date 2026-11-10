@@ -73,7 +73,7 @@ module module_stream_temperature_eq
    use module_hydro_stop,         only: HYDRO_stop
 #ifdef MPP_LAND
    use module_mpp_reachls,        only: gbcastReal2
-   use module_mpp_land,           only: left_id, down_id, sum_double
+   use module_mpp_land,           only: left_id, down_id, sum_double, sum_real1d
 #endif
 
    implicit none
@@ -149,6 +149,8 @@ contains
 
       real,    allocatable :: Q_acc(:)       ! upstream flow accumulated at each reach [m3/s]
       real,    allocatable :: QT_acc(:)      ! upstream Q*T accumulated at each reach  [m3/s * °C]
+      real,    allocatable :: lk_Q(:)        ! lake inflow from upstream reaches [m3/s]
+      real,    allocatable :: lk_QT(:)       ! lake inflow Q*T from upstream reaches [m3/s * °C]
 #ifdef MPP_LAND
       real,    allocatable :: gQup(:)        ! upstream outflow in global to-node index space [m3/s]
       real,    allocatable :: gTup(:)        ! previous-step temperature, same index space    [°C]
@@ -301,6 +303,31 @@ contains
       !         leaving the outlet stuck at the 10 °C initialisation value.
       ! -----------------------------------------------------------------------
       if (nlakes .gt. 0) then
+         ! Lake inflow temperature for the 1-D lake model's inflow heat: the
+         ! upstream inflow pulled into each lake pour-point reach above is the
+         ! lake inflow (flow-weighted, previous-step reach temperatures, the
+         ! same lag as for regular reaches).  Summed over pour-point reaches
+         ! and ranks so every rank holds the whole-lake value.
+         allocate(lk_Q(nlakes), source=0.0)
+         allocate(lk_QT(nlakes), source=0.0)
+         do i = 1, nlinksl
+            if (rt_domain(did)%TYPEL(i) .eq. 1) then
+               k = rt_domain(did)%LAKEIDX(i)
+               if (k .ge. 1 .and. k .le. nlakes) then
+                  lk_Q(k)  = lk_Q(k)  + Q_acc(i)
+                  lk_QT(k) = lk_QT(k) + QT_acc(i)
+               end if
+            end if
+         end do
+#ifdef MPP_LAND
+         call sum_real1d(lk_Q, nlakes)
+         call sum_real1d(lk_QT, nlakes)
+#endif
+         ! Lakes with no inflow this step keep their previous inflow temperature
+         ! (unused while the inflow is zero).
+         where (lk_Q .gt. 0.0) rt_domain(did)%LakeInflowTemp = lk_QT / lk_Q + 273.15
+         deallocate(lk_Q, lk_QT)
+
          do i = 1, nlinksl
             if (rt_domain(did)%TYPEL(i) .eq. 1) then
                k = rt_domain(did)%LAKEIDX(i)

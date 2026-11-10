@@ -6010,6 +6010,9 @@ end subroutine mpp_output_chrt
             iret = nf90_def_var(ncid, "lake_evap", NF90_FLOAT, (/dimid_lakes/), varid)
             ! level-pool elevation at the previous LSM step [m] (1-D lake depth update)
             iret = nf90_def_var(ncid, "lake_resht_lsm", NF90_FLOAT, (/dimid_lakes/), varid)
+            ! lake inflow temperature [K] for the 1-D lake model inflow heat
+            if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) &
+                 iret = nf90_def_var(ncid, "lake_inflow_temp", NF90_FLOAT, (/dimid_lakes/), varid)
          endif
 
          if( nlst(did)%channel_only       .eq. 0 .and. &
@@ -6260,6 +6263,15 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
            ,rt_domain(did)%lake_index  &
 #endif
            )
+
+      ! Lake inflow temperature (identical on all ranks after the stream model's reduction)
+      if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) then
+         call w_rst_crt_nc1_lake(ncid,rt_domain(did)%nlakes,rt_domain(did)%LakeInflowTemp,"lake_inflow_temp" &
+#ifdef MPP_LAND
+              ,rt_domain(did)%lake_index  &
+#endif
+              )
+      endif
 
       if( nlst(did)%channel_only       .eq. 0 .and. &
           nlst(did)%channelBucket_only .eq. 0         ) &
@@ -6996,6 +7008,10 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          ! Non-fatal (read_rst_crt_nc returns if absent); older restart files keep the
          ! -9999 sentinel and the LSM driver re-initializes the reference elevation.
          call read_rst_crt_nc(ncid,rt_domain(did)%LakeReshtLSM,rt_domain(did)%NLAKES,"lake_resht_lsm")
+         ! Non-fatal (read_rst_crt_nc returns if absent): older restart files keep
+         ! the -9999 sentinel, so the first step after the restart adds no inflow heat.
+         if(nlst(did)%water_temperature .eq. 2 .and. nlst(did)%channel_option .ne. 3) &
+              call read_rst_crt_nc(ncid,rt_domain(did)%LakeInflowTemp,rt_domain(did)%NLAKES,"lake_inflow_temp")
       endif
 
       if( nlst(did)%channel_only       .eq. 0 .and. &

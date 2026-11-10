@@ -406,12 +406,14 @@ module module_NoahMP_hrldas_driver
   REAL   , PARAMETER                     :: lake_min_depth = 1.0  ! floor on 1-D lake model depth (m)
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum       ! per-lake sum of outlet-depth temperature over this rank's cells (K)
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell     ! per-lake count of this rank's lake cells
+  INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_ix          ! routing lake index of each lake cell (0 = none)
   ! 1-D lake model sub-stepping: the lake model (with its multi-layer snow)
   ! is run with a time step no longer than lake_dt_max; fluxes are averaged
   ! over the sub-steps.  Rain-on-snow at a 3600 s step produced runaway
   ! lake snow-layer temperatures (t_soisno > 500 K).
   REAL   , PARAMETER                     :: lake_dt_max = 600.0  ! maximum lake sub-step (s)
   REAL   , ALLOCATABLE, DIMENSION(:,:)   :: rain_lk, hfx_lk, lh_lk, grdflx_lk, qfx_lk
+  LOGICAL                                :: lake_heat_warned = .false.
 
   INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_id
 #endif
@@ -1993,6 +1995,7 @@ end subroutine land_driver_ini
     use state_module, only: state_type
 #ifdef WRF_HYDRO
     use module_RT_data, only: rt_domain
+    use config_base, only: nlst
 #endif
     implicit  none
     type(state_type) :: state
@@ -2316,6 +2319,30 @@ end subroutine land_driver_ini
             grdflx = grdflx_lk / real(nsub_lk)
             qfx    = qfx_lk    / real(nsub_lk)
          end where
+
+#ifdef WRF_HYDRO
+         ! Heat carried into the lakes by river inflow (water_temperature = 2).
+         if (nlst(did)%water_temperature .eq. 2 .and. nlakes .gt. 0) then
+            if (allocated(rt_domain(did)%LakeInflowTemp) .and. allocated(rt_domain(did)%QLAKEI) &
+                .and. allocated(rt_domain(did)%LakeArea)) then
+               if (.not. allocated(lake_ix)) then
+                  allocate(lake_ix(XSTART:XEND,YSTART:YEND))
+                  lake_ix = 0
+                  do ilake = 1, nlakes
+                     where (lake_id == rt_domain(did)%lakeidm(ilake)) lake_ix = ilake
+                  end do
+               end if
+               call lake_inflow_heat(XSTART, XEND, YSTART, YEND, nlakes, lake_ix, lakemask,   &
+                    dtbl, rt_domain(did)%QLAKEI(1:nlakes), rt_domain(did)%LakeInflowTemp(1:nlakes), &
+                    rt_domain(did)%LakeArea(1:nlakes), rt_domain(did)%LakeOutletDepth(1:nlakes),  &
+                    z_lake3d, dz_lake3d, lake_icefrac3d, t_lake3d)
+            else if (.not. lake_heat_warned) then
+               write(6,*) 'WARNING: lake inflow heat disabled: lake inflow, inflow temperature ', &
+                          'or lake area arrays are not allocated.'
+               lake_heat_warned = .true.
+            end if
+         end if
+#endif
 
          ! fake values for testing:
          !where(ivgtyp == islake) rainbl  = 2.0
@@ -3486,6 +3513,118 @@ subroutine define_rst_variables(ncid, state)
                              "Problem nf90_close")
 
    end subroutine define_rst_variables
+
+#ifdef WRF_HYDRO
+!===============================================================================
+! Heat carried into each 1-D lake by its river inflow.
+!
+! Over one LSM step the lake receives V = Q_in * dt of water at T_in (the
+! flow-weighted temperature of the reaches entering the lake, from the stream
+! temperature model).  Spread uniformly over the lake surface area A (LAKEPARM
+! LkArea), this is a layer of thickness h = V / A in every column.  The inflow
+! enters at its level of neutral buoyancy: the first ice-free layer whose
+! density is at least that of the inflow (the bottom layer if none is).  The
+! level-pool reservoir carries the lake water balance, so an equal volume
+! leaves through the outlet: water between the insertion layer and the outlet
+! layer (layer containing LakeOutletDepth) is displaced by h toward the outlet
+! (first-order upwind, in passes of at most one layer thickness).  The heat
+! change of each column is therefore h * (T_in - T_outlet layer), and outflow
+! leaves at the outlet temperature.  If h exceeds the ice-free column depth the
+! column is flushed to T_in.
+!===============================================================================
+  subroutine lake_inflow_heat(xs, xe, ys, ye, nlakes, lake_ix, lakemask, dt, q_in, t_in, &
+                              area_km2, z_outlet, z_lake3d, dz_lake3d, icefrac3d, t_lake3d)
+    use module_sf_lake, only: nlevlake
+    implicit none
+    integer, intent(in) :: xs, xe, ys, ye, nlakes
+    integer, intent(in) :: lake_ix(xs:xe,ys:ye)
+    real,    intent(in) :: lakemask(xs:xe,ys:ye)
+    real,    intent(in) :: dt                      ! LSM step (s)
+    real,    intent(in) :: q_in(nlakes)            ! lake inflow (m3/s)
+    real,    intent(in) :: t_in(nlakes)            ! lake inflow temperature (K)
+    real,    intent(in) :: area_km2(nlakes)        ! lake surface area (km2)
+    real,    intent(in) :: z_outlet(nlakes)        ! outlet depth below the surface (m)
+    real,    intent(in) :: z_lake3d(xs:xe,1:nlevlake,ys:ye), dz_lake3d(xs:xe,1:nlevlake,ys:ye)
+    real,    intent(in) :: icefrac3d(xs:xe,1:nlevlake,ys:ye)
+    real,    intent(inout) :: t_lake3d(xs:xe,1:nlevlake,ys:ye)
+
+    integer :: i, j, k, lk, kf, k_in, k_out, kmin, kmax, npass, ip
+    real    :: h, hp, tin, rho_in, dzmin
+
+    do j = ys, ye
+       do i = xs, xe
+          lk = lake_ix(i,j)
+          if (lk .le. 0) cycle
+          if (lakemask(i,j) .ne. 1) cycle
+          if (q_in(lk) .le. 0.0 .or. area_km2(lk) .le. 0.0) cycle
+          if (t_in(lk) .lt. 200.0 .or. t_in(lk) .gt. 400.0) cycle      ! unset / invalid
+          h   = q_in(lk) * dt / (area_km2(lk) * 1.0e6)
+          tin = max(273.15, t_in(lk))
+
+          ! first ice-free layer
+          kf = 0
+          do k = 1, nlevlake
+             if (icefrac3d(i,k,j) .le. 0.0) then
+                kf = k
+                exit
+             end if
+          end do
+          if (kf .eq. 0) cycle
+
+          ! flushed column
+          if (h .ge. sum(dz_lake3d(i,kf:nlevlake,j))) then
+             t_lake3d(i,kf:nlevlake,j) = tin
+             cycle
+          end if
+
+          ! insertion layer (neutral buoyancy)
+          rho_in = lake_water_density(tin)
+          k_in = nlevlake
+          do k = kf, nlevlake
+             if (lake_water_density(t_lake3d(i,k,j)) .ge. rho_in) then
+                k_in = k
+                exit
+             end if
+          end do
+
+          ! outlet layer
+          k_out = nlevlake
+          do k = 1, nlevlake
+             if (z_outlet(lk) .le. z_lake3d(i,k,j) + 0.5 * dz_lake3d(i,k,j)) then
+                k_out = k
+                exit
+             end if
+          end do
+          k_out = max(k_out, kf)
+
+          kmin  = min(k_in, k_out)
+          kmax  = max(k_in, k_out)
+          dzmin = max(1.0e-3, minval(dz_lake3d(i,kmin:kmax,j)))
+          npass = max(1, ceiling(h / dzmin))
+          hp    = h / real(npass)
+          do ip = 1, npass
+             if (k_in .lt. k_out) then          ! displace downward toward the outlet
+                do k = k_out, k_in+1, -1
+                   t_lake3d(i,k,j) = t_lake3d(i,k,j) + hp / dz_lake3d(i,k,j) * (t_lake3d(i,k-1,j) - t_lake3d(i,k,j))
+                end do
+             else if (k_in .gt. k_out) then     ! displace upward toward the outlet
+                do k = k_out, k_in-1
+                   t_lake3d(i,k,j) = t_lake3d(i,k,j) + hp / dz_lake3d(i,k,j) * (t_lake3d(i,k+1,j) - t_lake3d(i,k,j))
+                end do
+             end if
+             t_lake3d(i,k_in,j) = t_lake3d(i,k_in,j) + hp / dz_lake3d(i,k_in,j) * (tin - t_lake3d(i,k_in,j))
+          end do
+       end do
+    end do
+  end subroutine lake_inflow_heat
+
+  ! Fresh-water density (kg/m3) as in the 1-D lake model (maximum at 277 K).
+  pure real function lake_water_density(t)
+    implicit none
+    real, intent(in) :: t
+    lake_water_density = 1000.0 * (1.0 - 1.9549e-5 * abs(t - 277.0)**1.68)
+  end function lake_water_density
+#endif
 
 end module module_NoahMP_hrldas_driver
 
