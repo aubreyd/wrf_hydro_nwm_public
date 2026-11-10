@@ -471,6 +471,16 @@ module module_NoahMP_hrldas_driver
   integer            :: rank = 0
   CHARACTER(len=256) :: inflnm, outflnm, inflnm_template
   logical            :: restart_flag
+  ! Lake state variables that must all be present in a restart file to restart the lake model
+  logical            :: lake_rst_complete
+  real, allocatable, dimension(:,:) :: tsk_lakeini   ! surface temperature for a cold lake start from restart
+  real               :: tg_land_sum(2)               ! sum and count of valid land TG (cold lake start)
+  integer            :: ilkvar
+  character(len=16), dimension(22), parameter :: lake_rst_vars = [character(len=16) :: &
+       'LAKE_DEPTH', 'LAKE_SAVETKE1', 'LAKE_SNOWP', 'LAKE_H2OSNO', 'LAKE_SNL', 'LAKE_T_GRND', &
+       'LAKE_T_SOILSNOW', 'LAKE_H2OSOI_ICE', 'LAKE_H2OSOI_LIQ', 'LAKE_H2OSOI_VOL', 'LAKE_Z', 'LAKE_DZ', &
+       'LAKE_T_LAKE', 'LAKE_ICEFRAC', 'LAKE_Z_LAKE', 'LAKE_DZ_LAKE', &
+       'LAKE_WATSAT', 'LAKE_CSOL', 'LAKE_TKMG', 'LAKE_TKDRY', 'LAKE_TKSATU', 'LAKE_ZI']
   character(len=256) :: restart_flnm
   integer            :: ierr
 
@@ -1011,7 +1021,10 @@ module module_NoahMP_hrldas_driver
 ! Needed for lake model (sf_lake_physics = 1)
 !------------------------------------------------------------------------
 
-!IF(SF_LAKE_PHYSICS == 1 )  THEN
+  ! Allocated only when the lake model is on; every use is inside an
+  ! IF (sf_lake_physics == 1) block (LDASOUT lake fields are turned off when
+  ! the lake model is off, see output_NoahMP_NWM).
+  IF (noah_lsm%sf_lake_physics == 1) THEN
 
   ALLOCATE ( lake2d(XSTART:XEND,YSTART:YEND))
 
@@ -1043,6 +1056,8 @@ module module_NoahMP_hrldas_driver
   ALLOCATE (         tkmg3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
   ALLOCATE (        tkdry3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
   ALLOCATE (       tksatu3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
+
+  ENDIF  ! sf_lake_physics == 1
 
 !------------------------------------------------------------------------
 ! Needed for wrf_hydro lake model
@@ -1547,6 +1562,20 @@ module module_NoahMP_hrldas_driver
                      )
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+           ! The restart must hold the complete lake state.  If any lake variable
+           ! is missing (e.g. a restart from a run without the lake model), the
+           ! whole lake state is cold-initialized with lakeini instead, so lakes
+           ! never start from uninitialized memory or a partially read state.
+           lake_rst_complete = .true.
+           do ilkvar = 1, size(lake_rst_vars)
+              if (checkRstV(trim(lake_rst_vars(ilkvar))) .ne. 0) then
+                 if (lake_rst_complete) write(6,*) 'WARNING: restart file has no ', &
+                    trim(lake_rst_vars(ilkvar)), ' (and possibly other lake variables): ', &
+                    'cold-initializing the 1-D lake model state with lakeini.'
+                 lake_rst_complete = .false.
+              end if
+           end do
+           IF ( lake_rst_complete ) THEN
              ! If restart = T, read from RESTART files instead of call to lakeini function:
              ! 2Ds:
              call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_DEPTH" ,lakedepth2d )
@@ -1589,6 +1618,46 @@ module module_NoahMP_hrldas_driver
                            lake_depth_flag, noah_lsm%use_lakedepth,                           &
                            tkdry3d,         tksatu3d,      lake2d,                            &
                            its,ite,jts,jte,ims,ime,jms,jme)
+           ELSE
+             ! Cold-start the lake model (lakeini returns immediately when its
+             ! restart argument is .true.).  lakeini sets the initial lake and
+             ! lake-soil profile from the surface temperature, but TSK is not in
+             ! the restart file (it is still undefined here), and Noah-MP TG on
+             ! lake cells is not a real temperature (Noah-MP does not compute it
+             ! there).  Use the domain-mean TG over land cells at the restart time
+             ! (floored at freezing) as the lake surface temperature; lakeini
+             ! ramps from it to 277 K at depth.  277 K if no valid land TG.
+             ! Snow from the restart is guarded against fill values.
+             allocate(tsk_lakeini(XSTART:XEND,YSTART:YEND))
+             tg_land_sum(1) = sum(TGXY, mask = (TGXY > 200.0 .and. TGXY < 350.0 .and. &
+                                               ivgtyp /= islake .and. ivgtyp /= iswater))
+             tg_land_sum(2) = real(count(TGXY > 200.0 .and. TGXY < 350.0 .and. &
+                                         ivgtyp /= islake .and. ivgtyp /= iswater))
+#ifdef MPP_LAND
+             call sum_real1d(tg_land_sum, 2)
+#endif
+             if (tg_land_sum(2) .gt. 0.0) then
+                tsk_lakeini = max(273.15, tg_land_sum(1) / tg_land_sum(2))
+             else
+                tsk_lakeini = 277.0
+             end if
+             write(6,*) 'Cold lake start: lake surface temperature from domain-mean land TG [K] =', &
+                        tsk_lakeini(XSTART,YSTART)
+             where (lakemask == 1 .and. (state%snow < 0.0 .or. state%snow > 1.0e4)) state%snow = 0.0
+             call  lakeini(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
+                           noah_lsm%lake_min_elev,   .false.,            noah_lsm%lakedepth_default, lake_depth,     &
+                           lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
+                           snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
+                           z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
+                           h2osoi_liq3d,    h2osoi_vol3d,  z3d,               dz3d,           &
+                           zi3d,            watsat3d,      csol3d,            tkmg3d,         &
+                           iswater,         xice,          xice_threshold,     xland,  tsk_lakeini, &
+                           lakemask,        lakeflag,                                         &
+                           lake_depth_flag, noah_lsm%use_lakedepth,                           &
+                           tkdry3d,         tksatu3d,      lake2d,                            &
+                           its,ite,jts,jte,ims,ime,jms,jme)
+             deallocate(tsk_lakeini)
+           ENDIF
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
             where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
          ENDIF
@@ -2300,11 +2369,11 @@ end subroutine land_driver_ini
 
          ! mask lake output variables:
          LAKERAINOUT = -9999.0
-         where(IVGTYP == 28) LAKERAINOUT = RAINBL * 3600.0 / dtbl ! RAINBL [mm per step] -> mm/h in the LDASOUT file
+         where(IVGTYP == ISLAKE) LAKERAINOUT = RAINBL * 3600.0 / dtbl ! RAINBL [mm per step] -> mm/h in the LDASOUT file
          LAKEEVAPOUT = -9999.0
-         where(IVGTYP == 28) LAKEEVAPOUT = QFX * 3600.0 ! QFX [kg/m2/s] -> mm/h in the LDASOUT file
+         where(IVGTYP == ISLAKE) LAKEEVAPOUT = QFX * 3600.0 ! QFX [kg/m2/s] -> mm/h in the LDASOUT file
          LAKEDEPTHOUT = -9999.0
-         where(IVGTYP == 28) LAKEDEPTHOUT = lakedepth2d
+         where(IVGTYP == ISLAKE) LAKEDEPTHOUT = lakedepth2d
          ENDIF
  
   IF(noah_lsm%RUNOFF_OPTION.EQ.5.AND.MOD(ITIME,STEPWTD).EQ.0)THEN
@@ -2653,8 +2722,17 @@ subroutine  ldas_output(itime, state)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKERAINOUT,IVGTYP,99)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKEEVAPOUT,IVGTYP,100)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKEDEPTHOUT,IVGTYP,101)
+   ! With the lake model off the 3-D lake arrays are not allocated and the lake
+   ! fields are switched off in output_NoahMP_NWM (outFlag = 0); the calls are
+   ! still made, with a valid 1-level placeholder, because the call for the last
+   ! variable index closes the LDASOUT file.
+   if (noah_lsm%sf_lake_physics == 1) then
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nlevlake,t_lake3d,IVGTYP,102)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,nlevlake,lake_icefrac3d,IVGTYP,103)
+   else
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKEDEPTHOUT,IVGTYP,102)
+   call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,LAKEDEPTHOUT,IVGTYP,103)
+   end if
    if (crocus_opt /= 0) then
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,float(GLACINFO),IVGTYP,104)
    call output_NoahMP_NWM(trim(noah_lsm%outdir),igrid,noah_lsm%output_timestep,itime,startdate,olddate,ixpar,jxpar,1,(GLACT),IVGTYP,105)

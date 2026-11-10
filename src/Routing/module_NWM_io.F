@@ -1373,6 +1373,12 @@ subroutine output_NoahMP_NWM(outDir,iGrid,output_timestep,itime,startdate,date,i
       fileMeta%numVars = numLdasVars_crocus_off ! 103
    end if
 
+   ! If the 1-D lake model is off, the lake fields (99-103) are not computed or
+   ! allocated and should not be outputted
+   if (noah_lsm%sf_lake_physics /= 1) then
+      fileMeta%outFlag(99:103) = 0
+   end if
+
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
 
