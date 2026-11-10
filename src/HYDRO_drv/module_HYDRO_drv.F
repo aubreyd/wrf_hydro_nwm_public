@@ -623,6 +623,13 @@ if (nlst(did)%GWBASESWCRT        .ne. 0 .or. &
 !MKB 
       call TemperatureDisag(RT_DOMAIN(did)%INFXSRT_T, RT_DOMAIN(did)%INFXSRT_T_RT,        &
            nlst(did)%AGGFACTRT, RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx)
+#ifdef MPP_LAND
+      ! TemperatureDisag fills only this rank's own routing cells; exchange the
+      ! halo so boundary cells hold the neighbor's values (as for the other
+      ! disaggregated fields) and results do not depend on the decomposition.
+      call MPP_LAND_COM_REAL(RT_DOMAIN(did)%INFXSRT_T_RT, RT_DOMAIN(did)%IXRT, &
+                             RT_DOMAIN(did)%JXRT, 99)
+#endif
       if(nlst(did)%OVRTSWCRT .eq. 0) then
          if(nlst(did)%UDMP_OPT .eq. 1) then
             call RunOffDisag(RT_DOMAIN(did)%INFXSRT, RT_DOMAIN(did)%landRunOff,        &
