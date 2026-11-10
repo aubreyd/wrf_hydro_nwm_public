@@ -475,6 +475,7 @@ module module_NoahMP_hrldas_driver
   logical            :: lake_rst_complete
   real, allocatable, dimension(:,:) :: tsk_lakeini   ! surface temperature for a cold lake start from restart
   real               :: tg_land_sum(2)               ! sum and count of valid land TG (cold lake start)
+  integer            :: lake_id_bad(1)               ! LAKE_ID cells whose land use is not ISLAKE
   integer            :: ilkvar
   character(len=16), dimension(22), parameter :: lake_rst_vars = [character(len=16) :: &
        'LAKE_DEPTH', 'LAKE_SAVETKE1', 'LAKE_SNOWP', 'LAKE_H2OSNO', 'LAKE_SNL', 'LAKE_T_GRND', &
@@ -1412,6 +1413,23 @@ module module_NoahMP_hrldas_driver
 
      lake_id = 0
      call read_lake_id(noah_lsm%hrldas_setup_file, xstart, xend, ystart, yend, lake_id)
+
+     ! The 1-D lake model runs only on ISLAKE cells, but lake outflow
+     ! temperature, precipitation and evaporation are averaged over all cells
+     ! of a lake's LAKE_ID footprint.  A LAKE_ID cell with another land use
+     ! would add unset lake temperatures and land P/E to the lake means, so
+     ! LAKE_ID and IVGTYP must be consistent (a pre-processing requirement).
+     lake_id_bad(1) = count(lake_id > 0 .and. ivgtyp /= islake)
+#ifdef MPP_LAND
+     call sum_int1d(lake_id_bad, 1)
+#endif
+     if (lake_id_bad(1) > 0) then
+        write(6,'(a,i0,a,i0,a)') 'FATAL ERROR: ', lake_id_bad(1), &
+             ' cells in wrfinput have LAKE_ID > 0 but IVGTYP /= ISLAKE (', islake, &
+             '). LAKE_ID lake footprints must have the lake land-use class; fix the domain pre-processing.'
+        call flush(6)
+        call fatal_error_stop('FATAL ERROR: LAKE_ID cells without lake land use (IVGTYP /= ISLAKE) in wrfinput')
+     end if
 
   end if
   
