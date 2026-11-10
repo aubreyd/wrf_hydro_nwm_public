@@ -998,18 +998,19 @@ if (nlst(did)%CHANRTSWCRT.eq.1 .or. nlst(did)%CHANRTSWCRT.eq.2) then
 
    ! Equilibrium stream temperature model (water_temperature=2, UDMP reach-based routing)
    if (nlst(did)%water_temperature .eq. 2) then
-      ! Only the gridded drive_CHANNEL fills InflowLand/InflowGw; the UDMP
-      ! driver leaves them at their zero init, making lateral water thermally
-      ! invisible to the stream model. Wire the reach-based lateral fluxes
-      ! (per-reach m3/s, populated when output_channelBucket_influx is 1 or 2)
-      ! so surface runoff and bucket baseflow carry heat into the mixing.
-      if ((nlst(did)%output_channelBucket_influx .eq. 1 .or.  &
-           nlst(did)%output_channelBucket_influx .eq. 2) .and. &
-          rt_domain(did)%NLINKSL .gt. 0) then
-         rt_domain(did)%InflowLand(1:rt_domain(did)%NLINKSL) = &
-              rt_domain(did)%qSfcLatRunoff(1:rt_domain(did)%NLINKSL)
+      ! Per-reach lateral inflows [m3/s] for the stream temperature mixing,
+      ! taken from the same fluxes the channel routing just used:
+      !   QLateral      = surface/subsurface lateral inflow + bucket outflow
+      !   qout_gwsubbas = bucket (groundwater) outflow to the reach
+      ! These are computed regardless of output settings (qSfcLatRunoff and
+      ! qBucket are output-only copies filled only when
+      ! output_channelBucket_influx is 1 or 2, so they must not drive physics).
+      if (rt_domain(did)%NLINKSL .gt. 0) then
          rt_domain(did)%InflowGw(1:rt_domain(did)%NLINKSL) = &
-              rt_domain(did)%qBucket(1:rt_domain(did)%NLINKSL)
+              rt_domain(did)%qout_gwsubbas(1:rt_domain(did)%NLINKSL)
+         rt_domain(did)%InflowLand(1:rt_domain(did)%NLINKSL) = &
+              rt_domain(did)%QLateral(1:rt_domain(did)%NLINKSL) &
+              - rt_domain(did)%qout_gwsubbas(1:rt_domain(did)%NLINKSL)
       end if
       call run_stream_temp_eq(did)
    end if
