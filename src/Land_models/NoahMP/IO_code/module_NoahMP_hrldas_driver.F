@@ -2355,12 +2355,19 @@ end subroutine land_driver_ini
          ! the lake model's depth is shifted by the reservoir's water-elevation
          ! change since the previous LSM step.  RESHT is synchronized across
          ! ranks after routing, so every rank applies the same change.  The
-         ! reference elevation is initialized on the first call (cold start or
-         ! restart) with no depth change, so no extra restart state is needed.
+         ! reference elevation (previous step's RESHT) is kept in
+         ! rt_domain%LakeReshtLSM, which is written to and read from HYDRO_RST,
+         ! so a restart applies the same depth change as a continuous run.  On a
+         ! cold start, or a restart file without it, it is initialized on the
+         ! first call with no depth change.
          if (allocated(rt_domain(did)%RESHT)) then
             if (size(rt_domain(did)%RESHT) .ge. nlakes) then
                if (.not. lake_resht_init) then
                   lake_resht_prev(1:nlakes) = rt_domain(did)%RESHT(1:nlakes)
+                  if (allocated(rt_domain(did)%LakeReshtLSM)) then
+                     if (all(rt_domain(did)%LakeReshtLSM(1:nlakes) .gt. -9000.0)) &
+                        lake_resht_prev(1:nlakes) = rt_domain(did)%LakeReshtLSM(1:nlakes)
+                  end if
                   lake_resht_init = .true.
                end if
                do ilake = 1, nlakes
@@ -2372,6 +2379,8 @@ end subroutine land_driver_ini
                         lakedepth2d = max(lake_min_depth, lakedepth2d + lake_dh_avg(ilake))
                   end if
                end do
+               if (allocated(rt_domain(did)%LakeReshtLSM)) &
+                  rt_domain(did)%LakeReshtLSM(1:nlakes) = lake_resht_prev(1:nlakes)
             end if
          end if
 

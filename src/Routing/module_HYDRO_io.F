@@ -6008,6 +6008,8 @@ end subroutine mpp_output_chrt
             iret = nf90_def_var(ncid, "qlakei", NF90_FLOAT, (/dimid_lakes/), varid)
             iret = nf90_def_var(ncid, "lake_precip", NF90_FLOAT, (/dimid_lakes/), varid)
             iret = nf90_def_var(ncid, "lake_evap", NF90_FLOAT, (/dimid_lakes/), varid)
+            ! level-pool elevation at the previous LSM step [m] (1-D lake depth update)
+            iret = nf90_def_var(ncid, "lake_resht_lsm", NF90_FLOAT, (/dimid_lakes/), varid)
          endif
 
          if( nlst(did)%channel_only       .eq. 0 .and. &
@@ -6248,6 +6250,12 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
            )
 
       call w_rst_crt_nc1_lake(ncid,rt_domain(did)%nlakes,rt_domain(did)%lake_evap,"lake_evap" &
+#ifdef MPP_LAND
+           ,rt_domain(did)%lake_index  &
+#endif
+           )
+
+      call w_rst_crt_nc1_lake(ncid,rt_domain(did)%nlakes,rt_domain(did)%LakeReshtLSM,"lake_resht_lsm" &
 #ifdef MPP_LAND
            ,rt_domain(did)%lake_index  &
 #endif
@@ -6985,6 +6993,9 @@ if(nlst(did)%SUBRTSWCRT  .eq. 1 .or. &
          call read_rst_crt_nc(ncid,rt_domain(did)%QLAKEI,rt_domain(did)%NLAKES,"qlakei")
          call read_rst_crt_nc(ncid,rt_domain(did)%lake_precip,rt_domain(did)%NLAKES,"lake_precip")
          call read_rst_crt_nc(ncid,rt_domain(did)%lake_evap,rt_domain(did)%NLAKES,"lake_evap")
+         ! Non-fatal (read_rst_crt_nc returns if absent); older restart files keep the
+         ! -9999 sentinel and the LSM driver re-initializes the reference elevation.
+         call read_rst_crt_nc(ncid,rt_domain(did)%LakeReshtLSM,rt_domain(did)%NLAKES,"lake_resht_lsm")
       endif
 
       if( nlst(did)%channel_only       .eq. 0 .and. &

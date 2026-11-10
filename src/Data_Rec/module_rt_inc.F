@@ -313,6 +313,7 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: Outflow
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
    REAL,    allocatable, DIMENSION(:)   :: LakeOutletDepth      !lake outlet withdrawal depth below surface (m)
+   REAL,    allocatable, DIMENSION(:)   :: LakeReshtLSM         !level-pool elevation at the previous LSM step (m), -9999 = unset
    REAL,    allocatable, DIMENSION(:)   :: CVOLTMP
 
    ! NEW FOR module_channel_routing.F

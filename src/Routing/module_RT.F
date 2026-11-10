@@ -499,6 +499,7 @@ CONTAINS
         allocate( rt_domain(did)%Outflow(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeOutletDepth(nlakes) )
+        allocate( rt_domain(did)%LakeReshtLSM(nlakes) )
         allocate( rt_domain(did)%CVOLTMP(nsizes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
@@ -531,6 +532,9 @@ CONTAINS
         rt_domain(did)%LakeOutflowTemp    = 10.
         ! 0 = surface withdrawal; LandRT_ini overwrites from LAKEPARM
         rt_domain(did)%LakeOutletDepth    = 0.
+        ! Reference elevation for the 1-D lake depth update (set by the LSM
+        ! driver; restart-persisted so a restart applies the same depth change)
+        rt_domain(did)%LakeReshtLSM       = -9999.
         rt_domain(did)%CVOLTMP            = 0.
 
         if( nlst(did)%channel_option .eq. 2 ) then
