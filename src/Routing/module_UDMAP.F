@@ -634,6 +634,83 @@ contains
 
       end subroutine UDMP_grid2reach_mean
 
+      !------------------------------------------------------------------------
+      ! UDMP_lateral_temp: per-reach temperature of the non-bucket lateral
+      !   inflow, weighted by the water volume each routing-grid cell actually
+      !   delivers to the reach.  Mirrors how drive_CHANNEL_RSL builds QLateral
+      !   (before the bucket outflow is added):
+      !     OVRTSWCRT = 0                  : landRunOff over all catchment cells
+      !                                      (cell_i/cell_j, cellWeight, cellArea)
+      !     OVRTSWCRT /= 0 .or. SUBRTSWCRT : QSTRMVOLRT_TS at the catchment's
+      !                                      channel cells (grid_i/grid_j, weight,
+      !                                      nodeArea)
+      !   Each delivered volume carries the temperature of the cell it enters at
+      !   (fldT, e.g. Noah-MP infxsrt_t on the routing grid, K).  Cells with
+      !   fldT outside (T_lo, T_hi) are skipped.  Numerator and denominator are
+      !   reduced across ranks separately.  Reaches with no delivered volume (or
+      !   no valid temperature) return missing_val.  Collective in MPP mode.
+      !------------------------------------------------------------------------
+      subroutine UDMP_lateral_temp(fldT, qstrmvolrt, landRunOff, OVRTSWCRT, SUBRTSWCRT, &
+                                   T_lo, T_hi, reachT, missing_val)
+         implicit none
+         real, dimension(:,:), intent(in)  :: fldT, qstrmvolrt, landRunOff
+         integer,              intent(in)  :: OVRTSWCRT, SUBRTSWCRT
+         real,                 intent(in)  :: T_lo, T_hi, missing_val
+         real, dimension(:),   intent(out) :: reachT
+
+         real*8, allocatable, dimension(:) :: lnum, lden
+         real,   allocatable, dimension(:) :: gnum, gden
+         real*8  :: v
+         integer :: k, m, n, ii, jj
+
+         n = size(reachT)
+         allocate(lnum(max(1,LNUMRSL)), lden(max(1,LNUMRSL)))
+         allocate(gnum(max(1,n)), gden(max(1,n)))
+         lnum = 0.d0; lden = 0.d0; gnum = 0.0; gden = 0.0
+
+         if (OVRTSWCRT .eq. 0) then
+            do k = 1, LNUMRSL
+               do m = 1, LUDRSL(k)%ncell
+                  ii = LUDRSL(k)%cell_i(m); jj = LUDRSL(k)%cell_j(m)
+                  if (fldT(ii,jj) .le. T_lo .or. fldT(ii,jj) .ge. T_hi) cycle
+                  v = dble(max(0.0, landRunOff(ii,jj))) * dble(LUDRSL(k)%cellWeight(m)) * dble(LUDRSL(k)%cellArea(m))
+                  lnum(k) = lnum(k) + v * dble(fldT(ii,jj))
+                  lden(k) = lden(k) + v
+               end do
+            end do
+         end if
+         if (OVRTSWCRT .ne. 0 .or. SUBRTSWCRT .ne. 0) then
+            do k = 1, LNUMRSL
+               do m = 1, LUDRSL(k)%ngrids
+                  ii = LUDRSL(k)%grid_i(m); jj = LUDRSL(k)%grid_j(m)
+                  if (fldT(ii,jj) .le. T_lo .or. fldT(ii,jj) .ge. T_hi) cycle
+                  v = dble(max(0.0, qstrmvolrt(ii,jj))) * dble(LUDRSL(k)%weight(m)) * dble(LUDRSL(k)%nodeArea(m))
+                  lnum(k) = lnum(k) + v * dble(fldT(ii,jj))
+                  lden(k) = lden(k) + v
+               end do
+            end do
+         end if
+
+#ifdef MPP_LAND
+         call updateLinkV(lnum, gnum)
+         call updateLinkV(lden, gden)
+#else
+         gnum(1:min(n,LNUMRSL)) = real(lnum(1:min(n,LNUMRSL)))
+         gden(1:min(n,LNUMRSL)) = real(lden(1:min(n,LNUMRSL)))
+#endif
+
+         do k = 1, n
+            if (gden(k) .gt. 0.0) then
+               reachT(k) = gnum(k) / gden(k)
+            else
+               reachT(k) = missing_val
+            end if
+         end do
+
+         deallocate(lnum, lden, gnum, gden)
+
+      end subroutine UDMP_lateral_temp
+
       subroutine get_nprocs_map(ix,jx,bufi,bufj,nprocs_map,ndata)
           implicit none
           integer,dimension(:)  :: bufi, bufj,nprocs_map

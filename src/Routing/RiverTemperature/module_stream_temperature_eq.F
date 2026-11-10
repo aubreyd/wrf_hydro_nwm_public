@@ -19,9 +19,10 @@
 !     travel_time  = reach_length / velocity                   [s]
 !
 !   Inflow temperature (volume-weighted mixing):
-!     T_in = [sum(Q_j * T_j, upstream j) + T_air*Q_land + T_bucket*Q_gw] /
+!     T_in = [sum(Q_j * T_j, upstream j) + T_land*Q_land + T_bucket*Q_gw] /
 !            [sum(Q_j, upstream j)        + Q_land + Q_gw]
-!     (T_air instantaneous, floored at 0 °C as liquid runoff; T_bucket the groundwater
+!     (T_land per surf_temp_opt: Noah-MP runoff temperature at the cells where it enters
+!      the reach, or instantaneous T_air; floored at 0 °C. T_bucket the groundwater
 !      bucket outflow temperature tracked in simp_gw_buck_nhd, falling back to the fixed
 !      T_gw parameter below where no bucket temperature is available)
 !
@@ -68,7 +69,7 @@ module module_stream_temperature_eq
    use module_lsm_forcing,        only: weather2d
    use config_base,               only: nlst
    use module_RT_data,            only: rt_domain
-   use module_UDMAP,              only: UDMP_grid2reach_mean
+   use module_UDMAP,              only: UDMP_grid2reach_mean, UDMP_lateral_temp
    use module_hydro_stop,         only: HYDRO_stop
 #ifdef MPP_LAND
    use module_mpp_reachls,        only: gbcastReal2
@@ -93,6 +94,11 @@ module module_stream_temperature_eq
                                             ! K_rate scales as 1/depth and the modeled West Branch depth
                                             ! (0.22-0.32 m) is biased shallow.
    real, parameter :: K_sw       = 400.0    ! SW equilibrium coefficient [W/m2/°C]
+   integer, parameter :: surf_temp_opt = 2  ! temperature of non-bucket lateral inflow (QLateral - bucket):
+                                            !  1 = reach instantaneous air temperature
+                                            !  2 = Noah-MP infxsrt_t (0 C under snow, else ground temp TG)
+                                            !      at the cells where the water enters the reach, weighted
+                                            !      by delivered volume (falls back to 1 where unavailable)
                                             ! Controls solar contribution to T_e = T_air + SW_net/K_sw
                                             ! Higher value -> smaller diurnal solar swing in T_e
    real, parameter :: T_gw       =  12.0    ! fallback groundwater inflow temperature [°C],
@@ -131,6 +137,8 @@ contains
 
       real    :: T_air_i, SW_net_i, T_e_i, T_in_i, T_out_i
       real    :: T_gw_i                       ! groundwater inflow temperature at this reach [°C]
+      real    :: T_land_i                     ! non-bucket lateral inflow temperature at this reach [°C]
+      real,    allocatable :: T_lat(:)        ! non-bucket lateral inflow temperature per reach [K]
       real    :: K_rate, travel_time, depth_i, vel_i, Q_this
       real    :: Q_total_i, QT_total_i, albedo_i, shade_i
       real    :: Tair_fallback, SW_fallback   ! domain-mean forcing for unmapped reaches
@@ -233,6 +241,16 @@ contains
       ! via the LINKID==TO_NODE ComID match (serial).  TO_NODE holds ComIDs in
       ! UDMP mode and must never be used as an array index.
       ! -----------------------------------------------------------------------
+      ! Non-bucket lateral inflow temperature per reach [K] (surf_temp_opt=2).
+      ! Collective in MPP mode: every rank calls it (or none do).
+      allocate(T_lat(max(1,nlinksl)), source=-9999.0)
+      if (surf_temp_opt .eq. 2 .and. allocated(rt_domain(did)%INFXSRT_T_RT) .and. &
+          allocated(rt_domain(did)%QSTRMVOLRT_TS) .and. allocated(rt_domain(did)%landRunOff)) then
+         call UDMP_lateral_temp(rt_domain(did)%INFXSRT_T_RT, rt_domain(did)%QSTRMVOLRT_TS,   &
+                                rt_domain(did)%landRunOff, nlst(did)%OVRTSWCRT,             &
+                                nlst(did)%SUBRTSWCRT, 200.0, 350.0, T_lat(1:nlinksl), -9999.0)
+      end if
+
       allocate(Q_acc(max(1,nlinksl)),  source=0.0)
       allocate(QT_acc(max(1,nlinksl)), source=0.0)
 
@@ -361,8 +379,13 @@ contains
             Q_total_i  = Q_acc(i)                                               &
                        + max(0.0, rt_domain(did)%InflowLand(i))                 &
                        + max(0.0, rt_domain(did)%InflowGw(i))
+            ! Non-bucket lateral inflow: Noah-MP runoff temperature at the cells
+            ! where it enters the reach (surf_temp_opt=2), else air temperature.
+            T_land_i = T_air_i
+            if (T_lat(i) .gt. 200.0) T_land_i = T_lat(i) - 273.15
+            T_land_i = min(T_max, max(T_water_min, T_land_i))
             QT_total_i = QT_acc(i)                                              &
-                       + max(T_water_min, T_air_i) * max(0.0, rt_domain(did)%InflowLand(i)) &
+                       + T_land_i * max(0.0, rt_domain(did)%InflowLand(i))     &
                        + T_gw_i  * max(0.0, rt_domain(did)%InflowGw(i))
 
             if (Q_total_i .gt. min_flow) then
@@ -389,7 +412,7 @@ contains
 
          end do   ! i
 
-      deallocate(Q_acc, QT_acc)
+      deallocate(Q_acc, QT_acc, T_lat)
 
       ! Save this timestep's temperatures: next call gathers them as the
       ! (1-step lagged) upstream inflow temperatures.
