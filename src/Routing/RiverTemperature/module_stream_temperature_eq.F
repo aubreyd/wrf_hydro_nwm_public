@@ -21,7 +21,10 @@
 !   Inflow temperature (volume-weighted mixing):
 !     T_in = [sum(Q_j * T_j, upstream j) + T_air*Q_land + T_gw*Q_gw] /
 !            [sum(Q_j, upstream j)        + Q_land + Q_gw]
-!     (T_air instantaneous; T_gw a fixed parameter below)
+!     (T_air instantaneous, floored at 0 °C as liquid runoff; T_gw a fixed parameter below)
+!
+!   All water temperatures are clamped to [0, 40] °C.  There is no river ice
+!   physics, so water is held at freezing when T_e or inflows would go below 0 °C.
 !     Headwater (no upstream inflow): T_in = T_e
 !
 !   Lake outlets:
@@ -94,8 +97,10 @@ module module_stream_temperature_eq
                                             ! ~mean annual air temperature for DRB; buffers diurnal swing
 
    ! --- Physical bounds ---
-   real, parameter :: T_min      = -15.0    ! lower temperature clamp [°C]
-   real, parameter :: T_max      =  40.0    ! upper temperature clamp [°C]
+   real, parameter :: T_min      = -15.0    ! lower clamp on AIR temperature [°C]
+   real, parameter :: T_max      =  40.0    ! upper clamp on air and water temperature [°C]
+   real, parameter :: T_water_min =  0.0    ! lower clamp on liquid WATER temperature [°C]
+                                            ! (no ice physics: water is held at freezing)
    real, parameter :: min_depth  =  0.02    ! minimum depth for relaxation [m]
    real, parameter :: min_flow   =  1.0e-4  ! minimum flow for mixing    [m3/s]
 
@@ -290,7 +295,7 @@ contains
                         shade_i  = min(1.0, max(0.0, rt_domain(did)%F_Shade(i)))
                         SW_net_i = SW_net_i * (1.0 - albedo_i) * (1.0 - shade_i)
                         T_e_i    = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
-                        rt_domain(did)%T_QSUM(i) = min(T_max, max(T_min, T_e_i))
+                        rt_domain(did)%T_QSUM(i) = min(T_max, max(T_water_min, T_e_i))
                      end if
                   end associate
                end if
@@ -333,7 +338,7 @@ contains
             ! --- Equilibrium temperature (24-hr smoothed T_air suppresses diurnal) ---
             ! T_air_i (instantaneous) is retained below for lateral inflow temperature.
             T_e_i = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
-            T_e_i = min(T_max, max(T_min, T_e_i))
+            T_e_i = min(T_max, max(T_water_min, T_e_i))
 
             ! --- Inflow temperature (volume-weighted mixing) ---
             ! Q_acc(i) holds upstream channel inflow (pulled above).  Surface
@@ -342,7 +347,7 @@ contains
                        + max(0.0, rt_domain(did)%InflowLand(i))                 &
                        + max(0.0, rt_domain(did)%InflowGw(i))
             QT_total_i = QT_acc(i)                                              &
-                       + T_air_i * max(0.0, rt_domain(did)%InflowLand(i))      &
+                       + max(T_water_min, T_air_i) * max(0.0, rt_domain(did)%InflowLand(i)) &
                        + T_gw    * max(0.0, rt_domain(did)%InflowGw(i))
 
             if (Q_total_i .gt. min_flow) then
@@ -350,7 +355,7 @@ contains
             else
                T_in_i = T_e_i   ! headwater: initialise at equilibrium
             end if
-            T_in_i = min(T_max, max(T_min, T_in_i))
+            T_in_i = min(T_max, max(T_water_min, T_in_i))
 
             ! --- Exponential relaxation toward equilibrium along the reach ---
             depth_i = rt_domain(did)%HLINK(i)
@@ -363,7 +368,7 @@ contains
             else
                T_out_i = T_in_i   ! very low flow: pass inflow temperature through
             end if
-            T_out_i = min(T_max, max(T_min, T_out_i))
+            T_out_i = min(T_max, max(T_water_min, T_out_i))
 
             rt_domain(did)%T_QSUM(i) = T_out_i
 
