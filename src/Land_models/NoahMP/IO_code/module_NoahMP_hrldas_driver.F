@@ -406,6 +406,12 @@ module module_NoahMP_hrldas_driver
   REAL   , PARAMETER                     :: lake_min_depth = 1.0  ! floor on 1-D lake model depth (m)
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum       ! per-lake sum of outlet-depth temperature over this rank's cells (K)
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell     ! per-lake count of this rank's lake cells
+  ! 1-D lake model sub-stepping: the lake model (with its multi-layer snow)
+  ! is run with a time step no longer than lake_dt_max; fluxes are averaged
+  ! over the sub-steps.  Rain-on-snow at a 3600 s step produced runaway
+  ! lake snow-layer temperatures (t_soisno > 500 K).
+  REAL   , PARAMETER                     :: lake_dt_max = 600.0  ! maximum lake sub-step (s)
+  REAL   , ALLOCATABLE, DIMENSION(:,:)   :: rain_lk, hfx_lk, lh_lk, grdflx_lk, qfx_lk
 
   INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_id
 #endif
@@ -1991,6 +1997,8 @@ end subroutine land_driver_ini
     implicit  none
     type(state_type) :: state
     integer :: itime          ! timestep loop
+    integer :: isub_lk, nsub_lk   ! 1-D lake model sub-steps
+    real    :: dt_lk              ! 1-D lake model sub-step (s)
 #ifdef WRF_HYDRO
     integer :: ilake
     integer :: lake_idx
@@ -2257,9 +2265,28 @@ end subroutine land_driver_ini
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
 
+         ! Sub-step the 1-D lake model (see lake_dt_max).  Each sub-step gets an
+         ! equal share of the step's precipitation (rainbl is an amount per
+         ! step); fluxes are averaged over the sub-steps and the surface state
+         ! (TSK, T2, Q2, albedo) is the last sub-step's.  With one sub-step this
+         ! reproduces the single call exactly.
+         nsub_lk = max(1, ceiling(dtbl / lake_dt_max - 1.0e-4))
+         dt_lk   = dtbl / real(nsub_lk)
+         if (.not. allocated(rain_lk)) then
+            allocate(rain_lk(XSTART:XEND,YSTART:YEND), hfx_lk(XSTART:XEND,YSTART:YEND),    &
+                     lh_lk(XSTART:XEND,YSTART:YEND),   grdflx_lk(XSTART:XEND,YSTART:YEND), &
+                     qfx_lk(XSTART:XEND,YSTART:YEND))
+         end if
+         rain_lk   = rainbl / real(nsub_lk)
+         hfx_lk    = 0.0
+         lh_lk     = 0.0
+         grdflx_lk = 0.0
+         qfx_lk    = 0.0
+
+         do isub_lk = 1, nsub_lk
          CALL Lake(  t_phy        ,p8w            ,dz8w         ,qv_curr         ,&  !i
                      u_phy        ,v_phy          ,glw          ,emiss           ,&
-                     rainbl       ,dtbl           ,swdown       ,albedo          ,&
+                     rain_lk      ,dt_lk          ,swdown       ,albedo          ,&
                      xlat_urb2d   ,z_lake3d       ,dz_lake3d    ,lakedepth2d     ,&
                      watsat3d     ,csol3d         ,tkmg3d       ,tkdry3d         ,&
                      tksatu3d     ,ivgtyp         ,terrain      ,xland           ,&
@@ -2276,6 +2303,19 @@ end subroutine land_driver_ini
                      lakemask                                                    ,&
                      hfx          ,lh             ,grdflx       ,tsk             ,&  !o
                      qfx          ,t2             ,th2          ,q2 )
+            where (lakemask == 1)
+               hfx_lk    = hfx_lk    + hfx
+               lh_lk     = lh_lk     + lh
+               grdflx_lk = grdflx_lk + grdflx
+               qfx_lk    = qfx_lk    + qfx
+            end where
+         end do
+         where (lakemask == 1)
+            hfx    = hfx_lk    / real(nsub_lk)
+            lh     = lh_lk     / real(nsub_lk)
+            grdflx = grdflx_lk / real(nsub_lk)
+            qfx    = qfx_lk    / real(nsub_lk)
+         end where
 
          ! fake values for testing:
          !where(ivgtyp == islake) rainbl  = 2.0
