@@ -11,7 +11,7 @@
 !   Equilibrium temperature:
 !     T_e = T_air + SW_net / K_e
 !     SW_net = SW_in * (1 - albedo) * (1 - shade_factor)
-!     K_e    = bulk surface heat exchange coefficient [W/m2/C]  (parameter K_exchange below)
+!     K_e    = bulk surface heat exchange coefficient [W/m2/C]  (Route_Link Kexch, default K_exchange below)
 !
 !   Temperature routing (exponential relaxation along each reach):
 !     T_out = T_e + (T_in - T_e) * exp(-K_rate * travel_time)
@@ -73,18 +73,24 @@ module module_stream_temperature_eq
    use module_hydro_stop,         only: HYDRO_stop
 #ifdef MPP_LAND
    use module_mpp_reachls,        only: gbcastReal2
-   use module_mpp_land,           only: left_id, down_id, sum_double, sum_real1d
+   use module_mpp_land,           only: left_id, down_id, sum_double, sum_real1d, my_id, io_id
+   use module_mpp_reachls,        only: ReachLS_decomp
 #endif
+   use netcdf
 
    implicit none
    private
-   public :: run_stream_temp_eq
+   public :: run_stream_temp_eq, init_stream_temp_params
 
    ! --- Physical constants ---
    real, parameter :: rho_w      = 1000.0   ! water density [kg/m3]
    real, parameter :: c_p_w      = 4182.0   ! water specific heat [J/kg/°C]
 
-   ! --- Default model parameters (can be promoted to namelist later) ---
+   ! --- Default model parameters ---
+   ! K_exchange, K_sw and T_smooth_tau (and the shade fraction and surface
+   ! albedo, default 0) are per-reach parameters read from optional Route_Link
+   ! variables Kexch, Ksw, TauTair, Shade and Albedo (init_stream_temp_params);
+   ! the values below are the defaults where a variable is absent or invalid.
    real, parameter :: K_exchange =  50.0    ! bulk surface heat exchange coeff [W/m2/°C]
                                             ! Controls relaxation rate: K_rate = K_exchange/(rho_w*c_p*depth)
                                             ! Bracketed against the USGS gauges: 150 relaxed the Cannonsville
@@ -223,7 +229,6 @@ contains
       !   seeded from current forcing; reaches restored from a restart file
       !   continue their EMA seamlessly.
       ! -----------------------------------------------------------------------
-      EMA_alpha = min(1.0, nlst(did)%DT / T_smooth_tau)
 
       do i = 1, nlinksl
          if (rt_domain(did)%Tair_fine_1D(i) .gt. 200.0 .and. &
@@ -233,6 +238,7 @@ contains
             T_air_raw_i = Tair_fallback - 273.15
          end if
          T_air_raw_i = min(T_max, max(T_min, T_air_raw_i))
+         EMA_alpha = min(1.0, nlst(did)%DT / rt_domain(did)%T_TauTair(i))
          if (rt_domain(did)%T_air_smooth(i) .lt. -100.0) then
             rt_domain(did)%T_air_smooth(i) = T_air_raw_i
          else
@@ -348,7 +354,7 @@ contains
                         albedo_i = min(1.0, max(0.0, rt_domain(did)%S_Albedo(i)))
                         shade_i  = min(1.0, max(0.0, rt_domain(did)%F_Shade(i)))
                         SW_net_i = SW_net_i * (1.0 - albedo_i) * (1.0 - shade_i)
-                        T_e_i    = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
+                        T_e_i    = rt_domain(did)%T_air_smooth(i) + SW_net_i / rt_domain(did)%T_Ksw(i)
                         rt_domain(did)%T_QSUM(i) = min(T_max, max(T_water_min, T_e_i))
                      end if
                   end associate
@@ -392,7 +398,7 @@ contains
 
             ! --- Equilibrium temperature (24-hr smoothed T_air suppresses diurnal) ---
             ! T_air_i (instantaneous) is retained below for lateral inflow temperature.
-            T_e_i = rt_domain(did)%T_air_smooth(i) + SW_net_i / K_sw
+            T_e_i = rt_domain(did)%T_air_smooth(i) + SW_net_i / rt_domain(did)%T_Ksw(i)
             T_e_i = min(T_max, max(T_water_min, T_e_i))
 
             ! --- Inflow temperature (volume-weighted mixing) ---
@@ -432,7 +438,7 @@ contains
             vel_i   = max(0.0, rt_domain(did)%velocity(i))
 
             if (depth_i .gt. min_depth .and. vel_i .gt. 0.0) then
-               K_rate      = K_exchange / (rho_w * c_p_w * depth_i)
+               K_rate      = rt_domain(did)%T_Kexch(i) / (rho_w * c_p_w * depth_i)
                travel_time = rt_domain(did)%CHANLEN(i) / vel_i
                T_out_i = T_e_i + (T_in_i - T_e_i) * exp(-K_rate * travel_time)
             else
@@ -451,6 +457,118 @@ contains
       rt_domain(did)%T_QSUM_prev = rt_domain(did)%T_QSUM
 
    end subroutine run_stream_temp_eq
+
+   !---------------------------------------------------------------------------
+   ! Subroutine: init_stream_temp_params
+   !
+   ! Per-reach stream temperature parameters from optional Route_Link
+   ! variables (dimension = reaches, same order as 'link'):
+   !   Kexch   bulk surface heat exchange coefficient [W/m2/C]   default K_exchange
+   !   Ksw     shortwave equilibrium coefficient [W/m2/C]        default K_sw
+   !   TauTair air temperature smoothing e-folding time [s]      default T_smooth_tau
+   !   Shade   shade fraction of incoming shortwave [0-1]        default 0
+   !   Albedo  water surface albedo [0-1]                        default 0
+   ! A variable that is absent uses its default for every reach; values outside
+   ! the valid range (Kexch, Ksw, TauTair <= 0; Shade, Albedo outside 0-1;
+   ! NaN or fill values) use the default for that reach and are counted in the
+   ! log.  Read on the IO rank and distributed like the other Route_Link
+   ! fields.  Shade and Albedo fill F_Shade / S_Albedo, which the reach-based
+   ! configuration otherwise leaves at 0 (the CHANPARM.TBL stream-order values
+   ! are used only by the gridded channel).
+   !---------------------------------------------------------------------------
+   subroutine init_stream_temp_params(did)
+      integer, intent(in) :: did
+
+      integer, parameter :: npar = 5
+      character(len=8), parameter :: pname(npar) = &
+           [character(len=8) :: 'Kexch', 'Ksw', 'TauTair', 'Shade', 'Albedo']
+      real    :: pdef(npar), plo(npar), phi(npar)
+      logical :: lo_open(npar)                ! lower bound exclusive (> lo) or inclusive (>= lo)
+      integer :: nlinksl, gnlinksl, k, j, ncid, varid, iret, nbad
+      logical :: found
+      real, allocatable :: gval(:), lval(:)
+
+      pdef = [K_exchange, K_sw, T_smooth_tau, 0.0, 0.0]
+      plo  = [0.0, 0.0, 0.0, 0.0, 0.0]
+      phi  = [huge(1.0), huge(1.0), huge(1.0), 1.0, 1.0]
+      lo_open = [.true., .true., .true., .false., .false.]
+
+      nlinksl  = rt_domain(did)%NLINKSL
+#ifdef MPP_LAND
+      gnlinksl = rt_domain(did)%GNLINKSL
+#else
+      gnlinksl = nlinksl
+#endif
+      if (.not. allocated(rt_domain(did)%T_Kexch))   allocate(rt_domain(did)%T_Kexch(max(1,nlinksl)))
+      if (.not. allocated(rt_domain(did)%T_Ksw))     allocate(rt_domain(did)%T_Ksw(max(1,nlinksl)))
+      if (.not. allocated(rt_domain(did)%T_TauTair)) allocate(rt_domain(did)%T_TauTair(max(1,nlinksl)))
+      allocate(lval(max(1,nlinksl)))
+
+      ncid = -1
+#ifdef MPP_LAND
+      if (my_id .eq. io_id) then
+#endif
+         allocate(gval(max(1,gnlinksl)))
+         iret = nf90_open(trim(nlst(did)%route_link_f), nf90_nowrite, ncid)
+         if (iret /= nf90_noerr) call hydro_stop('init_stream_temp_params: cannot open Route_Link file ' // &
+                                                 trim(nlst(did)%route_link_f))
+#ifdef MPP_LAND
+      else
+         allocate(gval(1))
+      end if
+#endif
+
+      do k = 1, npar
+#ifdef MPP_LAND
+         if (my_id .eq. io_id) then
+#endif
+            gval = pdef(k)
+            found = nf90_inq_varid(ncid, trim(pname(k)), varid) == nf90_noerr
+            nbad = 0
+            if (found) then
+               iret = nf90_get_var(ncid, varid, gval(1:gnlinksl))
+               if (iret /= nf90_noerr) call hydro_stop('init_stream_temp_params: cannot read Route_Link ' // &
+                                                       trim(pname(k)))
+               do j = 1, gnlinksl
+                  if (gval(j) /= gval(j) .or. gval(j) > phi(k) .or. &
+                      (lo_open(k) .and. gval(j) <= plo(k)) .or. (.not. lo_open(k) .and. gval(j) < plo(k))) then
+                     gval(j) = pdef(k)
+                     nbad = nbad + 1
+                  end if
+               end do
+               write(6,'(a,a,a,i0,a,es11.4,a,es11.4,a,i0,a)') ' init_stream_temp_params: ', trim(pname(k)), &
+                    ' read from Route_Link for ', gnlinksl, ' reaches (min ', minval(gval(1:gnlinksl)), &
+                    ', max ', maxval(gval(1:gnlinksl)), '); ', nbad, ' invalid values replaced by the default'
+            else
+               write(6,'(a,a,a,es11.4)') ' init_stream_temp_params: ', trim(pname(k)), &
+                    ' not in Route_Link; default for all reaches = ', pdef(k)
+            end if
+#ifdef MPP_LAND
+         end if
+         call ReachLS_decomp(gval, lval)
+#else
+         lval(1:nlinksl) = gval(1:nlinksl)
+#endif
+         select case (k)
+         case (1); rt_domain(did)%T_Kexch(1:nlinksl)   = lval(1:nlinksl)
+         case (2); rt_domain(did)%T_Ksw(1:nlinksl)     = lval(1:nlinksl)
+         case (3); rt_domain(did)%T_TauTair(1:nlinksl) = lval(1:nlinksl)
+         case (4); rt_domain(did)%F_Shade(1:nlinksl)   = lval(1:nlinksl)
+         case (5); rt_domain(did)%S_Albedo(1:nlinksl)  = lval(1:nlinksl)
+         end select
+      end do
+
+#ifdef MPP_LAND
+      if (my_id .eq. io_id) then
+#endif
+         iret = nf90_close(ncid)
+#ifdef MPP_LAND
+      end if
+#endif
+      deallocate(gval, lval)
+      call flush(6)
+
+   end subroutine init_stream_temp_params
 
    !---------------------------------------------------------------------------
    ! fill_forcing_from_upstream: reaches with no catchment in the spatialweights

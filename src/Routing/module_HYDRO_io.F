@@ -9618,12 +9618,19 @@ end function get_netcdf_dim
 
 ! read the GWBUCKET Parm for NHDPlus
 subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
-                gw_buck_loss, z_max, z_init, LINKID, nhdBuckMask)
+                gw_buck_loss, z_max, z_init, LINKID, nhdBuckMask, dtherm)
     implicit none
     integer, intent(in) :: numbasns
     integer(kind=int64), dimension(numbasns) :: LINKID
     real, dimension(numbasns) :: gw_buck_coeff, gw_buck_exp, gw_buck_loss
     real, dimension(numbasns) :: z_max, z_init
+    ! Optional GWBUCKPARM 'Dtherm': bucket thermal damping depth [m water
+    ! equivalent] for the bucket temperature (water_temperature=2).  Buckets
+    ! not in the file, a file without Dtherm, and negative/NaN values keep the
+    ! value passed in (0 = no damping).
+    real, dimension(numbasns), intent(inout) :: dtherm
+    real, allocatable, dimension(:) :: tmpDtherm
+    integer :: has_dtherm, nbad_dtherm
     integer, dimension(numbasns) :: nhdBuckMask
     character(len=*), intent(in) :: infile
 !   define temp array
@@ -9657,6 +9664,9 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
     allocate(tmpLoss(gnid))
     allocate(tmpz_max(gnid))
     allocate(tmpz_init(gnid))
+    allocate(tmpDtherm(gnid))
+    tmpDtherm = -1.0
+    has_dtherm = 0
 #ifdef MPP_LAND
     if(my_id .eq. io_id ) then
 #endif
@@ -9704,8 +9714,22 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
                call hydro_stop("Failed to read BUCKETPARM")
           endif
           iret = nf90_get_var(ncid, varid, tmpLinkID)
+
+          iret = nf90_inq_varid(ncid, "Dtherm",  varid)
+          if(iret == 0) then
+               iret = nf90_get_var(ncid, varid, tmpDtherm)
+               if(iret /= 0) call hydro_stop("Failed to read Dtherm from BUCKETPARM")
+               has_dtherm = 1
+               nbad_dtherm = count(tmpDtherm /= tmpDtherm .or. tmpDtherm < 0.0)
+               where(tmpDtherm /= tmpDtherm .or. tmpDtherm < 0.0) tmpDtherm = -1.0
+               write(6,'(a,i0,a,i0,a)') " readBucket_nhd: Dtherm read from GWBUCKPARM for ", gnid, &
+                    " buckets; ", nbad_dtherm, " negative/invalid values use the default"
+          else
+               write(6,*) "readBucket_nhd: Dtherm not in GWBUCKPARM; default thermal damping depth for all buckets"
+          endif
 #ifdef MPP_LAND
     endif
+    call mpp_land_bcast_int1(has_dtherm)
        if(gnid .gt. 0) then
           call mpp_land_bcast_real_1d(tmpCoeff)
           call mpp_land_bcast_real_1d(tmpExp)
@@ -9715,6 +9739,7 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
           call mpp_land_bcast_real_1d(tmpz_max)
           call mpp_land_bcast_real_1d(tmpz_init)
           call mpp_land_bcast_int8(gnid ,tmpLinkid)
+          if(has_dtherm .eq. 1) call mpp_land_bcast_real_1d(tmpDtherm)
        endif
 #endif
 
@@ -9752,6 +9777,7 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
                   end if
                   z_max(val) = tmpz_max(it)
                   z_init(val) = tmpz_init(it)
+                  if(tmpDtherm(it) .ge. 0.0) dtherm(val) = tmpDtherm(it)
                   nhdBuckMask(val) = 1
                end if
             end if
@@ -9765,6 +9791,7 @@ subroutine readBucket_nhd(infile, numbasns, gw_buck_coeff, gw_buck_exp, &
     if(allocated(tmpz_max)) deallocate(tmpz_max)
     if(allocated(tmpz_init)) deallocate(tmpz_init)
     if(allocated(tmpLinkid)) deallocate(tmpLinkid)
+    if(allocated(tmpDtherm)) deallocate(tmpDtherm)
 end subroutine readBucket_nhd
 
 !-- output the channel routine for fast output.

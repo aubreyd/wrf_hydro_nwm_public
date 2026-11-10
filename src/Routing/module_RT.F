@@ -1430,6 +1430,8 @@ subroutine LandRT_ini(did)
         allocate (rt_domain(did)%gw_buck_exp(rt_domain(did)%numbasns))
         allocate (rt_domain(did)%z_max (rt_domain(did)%numbasns))
         allocate (rt_domain(did)%basns_area (rt_domain(did)%numbasns))
+        allocate (rt_domain(did)%gw_buck_dtherm (rt_domain(did)%numbasns))
+        rt_domain(did)%gw_buck_dtherm = 0.0   ! no thermal damping unless GWBUCKPARM has Dtherm
 
         if(nlst(did)%bucket_loss .eq. 1) then
            allocate(rt_domain(did)%qloss_gwsubbas(rt_domain(did)%numbasns))
@@ -1454,7 +1456,7 @@ subroutine LandRT_ini(did)
         call readBucket_nhd(trim(nlst(did)%GWBUCKPARM_file), rt_domain(did)%numbasns, &
              rt_domain(did)%gw_buck_coeff, rt_domain(did)%gw_buck_exp, rt_domain(did)%gw_buck_loss, &
              rt_domain(did)%z_max, rt_domain(did)%z_gwsubbas, rt_domain(did)%LINKID(1:rt_domain(did)%numbasns),  &
-             rt_domain(did)%nhdBuckMask )
+             rt_domain(did)%nhdBuckMask, rt_domain(did)%gw_buck_dtherm )
 
       !ADCHANGE: Added in read for z_init from GWBUCKPARM. Units coming in are mm but z_gwsubbas is in m
       !for UDMP=1 so we convert units.

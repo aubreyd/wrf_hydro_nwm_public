@@ -56,7 +56,8 @@ contains
         nhdBuckMask,   bucket_loss,       &
         channelBucket_only,               &
         track_temp,    runoff2x_t_in,     &
-        z_gwsubbas_t,  qout_gwsubbas_t )
+        z_gwsubbas_t,  qout_gwsubbas_t,   &
+        D_therm )
 
    use module_UDMAP, only: LNUMRSL, LUDRSL
 
@@ -96,18 +97,19 @@ contains
    real, intent(in),    dimension(ix,jx)             :: runoff2x_t_in   ! drainage temperature [K]
    real, intent(inout), dimension(:)                 :: z_gwsubbas_t    ! bucket water temperature [K]
    real, intent(inout), dimension(:)                 :: qout_gwsubbas_t ! bucket outflow temperature [K]
+   ! Conceptual thermal damping depth per bucket [m water-equivalent]
+   ! (GWBUCKPARM Dtherm, default 0): heat capacity of the aquifer material
+   ! that the bucket water exchanges heat with, expressed as an equivalent
+   ! depth of water.  Inflow heat mixes into (z + D_therm), so the bucket
+   ! temperature responds more slowly than its water turns over (thermal
+   ! retardation); it does not change the bucket water balance.  0 = no damping.
+   real, intent(in),    dimension(numbasns)          :: D_therm
    real, dimension(ixrt,jxrt)                        :: runoff2x_t
    real*8,  dimension(LNLINKSL) :: LQheat, LQvolT, LTsoil_num, LTsoil_den
    real, dimension(numbasns)    :: net_heat, net_volT, Tsoil_num, Tsoil_den
    real    :: T_in, z_old, dz_in, vol
    real, parameter :: T_valid_lo = 200.0, T_valid_hi = 350.0   ! plausible water/soil temperature [K]
    real, parameter :: T_unset    = -9999.0                     ! sentinel: bucket temperature not yet set
-   ! Conceptual thermal damping depth [m water-equivalent]: heat capacity of the
-   ! aquifer material that the bucket water exchanges heat with, expressed as an
-   ! equivalent depth of water.  Inflow heat mixes into (z + D_therm), so the
-   ! bucket temperature responds more slowly than its water turns over (thermal
-   ! retardation); it does not change the bucket water balance.  0 = no damping.
-   real, parameter :: D_therm    = 0.0
 
    integer                                           :: i,j,bas, k, m, ii,jj
 
@@ -249,11 +251,11 @@ contains
                   z_gwsubbas_t(bas) = Tsoil_num(bas) / Tsoil_den(bas)
             end if
             if (T_in .gt. T_valid_lo .and. dz_in .gt. 0.0) then
-               if (z_gwsubbas_t(bas) .lt. T_valid_lo .or. (z_old + D_therm) .le. 0.0) then
+               if (z_gwsubbas_t(bas) .lt. T_valid_lo .or. (z_old + D_therm(bas)) .le. 0.0) then
                   z_gwsubbas_t(bas) = T_in
                else
-                  z_gwsubbas_t(bas) = ((z_old + D_therm)*z_gwsubbas_t(bas) + dz_in*T_in) &
-                                    / (z_old + D_therm + dz_in)
+                  z_gwsubbas_t(bas) = ((z_old + D_therm(bas))*z_gwsubbas_t(bas) + dz_in*T_in) &
+                                    / (z_old + D_therm(bas) + dz_in)
                end if
             end if
          end if

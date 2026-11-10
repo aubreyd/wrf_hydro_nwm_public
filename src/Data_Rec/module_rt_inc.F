@@ -129,6 +129,7 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)        :: gw_buck_coeff    !GW bucket model coefficient
   REAL, allocatable, DIMENSION(:)        :: gw_buck_exp      !GW bucket model exponent
   REAL, allocatable, DIMENSION(:)        :: gw_buck_loss     !GW bucket model loss fraction
+  REAL, allocatable, DIMENSION(:)        :: gw_buck_dtherm   !GW bucket thermal damping depth [m] (GWBUCKPARM Dtherm, optional)
   REAL, allocatable, DIMENSION(:)        :: z_max            !Height of GW bucket
 !DJG Switch for Deep Sat GW Init:
   INTEGER                                :: DEEPGWSPIN  !Switch to setup deep GW spinp
@@ -305,6 +306,10 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: NetRad
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
    REAL,    allocatable, DIMENSION(:)   :: T_air_smooth   ! 24-h EMA of air temperature [C] (water_temperature=2)
+   ! Per-reach stream temperature parameters (Route_Link, optional; water_temperature=2)
+   REAL,    allocatable, DIMENSION(:)   :: T_Kexch        ! bulk surface heat exchange coefficient [W/m2/C]
+   REAL,    allocatable, DIMENSION(:)   :: T_Ksw          ! shortwave equilibrium coefficient [W/m2/C]
+   REAL,    allocatable, DIMENSION(:)   :: T_TauTair      ! air temperature smoothing e-folding time [s]
    REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
    REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
    REAL,    allocatable, DIMENSION(:)   :: InflowLand

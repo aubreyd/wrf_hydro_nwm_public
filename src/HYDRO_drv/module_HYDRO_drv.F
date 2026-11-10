@@ -49,7 +49,7 @@ module module_HYDRO_drv
 #endif
    use module_hydro_stop, only: HYDRO_stop
    use module_UDMAP, only: get_basn_area_nhd
-   use module_stream_temperature_eq, only: run_stream_temp_eq
+   use module_stream_temperature_eq, only: run_stream_temp_eq, init_stream_temp_params
    use netcdf
 
    implicit none
@@ -835,7 +835,8 @@ subroutine driveGwBaseflow(did)
               rt_domain(did)%nhdBuckMask,   nlst(did)%bucket_loss,       &
               nlst(did)%channelBucket_only,                                &
               (nlst(did)%water_temperature .eq. 2), RT_DOMAIN(did)%SOLDRAIN_T, &
-              RT_DOMAIN(did)%z_gwsubbas_t,  RT_DOMAIN(did)%qout_gwsubbas_t )
+              RT_DOMAIN(did)%z_gwsubbas_t,  RT_DOMAIN(did)%qout_gwsubbas_t, &
+              RT_DOMAIN(did)%gw_buck_dtherm )
 
             else
                 call simp_gw_buck(RT_DOMAIN(did)%ix,RT_DOMAIN(did)%jx,RT_DOMAIN(did)%ixrt,&
@@ -1629,6 +1630,10 @@ if(nlst(did)%channel_only .ne. 1)  call get_dist_lrt(did) !! needed forchannelBu
 
 ! rt model initilization
 call LandRT_ini(did)
+
+! Per-reach stream temperature parameters (optional Route_Link variables)
+if (nlst(did)%water_temperature .eq. 2 .and. nlst(did)%UDMP_OPT .eq. 1) &
+   call init_stream_temp_params(did)
 
 if(nlst(did)%GWBASESWCRT .eq. 3 ) then
 
