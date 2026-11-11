@@ -5,13 +5,13 @@ Compares daily-mean CHRTOUT riverTemp with USGS daily mean water temperature
 season (DJF/MAM/JJA/SON), by gauge group, and per gauge.
 
 Gauge selection and grouping:
-  - Only gauges in HUC8 02040101 and 02040102 are used (the HUCs fully
-    contained in the DRB model domain); requires a 'huc8' column in
-    usgs_sites.csv.
+  - Only gauges in the HUC8s given by --huc8 are used (default 02040101 and
+    02040102, the HUCs fully contained in the DRB model domain); requires a
+    'huc8' column in usgs_sites.csv.
   - Each gauge is labelled 'below reservoir' if its reach is downstream of the
-    Cannonsville (2613174) or Pepacton (1748473) lake reaches in Route_Link
-    (NHDWaterbodyComID, followed via 'to'), else 'above reservoir'
-    (unregulated, baseflow-controlled).
+    lake reaches of a --lakes reservoir in Route_Link (NHDWaterbodyComID,
+    followed via 'to'), else 'above reservoir' (unregulated, baseflow-
+    controlled).  Default: DRB Cannonsville (2613174) and Pepacton (1748473).
 
 Inputs:
   OUTDIR      model output directory with hourly *.CHRTOUT_DOMAIN1 files
@@ -27,19 +27,37 @@ Inputs:
 Hourly CHRTOUT times are end-of-hour; they are shifted back 1 h before daily
 averaging so 01..24 UTC fall on the same day.
 
+If usgs_daily_temperature.csv has tmax / tmin, a last table compares daily
+maximum, minimum and diurnal range (model days in local standard time,
+LOCAL_UTC_OFFSET_H, as USGS daily values are) by gauge group and season.
+
 usage: python eval_usgs_seasonal.py OUTDIR OBSDIR START END CACHE.csv [ROUTE_LINK]
+                                    [--huc8 H1,H2] [--lakes ID:name,...]
 example (DRB spun-up run, evaluation year after spinup):
   python eval_usgs_seasonal.py run_dirs/run.drb_spinup_surft/OUTDIR \
       NASA_WaterTemperature/USGS_OBS_2017-2019 2018-10-01 2019-10-10 sim_surft.csv
+example (Lake Lanier domain, Upper Chattahoochee):
+  python eval_usgs_seasonal.py run.lanier_spinup/OUTDIR USGS_OBS_LANIER_2017-2019 \
+      2018-10-01 2019-10-10 sim_lanier.csv --huc8 03130001 --lakes 6495106:Lanier
 """
-import sys, os, glob
+import os, glob, argparse
 import numpy as np, pandas as pd
 import netCDF4 as nc
 
-outdir, obsdir, start, end, cache = sys.argv[1:6]
-route_link = sys.argv[6] if len(sys.argv) > 6 else os.path.join(os.path.dirname(os.path.abspath(outdir)), 'DOMAIN', 'Route_Link.nc')
-RESERVOIRS = {2613174: 'Cannonsville', 1748473: 'Pepacton'}   # the reservoirs set up in the model
-EVAL_HUC8 = {'02040101', '02040102'}   # HUCs fully contained in the DRB model domain
+ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+for a in ('outdir', 'obsdir', 'start', 'end', 'cache'):
+    ap.add_argument(a)
+ap.add_argument('route_link', nargs='?')
+ap.add_argument('--huc8', default='02040101,02040102',
+                help='comma-separated HUC8s to evaluate (default: DRB 02040101,02040102)')
+ap.add_argument('--lakes', default='2613174:Cannonsville,1748473:Pepacton',
+                help='comma-separated LAKE_ID:name of the reservoirs set up in the model '
+                     '(default: DRB Cannonsville, Pepacton)')
+args = ap.parse_args()
+outdir, obsdir, start, end, cache = args.outdir, args.obsdir, args.start, args.end, args.cache
+route_link = args.route_link or os.path.join(os.path.dirname(os.path.abspath(outdir)), 'DOMAIN', 'Route_Link.nc')
+RESERVOIRS = {int(k): v for k, v in (x.split(':') for x in args.lakes.split(','))}
+EVAL_HUC8 = set(args.huc8.split(','))
 
 sites = pd.read_csv(f'{obsdir}/usgs_sites.csv', dtype={'site_no': str, 'huc8': str})
 sites = sites[sites.huc8.isin(EVAL_HUC8)]
@@ -111,3 +129,33 @@ piv = piv.reindex(columns=['DJF', 'MAM', 'JJA', 'SON'])
 piv['RMSE'] = m.groupby(['group', 'reservoir', 'site_no', 'station_nm']).err.apply(lambda e: np.sqrt((e ** 2).mean()))
 piv['n'] = m.groupby(['group', 'reservoir', 'site_no', 'station_nm']).size()
 print(piv.round(2).to_string())
+
+# --- daily maximum / minimum and diurnal range ---
+# USGS daily values are for local standard time days, so the model's daily
+# max/min use local-standard-time days (UTC offset below; -5 h = EST for the
+# DRB).  The daily-mean statistics above keep UTC days.
+LOCAL_UTC_OFFSET_H = -5
+if {'tmax', 'tmin'}.issubset(obs.columns):
+    loc = sim.shift(-1, freq='h').shift(LOCAL_UTC_OFFSET_H, freq='h')
+    dx = loc.resample('D').max().loc[start:end]
+    dn = loc.resample('D').min().loc[start:end]
+    mm = []
+    for name, tab in (('simmax', dx), ('simmin', dn)):
+        t = tab.reset_index().melt(id_vars='time', var_name='comid', value_name=name)
+        t['comid'] = t.comid.astype(int)
+        mm.append(t.rename(columns={'time': 'date'}).set_index(['comid', 'date']))
+    x = obs.merge(mm[0].join(mm[1]).reset_index(), on=['comid', 'date'], how='inner')
+    x = x.dropna(subset=['tmax', 'tmin', 'simmax', 'simmin'])
+    x['season'] = x.date.dt.month.map({12: 'DJF', 1: 'DJF', 2: 'DJF', 3: 'MAM', 4: 'MAM', 5: 'MAM',
+                                       6: 'JJA', 7: 'JJA', 8: 'JJA', 9: 'SON', 10: 'SON', 11: 'SON'})
+    x['group'] = np.where(x.comid.map(lambda c: c in below), 'below reservoir', 'above reservoir')
+
+    def mxstats(g):
+        emax, emin = g.simmax - g.tmax, g.simmin - g.tmin
+        return pd.Series({'n': len(g), 'obs_max': g.tmax.mean(), 'bias_max': emax.mean(),
+                          'rmse_max': np.sqrt((emax ** 2).mean()), 'bias_min': emin.mean(),
+                          'obs_range': (g.tmax - g.tmin).mean(), 'sim_range': (g.simmax - g.simmin).mean()})
+
+    print(f'\nDaily maximum / minimum (local standard time days, UTC{LOCAL_UTC_OFFSET_H:+d} h):')
+    print(x.groupby(['group', 'season'])[['tmax', 'tmin', 'simmax', 'simmin']].apply(mxstats)
+          .reindex(['DJF', 'MAM', 'JJA', 'SON'], level=1).round(2).to_string())
