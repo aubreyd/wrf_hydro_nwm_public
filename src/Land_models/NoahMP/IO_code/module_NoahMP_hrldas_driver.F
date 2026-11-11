@@ -406,6 +406,8 @@ module module_NoahMP_hrldas_driver
   REAL   , PARAMETER                     :: lake_min_depth = 1.0  ! floor on 1-D lake model depth (m)
   REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum       ! per-lake sum of outlet-depth temperature over this rank's cells (K)
   INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell     ! per-lake count of this rank's lake cells
+  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum_dp    ! as lake_t_sum, cells whose column reaches the outlet depth
+  INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell_dp  ! as lake_t_ncell, cells whose column reaches the outlet depth
   INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_ix          ! routing lake index of each lake cell (0 = none)
   ! 1-D lake model sub-stepping: the lake model (with its multi-layer snow)
   ! is run with a time step no longer than lake_dt_max; fluxes are averaged
@@ -1884,6 +1886,8 @@ endif
    allocate(lake_resht_prev(nlakes))
    allocate(lake_t_sum(nlakes))
    allocate(lake_t_ncell(nlakes))
+   allocate(lake_t_sum_dp(nlakes))
+   allocate(lake_t_ncell_dp(nlakes))
    lake_precip = 0.0
    lake_evap   = 0.0
    lake_grids  = 0
@@ -1892,6 +1896,8 @@ endif
    lake_netoutflow = 0.0
    lake_t_sum   = 0.0
    lake_t_ncell = 0
+   lake_t_sum_dp   = 0.0
+   lake_t_ncell_dp = 0
 
 #endif
 
@@ -2007,8 +2013,8 @@ end subroutine land_driver_ini
     integer :: lake_idx
     integer, parameter :: did=1
     ! lake outlet-depth temperature sampling
-    integer :: il, jl, kl, ncell_lk
-    real    :: z_out, t_sum, t_col, wgt_lk
+    integer :: il, jl, kl, ncell_lk, ncell_dp
+    real    :: z_out, t_sum, t_col, wgt_lk, t_sum_dp
 #endif
 
 !---------------------------------------------------------------------------------
@@ -2361,11 +2367,17 @@ end subroutine land_driver_ini
            ! Pass water temperature from 1D lake physics to routing [K], sampled
            ! at the lake's outlet (withdrawal) depth below the surface.  Each
            ! column's profile t_lake3d/z_lake3d is interpolated at the outlet
-           ! depth (clamped to the column), then averaged over the lake's cells.
+           ! depth (clamped to the column), then averaged over the lake's cells
+           ! whose column (bottom of the lowest lake layer) reaches the outlet
+           ! depth, so shallow coves and arms do not contribute their warm
+           ! bottom water to a deep withdrawal.  If no cell reaches the outlet
+           ! depth, all cells are averaged (each at its clamped depth).
            ! LakeOutletDepth = 0 reproduces the legacy surface-layer withdrawal.
            z_out    = rt_domain(did)%LakeOutletDepth(ilake)
            t_sum    = 0.0
            ncell_lk = 0
+           t_sum_dp = 0.0
+           ncell_dp = 0
            do jl = YSTART, YEND
               do il = XSTART, XEND
                  if (lake_id(il,jl) == lake_idx) then
@@ -2387,11 +2399,17 @@ end subroutine land_driver_ini
                     end if
                     t_sum    = t_sum + t_col
                     ncell_lk = ncell_lk + 1
+                    if (z_out .le. z_lake3d(il,nlevlake,jl) + 0.5 * dz_lake3d(il,nlevlake,jl)) then
+                       t_sum_dp = t_sum_dp + t_col
+                       ncell_dp = ncell_dp + 1
+                    end if
                  end if
               end do
            end do
-           lake_t_sum(ilake)   = t_sum
-           lake_t_ncell(ilake) = ncell_lk
+           lake_t_sum(ilake)      = t_sum
+           lake_t_ncell(ilake)    = ncell_lk
+           lake_t_sum_dp(ilake)   = t_sum_dp
+           lake_t_ncell_dp(ilake) = ncell_dp
 
          end do
 
@@ -2403,6 +2421,8 @@ end subroutine land_driver_ini
 #ifdef MPP_LAND
          call sum_real1d(lake_t_sum, nlakes)
          call sum_int1d(lake_t_ncell, nlakes)
+         call sum_real1d(lake_t_sum_dp, nlakes)
+         call sum_int1d(lake_t_ncell_dp, nlakes)
 #endif
 
          ! Reduce lake cell counts and P/E sums across ranks so every rank holds
@@ -2452,7 +2472,9 @@ end subroutine land_driver_ini
          end if
 
          do ilake = 1, nlakes
-           if (lake_t_ncell(ilake) .gt. 0) then
+           if (lake_t_ncell_dp(ilake) .gt. 0) then
+              rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum_dp(ilake) / real(lake_t_ncell_dp(ilake))
+           else if (lake_t_ncell(ilake) .gt. 0) then
               rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum(ilake) / real(lake_t_ncell(ilake))
            end if
 #ifdef HYDRO_D
