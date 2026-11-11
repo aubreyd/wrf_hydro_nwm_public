@@ -833,7 +833,7 @@ SUBROUTINE ShalLakeFluxes(forc_t,forc_pbot,forc_psrf,forc_hgt,forc_hgt_q,       
        if (snl(c) > 0 .or. snl(c) < -5) then
          WRITE(message,*)  'snl is not defined in ShalLakeFluxesMod'
          CALL wrf_message(message)
-         CALL wrf_error_fatal("snl: out of range value")
+         CALL lake_fatal ("snl: out of range value")
        end if
 !       if (snl(c) /= 0) then
 !           write(6,*)'snl is not equal to zero in ShalLakeFluxesMod'
@@ -1133,7 +1133,7 @@ SUBROUTINE ShalLakeFluxes(forc_t,forc_pbot,forc_psrf,forc_hgt,forc_hgt_q,       
            CALL wrf_message(message)
        end if
        if (abs(eflx_sh_tot(p)) > 10000 .or. abs(eflx_lh_tot(p)) > 10000 &
-             .or. abs(t_grnd(c)-288)>200 ) CALL wrf_error_fatal ( 't_grnd is out of range' ) 
+             .or. abs(t_grnd(c)-288)>200 ) CALL lake_fatal ( 't_grnd is out of range' ) 
 #endif
        ! 2 m height air temperature
        t_ref2m(p) = thm(c) + temp1(p)*dth(p)*(1._r8/temp12m(p) - 1._r8/temp1(p))
@@ -1666,7 +1666,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
                 WRITE( message,* ) 'WARNING: Extreme t_soisno at c, level',c, j
                 WRITE( message,* ) 't_soisno at c, level = ',c, j, t_soisno(c,j)
 
-                CALL wrf_error_fatal ( message )
+                CALL lake_fatal ( message )
              endif
           end if
        end do
@@ -1875,7 +1875,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
           if(abs(errsoi(c)) > 1.e-5_r8) then
              WRITE( message,* )'Primary soil energy conservation error in shlake &
                                 column during Tridiagonal Solution,', 'error (W/m^2):', c, errsoi(c) 
-             CALL wrf_error_fatal ( message )
+             CALL lake_fatal ( message )
           end if
        end do
        ! This has to be done before convective mixing because the heat capacities for each layer
@@ -1935,7 +1935,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
           if(abs(errsoi(c)) > 1.e-5_r8) then
              write(message,*)'Primary soil energy conservation error in shlake column during Phase Change, error (W/m^2):', &
                        c, errsoi(c)
-             CALL wrf_error_fatal ( message )
+             CALL lake_fatal ( message )
           end if
        end do
 
@@ -1952,7 +1952,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
              if (abs(wsum(c)-wsum_end(c))>1.e-7_r8) then
                 write(message,*)'Soil water balance error during phase change in ShalLakeTemperature.', &
                           'column, error (kg/m^2):', c, wsum_end(c)-wsum(c)
-                CALL wrf_error_fatal ( message )
+                CALL lake_fatal ( message )
              end if
           end if
        end do
@@ -2264,7 +2264,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
 !                satw = min(1._r8, satw)
                 if (satw < 0.999_r8) then
                    write(message,*)'WARNING: soil layer unsaturated in SoilThermProp_Lake, satw, j = ', satw, j
-                   CALL wrf_error_fatal ( message )
+                   CALL lake_fatal ( message )
                 end if
           ! Could use denice because if it starts out frozen, the volume of water will go below sat.,
           ! since we're not yet doing excess ice.
@@ -3107,6 +3107,11 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
              if (heatrem + denh2o*dz_lake(c,1)*hfus > 0._r8) then            
                 ! Remove snow and subtract the latent heat from the top layer.
                 h2osno(c) = 0._r8
+                ! Also reset the snow depth (as CLM4.5): otherwise the next snowfall
+                ! builds new layers of the old depth around a few mm of water, snow of
+                ! ~10 kg/m3 with almost no heat capacity, and the snow temperature
+                ! solution diverges (Lake Lanier, NLDAS-2 forcing, 2018-02-04).
+                snowdp(c) = 0._r8
                 snl(c) = 0
                 ! The rest of the bookkeeping for the removed snow will be done below.
 #if (defined LAKEDEBUG)
@@ -3115,7 +3120,9 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
                 CALL wrf_message(message)
 #endif
                 if (heatrem > 0._r8) then ! simply subtract the heat from the layer
-                   t_lake(c,1) = t_lake(c,1) - heatrem/(cpliq*denh2o*dz_lake(c,1))
+                   ! (heatsum, not heatrem: t_lake - heatrem/C = tfrz + heatsum/C would
+                   ! warm the layer by the latent heat it gives up; as CLM5)
+                   t_lake(c,1) = t_lake(c,1) - heatsum(c)/(cpliq*denh2o*dz_lake(c,1))
                 else !freeze part of the layer
                    t_lake(c,1) = tfrz
                    lake_icefrac(c,1) = -heatrem/(denh2o*dz_lake(c,1)*hfus)
@@ -3228,7 +3235,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
             if(j == 0 .and. abs(snow_water(c)-h2osno(c))>1.e-7_r8) then
                write(message,*)'h2osno does not equal sum of snow layers in ShalLakeHydrology:', &
                          'column, h2osno, sum of snow layers =', c, h2osno(c), snow_water(c)
-               CALL wrf_error_fatal ( message )
+               CALL lake_fatal ( message )
             end if
          end if
       end do
@@ -5136,7 +5143,7 @@ end subroutine LakeDebug
         h2osoi_vol3d(i,:,j)    = 0.0
         snl2d(i,j)             = 0.0
           if ( use_lakedepth.eq.1 .and.lake_depth_flag.eq.0 ) then !mchen
-          call wrf_error_fatal ( 'STOP: You need lake-depth information. Rerun WPS or set use_lakedepth = 0')
+          call lake_fatal ( 'STOP: You need lake-depth information. Rerun WPS or set use_lakedepth = 0')
           end if
           if ( use_lakedepth.eq.0 .and.lake_depth_flag.eq.1 ) then !mchen
           lake_depth_flag = 0 
@@ -5607,7 +5614,7 @@ end subroutine LakeDebug
 
      if ( lake(i,j) ) then
           if ( use_lakedepth.eq.1 .and.lake_depth_flag.eq.0 ) then !mchen
-          call wrf_error_fatal ( 'STOP: You need lake-depth information. Rerun WPS or set use_lakedepth = 0')
+          call lake_fatal ( 'STOP: You need lake-depth information. Rerun WPS or set use_lakedepth = 0')
           end if
 
      endif
@@ -5748,5 +5755,20 @@ end subroutine LakeDebug
   ENDDO
   write(*,*) 'End of Lake Physics Model initiation for restart case'
   END SUBROUTINE lakeini_rst
+
+!-------------------------------------------------------------------------------
+! Fatal error in the lake model.  Stops all ranks through HYDRO_stop
+! (MPI_Abort in MPP builds): wrf_error_fatal is defined in more than one
+! library (e.g. LIS also has one that only STOPs the calling rank), so in a
+! coupled executable the one linked can leave the other ranks waiting forever.
+!-------------------------------------------------------------------------------
+  SUBROUTINE lake_fatal ( msg )
+    use module_hydro_stop, only: HYDRO_stop
+    implicit none
+    character(len=*), intent(in) :: msg
+    write(6,*) 'FATAL ERROR (1-D lake model): ', trim(msg)
+    call flush(6)
+    call HYDRO_stop('1-D lake model: '//trim(msg))
+  END SUBROUTINE lake_fatal
 
 END MODULE module_sf_lake
