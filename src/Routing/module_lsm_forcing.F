@@ -55,6 +55,9 @@ type :: weather_2D_inputs
       REAL, allocatable, dimension(:,:)   :: short   	! Shortwave radiation.
 !!!!!TLE: adding pressure--rewriting a few of the equations in the water temperature section
       REAL, allocatable, dimension (:,:)  :: sfcp   ! surface pressure
+      ! coupled use (NUOPC cap): forcing for the 1-D lake model
+      REAL, allocatable, dimension (:,:)  :: lwdown ! downward longwave radiation [W m-2]
+      REAL, allocatable, dimension (:,:)  :: prcp   ! precipitation rate [kg m-2 s-1]
       contains
       !procedure :: init => weather_2D_inputs_init
       procedure :: destroy => weather_2D_inputs_destroy

@@ -49,7 +49,10 @@ module wrfhydro_nuopc_gluecode
     weather2d
   use config_base, only: &
     nlst, &
+    noah_lsm, &
     init_namelist_rt_field
+  use module_lake1d, only: &
+    lake1d_cpl_init, lake1d_cpl_step, lake1d_cpl_post
   use orchestrator_base
   use wrfhydro_nuopc_fields
   use wrfhydro_nuopc_flags
@@ -303,11 +306,23 @@ contains
       allocate(weather2d%wind(rt_domain(did)%ix,rt_domain(did)%jx))
     if (.not. allocated(weather2d%sfcp)) &
       allocate(weather2d%sfcp(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%lwdown)) &
+      allocate(weather2d%lwdown(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%prcp)) &
+      allocate(weather2d%prcp(rt_domain(did)%ix,rt_domain(did)%jx))
     weather2d%T2    = 288.0
     weather2d%short = 0.0
     weather2d%q2x   = 0.0
     weather2d%wind  = 0.0
     weather2d%sfcp  = 100000.0
+    weather2d%lwdown = 0.0
+    weather2d%prcp   = 0.0
+
+    ! 1-D lake model (SF_LAKE_PHYSICS = 1 in namelist.hrldas), on the lake cells
+    ! of the setup file (HRLDAS_SETUP_FILE); its forcing is imported from the LSM
+    if (noah_lsm%sf_lake_physics == 1) then
+      call lake1d_cpl_init(x_start, x_end, y_start, y_end, did)
+    endif
 #ifdef DEBUG
     call ESMF_LogWrite(MODNAME//": Exit HYDRO_ini", ESMF_LOGMSG_INFO)
     call WRFHYDRO_domainLog(did,MODNAME,rc=rc)
@@ -472,8 +487,18 @@ contains
     ! take the bottom layer of the imported soil temperature.
     rt_domain(did)%soldrain_t = rt_domain(did)%stc(:,:,nlst(did)%nsoil)
 
+    ! 1-D lake model step (lake precipitation/evaporation to the reservoirs,
+    ! lake outflow temperature) before routing, as the offline Noah-MP driver
+    if (noah_lsm%sf_lake_physics == 1) then
+      call lake1d_cpl_step(x_start, x_end, y_start, y_end, did, nlst(did)%dt,   &
+        weather2d%T2, weather2d%q2x, weather2d%wind, weather2d%sfcp,           &
+        weather2d%lwdown, weather2d%short, weather2d%prcp)
+    endif
+
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)
+
+    if (noah_lsm%sf_lake_physics == 1) call lake1d_cpl_post(did)
 
     ! provide groundwater soil flux to WRF for fully coupled simulations (FERSCH 09/2014)
     !if(nlst(did)%GWBASESWCRT .eq. 3 ) then

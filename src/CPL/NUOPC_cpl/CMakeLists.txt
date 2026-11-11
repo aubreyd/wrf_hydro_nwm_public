@@ -14,6 +14,7 @@ list(APPEND wrfhydro_nuopc_files
 
 ### Library Dependencies
 list(APPEND wrfhydro_nuopc_deps
+  hydro_lake1d
   hydro_routing
   hydro_mpp
   hydro_driver
@@ -21,6 +22,8 @@ list(APPEND wrfhydro_nuopc_deps
 )
 
 list(APPEND wrfhydro_nuopc_linklibs
+  hydro_lake1d
+  noahmp_util
   hydro_utils
   hydro_mpp
   hydro_debug_utils

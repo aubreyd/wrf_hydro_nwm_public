@@ -38,7 +38,7 @@ module wrfhydro_nuopc_fields
     logical                     :: rl_export = .FALSE. ! realize export
   end type cap_fld_type
 
-  type(cap_fld_type),target,dimension(23) :: cap_fld_list = (/          &
+  type(cap_fld_type),target,dimension(28) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
@@ -85,7 +85,18 @@ module wrfhydro_nuopc_fields
     cap_fld_type("lsm_forcing_air_temperature             ","tair    ", &
                  "K     ",.TRUE. ,.FALSE.,288.d0),                      &
     cap_fld_type("lsm_forcing_downward_shortwave          ","swdown  ", &
-                 "W m-2 ",.TRUE. ,.FALSE.,0.00d0)                       &
+                 "W m-2 ",.TRUE. ,.FALSE.,0.00d0),                      &
+    ! 1-D lake model (sf_lake_physics = 1) forcing from the LSM
+    cap_fld_type("lsm_forcing_specific_humidity           ","q2x     ", &
+                 "kg kg-1   ",.TRUE. ,.FALSE.,0.00d0),                  &
+    cap_fld_type("lsm_forcing_surface_pressure            ","sfcp    ", &
+                 "Pa        ",.TRUE. ,.FALSE.,1.00d5),                  &
+    cap_fld_type("lsm_forcing_wind_speed                  ","wind    ", &
+                 "m s-1     ",.TRUE. ,.FALSE.,0.00d0),                  &
+    cap_fld_type("lsm_forcing_downward_longwave           ","lwdown  ", &
+                 "W m-2     ",.TRUE. ,.FALSE.,0.00d0),                  &
+    cap_fld_type("lsm_forcing_precipitation_rate          ","prcp    ", &
+                 "kg m-2 s-1",.TRUE. ,.FALSE.,0.00d0)                   &
     /)
 
   public cap_fld_list
@@ -789,6 +800,31 @@ module wrfhydro_nuopc_fields
             farray=weather2d%short, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if (ESMF_STDERRORCHECK(rc)) return
+        case ('q2x')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%q2x, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('sfcp')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%sfcp, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('wind')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%wind, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('lwdown')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%lwdown, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('prcp')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%prcp, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
         case default
           call ESMF_LogSetError(ESMF_FAILURE, &
             msg=METHOD//": Field hookup missing: "//trim(fld_name), &
@@ -1091,6 +1127,16 @@ module wrfhydro_nuopc_fields
             weather2d%T2 = farrayPtr2d
           case ('swdown')
             weather2d%short = farrayPtr2d
+          case ('q2x')
+            weather2d%q2x = farrayPtr2d
+          case ('sfcp')
+            weather2d%sfcp = farrayPtr2d
+          case ('wind')
+            weather2d%wind = farrayPtr2d
+          case ('lwdown')
+            weather2d%lwdown = farrayPtr2d
+          case ('prcp')
+            weather2d%prcp = farrayPtr2d
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1209,6 +1255,16 @@ module wrfhydro_nuopc_fields
             farrayPtr2d = weather2d%T2
           case ('swdown')
             farrayPtr2d = weather2d%short
+          case ('q2x')
+            farrayPtr2d = weather2d%q2x
+          case ('sfcp')
+            farrayPtr2d = weather2d%sfcp
+          case ('wind')
+            farrayPtr2d = weather2d%wind
+          case ('lwdown')
+            farrayPtr2d = weather2d%lwdown
+          case ('prcp')
+            farrayPtr2d = weather2d%prcp
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1308,6 +1364,16 @@ module wrfhydro_nuopc_fields
             missng = any(weather2d%T2.eq.chkVal)
           case ('swdown')
             missng = any(weather2d%short.eq.chkVal)
+          case ('q2x')
+            missng = any(weather2d%q2x.eq.chkVal)
+          case ('sfcp')
+            missng = any(weather2d%sfcp.eq.chkVal)
+          case ('wind')
+            missng = any(weather2d%wind.eq.chkVal)
+          case ('lwdown')
+            missng = any(weather2d%lwdown.eq.chkVal)
+          case ('prcp')
+            missng = any(weather2d%prcp.eq.chkVal)
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1438,6 +1504,21 @@ module wrfhydro_nuopc_fields
           case ('swdown')
             where (weather2d%short.eq.chkVal) &
               weather2d%short = filVal
+          case ('q2x')
+            where (weather2d%q2x.eq.chkVal) &
+              weather2d%q2x = filVal
+          case ('sfcp')
+            where (weather2d%sfcp.eq.chkVal) &
+              weather2d%sfcp = filVal
+          case ('wind')
+            where (weather2d%wind.eq.chkVal) &
+              weather2d%wind = filVal
+          case ('lwdown')
+            where (weather2d%lwdown.eq.chkVal) &
+              weather2d%lwdown = filVal
+          case ('prcp')
+            where (weather2d%prcp.eq.chkVal) &
+              weather2d%prcp = filVal
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
