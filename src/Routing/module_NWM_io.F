@@ -5438,8 +5438,6 @@ subroutine output_gw_NWM(domainId,iGrid)
                                rt_domain(domainId)%basnsInd,g_z_gwsubbas)
          call gw_write_io_int(rt_domain(domainId)%numbasns,rt_domain(domainId)%basnsInd, &
                               rt_domain(domainId)%basnsInd,g_basnsInd)
-         if (tBuckOn) call gw_write_io_real(rt_domain(domainId)%numbasns,l_T_bucket,  &
-                                            rt_domain(domainId)%basnsInd,g_T_bucket)
          if(nlst(domainId)%bucket_loss .eq. 1) then
              fileMeta%outFlag(3) = 1
              call gw_write_io_real(rt_domain(domainId)%numbasns,rt_domain(domainId)%qloss_gwsubbas, &

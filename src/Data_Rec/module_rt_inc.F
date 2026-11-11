@@ -104,7 +104,6 @@ module module_rt_inc
   REAL,    allocatable, DIMENSION(:,:)   :: SOLDRAIN_T   !time-step drainage temperature
   REAL,    allocatable, DIMENSION(:)     :: Z_GWSUBBAS_T   !Temp of water storage in bucket
   REAL,    allocatable, DIMENSION(:)     :: QOUT_GWSUBBAS_T   !Temp of gw outflow 
-  REAL,    allocatable, DIMENSION(:,:)   :: QINFLOWBASE_T   !Temp of inflow water to channel cells 
 
   INTEGER, allocatable, DIMENSION(:,:)   :: gw_strm_msk  !GW basin mask grid
   INTEGER, allocatable, DIMENSION(:,:)   :: gw_strm_msk_lind  !GW basin mask grid tile maping index
