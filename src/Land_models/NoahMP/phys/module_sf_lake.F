@@ -119,6 +119,25 @@ MODULE module_sf_lake
     real(r8) :: tkmg(1,nlevsoil)        ! thermal conductivity, soil minerals  [W/m-K]
     real(r8) :: tkdry(1,nlevsoil)       ! thermal conductivity, dry soil (W/m/Kelvin)
     real(r8) :: csol(1,nlevsoil)        ! heat capacity, soil solids (J/m**3/Kelvin)
+
+    ! Enhancement factor of the eddy diffusivity for deep columns (lakedepth > 15 m)
+    ! with a warm surface (t_lake(1) > 277.15 K), see ShalLakeTemperature.  The host
+    ! model may allocate lake_mixfact2d (memory bounds ims:ime, jms:jme) with a
+    ! per-cell value (WRF-Hydro: LAKEPARM LakeMixFact); otherwise, or where it is
+    ! <= 0, the built-in mixfact_default is used.  mixfact holds the current
+    ! column's value, like the soil property arrays above.
+    real(r8), parameter :: mixfact_default = 100._r8
+    real, allocatable, dimension(:,:), public :: lake_mixfact2d
+    real(r8) :: mixfact = mixfact_default
+    ! Background (hypolimnetic) eddy diffusivity [m2/s] added to the molecular and
+    ! wind-driven diffusivity at every lake layer, frozen or not (in ice-covered
+    ! layers only for the liquid fraction).  The wind-driven term decays as
+    ! exp(-ks*z) and is damped by stratification, so without it the water below
+    ! the thermocline mixes only molecularly (1.4e-7 m2/s); observed hypolimnetic
+    ! diffusivities are ~1e-6 - 1e-5 m2/s.  Per cell from lake_kbg2d (WRF-Hydro:
+    ! LAKEPARM LakeKbg) if the host model allocates it; default 0 (built-in model).
+    real, allocatable, dimension(:,:), public :: lake_kbg2d
+    real(r8) :: kbg = 0._r8
     CONTAINS
  
 
@@ -358,8 +377,16 @@ MODULE module_sf_lake
                tkdry(c,k)         = tkdry3d(i,k,j)
                tksatu(c,k)        = tksatu3d(i,k,j)
             enddo
-            
+
           enddo
+            mixfact = mixfact_default
+            if (allocated(lake_mixfact2d)) then
+               if (lake_mixfact2d(i,j) > 0.) mixfact = lake_mixfact2d(i,j)
+            end if
+            kbg = 0._r8
+            if (allocated(lake_kbg2d)) then
+               if (lake_kbg2d(i,j) > 0.) kbg = lake_kbg2d(i,j)
+            end if
             CALL LakeMain(forc_t,forc_pbot,forc_psrf,forc_hgt,forc_hgt_q,   & !I  
                           forc_hgt_t,forc_hgt_u,forc_q, forc_u,         &
                           forc_v,forc_lwrad,prec, sabg,lat,             &
@@ -1487,7 +1514,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
              if( t_lake(c,1) > 277.15_r8 ) then 
                 if (lakedepth(c) > 15.0 ) then 
                    !ke = 1.e+2_r8*vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
-                    ke  = 1.e+2_r8*ke1
+                    ke  = mixfact*ke1   ! built-in 1.e+2_r8, see mixfact_default
                 else 
                    !ke = vkc*ws(c)*z_lake(c,j)/p0 * exp(-ks(c)*z_lake(c,j)) / (1._r8+37._r8*ri*ri)
                     ke  = ke1
@@ -1507,15 +1534,15 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
                 endif 
              end if
 
-             kme(c,j) = km + ke
+             kme(c,j) = km + ke + kbg
              tk_lake(c,j) = kme(c,j)*cwat
              ! If there is some ice in this layer (this should rarely happen because the surface
              ! is unfrozen and it will be unstable), still use the cwat to get out the tk b/c the eddy
              ! diffusivity equation assumes water.
           else
-             kme(c,j) = km
+             kme(c,j) = km + kbg
              tk_lake(c,j) = tkwat*tkice_eff / ( (1._r8-lake_icefrac(c,j))*tkice_eff &
-                            + tkwat*lake_icefrac(c,j) )
+                            + tkwat*lake_icefrac(c,j) ) + kbg*cwat*(1._r8-lake_icefrac(c,j))
              ! Assume the resistances add as for the calculation of conductivities at layer interfaces.
           end if
        end do
@@ -1533,7 +1560,7 @@ SUBROUTINE ShalLakeTemperature(t_grnd,h2osno,sabg,dz,dz_lake,z,zi,           & !
           tk_lake(c,j) = tk_lake(c,j-1)
        else
           tk_lake(c,j) = tkwat*tkice_eff / ( (1._r8-lake_icefrac(c,j))*tkice_eff &
-                            + tkwat*lake_icefrac(c,j) )
+                            + tkwat*lake_icefrac(c,j) ) + kbg*cwat*(1._r8-lake_icefrac(c,j))
        end if
 
        ! Use in surface flux calculation for next timestep.

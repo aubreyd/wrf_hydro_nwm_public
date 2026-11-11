@@ -9418,6 +9418,72 @@ subroutine read_lake_outlet_depth(route_lake_file, outlet_depth, weir_e, orifice
 end subroutine read_lake_outlet_depth
 
 !===================================================================================================
+! read_lake_param_opt: Optional per-lake 1-D lake model parameter from LAKEPARM.
+!   values = default for every lake; if LAKEPARM has a 1-D variable 'varname' (one value per
+!   lake), its valid values replace the default.  Valid means > 0 if positive_only, else >= 0;
+!   invalid values keep the default and are counted in the log.  A variable that is not 1-D
+!   (e.g. a scalar written by 'ncap2 -s var=value') is ignored with a warning.  Used for
+!     LakeMixFact  eddy diffusivity enhancement, deep lakes with a warm surface (-), default 100
+!                  (module_sf_lake's built-in value), positive_only
+!     LakeKbg      background eddy diffusivity at all lake levels (m2/s), default 0
+!   Called on all ranks (each opens the file), like read_lake_outlet_depth.
+!===================================================================================================
+subroutine read_lake_param_opt(route_lake_file, varname, values, nlakes, default, positive_only)
+    implicit none
+    character(len=*), intent(in)               :: route_lake_file, varname
+    real, intent(out), dimension(nlakes)       :: values
+    integer, intent(in)                        :: nlakes
+    real, intent(in)                           :: default
+    logical, intent(in)                        :: positive_only
+
+    integer :: ncid, iret, varId, k, ndims, nbad, nset
+    real, dimension(nlakes) :: file_val
+    logical :: ok
+
+    values = default
+
+    iret = nf90_open(trim(route_lake_file), NF90_NOWRITE, ncid)
+    if (iret /= NF90_NOERR) return
+
+    iret = nf90_inq_varid(ncid, trim(varname), varId)
+    if (iret == NF90_NOERR) then
+        iret = nf90_inquire_variable(ncid, varId, ndims=ndims)
+        if (iret == NF90_NOERR .and. ndims == 1) then
+            iret = nf90_get_var(ncid, varId, file_val)
+            if (iret == NF90_NOERR) then
+                nbad = 0
+                nset = 0
+                do k = 1, nlakes
+                    if (positive_only) then
+                        ok = file_val(k) .gt. 0.0
+                    else
+                        ok = file_val(k) .ge. 0.0
+                    end if
+                    if (ok) then
+                        values(k) = file_val(k)
+                        nset = nset + 1
+                    else
+                        nbad = nbad + 1
+                    end if
+                end do
+                write(6,*) "read_lake_param_opt: ", trim(varname), " read for ", nset, " lakes"
+                if (nbad .gt. 0) write(6,*) "read_lake_param_opt: ", nbad, " lakes with invalid ", &
+                    trim(varname), " use the default ", default
+            else
+                write(6,*) "read_lake_param_opt: WARNING - failed to read ", trim(varname), &
+                           ", using the default ", default
+            end if
+        else
+            write(6,*) "read_lake_param_opt: WARNING - ", trim(varname), &
+                       " is not 1-D (one value per lake), using the default ", default
+        end if
+    end if
+
+    iret = nf90_close(ncid)
+
+end subroutine read_lake_param_opt
+
+!===================================================================================================
 ! Program Names: get_1d_netcdf_real, get_1d_netcdf_int, get_1d_netcdf_text
 ! Author(s)/Contact(s): James L McCreight <jamesmcc><ucar><edu>
 ! Abstract: Read a variable of real or integer type from an open netcdf file, respectively.

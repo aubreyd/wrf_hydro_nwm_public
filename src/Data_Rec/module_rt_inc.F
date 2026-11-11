@@ -303,6 +303,8 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: InflowGw
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
    REAL,    allocatable, DIMENSION(:)   :: LakeOutletDepth      !lake outlet withdrawal depth below surface (m)
+   REAL,    allocatable, DIMENSION(:)   :: LakeMixFact          !1-D lake eddy diffusivity enhancement, deep lake with warm surface (-)
+   REAL,    allocatable, DIMENSION(:)   :: LakeKbg              !1-D lake background eddy diffusivity at all levels (m2/s)
    REAL,    allocatable, DIMENSION(:)   :: LakeInflowTemp       !lake inflow flow-weighted temperature (K), -9999 = unset
    REAL,    allocatable, DIMENSION(:)   :: LakeArea             !lake surface area (km^2), kept after HRZAREA is deallocated
    REAL,    allocatable, DIMENSION(:)   :: LakeReshtLSM         !level-pool elevation at the previous LSM step (m), -9999 = unset

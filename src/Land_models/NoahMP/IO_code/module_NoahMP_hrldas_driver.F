@@ -23,7 +23,7 @@ module module_NoahMP_hrldas_driver
   USE module_hrldas_netcdf_io
   USE module_sf_noahmp_groundwater
   USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm
-  USE module_sf_lake, only: lake, lakeini, lakeini_rst, nlevsoil, nlevlake, nlevsnow
+  USE module_sf_lake, only: lake, lakeini, lakeini_rst, nlevsoil, nlevlake, nlevsnow, lake_mixfact2d, lake_kbg2d
   USE module_date_utilities
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
@@ -2291,6 +2291,32 @@ end subroutine land_driver_ini
          lh_lk     = 0.0
          grdflx_lk = 0.0
          qfx_lk    = 0.0
+
+#ifdef WRF_HYDRO
+         ! Per-cell mixing parameters for the 1-D lake model from the per-lake
+         ! LAKEPARM LakeMixFact and LakeKbg (filled once; cells of lakes not in
+         ! LAKEPARM keep 0, i.e. the lake model's built-in default).
+         if (.not. allocated(lake_mixfact2d) .and. nlakes .gt. 0) then
+            if (allocated(rt_domain(did)%LakeMixFact)) then
+               allocate(lake_mixfact2d(XSTART:XEND,YSTART:YEND))
+               lake_mixfact2d = 0.0
+               do ilake = 1, nlakes
+                  where (lake_id == rt_domain(did)%lakeidm(ilake)) &
+                     lake_mixfact2d = rt_domain(did)%LakeMixFact(ilake)
+               end do
+            end if
+         end if
+         if (.not. allocated(lake_kbg2d) .and. nlakes .gt. 0) then
+            if (allocated(rt_domain(did)%LakeKbg)) then
+               allocate(lake_kbg2d(XSTART:XEND,YSTART:YEND))
+               lake_kbg2d = 0.0
+               do ilake = 1, nlakes
+                  where (lake_id == rt_domain(did)%lakeidm(ilake)) &
+                     lake_kbg2d = rt_domain(did)%LakeKbg(ilake)
+               end do
+            end if
+         end if
+#endif
 
          do isub_lk = 1, nsub_lk
          CALL Lake(  t_phy        ,p8w            ,dz8w         ,qv_curr         ,&  !i

@@ -473,6 +473,8 @@ CONTAINS
         allocate( rt_domain(did)%InflowGw(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeOutletDepth(nlakes) )
+        allocate( rt_domain(did)%LakeMixFact(nlakes) )
+        allocate( rt_domain(did)%LakeKbg(nlakes) )
         allocate( rt_domain(did)%LakeInflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeArea(nlakes) )
         allocate( rt_domain(did)%LakeReshtLSM(nlakes) )
@@ -489,6 +491,10 @@ CONTAINS
         rt_domain(did)%LakeOutflowTemp    = 10.
         ! 0 = surface withdrawal; LandRT_ini overwrites from LAKEPARM
         rt_domain(did)%LakeOutletDepth    = 0.
+        ! 100 = the 1-D lake model's built-in value; LandRT_ini overwrites from LAKEPARM
+        rt_domain(did)%LakeMixFact        = 100.
+        ! 0 = no background diffusivity; LandRT_ini overwrites from LAKEPARM
+        rt_domain(did)%LakeKbg            = 0.
         ! Sentinel: no inflow heat is added to the 1-D lake model until the
         ! stream temperature model (or a restart file) sets this.
         rt_domain(did)%LakeInflowTemp     = -9999.
@@ -719,7 +725,7 @@ subroutine LandRT_ini(did)
   use module_RT_data, only: rt_domain
   use module_gw_gw2d_data, only: gw2d
   use module_HYDRO_io, only: regrid_lowres_to_highres, read_lake_coeff_doy, &
-                             read_lake_outlet_depth
+                             read_lake_outlet_depth, read_lake_param_opt
 #ifdef HYDRO_D
   use module_HYDRO_io, only: output_lake_types
 #endif
@@ -970,6 +976,16 @@ subroutine LandRT_ini(did)
        call read_lake_outlet_depth(nlst(did)%route_lake_f, &
             rt_domain(did)%LakeOutletDepth, rt_domain(did)%WEIRH, &
             rt_domain(did)%ORIFICEE, NLAKES_total)
+
+       ! 1-D lake model mixing parameters, optional in LAKEPARM:
+       ! LakeMixFact (eddy diffusivity enhancement for deep lakes, default 100)
+       ! and LakeKbg (background eddy diffusivity, m2/s, default 0)
+       if (allocated(rt_domain(did)%LakeMixFact)) &
+          call read_lake_param_opt(nlst(did)%route_lake_f, 'LakeMixFact', &
+               rt_domain(did)%LakeMixFact, NLAKES_total, 100.0, .true.)
+       if (allocated(rt_domain(did)%LakeKbg)) &
+          call read_lake_param_opt(nlst(did)%route_lake_f, 'LakeKbg', &
+               rt_domain(did)%LakeKbg, NLAKES_total, 0.0, .false.)
 
        ! Lake surface area for the 1-D lake model's inflow heat; HRZAREA is
        ! deallocated below once the reservoir objects hold their parameters.
