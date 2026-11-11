@@ -194,7 +194,7 @@ subroutine output_chrt_NWM(domainId)
    ! OWP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    if (nlst(1)%io_config_outputs .eq. 0) then
       ! All
-      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0,1,0,0,0,0,0] !Reza updated these arrays; size=12
+      fileMeta%outFlag(:) = [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0]
    else if (nlst(1)%io_config_outputs .eq. 1) then
       ! Analysis and Assimilation
       fileMeta%outFlag(:) = [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -225,11 +225,12 @@ subroutine output_chrt_NWM(domainId)
       fileMeta%outFlag(5) = 0
    endif
 
-   ! Stream temperature diagnostics: always written with the equilibrium
-   ! stream temperature model (water_temperature = 2, reach-based routing).
+   ! Stream temperature (riverTemp) and its diagnostics: written only with the
+   ! equilibrium stream temperature model (water_temperature = 2, reach-based
+   ! routing), for every io_config_outputs.
    tdiagOn = (nlst(domainId)%water_temperature .eq. 2 .and. nlst(domainId)%channel_option .ne. 3)
    if (tdiagOn) tdiagOn = allocated(rt_domain(domainId)%T_eq_diag)
-   if (tdiagOn) fileMeta%outFlag(13:17) = 1
+   if (tdiagOn) fileMeta%outFlag(12:17) = 1
 
    ! call the GetModelConfigType function
    modelConfigType = GetModelConfigType(nlst(1)%io_config_outputs)
@@ -287,6 +288,8 @@ subroutine output_chrt_NWM(domainId)
          allocate(g_outInd(gsize))
          allocate(g_riverTemp(gsize))
          allocate(g_riverTempOut(gsize))
+         g_riverTemp = -9999.0
+         g_riverTempOut = -9999.0
          if (nlst(domainId)%channel_loss_option > 0) then
             allocate(g_qloss(gsize))
             allocate(g_qlossOut(gsize))
@@ -326,6 +329,8 @@ subroutine output_chrt_NWM(domainId)
          allocate(g_outInd(1))
          allocate(g_riverTemp(1))
          allocate(g_riverTempOut(1))
+         g_riverTemp = -9999.0
+         g_riverTempOut = -9999.0
          if (nlst(domainId)%channel_option == 2 .and. nlst(domainId)%channel_loss_option > 0) then
             allocate(g_qloss(1))
             allocate(g_qlossOut(1))
@@ -440,7 +445,6 @@ subroutine output_chrt_NWM(domainId)
          call write_chanel_real(RT_DOMAIN(domainId)%ZELEV,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_zelev)
          call write_chanel_real(RT_DOMAIN(domainId)%QLateral,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_QLateral)
          call write_chanel_real(velocityLocal,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_velocity)
-         call write_chanel_real(RT_DOMAIN(domainId)%T_QSUM,rt_domain(domainId)%map_l2g,gSize,rt_domain(domainId)%nlinks,g_riverTemp)
          if(nlst(domainId)%output_channelBucket_influx .ne. 0) then
             call postDiagMsg(diagFlag,'WARNING: This channelBucket_influx only available for reach-based routing.')
          endif
