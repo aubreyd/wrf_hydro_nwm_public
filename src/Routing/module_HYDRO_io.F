@@ -8467,21 +8467,6 @@ call MPP_CHANNEL_COM_INT(Link_location,ixrt,jxrt,int(TYPEL, int64),NLINKS,99)
 call MPP_CHANNEL_COM_INT(Link_location,ixrt,jxrt,LAKENODE,NLINKS,99)
 #endif
 
-if (channel_option .eq. 3) then
-  do i = 1,NLINKS
-    if (CHANLEN(i) < 0) then ! edge
-      So(i) = 0.00001
-      CHANLEN(i) = 250.0
-    else
-      So(i) = ( ZELEV(FROM_NODE(i)) - ZELEV(TO_NODE(i)) ) / CHANLEN(i)
-      !TLE: added this if statement to force non-zero slopes
-      if (So(i) == 0.0) then
-        So(i) = 0.00001
-      end if
-    end if
-  end do
-end if
-
 end subroutine READ_CHROUTING1
 
 
