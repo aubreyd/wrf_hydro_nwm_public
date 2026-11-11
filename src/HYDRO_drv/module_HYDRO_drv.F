@@ -65,6 +65,10 @@ module module_HYDRO_drv
   integer :: clock_rate    = 0
 #endif
   integer :: rtout_factor  = 0
+  ! Model time (olddate(1:16)) of the last HYDRO_RST written by HYDRO_rst_out,
+  ! blank if none: lets a caller (the NUOPC cap) write its own restart state
+  ! (e.g. the 1-D lake model) at the same times.
+  character(len=16) :: hydro_rst_date = " "
 
   integer, parameter :: r4 = selected_real_kind(4)
   real,    parameter :: zeroFlt=0.0000000000000000000_r4
@@ -111,6 +115,7 @@ module module_HYDRO_drv
 #endif
     if(rst_out .gt. 0) then
       write(6,*) "yw check output restart at ",nlst(did)%olddate(1:16)
+      hydro_rst_date = nlst(did)%olddate(1:16)
 #ifdef MPP_LAND
       if(nlst(did)%rst_bi_out .eq. 1) then
              if(my_id .lt. 10) then

@@ -36,7 +36,8 @@ module wrfhydro_nuopc_gluecode
     MPP_LAND_INIT
   use module_HYDRO_drv, only: &
     HYDRO_ini, &
-    HYDRO_exe
+    HYDRO_exe, &
+    hydro_rst_date
   use module_HYDRO_io, only: &
     get_file_dimension
   use module_CPL_LAND, only: &
@@ -52,7 +53,8 @@ module wrfhydro_nuopc_gluecode
     noah_lsm, &
     init_namelist_rt_field
   use module_lake1d, only: &
-    lake1d_cpl_init, lake1d_cpl_step, lake1d_cpl_post
+    lake1d_cpl_init, lake1d_cpl_step, lake1d_cpl_post, lake1d_cpl_write_restart, &
+    lake1d_cpl_write_output
   use orchestrator_base
   use wrfhydro_nuopc_fields
   use wrfhydro_nuopc_flags
@@ -496,9 +498,19 @@ contains
     endif
 
     ! Call the WRF-HYDRO run routine
+    hydro_rst_date = " "
     call HYDRO_exe(did=did)
 
-    if (noah_lsm%sf_lake_physics == 1) call lake1d_cpl_post(did)
+    if (noah_lsm%sf_lake_physics == 1) then
+      call lake1d_cpl_post(did)
+      ! lake state restart (LAKE_RST) whenever HYDRO_exe wrote a HYDRO_RST
+      if (len_trim(hydro_rst_date) > 0) &
+        call lake1d_cpl_write_restart(hydro_rst_date, nlst(did)%hgrid, &
+          x_start, x_end, y_start, y_end)
+      ! lake fields (LAKE1D file) every OUTPUT_TIMESTEP of namelist.hrldas
+      call lake1d_cpl_write_output(did, nlst(did)%olddate(1:16), &
+        x_start, x_end, y_start, y_end)
+    endif
 
     ! provide groundwater soil flux to WRF for fully coupled simulations (FERSCH 09/2014)
     !if(nlst(did)%GWBASESWCRT .eq. 3 ) then

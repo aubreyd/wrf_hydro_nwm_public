@@ -18,7 +18,8 @@ module module_lake1d
   use module_rt_data, only: rt_domain
 #endif
 #ifdef MPP_LAND
-  use module_mpp_land, only: sum_real1d, sum_int1d
+  use module_mpp_land, only: sum_real1d, sum_int1d, write_IO_real, my_id, IO_id, &
+                             global_nx, global_ny, mpp_land_sync
   use module_cpl_land, only: fatal_error_stop
 #endif
   use netcdf
@@ -106,6 +107,8 @@ module module_lake1d
   ! lake cell gets the mean over the land cells on that lake's shoreline.
   integer, allocatable, dimension(:,:)   :: cpl_shore_ix    ! routing lake index of a shoreline land cell (0 = none)
   integer, allocatable, dimension(:,:)   :: cpl_lake_ix     ! routing lake index of a lake (LAKE_ID) cell (0 = none)
+  integer :: cpl_nlkgrp = 0        ! number of lake groups (distinct LAKE_IDs) for the lake-cell forcing
+  integer :: cpl_out_seconds = 0   ! model seconds since the start of the run (LAKE1D output timing)
 #endif
 
   ! Lake state variables that must all be present in a restart file to restart the lake model
@@ -158,6 +161,18 @@ contains
   ALLOCATE (         tkmg3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
   ALLOCATE (        tkdry3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
   ALLOCATE (       tksatu3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
+
+  ! Defined values on all cells: lakeini / lakeini_rst set the state on lake
+  ! cells only, and restart files would otherwise hold uninitialized memory
+  ! on the other cells.
+  lake2d = .false.
+  lake_depth = 0.0;  lakedepth2d = 0.0;  savedtke12d = 0.0;  snowdp2d = 0.0
+  h2osno2d = 0.0;    snl2d = 0.0;        t_grnd2d = 0.0;     lakemask = 0.0
+  t2 = 0.0;          th2 = 0.0;          q2 = 0.0
+  t_lake3d = 0.0;    lake_icefrac3d = 0.0;  z_lake3d = 0.0;  dz_lake3d = 0.0
+  t_soisno3d = 0.0;  h2osoi_ice3d = 0.0;    h2osoi_liq3d = 0.0;  h2osoi_vol3d = 0.0
+  z3d = 0.0;         dz3d = 0.0;            zi3d = 0.0
+  watsat3d = 0.0;    csol3d = 0.0;  tkmg3d = 0.0;  tkdry3d = 0.0;  tksatu3d = 0.0
 
   ENDIF  ! sf_lake_physics == 1
 
@@ -694,6 +709,7 @@ contains
     real, allocatable   :: tmp(:,:), gvg(:,:)
     integer, allocatable :: gid(:,:)
     integer :: ncid, dimid, nxg, nyg, ierr, i, j, ii, jj, k
+    logical :: from_rst
 
     flnm = noah_lsm%hrldas_setup_file
     allocate(tmp(XSTART:XEND,YSTART:YEND))
@@ -734,7 +750,14 @@ contains
 
     call lake1d_allocate(XSTART, XEND, YSTART, YEND)
     call lake1d_setup(XSTART, XEND, YSTART, YEND, cpl_ivgtyp, cpl_iswater, cpl_islake)
-    call lake1d_init(.false., cpl_ivgtyp, cpl_isltyp, cpl_terrain, cpl_snow, .false.,      &
+    ! Lake state from RESTART_FILENAME_REQUESTED (namelist.hrldas) if it holds
+    ! the complete lake state: a LAKE_RST file of a coupled run, or an offline
+    ! HRLDAS RESTART file (same variables).  Otherwise cold start.
+    from_rst = .false.
+    if (len_trim(noah_lsm%restart_filename_requested) > 0) &
+       from_rst = lake1d_cpl_read_restart(trim(noah_lsm%restart_filename_requested), &
+                                          XSTART, XEND, YSTART, YEND)
+    call lake1d_init(from_rst, cpl_ivgtyp, cpl_isltyp, cpl_terrain, cpl_snow, from_rst,   &
                      cpl_iswater, cpl_xice, 0.5, cpl_xland, cpl_tsk,                        &
                      XSTART, XEND, YSTART, YEND, XSTART, XEND, YSTART, YEND)
     cpl_albedo = 0.0
@@ -744,28 +767,40 @@ contains
     cpl_hfx = 0.0; cpl_lh = 0.0; cpl_grdflx = 0.0; cpl_qfx = 0.0
     call lake1d_allocate_lakes(rt_domain(did)%nlakes)
 
-    ! routing lake index of lake cells and of the land cells on each lake's
-    ! shoreline (8 neighbors), from the whole-domain LAKE_ID and IVGTYP
+    ! Lake groups for the lake-cell forcing: one per LAKE_ID on the domain,
+    ! whether or not the lake is a routing reservoir (LAKEPARM), numbered in
+    ! increasing LAKE_ID order (the same on every rank).  cpl_lake_ix: group of
+    ! a lake-model (ISLAKE) cell, -1 if it has no LAKE_ID; cpl_shore_ix: group
+    ! of the lake next to a land cell (8 neighbors), 0 if none.
     allocate(gid(nxg,nyg), gvg(nxg,nyg))
     call read_lake_id(flnm, 1, nxg, 1, nyg, gid)
     call lake1d_read_field(flnm, 'IVGTYP', 1, nxg, 1, nyg, gvg)
+    cpl_nlkgrp = 0
+    k = 0
+    do
+       ii = minval(gid, mask = gid > k)            ! next larger LAKE_ID
+       if (ii == huge(ii) .or. ii <= k) exit
+       cpl_nlkgrp = cpl_nlkgrp + 1
+       where (gid == ii) gid = -cpl_nlkgrp - 1     ! group g stored as -(g+1) until done
+       k = 0
+    end do
+    where (gid < -1) gid = -gid - 1                ! now gid = group (1..), others <= 0
+    where (gid < 0)  gid = 0
     allocate(cpl_shore_ix(XSTART:XEND,YSTART:YEND), cpl_lake_ix(XSTART:XEND,YSTART:YEND))
     cpl_shore_ix = 0
     cpl_lake_ix  = 0
     do j = YSTART, YEND
        do i = XSTART, XEND
-          if (gid(i,j) > 0) then
-             do k = 1, nlakes
-                if (rt_domain(did)%lakeidm(k) == gid(i,j)) cpl_lake_ix(i,j) = k
-             end do
-          else if (nint(gvg(i,j)) /= cpl_iswater .and. nint(gvg(i,j)) /= cpl_islake) then
+          if (cpl_ivgtyp(i,j) == cpl_islake) then
+             cpl_lake_ix(i,j) = gid(i,j)
+             if (gid(i,j) == 0) cpl_lake_ix(i,j) = -1
+          else if (gid(i,j) == 0 .and. nint(gvg(i,j)) /= cpl_iswater .and. &
+                   nint(gvg(i,j)) /= cpl_islake) then
              nbr: do jj = max(1,j-1), min(nyg,j+1)
                 do ii = max(1,i-1), min(nxg,i+1)
                    if (gid(ii,jj) > 0) then
-                      do k = 1, nlakes
-                         if (rt_domain(did)%lakeidm(k) == gid(ii,jj)) cpl_shore_ix(i,j) = k
-                      end do
-                      if (cpl_shore_ix(i,j) > 0) exit nbr
+                      cpl_shore_ix(i,j) = gid(ii,jj)
+                      exit nbr
                    end if
                 end do
              end do nbr
@@ -773,36 +808,54 @@ contains
        end do
     end do
     deallocate(gid, gvg, tmp)
-    write(6,*) 'lake1d_cpl_init: 1-D lake model cold start; lake cells on this tile: ', &
+    if (from_rst) then
+       write(6,*) 'lake1d_cpl_init: 1-D lake model state from ', &
+                  trim(noah_lsm%restart_filename_requested)
+    else
+       write(6,*) 'lake1d_cpl_init: 1-D lake model cold start'
+    end if
+    write(6,*) 'lake1d_cpl_init: lake cells on this tile: ', &
                count(cpl_lake_ix > 0), ', shoreline cells: ', count(cpl_shore_ix > 0)
 
   end subroutine lake1d_cpl_init
 
 !-------------------------------------------------------------------------------
-! Lake cells of each lake get the mean of a forcing field over that lake's
-! shoreline land cells with valid values (summed across ranks).
+! Lake cells of each lake (LAKE_ID) get the mean of a forcing field over that
+! lake's shoreline land cells with valid values (summed across ranks).  Lake
+! cells without a LAKE_ID, or of a lake without shoreline land cells, get the
+! mean over all land cells of the domain.
 !-------------------------------------------------------------------------------
   subroutine lake1d_fill_lake_cells(XSTART, XEND, YSTART, YEND, fld)
     implicit none
     integer, intent(in)    :: XSTART, XEND, YSTART, YEND
     real,    intent(inout) :: fld(XSTART:XEND,YSTART:YEND)
-    real    :: ssum(2*max(nlakes,1))
-    integer :: k
-    if (nlakes < 1) return
+    real    :: ssum(2*cpl_nlkgrp+2)
+    logical :: land(XSTART:XEND,YSTART:YEND)
+    integer :: k, n
+    ! (collective: every rank takes part in the sum, lake cells or not)
+    n = cpl_nlkgrp
     ! shoreline cells next to cells the land model does not cover can carry the
     ! coupler's missing value through the regridding; use valid values only
-    do k = 1, nlakes
-       ssum(k)        = sum(fld, mask = cpl_shore_ix == k .and. abs(fld) < 1.0e15)
-       ssum(nlakes+k) = real(count(cpl_shore_ix == k .and. abs(fld) < 1.0e15))
+    land = cpl_ivgtyp /= cpl_iswater .and. cpl_ivgtyp /= cpl_islake .and. abs(fld) < 1.0e15
+    do k = 1, n
+       ssum(k)   = sum(fld, mask = land .and. cpl_shore_ix == k)
+       ssum(n+k) = real(count(land .and. cpl_shore_ix == k))
     end do
+    ssum(2*n+1) = sum(fld, mask = land)
+    ssum(2*n+2) = real(count(land))
 #ifdef MPP_LAND
-    call sum_real1d(ssum, 2*nlakes)
+    call sum_real1d(ssum, 2*n+2)
 #endif
-    do k = 1, nlakes
-       if (ssum(nlakes+k) > 0.0) then
-          where (cpl_lake_ix == k) fld = ssum(k) / ssum(nlakes+k)
+    do k = 1, n
+       if (ssum(n+k) > 0.0) then
+          where (cpl_lake_ix == k) fld = ssum(k) / ssum(n+k)
+       else if (ssum(2*n+2) > 0.0) then
+          where (cpl_lake_ix == k) fld = ssum(2*n+1) / ssum(2*n+2)
        end if
     end do
+    if (ssum(2*n+2) > 0.0) then
+       where (cpl_lake_ix == -1) fld = ssum(2*n+1) / ssum(2*n+2)
+    end if
   end subroutine lake1d_fill_lake_cells
 
 !-------------------------------------------------------------------------------
@@ -870,6 +923,315 @@ contains
        lake_evap       = rt_domain(did)%lake_evap
     end if
   end subroutine lake1d_cpl_post
+
+!-------------------------------------------------------------------------------
+! Read the lake state on this tile from a restart file with the HRLDAS RESTART
+! lake variables (lake_rst_vars; a LAKE_RST file written by
+! lake1d_cpl_write_restart, or an offline HRLDAS RESTART file).  Returns
+! .false., reading nothing, if the file lacks any of them.
+!-------------------------------------------------------------------------------
+  logical function lake1d_cpl_read_restart(flnm, XSTART, XEND, YSTART, YEND) result(ok)
+    implicit none
+    character(len=*), intent(in) :: flnm
+    integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    integer :: ncid, varid, ierr, k
+
+    ok = .false.
+    ierr = nf90_open(flnm, NF90_NOWRITE, ncid)
+    if (ierr /= NF90_NOERR) then
+       write(6,*) 'WARNING: lake1d_cpl_read_restart: cannot open ', trim(flnm), &
+                  ': cold-starting the 1-D lake model'
+       return
+    end if
+    do k = 1, size(lake_rst_vars)
+       if (nf90_inq_varid(ncid, trim(lake_rst_vars(k)), varid) /= NF90_NOERR) then
+          write(6,*) 'WARNING: lake1d_cpl_read_restart: no ', trim(lake_rst_vars(k)), ' in ', &
+                     trim(flnm), ': cold-starting the 1-D lake model'
+          ierr = nf90_close(ncid)
+          return
+       end if
+    end do
+    call rd2('LAKE_DEPTH', lakedepth2d);   call rd2('LAKE_SAVETKE1', savedtke12d)
+    call rd2('LAKE_SNOWP', snowdp2d);      call rd2('LAKE_H2OSNO', h2osno2d)
+    call rd2('LAKE_SNL', snl2d);           call rd2('LAKE_T_GRND', t_grnd2d)
+    call rd3('LAKE_T_SOILSNOW', t_soisno3d);   call rd3('LAKE_H2OSOI_ICE', h2osoi_ice3d)
+    call rd3('LAKE_H2OSOI_LIQ', h2osoi_liq3d); call rd3('LAKE_H2OSOI_VOL', h2osoi_vol3d)
+    call rd3('LAKE_Z', z3d);                   call rd3('LAKE_DZ', dz3d)
+    call rd3('LAKE_T_LAKE', t_lake3d);         call rd3('LAKE_ICEFRAC', lake_icefrac3d)
+    call rd3('LAKE_Z_LAKE', z_lake3d);         call rd3('LAKE_DZ_LAKE', dz_lake3d)
+    call rd3('LAKE_WATSAT', watsat3d);         call rd3('LAKE_CSOL', csol3d)
+    call rd3('LAKE_TKMG', tkmg3d);             call rd3('LAKE_TKDRY', tkdry3d)
+    call rd3('LAKE_TKSATU', tksatu3d);         call rd3('LAKE_ZI', zi3d)
+    ierr = nf90_close(ncid)
+    ok = .true.
+
+  contains
+
+    subroutine rd2(name, a)        ! file: (west_east, south_north, Time)
+      character(len=*), intent(in) :: name
+      real, intent(out) :: a(XSTART:XEND,YSTART:YEND)
+      ierr = nf90_inq_varid(ncid, name, varid)
+      ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,YSTART,1/), &
+                          count=(/XEND-XSTART+1,YEND-YSTART+1,1/))
+      if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_read_restart: cannot read '// &
+                                                name//' from '//trim(flnm))
+    end subroutine rd2
+
+    subroutine rd3(name, a)        ! file: (west_east, layers, south_north, Time)
+      character(len=*), intent(in) :: name
+      real, intent(out) :: a(:,:,:)
+      ierr = nf90_inq_varid(ncid, name, varid)
+      ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,1,YSTART,1/), &
+                          count=(/XEND-XSTART+1,size(a,2),YEND-YSTART+1,1/))
+      if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_read_restart: cannot read '// &
+                                                name//' from '//trim(flnm))
+    end subroutine rd3
+
+  end function lake1d_cpl_read_restart
+
+!-------------------------------------------------------------------------------
+! Write the lake state to LAKE_RST.<date>_DOMAIN<hgrid> (date: YYYY-MM-DD_HH:MM)
+! with the variables and dimensions of the offline HRLDAS RESTART file, so
+! either can restart the lake model (RESTART_FILENAME_REQUESTED).  Collective
+! over the WRF-Hydro ranks; the IO rank writes.
+!-------------------------------------------------------------------------------
+  subroutine lake1d_cpl_write_restart(date, hgrid, XSTART, XEND, YSTART, YEND)
+    implicit none
+    character(len=*), intent(in) :: date, hgrid
+    integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    character(len=256) :: flnm
+    integer :: ncid, ierr, nxg, nyg, k
+    integer :: d_t, d_s, d_x, d_y, d_lk, d_lss, d_ls, d_lss2, vid
+    logical :: io
+
+    flnm = 'LAKE_RST.'//date(1:16)//'_DOMAIN'//trim(hgrid)
+#ifdef MPP_LAND
+    nxg = global_nx; nyg = global_ny; io = (my_id == IO_id)
+#else
+    nxg = XEND-XSTART+1; nyg = YEND-YSTART+1; io = .true.
+#endif
+    if (io) then
+       ierr = nf90_create(trim(flnm), ior(NF90_CLOBBER, NF90_64BIT_OFFSET), ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot create '//trim(flnm))
+       ierr = nf90_def_dim(ncid, 'Time', NF90_UNLIMITED, d_t)
+       ierr = nf90_def_dim(ncid, 'DateStrLen', 19, d_s)
+       ierr = nf90_def_dim(ncid, 'west_east', nxg, d_x)
+       ierr = nf90_def_dim(ncid, 'south_north', nyg, d_y)
+       ierr = nf90_def_dim(ncid, 'lake_layers', nlevlake, d_lk)
+       ierr = nf90_def_dim(ncid, 'lakesoilsnow_layers', nlevsnow+nlevsoil, d_lss)
+       ierr = nf90_def_dim(ncid, 'lakesoil_layers', nlevsoil, d_ls)
+       ierr = nf90_def_dim(ncid, 'lakesoilsnow_layers2', nlevsnow+nlevsoil+1, d_lss2)
+       ierr = nf90_def_var(ncid, 'Times', NF90_CHAR, (/d_s,d_t/), k)
+       do k = 1, 6
+          ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_y,d_t/), vid)
+       end do
+       do k = 7, 12
+          ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_lss,d_y,d_t/), vid)
+       end do
+       do k = 13, 16
+          ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_lk,d_y,d_t/), vid)
+       end do
+       do k = 17, 21
+          ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_ls,d_y,d_t/), vid)
+       end do
+       ierr = nf90_def_var(ncid, 'LAKE_ZI', NF90_FLOAT, (/d_x,d_lss2,d_y,d_t/), vid)
+       ierr = nf90_put_att(ncid, NF90_GLOBAL, 'TITLE', &
+                           '1-D lake model restart (WRF-Hydro NUOPC cap), HRLDAS RESTART lake variables')
+       ierr = nf90_enddef(ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot define '//trim(flnm))
+       ierr = nf90_inq_varid(ncid, 'Times', k)
+       ierr = nf90_put_var(ncid, k, (/ date(1:16)//':00' /), start=(/1,1/), count=(/19,1/))
+    end if
+
+    call lake1d_put2d(ncid, io, 'LAKE_DEPTH', lakedepth2d)
+    call lake1d_put2d(ncid, io, 'LAKE_SAVETKE1', savedtke12d)
+    call lake1d_put2d(ncid, io, 'LAKE_SNOWP', snowdp2d)
+    call lake1d_put2d(ncid, io, 'LAKE_H2OSNO', h2osno2d)
+    call lake1d_put2d(ncid, io, 'LAKE_SNL', snl2d)
+    call lake1d_put2d(ncid, io, 'LAKE_T_GRND', t_grnd2d)
+    call lake1d_put3d(ncid, io, 'LAKE_T_SOILSNOW', t_soisno3d)
+    call lake1d_put3d(ncid, io, 'LAKE_H2OSOI_ICE', h2osoi_ice3d)
+    call lake1d_put3d(ncid, io, 'LAKE_H2OSOI_LIQ', h2osoi_liq3d)
+    call lake1d_put3d(ncid, io, 'LAKE_H2OSOI_VOL', h2osoi_vol3d)
+    call lake1d_put3d(ncid, io, 'LAKE_Z', z3d)
+    call lake1d_put3d(ncid, io, 'LAKE_DZ', dz3d)
+    call lake1d_put3d(ncid, io, 'LAKE_T_LAKE', t_lake3d)
+    call lake1d_put3d(ncid, io, 'LAKE_ICEFRAC', lake_icefrac3d)
+    call lake1d_put3d(ncid, io, 'LAKE_Z_LAKE', z_lake3d)
+    call lake1d_put3d(ncid, io, 'LAKE_DZ_LAKE', dz_lake3d)
+    call lake1d_put3d(ncid, io, 'LAKE_WATSAT', watsat3d)
+    call lake1d_put3d(ncid, io, 'LAKE_CSOL', csol3d)
+    call lake1d_put3d(ncid, io, 'LAKE_TKMG', tkmg3d)
+    call lake1d_put3d(ncid, io, 'LAKE_TKDRY', tkdry3d)
+    call lake1d_put3d(ncid, io, 'LAKE_TKSATU', tksatu3d)
+    call lake1d_put3d(ncid, io, 'LAKE_ZI', zi3d)
+
+    if (io) then
+       ierr = nf90_close(ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot write '//trim(flnm))
+       write(6,*) 'lake1d_cpl_write_restart: wrote ', trim(flnm)
+    end if
+#ifdef MPP_LAND
+    call mpp_land_sync()
+#endif
+
+  end subroutine lake1d_cpl_write_restart
+
+!-------------------------------------------------------------------------------
+! Gather a tile field (XSTART:XEND, [levels,] YSTART:YEND) to the IO rank and
+! write it to variable NAME of the open file NCID (IO rank only; the first
+! record of a (west_east, [levels,] south_north, Time) variable).  Collective
+! over the WRF-Hydro ranks.
+!-------------------------------------------------------------------------------
+  subroutine lake1d_put2d(ncid, io, name, a)
+    implicit none
+    integer,          intent(in) :: ncid
+    logical,          intent(in) :: io
+    character(len=*), intent(in) :: name
+    real,             intent(in) :: a(:,:)
+    real, allocatable :: g(:,:)
+    integer :: varid, ierr
+#ifdef MPP_LAND
+    allocate(g(global_nx,global_ny))
+    call write_IO_real(a, g)
+#else
+    allocate(g(size(a,1),size(a,2)))
+    g = a
+#endif
+    if (io) then
+       ierr = nf90_inq_varid(ncid, name, varid)
+       if (ierr == NF90_NOERR) ierr = nf90_put_var(ncid, varid, g, start=(/1,1,1/), &
+                                                   count=(/size(g,1),size(g,2),1/))
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_put2d: cannot write '//name)
+    end if
+    deallocate(g)
+  end subroutine lake1d_put2d
+
+  subroutine lake1d_put3d(ncid, io, name, a)
+    implicit none
+    integer,          intent(in) :: ncid
+    logical,          intent(in) :: io
+    character(len=*), intent(in) :: name
+    real,             intent(in) :: a(:,:,:)
+    real, allocatable :: g(:,:), g3(:,:,:)
+    integer :: varid, ierr, k
+#ifdef MPP_LAND
+    allocate(g(global_nx,global_ny))
+#else
+    allocate(g(size(a,1),size(a,3)))
+#endif
+    allocate(g3(size(g,1),size(a,2),size(g,2)))
+    do k = 1, size(a,2)
+#ifdef MPP_LAND
+       call write_IO_real(a(:,k,:), g)
+#else
+       g = a(:,k,:)
+#endif
+       g3(:,k,:) = g
+    end do
+    if (io) then
+       ierr = nf90_inq_varid(ncid, name, varid)
+       if (ierr == NF90_NOERR) ierr = nf90_put_var(ncid, varid, g3, start=(/1,1,1,1/), &
+                                                   count=(/size(g3,1),size(g3,2),size(g3,3),1/))
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_put3d: cannot write '//name)
+    end if
+    deallocate(g, g3)
+  end subroutine lake1d_put3d
+
+!-------------------------------------------------------------------------------
+! Lake model output of a coupled run, as the lake fields of the offline LDASOUT
+! file: instantaneous values every OUTPUT_TIMESTEP (namelist.hrldas) in
+! YYYYMMDDHHMM.LAKE1D_DOMAIN<hgrid>, -9999 on cells that are not lake cells.
+! Called after each coupled step; DATE (YYYY-MM-DD_HH:MM) is the end of the step.
+!-------------------------------------------------------------------------------
+  subroutine lake1d_cpl_write_output(did, date, XSTART, XEND, YSTART, YEND)
+    implicit none
+    integer,          intent(in) :: did
+    character(len=*), intent(in) :: date
+    integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    character(len=256) :: flnm
+    integer :: ncid, ierr, nxg, nyg, d_t, d_s, d_x, d_y, d_lk, vid, k
+    logical :: io
+    real, allocatable :: w2(:,:), w3(:,:,:)
+    real, parameter :: fillv = -9999.0
+
+    if (noah_lsm%output_timestep <= 0) return
+    cpl_out_seconds = cpl_out_seconds + nint(nlst(did)%dt)
+    if (mod(cpl_out_seconds, noah_lsm%output_timestep) /= 0) return
+
+    flnm = date(1:4)//date(6:7)//date(9:10)//date(12:13)//date(15:16)// &
+           '.LAKE1D_DOMAIN'//trim(nlst(did)%hgrid)
+#ifdef MPP_LAND
+    nxg = global_nx; nyg = global_ny; io = (my_id == IO_id)
+#else
+    nxg = XEND-XSTART+1; nyg = YEND-YSTART+1; io = .true.
+#endif
+    if (io) then
+       ierr = nf90_create(trim(flnm), ior(NF90_CLOBBER, NF90_64BIT_OFFSET), ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_output: cannot create '//trim(flnm))
+       ierr = nf90_def_dim(ncid, 'Time', NF90_UNLIMITED, d_t)
+       ierr = nf90_def_dim(ncid, 'DateStrLen', 19, d_s)
+       ierr = nf90_def_dim(ncid, 'west_east', nxg, d_x)
+       ierr = nf90_def_dim(ncid, 'south_north', nyg, d_y)
+       ierr = nf90_def_dim(ncid, 'lake_layers', nlevlake, d_lk)
+       ierr = nf90_def_var(ncid, 'Times', NF90_CHAR, (/d_s,d_t/), vid)
+       call defv('LAKE_PRECIP2D', (/d_x,d_y,d_t/), 'mm h-1', 'precipitation over lakes')
+       call defv('LAKE_EVAP2D',   (/d_x,d_y,d_t/), 'mm h-1', 'evaporation from lakes')
+       call defv('LAKE_DEPTH2D',  (/d_x,d_y,d_t/), 'm', 'lake depth')
+       call defv('LAKE_TSK2D',    (/d_x,d_y,d_t/), 'K', 'lake surface (skin) temperature')
+       call defv('LAKE_T3D',      (/d_x,d_lk,d_y,d_t/), 'K', 'lake layer temperature')
+       call defv('LAKE_ICE3D',    (/d_x,d_lk,d_y,d_t/), '-', 'lake layer ice fraction')
+       call defv('LAKE_Z3D',      (/d_x,d_lk,d_y,d_t/), 'm', 'lake layer node depth')
+       ierr = nf90_put_att(ncid, NF90_GLOBAL, 'TITLE', '1-D lake model output (WRF-Hydro NUOPC cap)')
+       ierr = nf90_enddef(ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_output: cannot define '//trim(flnm))
+       ierr = nf90_inq_varid(ncid, 'Times', vid)
+       ierr = nf90_put_var(ncid, vid, (/ date(1:16)//':00' /), start=(/1,1/), count=(/19,1/))
+    end if
+
+    allocate(w2(XSTART:XEND,YSTART:YEND), w3(XSTART:XEND,nlevlake,YSTART:YEND))
+    w2 = fillv; where (lakemask == 1) w2 = cpl_rainbl * 3600.0 / nlst(did)%dt
+    call lake1d_put2d(ncid, io, 'LAKE_PRECIP2D', w2)
+    w2 = fillv; where (lakemask == 1) w2 = cpl_qfx * 3600.0
+    call lake1d_put2d(ncid, io, 'LAKE_EVAP2D', w2)
+    w2 = fillv; where (lakemask == 1) w2 = lakedepth2d
+    call lake1d_put2d(ncid, io, 'LAKE_DEPTH2D', w2)
+    w2 = fillv; where (lakemask == 1) w2 = cpl_tsk
+    call lake1d_put2d(ncid, io, 'LAKE_TSK2D', w2)
+    do k = 1, nlevlake
+       w3(:,k,:) = fillv; where (lakemask == 1) w3(:,k,:) = t_lake3d(:,k,:)
+    end do
+    call lake1d_put3d(ncid, io, 'LAKE_T3D', w3)
+    do k = 1, nlevlake
+       w3(:,k,:) = fillv; where (lakemask == 1) w3(:,k,:) = lake_icefrac3d(:,k,:)
+    end do
+    call lake1d_put3d(ncid, io, 'LAKE_ICE3D', w3)
+    do k = 1, nlevlake
+       w3(:,k,:) = fillv; where (lakemask == 1) w3(:,k,:) = z_lake3d(:,k,:)
+    end do
+    call lake1d_put3d(ncid, io, 'LAKE_Z3D', w3)
+    deallocate(w2, w3)
+
+    if (io) then
+       ierr = nf90_close(ncid)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_output: cannot write '//trim(flnm))
+    end if
+#ifdef MPP_LAND
+    call mpp_land_sync()
+#endif
+
+  contains
+
+    subroutine defv(name, dims, units, desc)
+      character(len=*), intent(in) :: name, units, desc
+      integer,          intent(in) :: dims(:)
+      ierr = nf90_def_var(ncid, name, NF90_FLOAT, dims, vid)
+      ierr = nf90_put_att(ncid, vid, 'units', units)
+      ierr = nf90_put_att(ncid, vid, 'description', desc)
+      ierr = nf90_put_att(ncid, vid, '_FillValue', fillv)
+    end subroutine defv
+
+  end subroutine lake1d_cpl_write_output
 
 !-------------------------------------------------------------------------------
 ! A 2-D field (optionally with a Time dimension) of the setup file on
