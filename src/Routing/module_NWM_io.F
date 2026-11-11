@@ -4589,6 +4589,8 @@ subroutine output_chanObs_NWM(domainId)
                                                      ! have been applied.
    integer, allocatable, dimension(:) :: g_STRMFRXSTPTS, g_outInd
    integer, allocatable, dimension(:) :: frxstPtsLocal, g_STRMFRXSTPTSOut
+   real, allocatable, dimension(:) :: g_riverTemp   ! stream temperature (water_temperature = 2) [C]
+   logical :: riverTempOn
    character (len=64) :: modelConfigType ! This is character verion (long name) for the io_config_outputs
 
    ! Establish macro variables to hlep guide this subroutine.
@@ -4630,8 +4632,14 @@ subroutine output_chanObs_NWM(domainId)
    ! for the output file.
    call initChanObsDict(fileMeta, diagFlag, myId)
 
-   ! For now, keep all output variables on, regardless of IOC flag
-   fileMeta%outFlag(:) = [1]
+   ! For now, keep all output variables on, regardless of IOC flag.
+   ! riverTemp only with the equilibrium stream temperature model
+   ! (water_temperature = 2, reach-based routing), as in CHRTOUT.
+   riverTempOn = (nlst(domainId)%water_temperature .eq. 2 .and. &
+                  nlst(domainId)%channel_option .ne. 3)
+   if (riverTempOn) riverTempOn = allocated(RT_DOMAIN(domainId)%T_QSUM)
+   fileMeta%outFlag(:) = [1, 0]
+   if (riverTempOn) fileMeta%outFlag(2) = 1
 
    ! Calculate datetime information.
    ! First compose strings of EPOCH and simulation start date.
@@ -4708,7 +4716,9 @@ subroutine output_chanObs_NWM(domainId)
          allocate(g_zelev(gSize))
          allocate(g_order(gSize))
          allocate(g_linkid(gSize))
+         allocate(g_riverTemp(gSize))
       else
+         allocate(g_riverTemp(1))
          allocate(g_STRMFRXSTPTS(1))
          allocate(g_outInd(1))
          allocate(g_qlink(1,2))
@@ -4765,6 +4775,7 @@ subroutine output_chanObs_NWM(domainId)
          call ReachLS_write_io(RT_DOMAIN(domainId)%CHLON,g_chlon)
          call ReachLS_write_io(RT_DOMAIN(domainId)%ZELEV,g_zelev)
          call ReachLS_write_io(RT_DOMAIN(domainId)%HLINK,g_hlink)
+         if (riverTempOn) call ReachLS_write_io(RT_DOMAIN(domainId)%T_QSUM,g_riverTemp)
       endif
 
       deallocate(strFlowLocal)
@@ -4794,6 +4805,8 @@ subroutine output_chanObs_NWM(domainId)
       g_linkid = RT_DOMAIN(domainId)%linkid
       g_order = RT_DOMAIN(domainId)%ORDER
       g_zelev = RT_DOMAIN(domainId)%ZELEV
+      allocate(g_riverTemp(gSize))
+      if (riverTempOn) g_riverTemp = RT_DOMAIN(domainId)%T_QSUM(1:gSize)
    endif
 
    if(myId .eq. 0) then
@@ -4847,6 +4860,8 @@ subroutine output_chanObs_NWM(domainId)
       allocate(varOutInt(numPtsOut))
 
       varOutReal(1,:) = g_qlinkOut(:,1)
+      varOutReal(2,:) = -9999.0
+      if (riverTempOn) varOutReal(2,:) = pack(g_riverTemp,g_outInd == 1)
 
       ! Mask out missing values
       where ( varOutReal == fileMeta%modelNdv ) varOutReal = -9999.0
@@ -5249,6 +5264,7 @@ subroutine output_chanObs_NWM(domainId)
    deallocate(g_linkid)
    deallocate(g_zelev)
    deallocate(g_order)
+   deallocate(g_riverTemp)
 
 end subroutine output_chanObs_NWM
 

@@ -434,6 +434,7 @@ With ``water_temperature = 2`` the following variables are written (°C,
 File        Variable          Meaning
 =========== ================= ============================================================
 CHRTOUT     riverTemp         reach outflow temperature
+CHANOBS     riverTemp         reach outflow temperature at the gauge / forecast points
 CHRTOUT     T_eq              equilibrium temperature
 CHRTOUT     T_airSmooth       smoothed reach air temperature
 CHRTOUT     T_upstream        flow-weighted temperature of the upstream inflow
@@ -443,6 +444,10 @@ GWOUT       T_bucket          bucket water temperature (needs ``output_gw = 1``)
 LAKEOUT     T_inflow          flow-weighted temperature of the lake's inflow
 LAKEOUT     T_outflow         lake outflow temperature (at OutletDepth)
 =========== ================= ============================================================
+
+``CHANOBS`` (``CHANOBS_DOMAIN = 1``) holds streamflow and ``riverTemp`` at the
+gauge points only, a compact alternative to hourly CHRTOUT at all reaches for
+comparisons with observations.
 
 The 1-D lake state is written every ``OUTPUT_TIMESTEP`` (namelist.hrldas) when
 ``SF_LAKE_PHYSICS = 1``: ``LAKE_T3D`` (layer temperatures, K), ``LAKE_ICE3D``,

@@ -27,7 +27,7 @@ integer, parameter :: numRtDomainVars = 5
 integer, parameter :: numLakeVars = 6
 integer, parameter :: numChGrdVars = 6
 integer, parameter :: numLsmVars = 14
-integer, parameter :: numChObsVars = 1
+integer, parameter :: numChObsVars = 2
 integer, parameter :: numGwVars = 5
 integer :: i
 !integer :: nsoil = nlst_rt(1)%nsoil
@@ -2709,20 +2709,21 @@ subroutine initChanObsDict(chObsDict,diagFlag,procId)
    chObsDict%featureIdComment = 'NHDPlusv2 ComIDs within CONUS, arbitrary Reach IDs outside of CONUS'
    chObsDict%cfRole = 'timeseries_id'
 
-   chObsDict%varNames(:) = [character(len=64) :: "streamflow"]
-   chObsDict%longName(:) = [character(len=64) :: "River Flow"]
-   chObsDict%units(:) = [character(len=64) :: "m3 s-1"]
-   chObsDict%coordNames(:) = [character(len=64) :: "latitude longitude"]
-   chObsDict%scaleFactor(:) = [0.01]
-   chObsDict%addOffset(:) = [0.0]
+   ! riverTemp: stream temperature (water_temperature = 2), as in CHRTOUT
+   chObsDict%varNames(:) = [character(len=64) :: "streamflow", "riverTemp"]
+   chObsDict%longName(:) = [character(len=64) :: "River Flow", "River Temperature"]
+   chObsDict%units(:) = [character(len=64) :: "m3 s-1", "deg. C"]
+   chObsDict%coordNames(:) = [character(len=64) :: "latitude longitude", "latitude longitude"]
+   chObsDict%scaleFactor(:) = [0.01, 0.01]
+   chObsDict%addOffset(:) = [0.0, 0.0]
    ! Initialize all output flags to 0. Modify (if absolutely necessary) in the
    ! output subroutine.
-   chObsDict%outFlag(:) = [0]
-   chObsDict%timeZeroFlag(:) = [1]
-   chObsDict%fillReal(:) = [-9999.0]
-   chObsDict%missingReal(:) = [-9999.0]
-   chObsDict%validMinDbl(:) = [0.0d0]
-   chObsDict%validMaxDbl(:) = [50000.0d0]
+   chObsDict%outFlag(:) = [0, 0]
+   chObsDict%timeZeroFlag(:) = [1, 1]
+   chObsDict%fillReal(:) = [-9999.0, -9999.0]
+   chObsDict%missingReal(:) = [-9999.0, -9999.0]
+   chObsDict%validMinDbl(:) = [0.0d0, -100.0d0]
+   chObsDict%validMaxDbl(:) = [50000.0d0, 100.0d0]
    ! Loop through and calculate missing/fill/min/max values that will be placed
    ! into the NetCDF attributes after scale_factor/add_offset are applied.
    do i=1,numChObsVars
