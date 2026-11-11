@@ -1,4 +1,3 @@
-
 !  Program Name:
 !  Author(s)/Contact(s):
 !  Abstract:
@@ -36,52 +35,7 @@ use iso_fortran_env, only: int64
 #endif
 implicit none
 
-
-!-- Reza's code starts here (June 2021):
-!-- Type, to be used by the weather disaggregate
-
-type :: vectorizing_tools
-      INTEGER :: NLINKS, IXRT,JXRT
-      INTEGER, DIMENSION(:,:), allocatable    :: CH_NETRT, LAKE_MSKRT
-      INTEGER, DIMENSION(:), allocatable      :: CHANXI, CHANYJ
-
-      contains
-      procedure :: init => vectorizing_tools_init
-      procedure :: destroy => vectorizing_tools_destroy
-
-end type vectorizing_tools
-
-! --------------------------------------------------------------------------
 contains
-
-
-subroutine vectorizing_tools_init(this, NLINKS, IXRT, JXRT, CH_NETRT, &
-	                          CHANXI, CHANYJ, LAKE_MSKRT)
-	implicit none
-	class(vectorizing_tools), intent(inout)         :: this             ! the type object being initialized
-	INTEGER, INTENT(in)                             :: NLINKS, IXRT, JXRT
-	INTEGER ,INTENT(in), DIMENSION(IXRT,JXRT)  	:: CH_NETRT, LAKE_MSKRT
-	INTEGER, INTENT(in), DIMENSION(NLINKS)  	:: CHANXI, CHANYJ
-
-	this%NLINKS = NLINKS
-	this%IXRT = IXRT
-	this%JXRT = JXRT
-	this%CH_NETRT = CH_NETRT
-	this%CHANXI = CHANXI
-	this%CHANYJ = CHANYJ
-	this%LAKE_MSKRT = LAKE_MSKRT
-
-end subroutine vectorizing_tools_init
-
-subroutine vectorizing_tools_destroy(this)
-
-	implicit none
-	! the type object being destroyed
-	class(vectorizing_tools), intent(inout) :: this
-
-end subroutine vectorizing_tools_destroy
-
-!-- Reza's code ends here
 
 ! ------------------------------------------------
 !   FUNCTION MUSKING
@@ -116,30 +70,26 @@ end function MUSKING
 ! ------------------------------------------------
 !   FUNCTION Diffusive wave
 ! ------------------------------------------------
-subroutine DIFFUSION(nod,z1,z20,h1,h2,dx,n, &
-     Bw, Cs, q, vel)
+real function DIFFUSION(nod,z1,z20,h1,h2,dx,n, &
+     Bw, Cs)
 implicit none
 !-- channel geometry and characteristics
-integer,intent(in) :: nod         !- node
-real,intent(in)    :: z1,z20      !-z1 is 'from', z2 is 'to' elevations
-real,intent(in)    :: h1,h2      !-tmp height variables
-real,intent(in)    :: dx         !-channel lngth (m)
+real    :: Bw         !-bottom width (meters)
+real    :: Cs         !-Channel side slope slope
+real    :: dx         !-channel lngth (m)
 real,intent(in)    :: n          !-mannings coefficient
-real,intent(in)    :: Bw         !-bottom width (meters)
-real,intent(in)    :: Cs         !-Channel side slope slope
-! Outputs
-real, intent(out) :: q  ! flowrate (m3/s)
-real, intent(out) :: vel  ! velocity (m/s)
-! Local variables
 real    :: R          !-Hydraulic radius
 real    :: AREA       !- wetted area
+real    :: h1,h2      !-tmp height variables
+real    :: z1,z2      !-z1 is 'from', z2 is 'to' elevations
 real    :: z          !-channel side distance
 real    :: w          !-upstream weight
 real    :: Ku,Kd      !-upstream and downstream conveyance
 real    :: Kf         !-final face conveyance
 real    :: Sf         !-friction slope
 real    :: sgn        !-0 or 1
-real ::  z2, dzx
+integer :: nod         !- node
+real ::  z20, dzx
 
 ! added by Wei Yu for bad data.
 
@@ -164,7 +114,7 @@ endif
 !         Sf = ((z1-z2)+(h1-h2))/dx  !-- compute the friction slope
 !endif
 
-!modified by Wei Yu for false geography data
+!modifieed by Wei Yu for false geography data
 if(abs(z1-z2) .gt. 1.0E5) then
 #ifdef HYDRO_D
    print*, "WARNING: huge slope rest to 0 for channel grid.", z1,z2
@@ -186,21 +136,15 @@ Ku = (1.0/n)*(R**(2./3.))*AREA     !-- convenyance
 
 R = ((Bw + z*h2)*h2)/(Bw + 2.0*h2*sqrt(1.0 + z*z)) !-- Hyd Radius
 AREA = (Bw + z*h2)*h2        !-- Flow area
-Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- conveyance
+Kd = (1.0/n)*(R**(2.0/3.0))*AREA     !-- convenyance
 
 Kf =  (1.0-w)*Kd + w*Ku      !-- conveyance
-q = Kf * sqrt(abs(Sf))*sgn
-vel = q / AREA
+DIFFUSION = Kf * sqrt(abs(Sf))*sgn
 
-!!!TLE hack
-!if (vel .gt. 1.0) then
-!    vel = 1.0
-!endif
 
 100 format('z1,z2,h1,h2,kf,Dif, Sf, sgn  ',f8.3,2x,f8.3,2x,f8.4,2x,f8.4,2x,f8.3,2x,f8.3,2x,f8.3,2x,f8.0)
 
-end subroutine DIFFUSION
-
+end function DIFFUSION
 ! ----------------------------------------------------------------
 
 subroutine SUBMUSKINGCUNGE(    &
@@ -617,14 +561,15 @@ END SUBROUTINE SUBMUSKINGCUNGE
 ! ------------------------------------------------
 ! ------------------------------------------------
      Subroutine drive_CHANNEL(did, latval,lonval,KT, IXRT,JXRT, SUBRTSWCRT, &
-        QSUBRT, LAKEINFLORT, QSTRMVOLRT, TO_NODE, FROM_NODE, &
-        TYPEL, ORDER, MAXORDER, NLINKS, CH_NETLNK, CH_NETRT, CH_LNKRT, &
-        LAKE_MSKRT, DT, DTCT, DTRT_CH,MUSK, MUSX, QLINK, &
-        QLateral, HLINK, ELRT, CHANLEN, MannN, So, ChSSlp, Bw, Tw, Tw_CC, n_CC,&
-        ChannK, RESHT, ZELEV, CVOL, NLAKES, QLAKEI, QLAKEO, LAKE_PRECIP, &
-        LAKE_EVAP, LAKE_NETOUTFLOW, LAKENODE, &
-        dist, QINFLOWBASE, CHANXI, CHANYJ, channel_option, RETDEP_CHAN, &
-        NLINKSL, LINKID, node_area  &
+       QSUBRT, LAKEINFLORT, QSTRMVOLRT, TO_NODE, FROM_NODE, &
+       TYPEL, ORDER, MAXORDER, NLINKS, CH_NETLNK, CH_NETRT, CH_LNKRT, &
+       LAKE_MSKRT, DT, DTCT, DTRT_CH,MUSK, MUSX, QLINK, &
+       QLateral, &
+       HLINK, ELRT, CHANLEN, MannN, So, ChSSlp, Bw, Tw, Tw_CC, n_CC,  &
+       ChannK, RESHT, &
+       ZELEV, CVOL, NLAKES, QLAKEI, QLAKEO, LAKE_PRECIP, LAKE_EVAP, LAKE_NETOUTFLOW, LAKENODE, &
+       dist, QINFLOWBASE, CHANXI, CHANYJ, channel_option, RETDEP_CHAN, &
+       NLINKSL, LINKID, node_area  &
 #ifdef MPP_LAND
        , lake_index,link_location,mpp_nlinks,nlinks_index,yw_mpp_nlinks  &
        , LNLINKSL  &
@@ -632,20 +577,20 @@ END SUBROUTINE SUBMUSKINGCUNGE
 #endif
        , CH_LNKRT_SL &
        ,gwBaseSwCRT, gwHead, qgw_chanrt, gwChanCondSw, gwChanCondConstIn, &
-       gwChanCondConstOut, velocity, qloss, &
-       XS_Peremeter, water_temperature_option, LakeOutflowTemp)
+       gwChanCondConstOut, velocity, qloss)
+
 
        IMPLICIT NONE
 
         ! -------- DECLARATIONS ------------------------
-        INTEGER, INTENT(IN) :: did, IXRT,JXRT,channel_option, water_temperature_option
+        INTEGER, INTENT(IN) :: did, IXRT,JXRT,channel_option
         INTEGER, INTENT(IN) :: NLINKS,NLAKES, NLINKSL
         integer, INTENT(INOUT) :: KT   ! flag of cold start (1) or continue run.
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSUBRT
-        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSTRMVOLRT   ! mm?
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QSTRMVOLRT
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: LAKEINFLORT
         REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: ELRT
-        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QINFLOWBASE  ! mm?
+        REAL, INTENT(IN), DIMENSION(IXRT,JXRT)    :: QINFLOWBASE
         INTEGER(kind=int64), INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETLNK
 
         INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
@@ -670,17 +615,17 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL , INTENT(INOUT), DIMENSION(:,:) :: QLINK
         REAL ,  DIMENSION(NLINKS,2) :: tmpQLINK
         REAL , INTENT(INOUT), DIMENSION(NLINKS)   :: HLINK
-        REAL, dimension(NLINKS), intent(inout)    :: QLateral !--lateral flow  ! m3/sec?
+        REAL, dimension(NLINKS), intent(inout)    :: QLateral !--lateral flow
         REAL, INTENT(IN)                          :: DT    !-- model timestep
         REAL, INTENT(IN)                          :: DTRT_CH  !-- routing timestep
-        REAL, INTENT(INOUT)                       :: DTCT    ! sec?
+        REAL, INTENT(INOUT)                       :: DTCT
         real                                      :: minDTCT !BF minimum routing timestep
         REAL                                      :: dist(ixrt,jxrt,9)
         REAL                                      :: RETDEP_CHAN
         INTEGER, INTENT(IN)                       :: MAXORDER, SUBRTSWCRT, &
                                                      gwBaseSwCRT, gwChanCondSw
         real, intent(in)                          :: gwChanCondConstIn, gwChanCondConstOut ! aquifer-channel conductivity constant from namelist
-        REAL , INTENT(IN), DIMENSION(NLINKS)      :: node_area  ! m2?
+        REAL , INTENT(IN), DIMENSION(NLINKS)      :: node_area
         real, dimension(:), INTENT(inout)         :: velocity, qloss
 
 
@@ -691,19 +636,7 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(:,:), allocatable :: gwHead      !DJG !!! groundwater head from Fersch-2d gw implementation...units (m ASL)
         REAL, INTENT(INOUT), DIMENSION(:,:), allocatable :: qgw_chanrt  !DJG !!! Channel-gw flux as used in Fersch 2d gw implementation...units (m^3/s)...Change 'INTENT' to 'OUT' when ready to update groundwater state...
 
-!-- Channel temperature variables
-        real, dimension(nlinks)                :: InflowUpstream          ! total inflow to reach from upstream reaches (m3/s)
-        real, dimension(nlinks)                :: InflowLand              ! inflow to reach from land (m3/s)
-        real, dimension(nlinks)                :: InflowGw                ! inflow to reach from groundwater (m3/s)
-        real, dimension(nlinks)                :: Outflow                 ! total outflow to downstream reaches (m3/s)
-        real, dimension(nlinks)                :: InflowUpstreamSumTemp   ! reach inflow volume-sum temperature (K * m3/s)
-        real, dimension(nlinks)                :: InflowUpstreamTemp      ! reach inflow volume-mean temperature (K)
-        real, dimension(nlakes)                :: LakeInflowUpstream          ! total inflow to lake from upstream reaches (m3/s)
-        real, dimension(nlakes)                :: LakeOutflow                 ! total outflow from lake from upstream reaches (m3/s)
-        real, dimension(nlakes)                :: LakeInflowUpstreamSumTemp   ! lake inflow volume-sum temperature (K * m3/s)
-        real, dimension(nlakes)                :: LakeInflowUpstreamTemp      ! lake inflow volume-mean temperature (K)
-        real, intent(inout), dimension(nlakes) :: LakeOutflowTemp             ! lake outflow temperature (K)
-        !real, dimension(nlinks), intent(out)   :: ReachTemp               ! current reach temperature (K)
+
 
         !-- lake params
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: RESHT    !-- reservoir height (m)
@@ -711,16 +644,14 @@ END SUBROUTINE SUBMUSKINGCUNGE
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEI   !-- lake inflow (cms)
         REAL,                DIMENSION(NLAKES)    :: QLAKEIP  !-- lake inflow previous timestep (cms)
         REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: QLAKEO   !-- outflow from lake used in diffusion scheme
-        REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: LAKE_EVAP,LAKE_PRECIP,LAKE_NETOUTFLOW  !-- evap pcp runoff
+        REAL, INTENT(INOUT), DIMENSION(NLAKES)    :: LAKE_EVAP,LAKE_PRECIP,LAKE_NETOUTFLOW  !-- lake evaporation, precipitation, net outflow
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LAKENODE !-- outflow from lake used in diffusion scheme
         INTEGER(kind=int64), INTENT(IN), DIMENSION(NLINKS)    :: LINKID   !--  id of channel elements for linked scheme
         !REAL, DIMENSION(NLINKS)                   :: QLateral !--lateral flow
         REAL, DIMENSION(NLINKS)                   :: QSUM     !--mass bal of node
-        REAL*8, DIMENSION(NLINKS)                 :: QSUM8     !--mass bal of node
+        REAL*8, DIMENSION(NLINKS)                   :: QSUM8     !--mass bal of node
         REAL, DIMENSION(NLAKES)                   :: QLLAKE   !-- lateral inflow to lake in diffusion scheme
-        REAL*8, DIMENSION(NLAKES)                 :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
-        REAL,   DIMENSION(NLAKES)                 :: XS_Peremeter
-
+        REAL*8, DIMENSION(NLAKES)                   :: QLLAKE8   !-- lateral inflow to lake in diffusion scheme
 
 !-- Local Variables
         INTEGER                     :: i,j,k,t,m,jj,kk,KRT,node
@@ -753,13 +684,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
         integer flag
 
         integer :: n, kk2, nt, nsteps  ! tmp
-        logical :: localprint
-
-	!-------------------------------------------------------
-	!-- Reza (June 2021):
-	!REAL, DIMENSION(NLINKS)	                :: XS_Peremeter   !-- cross sectional area calculated at diffusion function
-	!REAL, INTENT(INOUT), DIMENSION(NLINKS)  :: T_QSUM         ! To save the final products
-	!-------------------------------------------------------
 
         QLAKEIP = 0
         QLAKEI8 = 0
@@ -771,19 +695,6 @@ END SUBROUTINE SUBMUSKINGCUNGE
         QSUM     = 0
         QLLAKE   = 0
 
-        localprint = .false.
-
-        ! Initialize local channel temperature variables
-        ! Moved to inner time loop, but leaving here for now to track how QSUM and QLateral are initialized.
-        InflowUpstream = 0.0 ! accumulator variable
-        Outflow = 0.0 ! accumulator variable
-        InflowUpstreamSumTemp = 0.0 ! accumulator variable
-        InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-        LakeInflowUpstream = 0.0 ! accumulator variable
-        LakeOutflow = 0.0 ! accumulator variable
-        LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
-        LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-        !LakeOutflowTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
 
 !yw      print *, "DRIVE_channel,option,nlinkl,nlinks!!", channel_option,NLINKSL,NLINKS
 !      print *, "DRIVE_channel, RESHT", RESHT
@@ -992,29 +903,8 @@ END SUBROUTINE SUBMUSKINGCUNGE
 	  qgw_chanrt     = 0.
           end if
 
-        ! Initialize local channel temperature variables
-        !InflowUpstream = 0.0 ! accumulator variable
-        !Outflow = 0.0 ! accumulator variable
-        !InflowUpstreamSumTemp = 0.0 ! accumulator variable
-        !InflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-        !LakeInflowUpstream = 0.0 ! accumulator variable
-        !LakeOutflow = 0.0 ! accumulator variable
-        !LakeInflowUpstreamSumTemp = 0.0 ! accumulator variable
-        !LakeInflowUpstreamTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-        !LakeOutflowTemp = -9999. ! initialize as something unphysical to track - should be overwriting or not using at all
-
 !         ZWATTBLRT=1.0   !--HARDWIRE, remove this and pass in from subsfc/gw routing routines...
 
-if (localprint) then
-  print *, "ADCHECK_ORIENT_DRIVE: 67,48"
-  print *, "  CH_NETLNK FROM TO", CH_NETLNK(67,48), FROM_NODE(CH_NETLNK(67,48)), TO_NODE(CH_NETLNK(67,48))
-  print *, "  ZELEV FROM TO", ZELEV(FROM_NODE(CH_NETLNK(67,48))), ZELEV(TO_NODE(CH_NETLNK(67,48)))
-  print *, "  CH_NETRT LAKE_MSKRT", CH_NETRT(67,48), LAKE_MSKRT(67,48)
-  print *, "ADCHECK_ORIENT_DRIVE: 151,49"
-  print *, "  CH_NETLNK FROM TO", CH_NETLNK(151,49), FROM_NODE(CH_NETLNK(151,49)), TO_NODE(CH_NETLNK(151,49))
-  print *, "  ZELEV FROM TO", ZELEV(FROM_NODE(CH_NETLNK(151,49))), ZELEV(TO_NODE(CH_NETLNK(151,49)))
-  print *, "  CH_NETRT LAKE_MSKRT", CH_NETRT(151,49), LAKE_MSKRT(151,49)
-endif
 
 !-- vectorize
 !---------------------
@@ -1030,9 +920,6 @@ endif
                call hydro_stop("In drive_CHANNEL() - Error node_area")
            endif
 
-           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
-              print *, "ADCHECK_DRIVE1 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
-           endif
 
 
 nodeType:if((CH_NETRT(CHANXI(i), CHANYJ(i) ) .eq. 0) .and. &
@@ -1090,9 +977,6 @@ gwOption:   if(gwBaseSwCRT == 3) then
                 ((QSTRMVOLRT(CHANXI(i),CHANYJ(i))+&
                  QINFLOWBASE(CHANXI(i),CHANYJ(i))) &
                    /DT_STEPS*node_area(i)/1000/DTCT)
-!!AD: Adding new lateral flow components for export to channel temperature routine
-              InflowLand(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QSTRMVOLRT(CHANXI(i),CHANYJ(i)) / DT_STEPS * node_area(i) / 1000 / DTCT
-              InflowGw(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QINFLOWBASE(CHANXI(i),CHANYJ(i)) / DT_STEPS * node_area(i) / 1000 / DTCT
 	       if((QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))).lt.0.) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                print*, "i, CHANXI(i),CHANYJ(i) = ", i, CHANXI(i),CHANYJ(i)
@@ -1118,32 +1002,10 @@ gwOption:   if(gwBaseSwCRT == 3) then
          elseif(CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then  !pour out of lake
                  QLateral(CH_NETLNK(CHANXI(i),CHANYJ(i))) =  &
                    QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))  !-- previous timestep
-!!AD: Zeroing lateral flow components for lake pourpoint for channel temperature routine
-                 InflowLand(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.0
-                 InflowGw(CH_NETLNK(CHANXI(i),CHANYJ(i))) = 0.0
-                 InflowUpstream(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))
-                 InflowUpstreamTemp(CH_NETLNK(CHANXI(i),CHANYJ(i))) = LakeOutflowTemp(CH_NETRT(CHANXI(i),CHANYJ(i)))
-                 if (localprint) then
-                 print *, "ADCHECK1: After outlet qlateral = qlakeo assignment"
-                 print *, "i chanxi chanyj", i, CHANXI(i), CHANYJ(i)
-                 print *, "   CH_NETRT, CH_NETLNK", CH_NETRT(CHANXI(i),CHANYJ(i)), CH_NETLNK(CHANXI(i),CHANYJ(i))
-                 print *, "   QLAKEO", QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))
-                 print *, "   InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(CHANXI(i),CHANYJ(i)))
-                 end if
          endif nodeType
 
         ENDDO
 
-if (localprint) then
-print *, "ADCHECK1A: After qlateral and inflow land & gw calcs."
-print *, "ADCHECK1A: 67,48 LakeOutflowTemp", CH_NETLNK(67,48), LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK1A: 67,48 InflowUpstreamTemp", CH_NETLNK(67,48), InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK1A: 66,47 InflowUpstreamTemp", CH_NETLNK(66,47), InflowUpstreamTemp(CH_NETLNK(66,47)) 
-print *, "ADCHECK1A: 151,49 InflowUpstreamTemp", CH_NETLNK(151,49), InflowUpstreamTemp(CH_NETLNK(151,49))
-print *, "ADCHECK1A: 713 InflowUpstreamTemp", CHANXI(713), CHANYJ(713), InflowUpstreamTemp(713)
-print *, "ADCHECK1A: 1107 InflowUpstreamTemp", CHANXI(1107), CHANYJ(1107), InflowUpstreamTemp(1107)
-print *, "ADCHECK1A: 408 InflowUpstreamTemp", CHANXI(408), CHANYJ(408), InflowUpstreamTemp(408)
-end if
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLateral,NLINKS,99)
@@ -1166,40 +1028,18 @@ end if
 #endif
            if (TYPEL(i) .eq. 0 .AND. HLINKTMP(FROM_NODE(i)) .gt. RETDEP_CHAN) then
                if(from_node(i) .ne. to_node(i) .and. (to_node(i) .gt. 0) .and.(from_node(i) .gt. 0) ) &  ! added by Wei Yu
-                   call DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
+                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                      HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
+                     CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
             else !--  we are just computing critical depth for outflow points
-!!AD: Check this boundary condition for stability in water temperature calculations
-               !QLINK(i,1) =0.
-               call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
-                         CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
+               QLINK(i,1) =0.
             endif
-!              print *, "i = ", i
-!              print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
-!              print *, "ZELEV(TO_NODE(i)) = ", ZELEV(TO_NODE(i))
-!              print *, "HLINKTMP(FROM_NODE(i)) = ", HLINKTMP(FROM_NODE(i))
-!              print *, "HLINKTMP(TO_NODE(i)) = ", HLINKTMP(TO_NODE(i))
-!              print *, "CHANLEN(i) = ", CHANLEN(i)
-!              print *, "MannN(i) = ", MannN(i)
-!              print *, "Bw(i) = ", Bw(i)
-!              print *, "ChSSlp(i) = ", ChSSlp(i)
-!              print *, "velocity(i) = ", velocity(i)
           ENDDO
-!          print *, "velocity = ", velocity
+
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-if (localprint) then
-print *, "ADCHECK1AA: After qlink calcs."
-print *, "ADCHECK1AA: 67,48 QLINK", QLINK(CH_NETLNK(67,48),1)
-print *, "ADCHECK1AA: 66,47 QLINK", QLINK(CH_NETLNK(66,47),1)
-print *, "ADCHECK1AA: 151,49 QLINK", QLINK(CH_NETLNK(151,49),1)
-print *, "ADCHECK1AA: 713 QLINK", QLINK(713,1)
-print *, "ADCHECK1AA: 1107 QLINK", QLINK(1107,1)
-print *, "ADCHECK1AA: 408 QLINK", QLINK(408,1)
-end if
 
           !-- compute total flow across face, into node
 #ifdef MPP_LAND
@@ -1210,104 +1050,15 @@ end if
 #endif
            if(TYPEL(i) .eq. 0) then                                       !-- only regular nodes have to attribute
               QSUM8(TO_NODE(i)) = QSUM8(TO_NODE(i)) + QLINK(i,1)
-              if (QLINK(i,1) > 0) then
-                ! Numerator for volume-weighted temperature
-                InflowUpstreamSumTemp(TO_NODE(i)) = InflowUpstreamSumTemp(TO_NODE(i)) + rt_domain(did)%T_QSUM(i) * QLINK(i,1)
-                ! Denominator for volume-weighted temperature
-                InflowUpstream(TO_NODE(i)) = InflowUpstream(TO_NODE(i)) + QLINK(i,1)
-              endif
            endif
-            if (localprint) then
-            if(CHANXI(i)==67 .and. CHANYJ(i)==48) then
-              print *, "ADCHECK1B: After InflowUpstreamSumTemp calcs."
-              print *, "ADCHECK1B 67,48 i TONODE TYPEL", i, TO_NODE(i), TYPEL(i)
-              print *, "  QSUM QLINK T_QSUM", QSUM(i), QLINK(i,1), rt_domain(did)%T_QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamSumTemp", InflowUpstreamSumTemp(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-            if(CHANXI(i)==66 .and. CHANYJ(i)==47) then
-              print *, "ADCHECK1B: After InflowUpstreamSumTemp calcs."
-              print *, "ADCHECK1B 66,47 i TONODE TYPEL", i, TO_NODE(i), TYPEL(i)
-              print *, "  QSUM QLINK TQSUM", QSUM(i), QLINK(i,1), rt_domain(did)%T_QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamSumTemp", InflowUpstreamSumTemp(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-            if(CHANXI(i)==55 .and. CHANYJ(i)==126) then
-              print *, "ADCHECK1B: After InflowUpstreamSumTemp calcs."
-              print *, "ADCHECK1B 55,126 i TONODE TYPEL", i, TO_NODE(i), TYPEL(i)
-              print *, "  QSUM QLINK TQSUM", QSUM(i), QLINK(i,1), rt_domain(did)%T_QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamSumTemp", InflowUpstreamSumTemp(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-           end if
-
           END DO
-
-if (localprint) then
-print *, "ADCHECK1C: After InflowUpstreamSumTemp interim calcs."
-print *, "ADCHECK1C: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK1C: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK1C: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK1C: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK1C: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
-
-          ! Final calculation for volume-weighted temperature
-          ! e.g., (Inflow1 * Temperature1 + Inflow2 * Temperature2) / (Inflow1 + Inflow2)
-          where (InflowUpstream > 0) ! .and. InflowUpstreamSumTemp > 0)
-             InflowUpstreamTemp = InflowUpstreamSumTemp / InflowUpstream
-          end where
-
-if (localprint) then
-print *, "ADCHECK1D: After InflowUpstreamTemp calc."
-print *, "ADCHECK1D: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK1D: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK1D: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK1D: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK1D: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
-
-#ifdef MPP_LAND
-         DO iyw = 1,yw_mpp_nlinks
-         i = nlinks_index(iyw)
-#else
-          DO i = 1,NLINKS                                                 !-- inflow to node across each face
-#endif
-          if (InflowUpstreamTemp(i) .lt. -20) then
-            print *, "ADWARNING1: InflowUpstreamTemp < -20", i, CHANXI(i), CHANYJ(i)
-            print *, "            CH_NETRT Temp", CH_NETRT(CHANXI(i),CHANYJ(i)), InflowUpstreamTemp(i)
-          endif
-          if (CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then
-             InflowUpstream(CH_NETLNK(CHANXI(i),CHANYJ(i))) = QLAKEO(CH_NETRT(CHANXI(i),CHANYJ(i)))
-             InflowUpstreamTemp(CH_NETLNK(CHANXI(i),CHANYJ(i))) = LakeOutflowTemp(CH_NETRT(CHANXI(i),CHANYJ(i)))
-          endif
-         end do
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL8(Link_location,ixrt,jxrt,qsum8,NLINKS,0)
 #endif
     qsum = qsum8
 
-if (localprint) then
-print *, "ADCHECK1E: After InflowUpstreamTemp lake outlet adjustment."
-print *, "ADCHECK1E: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK1E: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK1E: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK1E: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK1E: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
+
 
 #ifdef MPP_LAND
          do iyw = 1,yw_mpp_nlinks
@@ -1316,8 +1067,6 @@ end if
          do i = 1,NLINKS                                                 !-- outflow from node across each face
 #endif
             QSUM(FROM_NODE(i)) = QSUM(FROM_NODE(i)) - QLINK(i,1)
-            Outflow(FROM_NODE(i)) = Outflow(FROM_NODE(i)) + QLINK(i,1)
-
          end do
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,qsum,NLINKS,99)
@@ -1333,10 +1082,6 @@ end if
 #else
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
-
-           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
-              print *, "ADCHECK_DRIVE2 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
-           endif
 
            if( TYPEL(i).eq.0 .and. CVOLTMP(i) .ge. 0.001 .and.(CVOLTMP(i)-QSUM(i)*DTCT)/CVOLTMP(i) .le. -0.01 ) then
             flag = -99
@@ -1375,7 +1120,6 @@ end if
               KRT = 0                                  !-- restart counter
               HLINKTMP = HLINK                         !-- set head and vol to start value of timestep
               CVOLTMP = CVOL
-              print *, "TLE CHECK"
               CYCLE crnt                               !-- start cycle over with smaller timestep
              else
               write(6,*) "Courant error with smallest routing timestep DTCT: ",DTCT
@@ -1397,21 +1141,8 @@ end if
         do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
 
-           if (CVOLTMP(i) < 0 .or. CVOLTMP(i) > 1000000.0) then
-              print *, "ADCHECK_DRIVE3 i cvol hlink nlinks", i, CVOLTMP(i), HLINKTMP(i), yw_MPP_NLINKS
-           endif
-
            if(TYPEL(i) .eq. 0) then                   !--  regular channel grid point, compute volume
-              ! Volume-weighted temperature
-              !ReachTemp(i) = ( ReachTemp(i) * ( CVOLTMP(i) - (Outflow(i) * DTCT) ) + &      ! current minus outflow
-              !               InflowUpstreamTemp(i) * (InflowUpstream(i) * DTCT) + &         ! inflow from upstream reaches
-              !               InflowLandTemp(i) * (InflowLand(i) * DTCT) + &                 ! inflow from land
-              !               InflowGwTemp(i) * (InflowGw(i) * DTCT) ) / &                   ! inflow from gw
-              !               ( CVOLTMP(i) + (InflowUpstream(i) + InflowLand(i) + InflowGw(i) - Outflow(i)) * DTCT ) ! total volume
-              ! Add to rt_domain: CVOLTMP (previous), Outflow, InflowUpstream, InflowLand, InflowGw, InflowUpstreamTemp
-              ! Already have: LateralTemp, ReachTemp, DTCT
               CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) )* DTCT
-
               if((CVOLTMP(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
                 print *, "WARNING! channel volume less than 0:i,CVOL,QSUM,QLat", &
@@ -1431,14 +1162,9 @@ end if
 
                ! change in volume is inflow, lateral flow, and outflow
                !yw DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*DXRT),HLINKTMP(i), &
-                   if (localprint) then
-                     print *, "ADCHECK_TYPEL1: i, H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
-                     print *, "    QSUM QLateral", QSUM(i), QLateral(i) 
-                   endif
-                   !call DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                   call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
-                          CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
-                   CVOLTMP(i) = CVOLTMP(i) + ( QSUM(i) + QLateral(i) - QLINK(i,1) ) * DTCT
+                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
+                       DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                       CD(i),CHANLEN(i), MannN(i), Bw(i), ChSSlp(i)) ) * DTCT
           elseif (TYPEL(i) .eq. 2) then              !--- into a reservoir, assume critical depth
               if ((QSUM(i)+QLateral(i) .lt. 0) .and. (gwChanCondSw == 0)) then
 #ifdef HYDRO_D
@@ -1450,21 +1176,9 @@ end if
              endif
 
               !-- compute volume in reach (m^3)
-                   if (localprint) then
-                     print *, "ADCHECK_TYPEL2: i H CVOL So", i, HLINKTMP(i), CVOLTMP(i), So(i)
-                     print *, "    QSUM QLateral", QSUM(i), QLateral(i)
-                   endif
-                  !call DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
-                  call DIFFUSION(i,ZELEV(i),ZELEV(i),HLINKTMP(i), &
-                          CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
-                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - QLINK(i,1)) * DTCT
-                   if (CVOLTMP(i) < 0) then
-                     print *, "ADCHECK_TYPEL2_NEGCVOL: i H CVOL", i, HLINKTMP(i), CVOLTMP(i)
-                     print *, "    QSUM QLateral", QSUM(i), QLateral(i)
-                     print *, "    MannN Bw ChSSlp", MannN(i), Bw(i), ChSSlp(i)
-                     print *, "    So CHANLEN vel", So(i), CHANLEN(i), velocity(i)
-                     print *, "    Diffusion", QLINK(i,1)
-                   endif
+                   CVOLTMP(i) = CVOLTMP(i) + (QSUM(i) + QLateral(i) - &
+                          DIFFUSION(i,ZELEV(i),ZELEV(i)-(So(i)*CHANLEN(i)),HLINKTMP(i), &
+                             CD(i) ,CHANLEN(i), MannN(i), Bw(i), ChSSlp(i)) ) * DTCT
           else
               print *, "FATAL ERROR: This node does not have a type.. error TYPEL =", TYPEL(i)
               call hydro_stop("In drive_CHANNEL() - error TYPEL")
@@ -1473,68 +1187,16 @@ end if
           if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
               HLINKTMP(i) = HEAD(i, CVOLTMP(i)/CHANLEN(i),Bw(i),1/ChSSlp(i))  !--updated depth
           else
-              !HLINKTMP(i) = CD(i)  !!!   CRITICALDEPTH(i,QSUM(i)+QLateral(i), Bw(i), 1./ChSSlp(i)) !--critical depth is head
-              HLINKTMP(i) = HEAD(i, CVOLTMP(i)/CHANLEN(i),Bw(i),1/ChSSlp(i))
+              HLINKTMP(i) = CD(i)  !!!   CRITICALDEPTH(i,QSUM(i)+QLateral(i), Bw(i), 1./ChSSlp(i)) !--critical depth is head
           endif
 
           if(TO_NODE(i) .gt. 0) then
              if(LAKENODE(TO_NODE(i)) .gt. 0) then
                   QLAKEI8(LAKENODE(TO_NODE(i))) = QLAKEI8(LAKENODE(TO_NODE(i))) + QLINK(i,1)
-                  ! Numerator for volume-weighted temperature
-                  LakeInflowUpstreamSumTemp(LAKENODE(TO_NODE(i))) = LakeInflowUpstreamSumTemp(LAKENODE(TO_NODE(i))) + rt_domain(did)%T_QSUM(i) * QLINK(i,1)
-                  ! Denominator for volume-weighted temperature
-                  LakeInflowUpstream(LAKENODE(TO_NODE(i))) = LakeInflowUpstream(LAKENODE(TO_NODE(i))) + QLINK(i,1)
-                  !print *, "ADCHECK2: i TO_NODE LAKENODE CH", i, TO_NODE(i), LAKENODE(TO_NODE(i))
-                  !print *, "  CH_NETRT CH_NETLNK", CH_NETRT(CHANXI(i),CHANYJ(i)), CH_NETLNK(CHANXI(i),CHANYJ(i))
-                  !print *, "  LakeInflowUpstreamSumTemp", LakeInflowUpstreamSumTemp(LAKENODE(TO_NODE(i)))
-                  !print *, "  T_QSUM", rt_domain(did)%T_QSUM(i)
-                  !print *, "  QLINK", QLINK(i,1)
-                  !print *, "  LakeInflowUpstream", LakeInflowUpstream(LAKENODE(TO_NODE(i)))
-                  !print *, "  QLAKEI8", QLAKEI8(LAKENODE(TO_NODE(i)))
              endif
           endif
 
-            if (localprint) then
-            if(CHANXI(i)==67 .and. CHANYJ(i)==48) then
-              print *, "ADCHECK2A: After LakeInflowUpstreamSumTemp interim calcs."
-              print *, "ADCHECK2A 67,48 i TYPEL KRT", i, TYPEL(i), KRT
-              print *, "  QSUM", QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-              print *, "  CVOLTMP", CVOLTMP(i)
-            endif
-            end if
-
-
         END DO  !--- done processing all the links
-!        print *, "rt_domain(did)%velocity = ", rt_domain(did)%velocity
-
-if (localprint) then
-print *, "ADCHECK2B: After LakeInflowUpstreamSumTemp interim calcs."
-print *, "ADCHECK2B: LakeInflowUpstreamTemp", LakeInflowUpstreamTemp
-print *, "ADCHECK2B: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK2B: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK2B: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK2B: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK2B: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
-
-        ! Final calculation for volume-weighted temperature for lakes
-        ! e.g., (Inflow1 * Temperature1 + Inflow2 * Temperature2) / (Inflow1 + Inflow2)
-        where (LakeInflowUpstream > 0) !.and. LakeInflowUpstreamSumTemp > 0)
-           LakeInflowUpstreamTemp = LakeInflowUpstreamSumTemp / LakeInflowUpstream
-        end where
-
-if (localprint) then
-print *, "ADCHECK2C: After LakeInflowUpstreamTemp final calcs."
-print *, "ADCHECK2C: LakeInflowUpstreamTemp", LakeInflowUpstreamTemp
-print *, "ADCHECK2C: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK2C: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK2C: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-end if
 
 #ifdef MPP_LAND
     call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,CVOLTMP,NLINKS,99)
@@ -1558,7 +1220,7 @@ end if
 
               ! Calls run for a single reservoir depending on its type as
               ! in whether it uses level pool, machine learning, or persistence.
-              ! Inflow, lateral inflow, water elevation, eveporation, precipitation,
+              ! Inflow, lateral inflow, water elevation, evaporation, precipitation,
               ! and the routing period are passed in. Updated outflow and water elevation are returned.
               call rt_domain(did)%reservoirs(i)%ptr%run(QLAKEIP(i), QLAKEI(i), &
                    QLLAKE(i), RESHT(i), QLAKEO(i), &
@@ -1571,33 +1233,13 @@ end if
               !       MPI communication model.
 
               QLAKEIP(i) = QLAKEI(i)  !-- store total lake inflow for this timestep
-              ! LakeOutflowTemp(i) is set from 1D lake physics (t_lake3d top layer)
-              ! in module_NoahMP_hrldas_driver before routing is called.
               LAKE_NETOUTFLOW(i) = QLAKEI(i) + QLLAKE(i) - QLAKEO(i)
 
-if (localprint) then
-              print *, "ADCHECK3: After assign lake inflow temp to lake outflow temp."
-              print *, "ADCHECK3: i QLAKEO LakeOutflowTemp", i, QLAKEO(i), LakeOutflowTemp(i)
-              print *, "DYCHECK: NETOLAK",i, LAKE_NETOUTFLOW(i) 
-              print *, "DYCHECK: QLAKEI", i, QLAKEI(i)
-              print *, "DYCHECK: QLAKEO", i, QLAKEO(i)
-              print *, "DYCHECK: QLLAKEO", i, QLLAKE(i)
-end if
 
 #ifdef MPP_LAND
             endif
 #endif
            enddo
-
-if (localprint) then
-print *, "ADCHECK3A: After loop to assign lake inflow temp to lake outflow temp."
-print *, "ADCHECK3A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK3A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK3A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK3A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK3A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
-
 #ifdef MPP_LAND
     if(NLAKES .gt. 0) then
 !yw       call MPP_CHANNEL_COM_REAL(LAKE_MSKRT,ixrt,jxrt,QLLAKE,NLAKES,99)
@@ -1616,9 +1258,9 @@ end if
          call updateLake_grid(LAKE_EVAP,nlakes,lake_index)
          call updateLake_grid(LAKE_PRECIP,nlakes,lake_index)
          call updateLake_grid(LAKE_NETOUTFLOW,nlakes,lake_index)
-
     endif
 #endif
+
 
 #ifdef MPP_LAND
          do iyw = 1,yw_MPP_NLINKS
@@ -1627,133 +1269,20 @@ end if
          do i = 1, NLINKS                                                !--- compute volume and depth at each node
 #endif
             if(TYPEL(i) == 0) then !-- regular channel node, finalize head and flow
-                   call DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
+                   QLINK(i,1)=DIFFUSION(i,ZELEV(FROM_NODE(i)),ZELEV(TO_NODE(i)), &
                       HLINKTMP(FROM_NODE(i)),HLINKTMP(TO_NODE(i)), &
-                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i), QLINK(i,1), velocity(i))
-		      !--Reza-------------------------------------------------------
-                      !XS_Peremeter(i) = Bw(i)+ 2.0*((HLINKTMP(FROM_NODE(i))+HLINKTMP(TO_NODE(i)))/2.)* &
-	              !                              sqrt(1.0 + ChSSlp(i)*ChSSlp(i))
-                      XS_Peremeter(i) = Bw(i) + 2.0 * HLINKTMP(i) * sqrt(1.0 + (1./(ChSSlp(i)*ChSSlp(i)))) ! should be (1/ChSSlp)^2
+                      CHANLEN(i), MannN(i), Bw(i), ChSSlp(i))
             endif
-!            print *, "i = ", i
-!            print *, "ZELEV(FROM_NODE(i)) = ", ZELEV(FROM_NODE(i))
-!            print *, "ZELEV(TO_NODE(i)) = ", ZELEV(TO_NODE(i))
-!            print *, "HLINKTMP(FROM_NODE(i)) = ", HLINKTMP(FROM_NODE(i))
-!            print *, "HLINKTMP(TO_NODE(i)) = ", HLINKTMP(TO_NODE(i))
-!            print *, "CHANLEN(i) = ", CHANLEN(i)
-!            print *, "MannN(i) = ", MannN(i)
-!            print *, "Bw(i) = ", Bw(i)
-!            print *, "ChSSlp(i) = ", ChSSlp(i)
-!            print *, "velocity(i) = ", velocity(i)
-if (localprint) then
-            if(CHANXI(i)==67 .and. CHANYJ(i)==48) then
-              print *, "ADCHECK4: After qlink final calc."
-              print *, "ADCHECK4 67,48 i TYPEL", i, TYPEL(i)
-              print *, "  QSUM", QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-            if(CHANXI(i)==66 .and. CHANYJ(i)==47) then
-              print *, "ADCHECK4: After qlink final calc."
-              print *, "ADCHECK4 66,47 i TYPEL", i, TYPEL(i)
-              print *, "  QSUM", QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-            if(CHANXI(i)==55 .and. CHANYJ(i)==126) then
-              print *, "ADCHECK4: After qlink final calc."
-              print *, "ADCHECK4 55,126 i TYPEL", i, TYPEL(i)
-              print *, "  QSUM", QSUM(i)
-              print *, "  InflowUpstream", InflowUpstream(i)
-              print *, "  InflowLand", InflowLand(i)
-              print *, "  InflowGw", InflowGw(i)
-              print *, "  InflowUpstreamTemp", InflowUpstreamTemp(i)
-              print *, "  Outflow", Outflow(i)
-            endif
-end if
-
          enddo
-
-if (localprint) then
-print *, "ADCHECK4A: After qlink final calc loop. KRT", KRT
-print *, "ADCHECK4A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK4A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK4A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK4A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK4A: 1107 InflowUpstreamTemp", InflowUpstreamTemp(1107)
-end if
 
 #ifdef MPP_LAND
           call MPP_CHANNEL_COM_REAL(Link_location,ixrt,jxrt,QLINK(:,1),NLINKS,99)
 #endif
 
-          !-- Reza's update goes in here:
-          !-- The RUN function should be called here.
-	  ! Run the subroutine to diaggregate
-
-          ! Variable mapping to rt_domain before the channel temperature call.
-          ! Note that CVOL is still from previous timestep so we can use as-is.
-          ! CVOLTMP stores new values including lateral and upstream inflows,
-          ! which gets mapped to CVOL below this channel temperature call.
-          rt_domain(did)%QSUM = QSUM
-          rt_domain(did)%CVOLTMP = CVOLTMP
-          rt_domain(did)%InflowUpstream = InflowUpstream  ! total inflow from upstream reaches (m3/s)
-          rt_domain(did)%InflowLand = InflowLand  ! lateral inflow from land (might be duplicate) (m3/s)
-          rt_domain(did)%InflowGw = InflowGw  ! inflow from groundwater (might be duplicate) (m3/s)
-          rt_domain(did)%InflowUpstreamTemp = InflowUpstreamTemp  ! average temperature of inflow from upstream reaches (m3/s)
-          rt_domain(did)%Outflow = Outflow ! outflow from reach (might be duplicate) (m3/s)
-          rt_domain(did)%LakeOutflowTemp = LakeOutflowTemp ! outflow from lake (might be duplicate) (m3/s)
-          if (water_temperature_option .eq. 1) then
-            print *, "calling rivertemp_run"
-!           print *, "ADCHECK QSUM", rt_domain(did)%QSUM
-!           print *, "        InflowUpstream", rt_domain(did)%InflowUpstream
-!           print *, "   X     InflowLand", rt_domain(did)%InflowLand
-!           print *, "   X     InflowGw", rt_domain(did)%InflowGw
-!           print *, "   -     QLateral", QLateral
-!           print *, "        T_QSUM", rt_domain(did)%T_QSUM
-!           print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
-!           print *, "   -     Outflow", rt_domain(did)%Outflow
-!           print *, "   -     QLINK", QLINK(:,1)
-
-          !AD: River temperature routine seems to be generating NAs over reservoir outlets, so updating manually here for now.
-          !There is probably a better way to do this... just loop through lakes and assign to outlet reaches?
-#ifdef MPP_LAND
-          do iyw = 1,yw_MPP_NLINKS
-             i = nlinks_index(iyw)
-#else
-          do i = 1, NLINKS                                                !--- compute volume and depth at each node
-#endif
-             if (CH_NETRT(CHANXI(i),CHANYJ(i)) .gt. 0) then
-                rt_domain(did)%T_QSUM(i) = LakeOutflowTemp(CH_NETRT(CHANXI(i),CHANYJ(i)))
-             end if
-          end do
-
-if (localprint) then
-print *, "ADCHECK5A: After  river temp."
-print *, "ADCHECK5A: 408 LakeOutflowTemp", LakeOutflowTemp(CH_NETRT(67,48))
-print *, "ADCHECK5A: 408 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(67,48))
-print *, "ADCHECK5A: 400 InflowUpstreamTemp", InflowUpstreamTemp(CH_NETLNK(66,47))
-print *, "ADCHECK5A: 713 InflowUpstreamTemp", InflowUpstreamTemp(713)
-print *, "ADCHECK5A: 408 T_QSUM", rt_domain(did)%T_QSUM(CH_NETLNK(67,48))
-print *, "ADCHECK5A: 400 T_QSUM", rt_domain(did)%T_QSUM(CH_NETLNK(66,47))
-print *, "ADCHECK5A: 713 T_QSUM", rt_domain(did)%T_QSUM(713)
-print *, "ADCHECK5A: 1107 T_QSUM", rt_domain(did)%T_QSUM(1107)
-end if
-
-          endif ! temperature module active check
-
-          KRT = KRT + 1                     !-- iterate on the timestep
-          if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
+           KRT = KRT + 1                     !-- iterate on the timestep
+           if(KRT .eq. DT_STEPS) exit crnt   !-- up to the maximum time in interval
 
           end do crnt   !--- DTCT timestep of DT_STEPS
-
-
 
            HLINK = HLINKTMP                 !-- update head based on final solution in timestep
            CVOL  = CVOLTMP                  !-- update volume
