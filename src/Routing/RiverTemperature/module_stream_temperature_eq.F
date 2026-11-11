@@ -9,8 +9,11 @@
 !
 ! Physics:
 !   Equilibrium temperature:
-!     T_e = T_air + SW_net / K_e
+!     T_e = T_air_smooth + SW_net / K_sw
+!     T_air_smooth = exponential moving average of the reach air temperature
+!                    (e-folding time Route_Link TauTair, default T_smooth_tau below)
 !     SW_net = SW_in * (1 - albedo) * (1 - shade_factor)
+!     K_sw   = shortwave equilibrium coefficient [W/m2/C]   (Route_Link Ksw, default K_sw below)
 !     K_e    = bulk surface heat exchange coefficient [W/m2/C]  (Route_Link Kexch, default K_exchange below)
 !
 !   Temperature routing (exponential relaxation along each reach):
