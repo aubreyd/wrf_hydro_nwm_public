@@ -1,6 +1,7 @@
 
 all: user_build_options
 	(cd Utility_routines;		make)
+	(cd ../Lake1D;			make)
 	(cd phys;			make)
 	(cd data_structures;		make)
 	(cd IO_code;			make)
@@ -8,6 +9,7 @@ all: user_build_options
 
 clean:
 	(cd Utility_routines;		make clean)
+	(cd ../Lake1D;			make clean)
 	(cd phys;			make clean)
 	(cd data_structures;		make clean)
 	(cd IO_code;			make clean)
@@ -16,6 +18,7 @@ clean:
 ### explicitly point to other land model options
 NoahMP: user_build_options
 	(cd Utility_routines;		make)
+	(cd ../Lake1D;			make)
 	(cd phys;			make)
 	(cd data_structures;		make)
 	(cd IO_code;			make NoahMP MOD_OPT="-DNoahMP")

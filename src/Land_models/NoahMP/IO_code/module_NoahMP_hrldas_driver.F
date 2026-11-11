@@ -23,7 +23,7 @@ module module_NoahMP_hrldas_driver
   USE module_hrldas_netcdf_io
   USE module_sf_noahmp_groundwater
   USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm
-  USE module_sf_lake, only: lake, lakeini, lakeini_rst, nlevsoil, nlevlake, nlevsnow, lake_mixfact2d, lake_kbg2d
+  USE module_lake1d
   USE module_date_utilities
   USE orchestrator_base
   USE config_base, only: wrf_hydro, noah_lsm
@@ -353,72 +353,7 @@ module module_NoahMP_hrldas_driver
   REAL,       ALLOCATABLE, DIMENSION(:,:,:)   ::  PSNOWDZXY
   REAL,       ALLOCATABLE, DIMENSION(:,:,:)   ::  PSNOWHISTXY
 
-!------------------------------------------------------------------------
-! Needed for lake model (sf_lake_physics = 1)
-!------------------------------------------------------------------------
-
-  INTEGER                             :: lakeflag
-  INTEGER                             :: lake_depth_flag
-  LOGICAL, ALLOCATABLE, DIMENSION(:,:):: lake2d
-
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: lake_depth
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: lakedepth2d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: savedtke12d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: snowdp2d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: h2osno2d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: snl2d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: t_grnd2d
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: lakemask
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: t2        ! temporary add these since they dont exist
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: th2       ! temporary add these since they dont exist
-  REAL, ALLOCATABLE, DIMENSION(:,:)   :: q2        ! temporary add these since they dont exist
-
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: t_lake3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: lake_icefrac3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: z_lake3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: dz_lake3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: t_soisno3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: h2osoi_ice3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: h2osoi_liq3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: h2osoi_vol3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: z3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: dz3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: zi3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: watsat3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: csol3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: tkmg3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: tkdry3d
-  REAL, ALLOCATABLE, DIMENSION(:,:,:) :: tksatu3d
-
-!------------------------------------------------------------------------
-! Needed for wrf_hydro lake model
-!------------------------------------------------------------------------
-#ifdef WRF_HYDRO
-  INTEGER                                :: nlakes
-
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_precip
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_evap
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_netoutflow
-  INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_grids
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_dh_avg      ! change in lake water level this LSM step, from the level-pool reservoir (m)
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_resht_prev  ! level-pool water elevation at the previous LSM step (m)
-  LOGICAL                                :: lake_resht_init = .false.
-  REAL   , PARAMETER                     :: lake_min_depth = 1.0  ! floor on 1-D lake model depth (m)
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum       ! per-lake sum of outlet-depth temperature over this rank's cells (K)
-  INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell     ! per-lake count of this rank's lake cells
-  REAL   , ALLOCATABLE, DIMENSION(:)     :: lake_t_sum_dp    ! as lake_t_sum, cells whose column reaches the outlet depth
-  INTEGER, ALLOCATABLE, DIMENSION(:)     :: lake_t_ncell_dp  ! as lake_t_ncell, cells whose column reaches the outlet depth
-  INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_ix          ! routing lake index of each lake cell (0 = none)
-  ! 1-D lake model sub-stepping: the lake model (with its multi-layer snow)
-  ! is run with a time step no longer than lake_dt_max; fluxes are averaged
-  ! over the sub-steps.  Rain-on-snow at a 3600 s step produced runaway
-  ! lake snow-layer temperatures (t_soisno > 500 K).
-  REAL   , PARAMETER                     :: lake_dt_max = 600.0  ! maximum lake sub-step (s)
-  REAL   , ALLOCATABLE, DIMENSION(:,:)   :: rain_lk, hfx_lk, lh_lk, grdflx_lk, qfx_lk
-  LOGICAL                                :: lake_heat_warned = .false.
-
-  INTEGER, ALLOCATABLE, DIMENSION(:,:)   :: lake_id
-#endif
+! 1-D lake model state and per-lake reservoir coupling arrays: module_lake1d
 !------------------------------------------------------------------------
 ! 2D variables not used in WRF - should be removed?
 !------------------------------------------------------------------------
@@ -485,13 +420,7 @@ module module_NoahMP_hrldas_driver
   logical            :: lake_rst_complete
   real, allocatable, dimension(:,:) :: tsk_lakeini   ! surface temperature for a cold lake start from restart
   real               :: tg_land_sum(2)               ! sum and count of valid land TG (cold lake start)
-  integer            :: lake_id_bad(1)               ! LAKE_ID cells whose land use is not ISLAKE
   integer            :: ilkvar
-  character(len=16), dimension(22), parameter :: lake_rst_vars = [character(len=16) :: &
-       'LAKE_DEPTH', 'LAKE_SAVETKE1', 'LAKE_SNOWP', 'LAKE_H2OSNO', 'LAKE_SNL', 'LAKE_T_GRND', &
-       'LAKE_T_SOILSNOW', 'LAKE_H2OSOI_ICE', 'LAKE_H2OSOI_LIQ', 'LAKE_H2OSOI_VOL', 'LAKE_Z', 'LAKE_DZ', &
-       'LAKE_T_LAKE', 'LAKE_ICEFRAC', 'LAKE_Z_LAKE', 'LAKE_DZ_LAKE', &
-       'LAKE_WATSAT', 'LAKE_CSOL', 'LAKE_TKMG', 'LAKE_TKDRY', 'LAKE_TKSATU', 'LAKE_ZI']
   character(len=256) :: restart_flnm
   integer            :: ierr
 
@@ -1035,46 +964,7 @@ module module_NoahMP_hrldas_driver
   ! Allocated only when the lake model is on; every use is inside an
   ! IF (sf_lake_physics == 1) block (LDASOUT lake fields are turned off when
   ! the lake model is off, see output_NoahMP_NWM).
-  IF (noah_lsm%sf_lake_physics == 1) THEN
-
-  ALLOCATE ( lake2d(XSTART:XEND,YSTART:YEND))
-
-  ALLOCATE (  lake_depth(XSTART:XEND,YSTART:YEND))
-  ALLOCATE ( lakedepth2d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE ( savedtke12d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (    snowdp2d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (    h2osno2d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (       snl2d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (    t_grnd2d(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (    lakemask(XSTART:XEND,YSTART:YEND))
-  ALLOCATE (          t2(XSTART:XEND,YSTART:YEND)) ! temporary add these since they dont exist
-  ALLOCATE (         th2(XSTART:XEND,YSTART:YEND)) ! temporary add these since they dont exist
-  ALLOCATE (          q2(XSTART:XEND,YSTART:YEND)) ! temporary add these since they dont exist
-
-  ALLOCATE (       t_lake3d(XSTART:XEND,          1:nlevlake,YSTART:YEND)) 
-  ALLOCATE ( lake_icefrac3d(XSTART:XEND,          1:nlevlake,YSTART:YEND)) 
-  ALLOCATE (       z_lake3d(XSTART:XEND,          1:nlevlake,YSTART:YEND)) 
-  ALLOCATE (      dz_lake3d(XSTART:XEND,          1:nlevlake,YSTART:YEND)) 
-  ALLOCATE (     t_soisno3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (   h2osoi_ice3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (   h2osoi_liq3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (   h2osoi_vol3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (            z3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (           dz3d(XSTART:XEND,-nlevsnow+1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (           zi3d(XSTART:XEND,-nlevsnow+0:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (       watsat3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (         csol3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (         tkmg3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (        tkdry3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
-  ALLOCATE (       tksatu3d(XSTART:XEND,          1:nlevsoil,YSTART:YEND)) 
-
-  ENDIF  ! sf_lake_physics == 1
-
-!------------------------------------------------------------------------
-! Needed for wrf_hydro lake model
-!------------------------------------------------------------------------
-
-  ALLOCATE ( lake_id(XSTART:XEND,YSTART:YEND))
+  call lake1d_allocate(XSTART, XEND, YSTART, YEND)
 
 !ENDIF
 
@@ -1409,37 +1299,7 @@ module module_NoahMP_hrldas_driver
 !------------------------------------------------------------------------
 
   if (noah_lsm%sf_lake_physics == 1) then
-     lakemask = 0
-     where(ivgtyp ==  islake) lakemask = 1
-
-     lakeflag = 1
-     if(iswater < 0) lakeflag = 0
-
-     lake_depth_flag = 0
-     if(noah_lsm%use_lakedepth == 1) then
-       CALL READ_LAKE_DEPTH(noah_lsm%HRLDAS_SETUP_FILE, XSTART, XEND, YSTART, YEND,LAKE_DEPTH)
-       lake_depth_flag = 1
-     end if
-
-     lake_id = 0
-     call read_lake_id(noah_lsm%hrldas_setup_file, xstart, xend, ystart, yend, lake_id)
-
-     ! The 1-D lake model runs only on ISLAKE cells, but lake outflow
-     ! temperature, precipitation and evaporation are averaged over all cells
-     ! of a lake's LAKE_ID footprint.  A LAKE_ID cell with another land use
-     ! would add unset lake temperatures and land P/E to the lake means, so
-     ! LAKE_ID and IVGTYP must be consistent (a pre-processing requirement).
-     lake_id_bad(1) = count(lake_id > 0 .and. ivgtyp /= islake)
-#ifdef MPP_LAND
-     call sum_int1d(lake_id_bad, 1)
-#endif
-     if (lake_id_bad(1) > 0) then
-        write(6,'(a,i0,a,i0,a)') 'FATAL ERROR: ', lake_id_bad(1), &
-             ' cells in wrfinput have LAKE_ID > 0 but IVGTYP /= ISLAKE (', islake, &
-             '). LAKE_ID lake footprints must have the lake land-use class; fix the domain pre-processing.'
-        call flush(6)
-        call fatal_error_stop('FATAL ERROR: LAKE_ID cells without lake land use (IVGTYP /= ISLAKE) in wrfinput')
-     end if
+     call lake1d_setup(XSTART, XEND, YSTART, YEND, ivgtyp, iswater, islake)
 
   end if
   
@@ -1634,18 +1494,9 @@ module module_NoahMP_hrldas_driver
 
              call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_ZI" ,zi3d )
 
-             call  lakeini_rst(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
-                           noah_lsm%lake_min_elev,   restart_flag,        noah_lsm%lakedepth_default, lake_depth,     &
-                           lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
-                           snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
-                           z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
-                           h2osoi_liq3d,    h2osoi_vol3d,  z3d,               dz3d,           &
-                           zi3d,            watsat3d,      csol3d,            tkmg3d,         &
-                           iswater,         xice,          xice_threshold,     xland,  tsk,   &
-                           lakemask,        lakeflag,                                         &
-                           lake_depth_flag, noah_lsm%use_lakedepth,                           &
-                           tkdry3d,         tksatu3d,      lake2d,                            &
-                           its,ite,jts,jte,ims,ime,jms,jme)
+             call lake1d_init(.true., ivgtyp, isltyp, terrain, state%snow, restart_flag, &
+                              iswater, xice, xice_threshold, xland, tsk,                &
+                              its, ite, jts, jte, ims, ime, jms, jme)
            ELSE
              ! Cold-start the lake model (lakeini returns immediately when its
              ! restart argument is .true.).  lakeini sets the initial lake and
@@ -1672,18 +1523,9 @@ module module_NoahMP_hrldas_driver
              write(6,*) 'Cold lake start: lake surface temperature from domain-mean land TG [K] =', &
                         tsk_lakeini(XSTART,YSTART)
              where (lakemask == 1 .and. (state%snow < 0.0 .or. state%snow > 1.0e4)) state%snow = 0.0
-             call  lakeini(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
-                           noah_lsm%lake_min_elev,   .false.,            noah_lsm%lakedepth_default, lake_depth,     &
-                           lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
-                           snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
-                           z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
-                           h2osoi_liq3d,    h2osoi_vol3d,  z3d,               dz3d,           &
-                           zi3d,            watsat3d,      csol3d,            tkmg3d,         &
-                           iswater,         xice,          xice_threshold,     xland,  tsk_lakeini, &
-                           lakemask,        lakeflag,                                         &
-                           lake_depth_flag, noah_lsm%use_lakedepth,                           &
-                           tkdry3d,         tksatu3d,      lake2d,                            &
-                           its,ite,jts,jte,ims,ime,jms,jme)
+             call lake1d_init(.false., ivgtyp, isltyp, terrain, state%snow, .false.,    &
+                              iswater, xice, xice_threshold, xland, tsk_lakeini,       &
+                              its, ite, jts, jte, ims, ime, jms, jme)
              deallocate(tsk_lakeini)
            ENDIF
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
@@ -1792,18 +1634,9 @@ module module_NoahMP_hrldas_driver
       TAUSSXY = 0.0   ! Need to be added to _INIT later
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
-             call  lakeini(ivgtyp,          isltyp,        terrain,           state%snow,           & !i
-                           noah_lsm%lake_min_elev,   restart_flag,       noah_lsm%lakedepth_default, lake_depth,     &
-                           lakedepth2d,     savedtke12d,   snowdp2d,          h2osno2d,       & !o
-                           snl2d,           t_grnd2d,      t_lake3d,          lake_icefrac3d, &
-                           z_lake3d,        dz_lake3d,     t_soisno3d,        h2osoi_ice3d,   &
-                           h2osoi_liq3d,    h2osoi_vol3d,  z3d,               dz3d,           &
-                           zi3d,            watsat3d,      csol3d,            tkmg3d,         &
-                           iswater,         xice,          xice_threshold,     xland,  tsk,   &
-                           lakemask,        lakeflag,                                         &
-                           lake_depth_flag, noah_lsm%use_lakedepth,                                    &
-                           tkdry3d,         tksatu3d,      lake2d,                            &
-                           its,ite,jts,jte,ims,ime,jms,jme)
+             call lake1d_init(.false., ivgtyp, isltyp, terrain, state%snow, restart_flag, &
+                              iswater, xice, xice_threshold, xland, tsk,                 &
+                              its, ite, jts, jte, ims, ime, jms, jme)
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
             where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
 
@@ -1878,26 +1711,7 @@ if (io_config_outputs .gt. 0) then
      ACSNOW = 0.0
 endif
 
-   allocate(lake_precip(nlakes))
-   allocate(lake_evap(nlakes))
-   allocate(lake_netoutflow(nlakes))
-   allocate(lake_grids(nlakes))
-   allocate(lake_dh_avg(nlakes))
-   allocate(lake_resht_prev(nlakes))
-   allocate(lake_t_sum(nlakes))
-   allocate(lake_t_ncell(nlakes))
-   allocate(lake_t_sum_dp(nlakes))
-   allocate(lake_t_ncell_dp(nlakes))
-   lake_precip = 0.0
-   lake_evap   = 0.0
-   lake_grids  = 0
-   lake_dh_avg = 0.0
-   lake_resht_prev = 0.0
-   lake_netoutflow = 0.0
-   lake_t_sum   = 0.0
-   lake_t_ncell = 0
-   lake_t_sum_dp   = 0.0
-   lake_t_ncell_dp = 0
+   call lake1d_allocate_lakes((nlakes))
 
 #endif
 
@@ -2006,15 +1820,8 @@ end subroutine land_driver_ini
     implicit  none
     type(state_type) :: state
     integer :: itime          ! timestep loop
-    integer :: isub_lk, nsub_lk   ! 1-D lake model sub-steps
-    real    :: dt_lk              ! 1-D lake model sub-step (s)
 #ifdef WRF_HYDRO
-    integer :: ilake
-    integer :: lake_idx
     integer, parameter :: did=1
-    ! lake outlet-depth temperature sampling
-    integer :: il, jl, kl, ncell_lk, ncell_dp
-    real    :: z_out, t_sum, t_col, wgt_lk, t_sum_dp
 #endif
 
 !---------------------------------------------------------------------------------
@@ -2273,241 +2080,14 @@ end subroutine land_driver_ini
           sflx_count_sum = sflx_count_sum + ( count_after_sflx - count_before_sflx )
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
-
-         ! Sub-step the 1-D lake model (see lake_dt_max).  Each sub-step gets an
-         ! equal share of the step's precipitation (rainbl is an amount per
-         ! step); fluxes are averaged over the sub-steps and the surface state
-         ! (TSK, T2, Q2, albedo) is the last sub-step's.  With one sub-step this
-         ! reproduces the single call exactly.
-         nsub_lk = max(1, ceiling(dtbl / lake_dt_max - 1.0e-4))
-         dt_lk   = dtbl / real(nsub_lk)
-         if (.not. allocated(rain_lk)) then
-            allocate(rain_lk(XSTART:XEND,YSTART:YEND), hfx_lk(XSTART:XEND,YSTART:YEND),    &
-                     lh_lk(XSTART:XEND,YSTART:YEND),   grdflx_lk(XSTART:XEND,YSTART:YEND), &
-                     qfx_lk(XSTART:XEND,YSTART:YEND))
-         end if
-         rain_lk   = rainbl / real(nsub_lk)
-         hfx_lk    = 0.0
-         lh_lk     = 0.0
-         grdflx_lk = 0.0
-         qfx_lk    = 0.0
-
-#ifdef WRF_HYDRO
-         ! Per-cell mixing parameters for the 1-D lake model from the per-lake
-         ! LAKEPARM LakeMixFact and LakeKbg (filled once; cells of lakes not in
-         ! LAKEPARM keep 0, i.e. the lake model's built-in default).
-         if (.not. allocated(lake_mixfact2d) .and. nlakes .gt. 0) then
-            if (allocated(rt_domain(did)%LakeMixFact)) then
-               allocate(lake_mixfact2d(XSTART:XEND,YSTART:YEND))
-               lake_mixfact2d = 0.0
-               do ilake = 1, nlakes
-                  where (lake_id == rt_domain(did)%lakeidm(ilake)) &
-                     lake_mixfact2d = rt_domain(did)%LakeMixFact(ilake)
-               end do
-            end if
-         end if
-         if (.not. allocated(lake_kbg2d) .and. nlakes .gt. 0) then
-            if (allocated(rt_domain(did)%LakeKbg)) then
-               allocate(lake_kbg2d(XSTART:XEND,YSTART:YEND))
-               lake_kbg2d = 0.0
-               do ilake = 1, nlakes
-                  where (lake_id == rt_domain(did)%lakeidm(ilake)) &
-                     lake_kbg2d = rt_domain(did)%LakeKbg(ilake)
-               end do
-            end if
-         end if
-#endif
-
-         do isub_lk = 1, nsub_lk
-         CALL Lake(  t_phy        ,p8w            ,dz8w         ,qv_curr         ,&  !i
-                     u_phy        ,v_phy          ,glw          ,emiss           ,&
-                     rain_lk      ,dt_lk          ,swdown       ,albedo          ,&
-                     xlat_urb2d   ,z_lake3d       ,dz_lake3d    ,lakedepth2d     ,&
-                     watsat3d     ,csol3d         ,tkmg3d       ,tkdry3d         ,&
-                     tksatu3d     ,ivgtyp         ,terrain      ,xland           ,&
-                     iswater      ,xice           ,xice_threshold, noah_lsm%lake_min_elev ,&
-                     ids          ,ide            ,jds          ,jde             ,&
-                     kds          ,kde            ,ims          ,ime             ,&
-                     jms          ,jme            ,kms          ,kme             ,&
-                     its          ,ite            ,jts          ,jte             ,&
-                     kts          ,kte                                           ,&
-                     h2osno2d     ,snowdp2d       ,snl2d        ,z3d             ,&  !h
-                     dz3d         ,zi3d           ,h2osoi_vol3d ,h2osoi_liq3d    ,&
-                     h2osoi_ice3d ,t_grnd2d       ,t_soisno3d   ,t_lake3d        ,&
-                     savedtke12d  ,lake_icefrac3d                                ,&
-                     lakemask                                                    ,&
-                     hfx          ,lh             ,grdflx       ,tsk             ,&  !o
-                     qfx          ,t2             ,th2          ,q2 )
-            where (lakemask == 1)
-               hfx_lk    = hfx_lk    + hfx
-               lh_lk     = lh_lk     + lh
-               grdflx_lk = grdflx_lk + grdflx
-               qfx_lk    = qfx_lk    + qfx
-            end where
-         end do
-         where (lakemask == 1)
-            hfx    = hfx_lk    / real(nsub_lk)
-            lh     = lh_lk     / real(nsub_lk)
-            grdflx = grdflx_lk / real(nsub_lk)
-            qfx    = qfx_lk    / real(nsub_lk)
-         end where
-
-#ifdef WRF_HYDRO
-         ! Heat carried into the lakes by river inflow (water_temperature = 2).
-         if (nlst(did)%water_temperature .eq. 2 .and. nlakes .gt. 0) then
-            if (allocated(rt_domain(did)%LakeInflowTemp) .and. allocated(rt_domain(did)%QLAKEI) &
-                .and. allocated(rt_domain(did)%LakeArea)) then
-               if (.not. allocated(lake_ix)) then
-                  allocate(lake_ix(XSTART:XEND,YSTART:YEND))
-                  lake_ix = 0
-                  do ilake = 1, nlakes
-                     where (lake_id == rt_domain(did)%lakeidm(ilake)) lake_ix = ilake
-                  end do
-               end if
-               call lake_inflow_heat(XSTART, XEND, YSTART, YEND, nlakes, lake_ix, lakemask,   &
-                    dtbl, rt_domain(did)%QLAKEI(1:nlakes), rt_domain(did)%LakeInflowTemp(1:nlakes), &
-                    rt_domain(did)%LakeArea(1:nlakes), rt_domain(did)%LakeOutletDepth(1:nlakes),  &
-                    z_lake3d, dz_lake3d, lake_icefrac3d, t_lake3d)
-            else if (.not. lake_heat_warned) then
-               write(6,*) 'WARNING: lake inflow heat disabled: lake inflow, inflow temperature ', &
-                          'or lake area arrays are not allocated.'
-               lake_heat_warned = .true.
-            end if
-         end if
-#endif
-
-         ! fake values for testing:
-         !where(ivgtyp == islake) rainbl  = 2.0
-         !where(ivgtyp == islake) qfx = 1.0
-#ifdef WRF_HYDRO
-#endif
-         do ilake = 1, nlakes
-           
-           ! find ID for this lake.  These are sums over this rank's tile only;
-           ! they are reduced across ranks after the loop.
-           lake_idx = rt_domain(did)%lakeidm(ilake)
-           lake_grids(ilake) = count(mask = lake_id == lake_idx)
-           lake_precip(ilake) = sum(rainbl, mask = lake_id == lake_idx)
-           lake_evap(ilake)   = sum(qfx, mask = lake_id == lake_idx)
-
-           ! Pass water temperature from 1D lake physics to routing [K], sampled
-           ! at the lake's outlet (withdrawal) depth below the surface.  Each
-           ! column's profile t_lake3d/z_lake3d is interpolated at the outlet
-           ! depth (clamped to the column), then averaged over the lake's cells
-           ! whose column (bottom of the lowest lake layer) reaches the outlet
-           ! depth, so shallow coves and arms do not contribute their warm
-           ! bottom water to a deep withdrawal.  If no cell reaches the outlet
-           ! depth, all cells are averaged (each at its clamped depth).
-           ! LakeOutletDepth = 0 reproduces the legacy surface-layer withdrawal.
-           z_out    = rt_domain(did)%LakeOutletDepth(ilake)
-           t_sum    = 0.0
-           ncell_lk = 0
-           t_sum_dp = 0.0
-           ncell_dp = 0
-           do jl = YSTART, YEND
-              do il = XSTART, XEND
-                 if (lake_id(il,jl) == lake_idx) then
-                    if (z_out .le. z_lake3d(il,1,jl)) then
-                       t_col = t_lake3d(il,1,jl)
-                    else if (z_out .ge. z_lake3d(il,nlevlake,jl)) then
-                       t_col = t_lake3d(il,nlevlake,jl)
-                    else
-                       t_col = t_lake3d(il,1,jl)
-                       do kl = 1, nlevlake-1
-                          if (z_out .le. z_lake3d(il,kl+1,jl)) then
-                             wgt_lk = (z_out - z_lake3d(il,kl,jl)) / &
-                                      max(1.0e-6, z_lake3d(il,kl+1,jl) - z_lake3d(il,kl,jl))
-                             t_col  = (1.0 - wgt_lk) * t_lake3d(il,kl,jl) &
-                                    +        wgt_lk  * t_lake3d(il,kl+1,jl)
-                             exit
-                          end if
-                       end do
-                    end if
-                    t_sum    = t_sum + t_col
-                    ncell_lk = ncell_lk + 1
-                    if (z_out .le. z_lake3d(il,nlevlake,jl) + 0.5 * dz_lake3d(il,nlevlake,jl)) then
-                       t_sum_dp = t_sum_dp + t_col
-                       ncell_dp = ncell_dp + 1
-                    end if
-                 end if
-              end do
-           end do
-           lake_t_sum(ilake)      = t_sum
-           lake_t_ncell(ilake)    = ncell_lk
-           lake_t_sum_dp(ilake)   = t_sum_dp
-           lake_t_ncell_dp(ilake) = ncell_dp
-
-         end do
-
-         ! Reduce the outlet-temperature sums across ranks: a lake's cells live
-         ! on the land tiles of a few ranks, but every rank needs the resulting
-         ! LakeOutflowTemp (the rank owning the outlet reach in the channel
-         ! decomposition generally has no lake cells and would otherwise keep
-         ! the 10 K init value, tripping the stream model's fallback).
-#ifdef MPP_LAND
-         call sum_real1d(lake_t_sum, nlakes)
-         call sum_int1d(lake_t_ncell, nlakes)
-         call sum_real1d(lake_t_sum_dp, nlakes)
-         call sum_int1d(lake_t_ncell_dp, nlakes)
-#endif
-
-         ! Reduce lake cell counts and P/E sums across ranks so every rank holds
-         ! whole-lake totals.  The coupler (hrldas_cpl_HYDRO) divides these by
-         ! lake_grids to get lake-mean P and E for the level-pool reservoirs;
-         ! the reservoir arrays must be identical on all ranks because
-         ! updateLake_seq adds each rank's deviation from the IO rank's values.
-#ifdef MPP_LAND
-         call sum_int1d(lake_grids, nlakes)
-         call sum_real1d(lake_precip, nlakes)
-         call sum_real1d(lake_evap, nlakes)
-#endif
-
-         ! Update the 1-D lake model depth to follow the level-pool reservoir.
-         ! The level pool is the single lake water balance (inflow - outflow
-         ! + P - E, with P and E from this lake model passed via the coupler);
-         ! the lake model's depth is shifted by the reservoir's water-elevation
-         ! change since the previous LSM step.  RESHT is synchronized across
-         ! ranks after routing, so every rank applies the same change.  The
-         ! reference elevation (previous step's RESHT) is kept in
-         ! rt_domain%LakeReshtLSM, which is written to and read from HYDRO_RST,
-         ! so a restart applies the same depth change as a continuous run.  On a
-         ! cold start, or a restart file without it, it is initialized on the
-         ! first call with no depth change.
-         if (allocated(rt_domain(did)%RESHT)) then
-            if (size(rt_domain(did)%RESHT) .ge. nlakes) then
-               if (.not. lake_resht_init) then
-                  lake_resht_prev(1:nlakes) = rt_domain(did)%RESHT(1:nlakes)
-                  if (allocated(rt_domain(did)%LakeReshtLSM)) then
-                     if (all(rt_domain(did)%LakeReshtLSM(1:nlakes) .gt. -9000.0)) &
-                        lake_resht_prev(1:nlakes) = rt_domain(did)%LakeReshtLSM(1:nlakes)
-                  end if
-                  lake_resht_init = .true.
-               end if
-               do ilake = 1, nlakes
-                  lake_dh_avg(ilake) = rt_domain(did)%RESHT(ilake) - lake_resht_prev(ilake)
-                  lake_resht_prev(ilake) = rt_domain(did)%RESHT(ilake)
-                  if (lake_grids(ilake) .gt. 0) then
-                     lake_idx = rt_domain(did)%lakeidm(ilake)
-                     where(lake_id == lake_idx) &
-                        lakedepth2d = max(lake_min_depth, lakedepth2d + lake_dh_avg(ilake))
-                  end if
-               end do
-               if (allocated(rt_domain(did)%LakeReshtLSM)) &
-                  rt_domain(did)%LakeReshtLSM(1:nlakes) = lake_resht_prev(1:nlakes)
-            end if
-         end if
-
-         do ilake = 1, nlakes
-           if (lake_t_ncell_dp(ilake) .gt. 0) then
-              rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum_dp(ilake) / real(lake_t_ncell_dp(ilake))
-           else if (lake_t_ncell(ilake) .gt. 0) then
-              rt_domain(did)%LakeOutflowTemp(ilake) = lake_t_sum(ilake) / real(lake_t_ncell(ilake))
-           end if
-#ifdef HYDRO_D
-           print *, "LakeOutflowTemp ilake z_out T", ilake, &
-                rt_domain(did)%LakeOutletDepth(ilake), rt_domain(did)%LakeOutflowTemp(ilake)
-#endif
-         end do
+         ! 1-D lake model step and its coupling to the level-pool reservoirs (module_lake1d)
+         call lake1d_step(XSTART, XEND, YSTART, YEND, dtbl,                               &
+                          t_phy, p8w, dz8w, qv_curr, u_phy, v_phy, glw, emiss, rainbl,     &
+                          swdown, albedo, xlat_urb2d, ivgtyp, terrain, xland, iswater,     &
+                          xice, xice_threshold,                                            &
+                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme,      &
+                          its, ite, jts, jte, kts, kte,                                    &
+                          hfx, lh, grdflx, tsk, qfx)
 
          ! mask lake output variables:
          LAKERAINOUT = -9999.0
@@ -3562,117 +3142,6 @@ subroutine define_rst_variables(ncid, state)
 
    end subroutine define_rst_variables
 
-#ifdef WRF_HYDRO
-!===============================================================================
-! Heat carried into each 1-D lake by its river inflow.
-!
-! Over one LSM step the lake receives V = Q_in * dt of water at T_in (the
-! flow-weighted temperature of the reaches entering the lake, from the stream
-! temperature model).  Spread uniformly over the lake surface area A (LAKEPARM
-! LkArea), this is a layer of thickness h = V / A in every column.  The inflow
-! enters at its level of neutral buoyancy: the first ice-free layer whose
-! density is at least that of the inflow (the bottom layer if none is).  The
-! level-pool reservoir carries the lake water balance, so an equal volume
-! leaves through the outlet: water between the insertion layer and the outlet
-! layer (layer containing LakeOutletDepth) is displaced by h toward the outlet
-! (first-order upwind, in passes of at most one layer thickness).  The heat
-! change of each column is therefore h * (T_in - T_outlet layer), and outflow
-! leaves at the outlet temperature.  If h exceeds the ice-free column depth the
-! column is flushed to T_in.
-!===============================================================================
-  subroutine lake_inflow_heat(xs, xe, ys, ye, nlakes, lake_ix, lakemask, dt, q_in, t_in, &
-                              area_km2, z_outlet, z_lake3d, dz_lake3d, icefrac3d, t_lake3d)
-    use module_sf_lake, only: nlevlake
-    implicit none
-    integer, intent(in) :: xs, xe, ys, ye, nlakes
-    integer, intent(in) :: lake_ix(xs:xe,ys:ye)
-    real,    intent(in) :: lakemask(xs:xe,ys:ye)
-    real,    intent(in) :: dt                      ! LSM step (s)
-    real,    intent(in) :: q_in(nlakes)            ! lake inflow (m3/s)
-    real,    intent(in) :: t_in(nlakes)            ! lake inflow temperature (K)
-    real,    intent(in) :: area_km2(nlakes)        ! lake surface area (km2)
-    real,    intent(in) :: z_outlet(nlakes)        ! outlet depth below the surface (m)
-    real,    intent(in) :: z_lake3d(xs:xe,1:nlevlake,ys:ye), dz_lake3d(xs:xe,1:nlevlake,ys:ye)
-    real,    intent(in) :: icefrac3d(xs:xe,1:nlevlake,ys:ye)
-    real,    intent(inout) :: t_lake3d(xs:xe,1:nlevlake,ys:ye)
-
-    integer :: i, j, k, lk, kf, k_in, k_out, kmin, kmax, npass, ip
-    real    :: h, hp, tin, rho_in, dzmin
-
-    do j = ys, ye
-       do i = xs, xe
-          lk = lake_ix(i,j)
-          if (lk .le. 0) cycle
-          if (lakemask(i,j) .ne. 1) cycle
-          if (q_in(lk) .le. 0.0 .or. area_km2(lk) .le. 0.0) cycle
-          if (t_in(lk) .lt. 200.0 .or. t_in(lk) .gt. 400.0) cycle      ! unset / invalid
-          h   = q_in(lk) * dt / (area_km2(lk) * 1.0e6)
-          tin = max(273.15, t_in(lk))
-
-          ! first ice-free layer
-          kf = 0
-          do k = 1, nlevlake
-             if (icefrac3d(i,k,j) .le. 0.0) then
-                kf = k
-                exit
-             end if
-          end do
-          if (kf .eq. 0) cycle
-
-          ! flushed column
-          if (h .ge. sum(dz_lake3d(i,kf:nlevlake,j))) then
-             t_lake3d(i,kf:nlevlake,j) = tin
-             cycle
-          end if
-
-          ! insertion layer (neutral buoyancy)
-          rho_in = lake_water_density(tin)
-          k_in = nlevlake
-          do k = kf, nlevlake
-             if (lake_water_density(t_lake3d(i,k,j)) .ge. rho_in) then
-                k_in = k
-                exit
-             end if
-          end do
-
-          ! outlet layer
-          k_out = nlevlake
-          do k = 1, nlevlake
-             if (z_outlet(lk) .le. z_lake3d(i,k,j) + 0.5 * dz_lake3d(i,k,j)) then
-                k_out = k
-                exit
-             end if
-          end do
-          k_out = max(k_out, kf)
-
-          kmin  = min(k_in, k_out)
-          kmax  = max(k_in, k_out)
-          dzmin = max(1.0e-3, minval(dz_lake3d(i,kmin:kmax,j)))
-          npass = max(1, ceiling(h / dzmin))
-          hp    = h / real(npass)
-          do ip = 1, npass
-             if (k_in .lt. k_out) then          ! displace downward toward the outlet
-                do k = k_out, k_in+1, -1
-                   t_lake3d(i,k,j) = t_lake3d(i,k,j) + hp / dz_lake3d(i,k,j) * (t_lake3d(i,k-1,j) - t_lake3d(i,k,j))
-                end do
-             else if (k_in .gt. k_out) then     ! displace upward toward the outlet
-                do k = k_out, k_in-1
-                   t_lake3d(i,k,j) = t_lake3d(i,k,j) + hp / dz_lake3d(i,k,j) * (t_lake3d(i,k+1,j) - t_lake3d(i,k,j))
-                end do
-             end if
-             t_lake3d(i,k_in,j) = t_lake3d(i,k_in,j) + hp / dz_lake3d(i,k_in,j) * (tin - t_lake3d(i,k_in,j))
-          end do
-       end do
-    end do
-  end subroutine lake_inflow_heat
-
-  ! Fresh-water density (kg/m3) as in the 1-D lake model (maximum at 277 K).
-  pure real function lake_water_density(t)
-    implicit none
-    real, intent(in) :: t
-    lake_water_density = 1000.0 * (1.0 - 1.9549e-5 * abs(t - 277.0)**1.68)
-  end function lake_water_density
-#endif
 
 end module module_NoahMP_hrldas_driver
 

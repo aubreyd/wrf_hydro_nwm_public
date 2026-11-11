@@ -11,6 +11,10 @@ add_subdirectory("Routing/Reservoirs")
 add_subdirectory("Data_Rec")
 add_subdirectory("Routing")
 add_subdirectory("HYDRO_drv")
+# Noah-MP utility routines (model constants) and the 1-D lake model are used
+# by both the offline Noah-MP driver and the NUOPC cap
+add_subdirectory("Land_models/NoahMP/Utility_routines")
+add_subdirectory("Land_models/Lake1D")
 
 if (WRF_HYDRO_NUDGING STREQUAL "1")
     add_subdirectory("nudging")
@@ -99,6 +103,7 @@ if (HYDRO_LSM MATCHES "NoahMP")
     target_link_libraries(wrfhydro.exe noahmp_phys)
     target_link_libraries(wrfhydro.exe noahmp_data)
     target_link_libraries(wrfhydro.exe hydro_noahmp_cpl)
+    target_link_libraries(wrfhydro.exe hydro_lake1d)
     target_link_libraries(wrfhydro.exe ${NETCDF_LIBRARIES})
 
     if (WRF_HYDRO_NUDGING STREQUAL "1")
