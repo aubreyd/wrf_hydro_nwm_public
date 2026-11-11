@@ -168,12 +168,8 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)      :: Tw     ! top width of channel
   REAL, allocatable, DIMENSION(:)      :: Tw_CC  ! top width of the (CC) compound channel
   REAL, allocatable, DIMENSION(:)      :: n_CC   ! mannings N of (CC) compound channel
-  REAL, allocatable, DIMENSION(:)      :: C_Emb     ! Embeddedness coefficient (fraction 0-1)
-  REAL, allocatable, DIMENSION(:)      :: P_Size    ! Particle size (mm)
   REAL, allocatable, DIMENSION(:)      :: F_Shade   ! Shading factor (0 to 1)
   REAL, allocatable, DIMENSION(:)      :: S_Albedo  ! Surface albedo (0-1)
-  REAL, allocatable, DIMENSION(:)      :: C_Cloud   ! Cloudiness (0-1)
-  REAL, allocatable, DIMENSION(:)      :: G_Chann_K ! Dominant Substrate Hydraulic Conductivity (m/s)
   REAL, allocatable, DIMENSION(:,:)    :: QLINK      !flow in link
   integer, allocatable, DIMENSION(:)   :: ascendIndex !sorting of routelink
 #ifdef WRF_HYDRO_NUDGING
@@ -182,11 +178,10 @@ module module_rt_inc
   REAL, allocatable, DIMENSION(:)      :: HLINK      !head in link
   REAL, allocatable, DIMENSION(:)      :: ZELEV      !elevation of nodes for channel
   INTEGER, allocatable, DIMENSION(:)   :: CHANXI,CHANYJ !map chan to fine grid
-  REAL,  DIMENSION(50)     :: BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann      !Channel parms from table
-  REAL,  DIMENSION(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK        !Channel parms from table - new
   REAL,  DIMENSION(50)     :: TOPWIDCC, NCC  !topwidth and mannings n of compund
 
   ! VARIABLES FOR  RESERVOIRS
+  REAL,  DIMENSION(50)     :: BOTWID,CHANN_K,TOPWID,HLINK_INIT,CHAN_SS,CHMann !Channel parms from table
   REAL, allocatable, DIMENSION(:)      :: RESHT            !reservoir height
   REAL, allocatable, DIMENSION(:)      :: lake_precip      ! precip on lake object
   REAL, allocatable, DIMENSION(:)      :: lake_evap        ! evaporation of lake object
@@ -292,16 +287,8 @@ module module_rt_inc
 
 ! added for the river temperature module
    REAL,    allocatable, DIMENSION(:)   :: Tair_fine_1D
-   REAL,    allocatable, DIMENSION(:)   :: RelH_fine_1D
-   REAL,    allocatable, DIMENSION(:)   :: windSpd_fine_1D
    REAL,    allocatable, DIMENSION(:)   :: SolarRad_fine_1D
-   REAL,    allocatable, DIMENSION(:)   :: TMN_1D_fine
-   REAL,    allocatable, DIMENSION(:)   :: TSK_1D_fine
-   REAL,    allocatable, DIMENSION(:)   :: TG_1D_fine
-   REAL,    allocatable, DIMENSION(:)   :: TSLB_1D_fine
-   REAL,    allocatable, DIMENSION(:)   :: SFCP_1D
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM
-   REAL,    allocatable, DIMENSION(:)   :: NetRad
    REAL,    allocatable, DIMENSION(:)   :: T_QSUM_prev
    REAL,    allocatable, DIMENSION(:)   :: T_air_smooth   ! 24-h EMA of air temperature [C] (water_temperature=2)
    ! Per-reach stream temperature parameters (Route_Link, optional; water_temperature=2)
@@ -313,28 +300,14 @@ module module_rt_inc
    REAL,    allocatable, DIMENSION(:)   :: T_up_diag      ! flow-weighted upstream inflow temperature
    REAL,    allocatable, DIMENSION(:)   :: T_lat_diag     ! surface (non-bucket) lateral inflow temperature
    REAL,    allocatable, DIMENSION(:)   :: T_gwin_diag    ! groundwater (bucket) inflow temperature
-   REAL,    allocatable, DIMENSION(:)   :: NetRad_prev
-   REAL,    allocatable, DIMENSION(:)   :: InflowUpstream
    REAL,    allocatable, DIMENSION(:)   :: InflowLand
    REAL,    allocatable, DIMENSION(:)   :: InflowGw
-   REAL,    allocatable, DIMENSION(:)   :: InflowUpstreamTemp
-   REAL,    allocatable, DIMENSION(:)   :: Outflow
    REAL,    allocatable, DIMENSION(:)   :: LakeOutflowTemp      !lake outflow temperature
    REAL,    allocatable, DIMENSION(:)   :: LakeOutletDepth      !lake outlet withdrawal depth below surface (m)
    REAL,    allocatable, DIMENSION(:)   :: LakeInflowTemp       !lake inflow flow-weighted temperature (K), -9999 = unset
    REAL,    allocatable, DIMENSION(:)   :: LakeArea             !lake surface area (km^2), kept after HRZAREA is deallocated
    REAL,    allocatable, DIMENSION(:)   :: LakeReshtLSM         !level-pool elevation at the previous LSM step (m), -9999 = unset
-   REAL,    allocatable, DIMENSION(:)   :: CVOLTMP
 
-   ! NEW FOR module_channel_routing.F
-   REAL,    allocatable, DIMENSION(:)     :: XS_Peremeter
-
-   !-- to get the temperature data from NoahMP
-   REAL,    allocatable, DIMENSION(:,:)   :: TMN_temp
-   REAL,    allocatable, DIMENSION(:,:)   :: TSK_temp
-   REAL,    allocatable, DIMENSION(:,:)   :: TG_temp
-   REAL,    allocatable, DIMENSION(:,:,:) :: TSLB_temp
-   REAL,    allocatable, DIMENSION(:)     :: QSUM     !--mass bal of node
 
 
    END TYPE RT_FIELD

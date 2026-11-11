@@ -31,7 +31,6 @@ implicit none
     integer :: i_forcing
 character(len=19) out_date
 
-
 interface read_hydro_forcing
 #ifdef MPP_LAND
    !yw module procedure read_hydro_forcing_mpp
@@ -985,7 +984,7 @@ end subroutine weather_2D_inputs_destroy
        forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
        forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,snowbl,fpar,snodep,dt,k,lsm_dt,prcp_old)
+       lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
    implicit none
    ! in variable
@@ -1004,7 +1003,7 @@ end subroutine weather_2D_inputs_destroy
    character(len=256), intent(in)  :: forcing_name_LF
    real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
           prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
-   real ::  dt, wrf_dt,lsm_dt
+   real ::  dt, wrf_dt
    ! tmp variable
    character(len=256) :: inflnm, inflnm2, product
    integer  :: i,j,mmflag,ierr_flg
@@ -1105,7 +1104,6 @@ end subroutine weather_2D_inputs_destroy
 
      end if
 
-
 !!!DJG CONSTant, idealized forcing...
      if(FORC_TYP.eq.4) then
 ! Impose a fixed diurnal cycle...
@@ -1113,33 +1111,24 @@ end subroutine weather_2D_inputs_destroy
 ! assumes K=1 is 12z (Ks or ~ sunrise)
 ! First Precip...
        IF (K.EQ.2) THEN
-        PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
+       PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
 !       PRCP1 =0./3600.0      !units mm/s  (Simulates <1"/hr for first 10 hours...)
        ELSEIF (K.GT.1) THEN
-!       PRCP1 =0./3600.0      !units mm/s
+!        PRCP1 =0./3600.0      !units mm/s
 !       ELSE
          PRCP1 = 0.
        END IF
 !       PRCP1 = 0.
 !       PRCP1 =10./3600.0      !units mm/s
 ! Other Met. Vars...
-      !!!TLE: this is for hourly
-!       T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!       Q2X = 0.01
-!       U = 1.0
-!       V = 1.0
-!       PRES = 100000.0
-!       XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-       !!!TLE: change this version for a different model time step
-        T2=290.0 + 3.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-        Q2X = 0.01
-        U = 1.0
-        V = 1.0
-        PRES = 100000.0
-        XLONG=400.0 + 25.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-        SHORT=450.0 + 450.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-!       SHORT=450.0 + 450.0*(cos((2*3.1416*K/144.0)-72.0*2*3.1416/144.0))
+       T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+       Q2X = 0.01
+       U = 1.0
+       V = 1.0
+       PRES = 100000.0
+       XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+       SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+
 !      print *, "PCP", PRCP1
 
     end if
@@ -1834,7 +1823,7 @@ end subroutine weather_2D_inputs_destroy
        forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
        forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
        T2,q2x,u,v,pres,xlong,short,prcp1,&
-       lai,snowbl,fpar,snodep,dt,k,lsm_dt,prcp_old)
+       lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 
 
@@ -1855,13 +1844,14 @@ end subroutine weather_2D_inputs_destroy
    character(len=256), intent(in)  :: forcing_name_LF
    real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
           prcpnew,lai,snowbl,fpar,snodep,prcp_old
-   real ::  dt,lsm_dt
+   real ::  dt
    ! tmp variable
    character(len=256) :: inflnm, product
    integer  :: i,j,mmflag
    real,dimension(global_nx,global_ny):: g_T2,g_Q2X,g_U,g_V,g_XLONG, &
              g_SHORT,g_PRCP1,g_PRES,g_lai,g_snowbl,g_snodep,g_prcp_old, g_fpar
    integer flag
+
 
 
      call write_io_real(T2,g_T2)
@@ -1888,7 +1878,7 @@ end subroutine weather_2D_inputs_destroy
         forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
         forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
         g_T2,g_q2x,g_u,g_v,g_pres,g_xlong,g_short,g_prcp1,&
-        g_lai,g_snowbl,g_fpar,g_snodep,dt,k,lsm_dt,g_prcp_old)
+        g_lai,g_snowbl,g_fpar,g_snodep,dt,k,g_prcp_old)
 #ifdef HYDRO_D
      write(6,*) "finish read forcing,olddate ",olddate
 #endif
@@ -2381,7 +2371,7 @@ subroutine read_hydro_forcing_mpp1( &
      forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
      forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN, forcing_name_LF,&
      T2,q2x,u,v,pres,xlong,short,prcp1,&
-     lai,snowbl,fpar,snodep,dt,k,lsm_dt,prcp_old)
+     lai,snowbl,fpar,snodep,dt,k,prcp_old)
 ! This subrouting is going to read different forcing.
 implicit none
 ! in variable
@@ -2400,15 +2390,13 @@ character(len=256), intent(in)  :: forcing_name_SN
 character(len=256), intent(in)  :: forcing_name_LF
 real,dimension(ix,jx):: T2,q2x,u,v,pres,xlong,short,prcp1,&
      prcpnew,weasd,snodep,prcp0,prcp2,prcp_old
-real ::  dt, wrf_dt,lsm_dt
+real ::  dt, wrf_dt
 ! tmp variable
 character(len=256) :: inflnm, inflnm2, product
 integer  :: i,j,mmflag,ierr_flg
 real,dimension(ix,jx):: lai,snowbl,fpar
 character(len=4) nwxst_t
 logical :: fexist
-logical :: firstTimeStep = .TRUE.
-
 
 inflnm = trim(indir)//"/"//&
          olddate(1:4)//olddate(6:7)//olddate(9:10)//olddate(12:13)//&
@@ -2540,47 +2528,19 @@ if(FORC_TYP.eq.4) then
    ! assumes K=1 is 12z (Ks or ~ sunrise)
    ! First Precip...
    !       IF (K.GE.1 .and. K.LE.2) THEN
-   !if (K.eq.1) then
-  !    PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
-  ! elseif (K.gt.1) then
-  !    PRCP1 = 0.
-  ! end if
-  !!! TLE edit: changed everything to automatically vary based on time step
-  !!!           (default is hourly (3600s))
-  ! if (K.le.20) then
-  !    PRCP1 =10/3600.0
-      PRCP1 = 10/DT
-   !elseif (K.gt.1) then
-  !    PRCP1 = 0.
-  ! end if
-  ! Other Met. Vars...
-  T2=290.0 + 3.0*(cos((2*3.1416*K/(24.0*(3600.0/lsm_dt)))-(12.0*(3600.0/lsm_dt))*2*3.1416/(24.0*(3600.0/lsm_dt))))
-  Q2X = 0.01
-  U = 1.0
-  V = 1.0
-  PRES = 100000.0
-  XLONG=400.0 + 25.0*(cos((2*3.1416*K/(24.0*(3600.0/lsm_dt)))-(12.0*(3600.0/lsm_dt))*2*3.1416/(24.0*(3600.0/lsm_dt))))
-  SHORT=450.0 + 450.0*(cos((2*3.1416*K/(24.0*(3600.0/lsm_dt)))-(12.0*(3600.0/lsm_dt))*2*3.1416/(24.0*(3600.0/lsm_dt))))
-
-
+   if (K.eq.1) then
+      PRCP1 =25.4/3600.0      !units mm/s  (Simulates 1"/hr for first time step...)
+   elseif (K.gt.1) then
+      PRCP1 = 0.
+   end if
    ! Other Met. Vars...
-!   T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!   Q2X = 0.01
-!   U = 1.0
-!   V = 1.0
-!   PRES = 100000.0
-!   XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-!   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
-
-!!!TLE: change this version for a different model time step
-!    T2=290.0 + 3.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-!    Q2X = 0.01
-!    U = 1.0
-!    V = 1.0
-!    PRES = 100000.0
-!    XLONG=400.0 + 25.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-!    SHORT=450.0 + 450.0*(cos((2*3.1416*K/96.0)-48.0*2*3.1416/96.0))
-
+   T2=290.0 + 3.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+   Q2X = 0.01
+   U = 1.0
+   V = 1.0
+   PRES = 100000.0
+   XLONG=400.0 + 25.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
+   SHORT=450.0 + 450.0*(cos((2*3.1416*K/24.0)-12.0*2*3.1416/24.0))
 end if
 
 

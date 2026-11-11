@@ -2094,7 +2094,7 @@ end subroutine land_driver_ini
                T_PHY(:,1,:), QV_CURR(:,1,:), U_PHY(:,1,:), V_PHY(:,1,:), &
                P8W(:,1,:), GLW, SWDOWN, RAINBL_tmp, &
                LAI, SNOWBL, VEGFRA, state%SNOWH, &
-               ITIME,noah_lsm%FORCING_TIMESTEP,noah_lsm%noah_timestep,prcp0)
+               ITIME, noah_lsm%FORCING_TIMESTEP, prcp0)
                if(maxval(VEGFRA) .le. 1)  VEGFRA = VEGFRA * 100
 
            call geth_newdate(newdate, forcDate, noah_lsm%FORCING_TIMESTEP)

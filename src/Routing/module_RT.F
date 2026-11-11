@@ -383,12 +383,8 @@ CONTAINS
      allocate( rt_domain(did)%ChannK(nsizes) )
      allocate( rt_domain(did)%LAKEIDA(nsizes) )
      allocate( rt_domain(did)%LAKEIDX(nsizes) )
-     allocate( rt_domain(did)%C_Emb(nsizes) )
-     allocate( rt_domain(did)%P_Size(nsizes) )
      allocate( rt_domain(did)%F_Shade(nsizes) )
      allocate( rt_domain(did)%S_Albedo(nsizes) )
-     allocate( rt_domain(did)%C_Cloud(nsizes) )
-     allocate( rt_domain(did)%G_Chann_k(nsizes) )
 
      if(NLAKES .gt. 0) then
 
@@ -469,66 +465,29 @@ CONTAINS
 	allocate( rt_domain(did)%velocity(nsizes) )
 	rt_domain(did)%QLateral  = zeroFlt
 	rt_domain(did)%velocity  = zeroFlt
-        !-- allocating arguments that are gonna be used by the river temperature modules
+        !-- stream temperature (water_temperature = 2) reach arrays
         allocate( rt_domain(did)%Tair_fine_1D(nsizes) )
-        allocate( rt_domain(did)%RelH_fine_1D(nsizes) )
-        allocate( rt_domain(did)%windSpd_fine_1D(nsizes) )
         allocate( rt_domain(did)%SolarRad_fine_1D(nsizes) )
-        allocate( rt_domain(did)%TMN_1D_fine(nsizes) )
-        allocate( rt_domain(did)%TSK_1D_fine(nsizes) )
-        allocate( rt_domain(did)%TG_1D_fine(nsizes) )
-        allocate( rt_domain(did)%TSLB_1D_fine(nsizes) )
-        allocate( rt_domain(did)%SFCP_1D(nsizes) )
         allocate( rt_domain(did)%T_QSUM(nsizes) )
         allocate( rt_domain(did)%T_QSUM_prev(nsizes) )
         allocate( rt_domain(did)%T_air_smooth(nsizes) )
-        allocate( rt_domain(did)%NetRad(nsizes) )
-        allocate( rt_domain(did)%NetRad_prev(nsizes) )
-        allocate( rt_domain(did)%XS_Peremeter (nsizes) )
-        allocate( rt_domain(did)%QSUM(nsizes) )
-        allocate( rt_domain(did)%TMN_temp(IX,JX) )
-        allocate( rt_domain(did)%TSK_temp(IX,JX) )
-        allocate( rt_domain(did)%TG_temp(IX,JX) )
-        allocate( rt_domain(did)%TSLB_temp(IX,NSOIL,JX) )
-        allocate( rt_domain(did)%InflowUpstream(nsizes) )
         allocate( rt_domain(did)%InflowLand(nsizes) )
         allocate( rt_domain(did)%InflowGw(nsizes) )
-        allocate( rt_domain(did)%InflowUpstreamTemp(nsizes) )
-        allocate( rt_domain(did)%Outflow(nsizes) )
         allocate( rt_domain(did)%LakeOutflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeOutletDepth(nlakes) )
         allocate( rt_domain(did)%LakeInflowTemp(nlakes) )
         allocate( rt_domain(did)%LakeArea(nlakes) )
         allocate( rt_domain(did)%LakeReshtLSM(nlakes) )
-        allocate( rt_domain(did)%CVOLTMP(nsizes) )
 
         rt_domain(did)%Tair_fine_1D       = 0.
-        rt_domain(did)%RelH_fine_1D       = 0.
-        rt_domain(did)%windSpd_fine_1D    = 0.
         rt_domain(did)%SolarRad_fine_1D   = 0.
-        rt_domain(did)%TMN_1D_fine        = 0.
-        rt_domain(did)%TSK_1D_fine        = 0.
-        rt_domain(did)%TG_1D_fine         = 0.
-        rt_domain(did)%TSLB_1D_fine       = 0.
-        rt_domain(did)%SFCP_1D            = 0.
         rt_domain(did)%T_QSUM             = 10.
         rt_domain(did)%T_QSUM_prev        = 10.
         ! Sentinel: run_stream_temp_eq seeds the EMA from forcing on first use
         ! unless a restart file has already populated this array.
         rt_domain(did)%T_air_smooth       = -9999.
-        rt_domain(did)%NetRad             = 0.
-        rt_domain(did)%NetRad_prev        = 0.
-        rt_domain(did)%XS_Peremeter       = 0.
-        rt_domain(did)%QSUM               = 0.
-        rt_domain(did)%TMN_temp           = 0.
-        rt_domain(did)%TSK_temp           = 0.
-        rt_domain(did)%TG_temp            = 0.
-        rt_domain(did)%TSLB_temp          = 0.
-        rt_domain(did)%InflowUpstream     = 0.
         rt_domain(did)%InflowLand         = 0.
         rt_domain(did)%InflowGw           = 0.
-        rt_domain(did)%InflowUpstreamTemp = 10.
-        rt_domain(did)%Outflow            = 0.
         rt_domain(did)%LakeOutflowTemp    = 10.
         ! 0 = surface withdrawal; LandRT_ini overwrites from LAKEPARM
         rt_domain(did)%LakeOutletDepth    = 0.
@@ -540,7 +499,6 @@ CONTAINS
         ! Reference elevation for the 1-D lake depth update (set by the LSM
         ! driver; restart-persisted so a restart applies the same depth change)
         rt_domain(did)%LakeReshtLSM       = -9999.
-        rt_domain(did)%CVOLTMP            = 0.
 
         if( nlst(did)%channel_option .eq. 2 ) then
            allocate( rt_domain(did)%qloss(nsizes) )
@@ -596,12 +554,8 @@ CONTAINS
       rt_domain(did)%Tw_CC = 0.0
       rt_domain(did)%n_CC = 0.0
       rt_domain(did)%ChannK = 0.0
-      rt_domain(did)%C_Emb = 0.0
-      rt_domain(did)%P_Size = 0.0
       rt_domain(did)%F_Shade = 0.0
       rt_domain(did)%S_Albedo = 0.0
-      rt_domain(did)%C_Cloud = 0.0
-      rt_domain(did)%G_Chann_k = 0.0
 
 
       rt_domain(did)%ZELEV = 0.0
@@ -788,7 +742,6 @@ subroutine LandRT_ini(did)
   integer :: lake_index, NLAKES_total
 
   real,  dimension(50)     :: BOTWID, TOPWID, HLINK_INIT, CHAN_SS, CHMann !Channel parms from table
-  real,  dimension(50)     :: CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk        ! Channel params for river temp.
   real,  dimension(50)     :: TOPWIDCC, NCC    !channnel params of compound
   real,  dimension(50)     :: CHANN_K ! Channel infiltration param
   integer :: i,j,k, ll, count
@@ -1572,12 +1525,10 @@ subroutine LandRT_ini(did)
       ! This conflict of options is caught in Data_Rec/module_namelist.F
       ! Some of the code for reading/using top-width-necessary params from CHANPARM.TBL are available
       ! but commented out in the code, since they were a bridge to nowhere.
-        call mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, &
-	                         CEmb, PSize, FShade, SAlbedo, CCloud, G_Channk)        !Read chan parms from table...
+        call mpp_CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann)  !Read chan parms from table...
       !call mpp_CHAN_PARM_INIT (BOTWID,TOPWID,HLINK_INIT,CHAN_SS,CHMann,TOPWIDCC,NCC)  !Read chan parms from table...
 #else
-        call CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann, &
-	                     CEmb, PSize, FShade, SAlbedo, CCloud, G_ChannK) !,TOPWIDCC,NCC)  !Read chan parms from table...
+        call CHAN_PARM_INIT (BOTWID,CHANN_K,HLINK_INIT,CHAN_SS,CHMann) !,TOPWIDCC,NCC)  !Read chan parms from table...
 #endif
      end if
 
@@ -1622,24 +1573,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 2) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1660,24 +1593,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 3) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1698,24 +1613,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 4) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1736,24 +1633,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 5) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1774,24 +1653,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .eq. 6) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1812,24 +1673,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            elseif (rt_domain(did)%ORDER(j) .ge. 7) then
               if(rt_domain(did)%Bw(j) .eq. 0.0) then
                  rt_domain(did)%Bw(j) = BOTWID(rt_domain(did)%ORDER(j))
@@ -1850,24 +1693,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(rt_domain(did)%ORDER(j))
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(rt_domain(did)%ORDER(j))
-	      if(rt_domain(did)%C_Emb(j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb(j) = CEmb(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%P_Size(j) .eq. 0.0) then
-                 rt_domain(did)%P_Size(j) = PSize(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%F_Shade(j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade(j) = FShade(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%S_Albedo(j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo(j) = SAlbedo(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%C_Cloud(j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud(j) = CCloud(rt_domain(did)%ORDER(j))
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(rt_domain(did)%ORDER(j))
-              endif
            else   !-- the outlets won't have orders since there's no nodes, so
               !-- assign the order 5 values
 
@@ -1891,25 +1716,6 @@ subroutine LandRT_ini(did)
                  rt_domain(did)%MannN(j) = CHMann(5)
               endif
               rt_domain(did)%HLINK(j) = HLINK_INIT(5)
-
-	      if(rt_domain(did)%C_Emb (j) .eq. 0.0) then
-                 rt_domain(did)%C_Emb (j) = CEmb (5)
-              endif
-	      if(rt_domain(did)%P_Size (j) .eq. 0.0) then
-                 rt_domain(did)%P_Size (j) = PSize (5)
-              endif
-	      if(rt_domain(did)%F_Shade (j) .eq. 0.0) then
-                 rt_domain(did)%F_Shade (j) = FShade (5)
-              endif
-	      if(rt_domain(did)%S_Albedo (j) .eq. 0.0) then
-                 rt_domain(did)%S_Albedo (j) = SAlbedo (5)
-              endif
-	      if(rt_domain(did)%C_Cloud (j) .eq. 0.0) then
-                 rt_domain(did)%C_Cloud (j) = CCloud (5)
-              endif
-	      if(rt_domain(did)%G_Chann_k(j) .eq. 0.0) then
-                 rt_domain(did)%G_Chann_k(j) = G_Channk(5)
-              endif
            endif
 
            ! Edge cells have CHANLEN < 0 but we do not want negative CVOLs
