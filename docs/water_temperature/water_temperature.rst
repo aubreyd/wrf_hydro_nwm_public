@@ -35,7 +35,18 @@ The capability is switched on with ``water_temperature = 2`` in
 behaves as before. Results for streamflow, the land surface and lakes do not
 depend on whether temperature output is requested.
 
-Data flow::
+.. figure:: figures/water_temperature_dataflow.png
+   :width: 100%
+   :alt: Data flow of the water temperature model
+
+   Data flow of the water temperature model. Atmospheric forcing drives the
+   land model, the reach equilibrium temperature (catchment means) and the
+   1-D lake model (lake cells). Each reach mixes its inflows by volume and
+   relaxes toward its equilibrium temperature; lakes receive the river inflow
+   heat and pass the temperature at their outlet depth downstream. The
+   tunable parameters are shown in the corner of the component they act on.
+
+The same data flow in text form::
 
    forcing (T2, SWDOWN) --catchment mean--> reach air temperature, shortwave
                                               |
