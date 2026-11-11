@@ -42,8 +42,6 @@ MODULE module_Routing
    use module_hydro_stop, only: HYDRO_stop
    use hashtable
    use iso_fortran_env, only: int64
-   use module_river_temperature, only: riverTemp
-   use disaggregateWeatherModule, only: fineWeathData
 #ifdef OUTPUT_CHAN_CONN
 #ifdef MPP_LAND
    use mpi
@@ -1026,24 +1024,6 @@ subroutine LandRT_ini(did)
        ! deallocated below once the reservoir objects hold their parameters.
        if (allocated(rt_domain(did)%LakeArea)) rt_domain(did)%LakeArea = rt_domain(did)%HRZAREA(1:NLAKES_total)
    end if
-
-   !-- Reza's code goes here to be initialized
-   call fineWeathData%init (                      &
-                   rt_domain(did)%Tair_fine_1D,     &
-		   rt_domain(did)%RelH_fine_1D,     &
-		   rt_domain(did)%windSpd_fine_1D,  &
-		   rt_domain(did)%SolarRad_fine_1D, &
-		   rt_domain(did)%TMN_1D_fine,      &
-!       rt_domain(did)%TSK_1D_fine,      &
-       rt_domain(did)%TG_1D_fine,       &
-		   rt_domain(did)%TSLB_1D_fine,     &
-       rt_domain(did)%SFCP_1D           &
-		   )
-   call riverTemp%init(rt_domain(did)%T_QSUM,            &
-                       rt_domain(did)%T_QSUM_prev,       &
-                       rt_domain(did)%NetRad,            &
-                       rt_domain(did)%NetRad_prev       &
-                       )
 
    !ADCHANGE: Add lake reach output
 #ifdef HYDRO_D

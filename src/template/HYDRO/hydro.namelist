@@ -212,7 +212,10 @@ UDMP_OPT = 0
 ! If on, specify the user-defined mapping file (e.g.: "spatialweights.nc")
 !udmap_file = "./DOMAIN/spatialweights.nc"
 
-! Activate water temperature module? 0=no (default), 1=yes
+! Stream and lake water temperature: 0 = off (default), 2 = equilibrium stream
+! temperature model (requires UDMP_OPT = 1; with SF_LAKE_PHYSICS = 1 in
+! namelist.hrldas the 1-D lake model supplies lake outflow temperatures).
+! Option 1 (gridded-channel temperature model) was removed.
 water_temperature = 0
 
 /

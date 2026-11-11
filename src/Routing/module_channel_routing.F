@@ -30,8 +30,6 @@ use MODULE_mpp_ReachLS, only : updatelinkv,                   &
 use module_reservoir, only: reservoir
 use module_RT_data, only: rt_domain
 use module_hydro_stop, only: HYDRO_stop
-!use module_river_temperature, only: riverTemp
-use riverTemperatureExecutor, only: riverTempRuns
 
 use iso_fortran_env, only: int64
 
@@ -1722,7 +1720,6 @@ end if
 !           print *, "        InflowUpstreamTemp", rt_domain(did)%InflowUpstreamTemp
 !           print *, "   -     Outflow", rt_domain(did)%Outflow
 !           print *, "   -     QLINK", QLINK(:,1)
-           call riverTempRuns%riverTemp_run(did)
 
           !AD: River temperature routine seems to be generating NAs over reservoir outlets, so updating manually here for now.
           !There is probably a better way to do this... just loop through lakes and assign to outlet reaches?

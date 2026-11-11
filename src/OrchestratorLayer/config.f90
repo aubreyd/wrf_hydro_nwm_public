@@ -487,8 +487,14 @@ contains
 
    ! 0=off, 1=full advection-diffusion (gridded routing only),
    ! 2=equilibrium temperature (UDMP reach-based routing)
-   if( (self%water_temperature .lt. 0 ) .or. (self%water_temperature .gt. 2) ) then
-      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified (0,1,2)')
+   ! water_temperature = 1 (gridded-channel river temperature model) was
+   ! removed; it is preserved at git tag archive/gridded-water-temperature.
+   if( self%water_temperature .eq. 1 ) then
+      call hydro_stop('hydro.namelist ERROR: water_temperature = 1 (gridded-channel temperature model) '// &
+                      'was removed; see git tag archive/gridded-water-temperature. Use 2 (equilibrium model).')
+   endif
+   if( (self%water_temperature .ne. 0 ) .and. (self%water_temperature .ne. 2) ) then
+      call hydro_stop('hydro.namelist ERROR: Invalid water_temperature specified (valid: 0=off, 2=equilibrium)')
    endif
 
   end subroutine rt_nlst_check

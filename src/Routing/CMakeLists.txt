@@ -15,7 +15,6 @@ add_library(hydro_routing STATIC
 	Noah_distr_routing.F
 	Noah_distr_routing_overland.F
 	Noah_distr_routing_subsurface.F
-        module_riverTemperatureRuns.F
         RiverTemperature/module_stream_temperature_eq.F
 )
 
@@ -33,5 +32,4 @@ target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_levelpool)
 target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_hybrid)
 target_link_libraries(hydro_routing PUBLIC hydro_data_rec)
 target_link_libraries(hydro_routing PUBLIC hydro_routing_reservoirs_rfc)
-target_link_libraries(hydro_routing PUBLIC hydro_routing_rivertemperature)
 
