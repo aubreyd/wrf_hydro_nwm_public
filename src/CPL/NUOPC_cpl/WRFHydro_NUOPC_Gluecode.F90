@@ -505,8 +505,7 @@ contains
       call lake1d_cpl_post(did)
       ! lake state restart (LAKE_RST) whenever HYDRO_exe wrote a HYDRO_RST
       if (len_trim(hydro_rst_date) > 0) &
-        call lake1d_cpl_write_restart(hydro_rst_date, nlst(did)%hgrid, &
-          x_start, x_end, y_start, y_end)
+        call lake1d_cpl_write_restart(hydro_rst_date, x_start, x_end, y_start, y_end)
       ! lake fields (LAKE1D file) every OUTPUT_TIMESTEP of namelist.hrldas
       call lake1d_cpl_write_output(did, nlst(did)%olddate(1:16), &
         x_start, x_end, y_start, y_end)

@@ -1450,20 +1450,33 @@ module module_NoahMP_hrldas_driver
                      )
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
-           ! The restart must hold the complete lake state.  If any lake variable
-           ! is missing (e.g. a restart from a run without the lake model), the
-           ! whole lake state is cold-initialized with lakeini instead, so lakes
-           ! never start from uninitialized memory or a partially read state.
+           ! 1-D lake model state: from LAKE_RESTART_FILE if set (a LAKE_RST file,
+           ! or an older RESTART file with the lake state); otherwise from the lake
+           ! variables of this RESTART file if it has all of them (RESTART files of
+           ! earlier versions); otherwise cold start.  A restart file without the
+           ! complete lake state is never partially read.
+           lake_rst_complete = .false.
+           IF ( len_trim(noah_lsm%lake_restart_file) > 0 ) THEN
+              if (.not. lake1d_read_restart(trim(noah_lsm%lake_restart_file), XSTART, XEND, YSTART, YEND)) &
+                 call lake1d_fatal('no complete 1-D lake model state in LAKE_RESTART_FILE '// &
+                                   trim(noah_lsm%lake_restart_file))
+              write(6,*) '1-D lake model state from LAKE_RESTART_FILE ', trim(noah_lsm%lake_restart_file)
+              call lake1d_init(.true., ivgtyp, isltyp, terrain, state%snow, restart_flag, &
+                               iswater, xice, xice_threshold, xland, tsk,                &
+                               its, ite, jts, jte, ims, ime, jms, jme)
+           ELSE
            lake_rst_complete = .true.
            do ilkvar = 1, size(lake_rst_vars)
               if (checkRstV(trim(lake_rst_vars(ilkvar))) .ne. 0) then
-                 if (lake_rst_complete) write(6,*) 'WARNING: restart file has no ', &
+                 if (lake_rst_complete) write(6,*) 'WARNING: no LAKE_RESTART_FILE and the restart file has no ', &
                     trim(lake_rst_vars(ilkvar)), ' (and possibly other lake variables): ', &
                     'cold-initializing the 1-D lake model state with lakeini.'
                  lake_rst_complete = .false.
               end if
            end do
            IF ( lake_rst_complete ) THEN
+             write(6,*) 'NOTE: 1-D lake model state from the lake variables of the RESTART file ', &
+                        '(deprecated: the lake state is now written to LAKE_RST files; set LAKE_RESTART_FILE)'
              ! If restart = T, read from RESTART files instead of call to lakeini function:
              ! 2Ds:
              call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "LAKE_DEPTH" ,lakedepth2d )
@@ -1528,8 +1541,13 @@ module module_NoahMP_hrldas_driver
                               its, ite, jts, jte, ims, ime, jms, jme)
              deallocate(tsk_lakeini)
            ENDIF
+           ENDIF   ! LAKE_RESTART_FILE
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
             where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
+           ! lake surface fields of a LAKE_RST file (boundary conditions over lakes)
+           IF ( len_trim(noah_lsm%lake_restart_file) > 0 ) &
+              call lake1d_read_restart_sfc(trim(noah_lsm%lake_restart_file), XSTART, XEND, YSTART, YEND, &
+                                           tsk, hfx, lh, qfx, grdflx, albedo, emiss)
          ENDIF
  
   else  ! for none restart
@@ -1634,11 +1652,25 @@ module module_NoahMP_hrldas_driver
       TAUSSXY = 0.0   ! Need to be added to _INIT later
 
          IF ( noah_lsm%sf_lake_physics == 1 ) THEN
+           ! 1-D lake model: state from LAKE_RESTART_FILE if set, else cold start
+           IF ( len_trim(noah_lsm%lake_restart_file) > 0 ) THEN
+              if (.not. lake1d_read_restart(trim(noah_lsm%lake_restart_file), XSTART, XEND, YSTART, YEND)) &
+                 call lake1d_fatal('no complete 1-D lake model state in LAKE_RESTART_FILE '// &
+                                   trim(noah_lsm%lake_restart_file))
+              write(6,*) '1-D lake model state from LAKE_RESTART_FILE ', trim(noah_lsm%lake_restart_file)
+              call lake1d_init(.true., ivgtyp, isltyp, terrain, state%snow, .true.,      &
+                               iswater, xice, xice_threshold, xland, tsk,                 &
+                               its, ite, jts, jte, ims, ime, jms, jme)
+           ELSE
              call lake1d_init(.false., ivgtyp, isltyp, terrain, state%snow, restart_flag, &
                               iswater, xice, xice_threshold, xland, tsk,                 &
                               its, ite, jts, jte, ims, ime, jms, jme)
+           ENDIF
             where(ivgtyp ==  islake)  emiss = 0.98  ! WRF seems to assume an emissivity over lake
             where(ivgtyp ==  islake) albedo = 0.08  ! WRF seems to assume an albedo over lake
+           IF ( len_trim(noah_lsm%lake_restart_file) > 0 ) &
+              call lake1d_read_restart_sfc(trim(noah_lsm%lake_restart_file), XSTART, XEND, YSTART, YEND, &
+                                           tsk, hfx, lh, qfx, grdflx, albedo, emiss)
 
          ENDIF
  
@@ -1816,6 +1848,7 @@ end subroutine land_driver_ini
 #ifdef WRF_HYDRO
     use module_RT_data, only: rt_domain
     use config_base, only: nlst
+    use module_HYDRO_drv, only: hydro_rst_date
 #endif
     implicit  none
     type(state_type) :: state
@@ -2126,10 +2159,16 @@ end subroutine land_driver_ini
      call geth_newdate(newdate, olddate, nint(dtbl))
      olddate = newdate
 
+     hydro_rst_date = " "
      call hrldas_drv_HYDRO(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:), &
         SH2O(:,1:NSOIL,:),infxsrt,sfcheadrt,soldrain,lake_precip, &
         lake_evap,lake_netoutflow,lake_grids,nlakes,ix,jx,NSOIL, &
         infxsrt_t,soldrain_t)
+
+     ! 1-D lake model restart (LAKE_RST) whenever WRF-Hydro wrote a HYDRO_RST
+     if (noah_lsm%sf_lake_physics == 1 .and. len_trim(hydro_rst_date) > 0) &
+        call lake1d_write_restart(hydro_rst_date, XSTART, XEND, YSTART, YEND, &
+                                  tsk, hfx, lh, qfx, grdflx, albedo, emiss)
 #endif
 
 ! Output for history
@@ -2600,37 +2639,8 @@ subroutine lsm_restart(state)
   call add_to_restart(ncid,RIVERBEDXY , "RIVERBEDXY"  )
   call add_to_restart(ncid,EQZWT , "EQZWT"  )
   call add_to_restart(ncid,PEXPXY , "PEXPXY"  )
-  ! If lake model is on (sf_lake_physics = 1)
-  IF ( noah_lsm%sf_lake_physics == 1 ) THEN
-     ! 2Ds:
-     call add_to_restart(ncid,lakedepth2d , "LAKE_DEPTH")
-     call add_to_restart(ncid,savedtke12d , "LAKE_SAVETKE1")
-     call add_to_restart(ncid,snowdp2d , "LAKE_SNOWP")
-     call add_to_restart(ncid,h2osno2d , "LAKE_H2OSNO")
-     call add_to_restart(ncid,snl2d , "LAKE_SNL")
-     call add_to_restart(ncid,t_grnd2d , "LAKE_T_GRND")
-     !call add_to_restart(ncid,lake2d , "LAKE_LAKE")
-     ! 3Ds:
-     call add_to_restart(ncid,t_soisno3d, "LAKE_T_SOILSNOW", layers="LKSS") ! LKSS is lake soil+snow layers =15
-     call add_to_restart(ncid,h2osoi_ice3d , "LAKE_H2OSOI_ICE", layers="LKSS") ! LKSS is lake soil+snow layers =15
-     call add_to_restart(ncid,h2osoi_liq3d , "LAKE_H2OSOI_LIQ", layers="LKSS") ! LKSS is lake soil+snow layers =15
-     call add_to_restart(ncid,h2osoi_vol3d , "LAKE_H2OSOI_VOL", layers="LKSS") ! LKSS is lake soil+snow layers =15
-     call add_to_restart(ncid,z3d , "LAKE_Z", layers="LKSS") ! LKSS is lake soil+snow layers =15
-     call add_to_restart(ncid,dz3d , "LAKE_DZ", layers="LKSS") ! LKSS is lake soil+snow layers =15
-
-     call add_to_restart(ncid,t_lake3d , "LAKE_T_LAKE", layers="LAKE") ! Lake layers =10
-     call add_to_restart(ncid,lake_icefrac3d,"LAKE_ICEFRAC", layers="LAKE") ! Lake layers =10
-     call add_to_restart(ncid,z_lake3d , "LAKE_Z_LAKE", layers="LAKE") ! Lake layers =10
-     call add_to_restart(ncid,dz_lake3d , "LAKE_DZ_LAKE", layers="LAKE") ! Lake layers =10
-
-     call add_to_restart(ncid,watsat3d , "LAKE_WATSAT", layers="LKSO") ! LKSO soil layers =10
-     call add_to_restart(ncid,csol3d , "LAKE_CSOL", layers="LKSO") ! LKSO soil layers =10
-     call add_to_restart(ncid,tkmg3d , "LAKE_TKMG", layers="LKSO") ! LKSO soil layers =10
-     call add_to_restart(ncid,tkdry3d , "LAKE_TKDRY", layers="LKSO") ! LKSO soil layers =10
-     call add_to_restart(ncid,tksatu3d , "LAKE_TKSATU", layers="LKSO") ! LKSO soil layers =10
-
-     call add_to_restart(ncid,zi3d , "LAKE_ZI", layers="LKEX") ! LKEX is lake soil+snow+1 layers =16
-  ENDIF
+  ! The 1-D lake model state is written to LAKE_RST files with the HYDRO_RST
+  ! files (module_lake1d, lake1d_write_restart), not to this file.
 #ifdef MPP_LAND
   if(my_id .eq. io_id) then
      ierr = nf90_close(ncid)

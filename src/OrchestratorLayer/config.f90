@@ -22,6 +22,7 @@ module config_base
      integer            :: start_min
      character(len=256) :: outdir = "."
      character(len=256) :: restart_filename_requested = " "
+     character(len=256) :: lake_restart_file = " "   ! 1-D lake model state (LAKE_RST or HRLDAS RESTART)
      integer            :: restart_frequency_hours
      integer            :: output_timestep
      integer            :: dynamic_veg_option
@@ -919,6 +920,7 @@ contains
      integer            :: start_min
      character(len=256) :: outdir = "."
      character(len=256) :: restart_filename_requested = " "
+     character(len=256) :: lake_restart_file = " "   ! 1-D lake model state (LAKE_RST or HRLDAS RESTART)
      integer            :: restart_frequency_hours
      integer            :: output_timestep
      character(len=256) :: forcing_name_T = "T2D"
@@ -978,6 +980,7 @@ contains
          start_year, start_month, start_day, start_hour, start_min, &
          outdir, &
          restart_filename_requested, restart_frequency_hours, output_timestep, &
+         lake_restart_file, &
 
          forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &
          forcing_name_LW,forcing_name_SW,forcing_name_PR,forcing_name_SN,forcing_name_LF, &
@@ -1077,6 +1080,7 @@ contains
     noah_lsm%start_min = start_min
     noah_lsm%outdir = outdir
     noah_lsm%restart_filename_requested = restart_filename_requested
+    noah_lsm%lake_restart_file = lake_restart_file
     noah_lsm%restart_frequency_hours = restart_frequency_hours
     noah_lsm%output_timestep = output_timestep
     noah_lsm%forcing_name_T = forcing_name_T

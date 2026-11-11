@@ -15,6 +15,13 @@ START_MIN   = 00
 ! Comment out the option if not initializing from a restart file
 RESTART_FILENAME_REQUESTED = "RESTART/RESTART.2011082600_DOMAIN1"
 
+! 1-D lake model (SF_LAKE_PHYSICS = 1) restart file: a LAKE_RST file (written
+! with each HYDRO_RST file), or a RESTART file of an earlier version holding the
+! lake state. Optional; without it the lake state comes from the lake variables
+! of RESTART_FILENAME_REQUESTED if present (earlier versions), else cold start.
+! In coupled runs (NUOPC cap) this is the only source of the lake state.
+!LAKE_RESTART_FILE = "RESTART/LAKE_RST.2011-08-26_00:00_DOMAIN1"
+
 ! Specification of simulation length in hours OR days
 ! KDAY = 7 ! This option is deprecated and may be removed in a future version
 KHOUR = 24

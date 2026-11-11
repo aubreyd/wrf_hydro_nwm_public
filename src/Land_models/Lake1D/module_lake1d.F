@@ -117,6 +117,11 @@ module module_lake1d
        'LAKE_T_SOILSNOW', 'LAKE_H2OSOI_ICE', 'LAKE_H2OSOI_LIQ', 'LAKE_H2OSOI_VOL', 'LAKE_Z', 'LAKE_DZ', &
        'LAKE_T_LAKE', 'LAKE_ICEFRAC', 'LAKE_Z_LAKE', 'LAKE_DZ_LAKE', &
        'LAKE_WATSAT', 'LAKE_CSOL', 'LAKE_TKMG', 'LAKE_TKDRY', 'LAKE_TKSATU', 'LAKE_ZI']
+  ! Lake surface fields in LAKE_RST files (boundary conditions for a coupled
+  ! atmosphere over lake cells); optional on input
+  character(len=16), dimension(10), parameter :: lake_rst_sfc_vars = [character(len=16) :: &
+       'LAKE_TSK', 'LAKE_HFX', 'LAKE_LH', 'LAKE_QFX', 'LAKE_GRDFLX', 'LAKE_ALBEDO', 'LAKE_EMISS', &
+       'LAKE_T2', 'LAKE_TH2', 'LAKE_Q2']
 
 contains
 
@@ -750,13 +755,18 @@ contains
 
     call lake1d_allocate(XSTART, XEND, YSTART, YEND)
     call lake1d_setup(XSTART, XEND, YSTART, YEND, cpl_ivgtyp, cpl_iswater, cpl_islake)
-    ! Lake state from RESTART_FILENAME_REQUESTED (namelist.hrldas) if it holds
-    ! the complete lake state: a LAKE_RST file of a coupled run, or an offline
-    ! HRLDAS RESTART file (same variables).  Otherwise cold start.
-    from_rst = .false.
+    ! Lake state from LAKE_RESTART_FILE (namelist.hrldas): a LAKE_RST file or
+    ! an HRLDAS RESTART file with the lake state; cold start if not set.  The
+    ! land model holds the land state, so RESTART_FILENAME_REQUESTED is unused.
     if (len_trim(noah_lsm%restart_filename_requested) > 0) &
-       from_rst = lake1d_cpl_read_restart(trim(noah_lsm%restart_filename_requested), &
-                                          XSTART, XEND, YSTART, YEND)
+       write(6,*) 'WARNING: lake1d_cpl_init: RESTART_FILENAME_REQUESTED is not used in coupled ', &
+                  'runs; the 1-D lake model state is read from LAKE_RESTART_FILE'
+    from_rst = len_trim(noah_lsm%lake_restart_file) > 0
+    if (from_rst) then
+       if (.not. lake1d_read_restart(trim(noah_lsm%lake_restart_file), XSTART, XEND, YSTART, YEND)) &
+          call lake1d_fatal('lake1d_cpl_init: no complete 1-D lake model state in LAKE_RESTART_FILE '// &
+                            trim(noah_lsm%lake_restart_file))
+    end if
     call lake1d_init(from_rst, cpl_ivgtyp, cpl_isltyp, cpl_terrain, cpl_snow, from_rst,   &
                      cpl_iswater, cpl_xice, 0.5, cpl_xland, cpl_tsk,                        &
                      XSTART, XEND, YSTART, YEND, XSTART, XEND, YSTART, YEND)
@@ -765,6 +775,9 @@ contains
     where (cpl_ivgtyp == cpl_islake) cpl_emiss  = 0.98   ! as the HRLDAS driver
     where (cpl_ivgtyp == cpl_islake) cpl_albedo = 0.08
     cpl_hfx = 0.0; cpl_lh = 0.0; cpl_grdflx = 0.0; cpl_qfx = 0.0
+    if (from_rst) call lake1d_read_restart_sfc(trim(noah_lsm%lake_restart_file), &
+                         XSTART, XEND, YSTART, YEND, cpl_tsk, cpl_hfx, cpl_lh, cpl_qfx,  &
+                         cpl_grdflx, cpl_albedo, cpl_emiss)
     call lake1d_allocate_lakes(rt_domain(did)%nlakes)
 
     ! Lake groups for the lake-cell forcing: one per LAKE_ID on the domain,
@@ -810,7 +823,7 @@ contains
     deallocate(gid, gvg, tmp)
     if (from_rst) then
        write(6,*) 'lake1d_cpl_init: 1-D lake model state from ', &
-                  trim(noah_lsm%restart_filename_requested)
+                  trim(noah_lsm%lake_restart_file)
     else
        write(6,*) 'lake1d_cpl_init: 1-D lake model cold start'
     end if
@@ -925,12 +938,21 @@ contains
   end subroutine lake1d_cpl_post
 
 !-------------------------------------------------------------------------------
-! Read the lake state on this tile from a restart file with the HRLDAS RESTART
-! lake variables (lake_rst_vars; a LAKE_RST file written by
-! lake1d_cpl_write_restart, or an offline HRLDAS RESTART file).  Returns
-! .false., reading nothing, if the file lacks any of them.
+! Lake model restart (LAKE_RST.<date>_DOMAIN<n>), offline and coupled.
+!
+! The lake state (lake_rst_vars) has the variable names and dimensions of the
+! lake state in the offline HRLDAS RESTART file of earlier versions, so the
+! lake model can also restart from such a RESTART file.  LAKE_RST files also
+! hold the lake surface fields that a coupled atmosphere receives over lake
+! cells (lake_rst_sfc_vars), so that the first exchange after a restart is
+! that of a continuous run; they are optional on input.
 !-------------------------------------------------------------------------------
-  logical function lake1d_cpl_read_restart(flnm, XSTART, XEND, YSTART, YEND) result(ok)
+
+!-------------------------------------------------------------------------------
+! Read the lake state on this tile.  Returns .false., reading nothing, if the
+! file cannot be opened or lacks any lake state variable.
+!-------------------------------------------------------------------------------
+  logical function lake1d_read_restart(flnm, XSTART, XEND, YSTART, YEND) result(ok)
     implicit none
     character(len=*), intent(in) :: flnm
     integer,          intent(in) :: XSTART, XEND, YSTART, YEND
@@ -939,72 +961,117 @@ contains
     ok = .false.
     ierr = nf90_open(flnm, NF90_NOWRITE, ncid)
     if (ierr /= NF90_NOERR) then
-       write(6,*) 'WARNING: lake1d_cpl_read_restart: cannot open ', trim(flnm), &
-                  ': cold-starting the 1-D lake model'
+       write(6,*) 'WARNING: lake1d_read_restart: cannot open ', trim(flnm)
        return
     end if
     do k = 1, size(lake_rst_vars)
        if (nf90_inq_varid(ncid, trim(lake_rst_vars(k)), varid) /= NF90_NOERR) then
-          write(6,*) 'WARNING: lake1d_cpl_read_restart: no ', trim(lake_rst_vars(k)), ' in ', &
-                     trim(flnm), ': cold-starting the 1-D lake model'
+          write(6,*) 'WARNING: lake1d_read_restart: no ', trim(lake_rst_vars(k)), ' in ', trim(flnm)
           ierr = nf90_close(ncid)
           return
        end if
     end do
-    call rd2('LAKE_DEPTH', lakedepth2d);   call rd2('LAKE_SAVETKE1', savedtke12d)
-    call rd2('LAKE_SNOWP', snowdp2d);      call rd2('LAKE_H2OSNO', h2osno2d)
-    call rd2('LAKE_SNL', snl2d);           call rd2('LAKE_T_GRND', t_grnd2d)
-    call rd3('LAKE_T_SOILSNOW', t_soisno3d);   call rd3('LAKE_H2OSOI_ICE', h2osoi_ice3d)
-    call rd3('LAKE_H2OSOI_LIQ', h2osoi_liq3d); call rd3('LAKE_H2OSOI_VOL', h2osoi_vol3d)
-    call rd3('LAKE_Z', z3d);                   call rd3('LAKE_DZ', dz3d)
-    call rd3('LAKE_T_LAKE', t_lake3d);         call rd3('LAKE_ICEFRAC', lake_icefrac3d)
-    call rd3('LAKE_Z_LAKE', z_lake3d);         call rd3('LAKE_DZ_LAKE', dz_lake3d)
-    call rd3('LAKE_WATSAT', watsat3d);         call rd3('LAKE_CSOL', csol3d)
-    call rd3('LAKE_TKMG', tkmg3d);             call rd3('LAKE_TKDRY', tkdry3d)
-    call rd3('LAKE_TKSATU', tksatu3d);         call rd3('LAKE_ZI', zi3d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_DEPTH', XSTART, XEND, YSTART, YEND, lakedepth2d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_SAVETKE1', XSTART, XEND, YSTART, YEND, savedtke12d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_SNOWP', XSTART, XEND, YSTART, YEND, snowdp2d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_H2OSNO', XSTART, XEND, YSTART, YEND, h2osno2d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_SNL', XSTART, XEND, YSTART, YEND, snl2d)
+    call lake1d_get2d(ncid, flnm, 'LAKE_T_GRND', XSTART, XEND, YSTART, YEND, t_grnd2d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_T_SOILSNOW', XSTART, YSTART, t_soisno3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_H2OSOI_ICE', XSTART, YSTART, h2osoi_ice3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_H2OSOI_LIQ', XSTART, YSTART, h2osoi_liq3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_H2OSOI_VOL', XSTART, YSTART, h2osoi_vol3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_Z', XSTART, YSTART, z3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_DZ', XSTART, YSTART, dz3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_T_LAKE', XSTART, YSTART, t_lake3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_ICEFRAC', XSTART, YSTART, lake_icefrac3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_Z_LAKE', XSTART, YSTART, z_lake3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_DZ_LAKE', XSTART, YSTART, dz_lake3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_WATSAT', XSTART, YSTART, watsat3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_CSOL', XSTART, YSTART, csol3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_TKMG', XSTART, YSTART, tkmg3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_TKDRY', XSTART, YSTART, tkdry3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_TKSATU', XSTART, YSTART, tksatu3d)
+    call lake1d_get3d(ncid, flnm, 'LAKE_ZI', XSTART, YSTART, zi3d)
     ierr = nf90_close(ncid)
     ok = .true.
-
-  contains
-
-    subroutine rd2(name, a)        ! file: (west_east, south_north, Time)
-      character(len=*), intent(in) :: name
-      real, intent(out) :: a(XSTART:XEND,YSTART:YEND)
-      ierr = nf90_inq_varid(ncid, name, varid)
-      ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,YSTART,1/), &
-                          count=(/XEND-XSTART+1,YEND-YSTART+1,1/))
-      if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_read_restart: cannot read '// &
-                                                name//' from '//trim(flnm))
-    end subroutine rd2
-
-    subroutine rd3(name, a)        ! file: (west_east, layers, south_north, Time)
-      character(len=*), intent(in) :: name
-      real, intent(out) :: a(:,:,:)
-      ierr = nf90_inq_varid(ncid, name, varid)
-      ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,1,YSTART,1/), &
-                          count=(/XEND-XSTART+1,size(a,2),YEND-YSTART+1,1/))
-      if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_read_restart: cannot read '// &
-                                                name//' from '//trim(flnm))
-    end subroutine rd3
-
-  end function lake1d_cpl_read_restart
+  end function lake1d_read_restart
 
 !-------------------------------------------------------------------------------
-! Write the lake state to LAKE_RST.<date>_DOMAIN<hgrid> (date: YYYY-MM-DD_HH:MM)
-! with the variables and dimensions of the offline HRLDAS RESTART file, so
-! either can restart the lake model (RESTART_FILENAME_REQUESTED).  Collective
-! over the WRF-Hydro ranks; the IO rank writes.
+! Set the lake surface fields on lake cells (lakemask = 1) from a restart file,
+! where present (LAKE_RST files; not in HRLDAS RESTART files).  Call after the
+! lake model is initialized (lake1d_init sets the lake mask).
 !-------------------------------------------------------------------------------
-  subroutine lake1d_cpl_write_restart(date, hgrid, XSTART, XEND, YSTART, YEND)
+  subroutine lake1d_read_restart_sfc(flnm, XSTART, XEND, YSTART, YEND, &
+                                     tsk, hfx, lh, qfx, grdflx, albedo, emiss)
     implicit none
-    character(len=*), intent(in) :: date, hgrid
+    character(len=*), intent(in) :: flnm
     integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    real, dimension(XSTART:XEND,YSTART:YEND), intent(inout) :: tsk, hfx, lh, qfx, grdflx, albedo, emiss
+    real    :: a(XSTART:XEND,YSTART:YEND)
+    integer :: ncid, varid, ierr, n
+    ierr = nf90_open(flnm, NF90_NOWRITE, ncid)
+    if (ierr /= NF90_NOERR) return
+    n = 0
+    call get('LAKE_TSK', tsk);       call get('LAKE_HFX', hfx);     call get('LAKE_LH', lh)
+    call get('LAKE_QFX', qfx);       call get('LAKE_GRDFLX', grdflx)
+    call get('LAKE_ALBEDO', albedo); call get('LAKE_EMISS', emiss)
+    call get('LAKE_T2', t2);         call get('LAKE_TH2', th2);     call get('LAKE_Q2', q2)
+    ierr = nf90_close(ncid)
+    if (n > 0) write(6,*) 'lake1d_read_restart_sfc: ', n, ' lake surface fields from ', trim(flnm)
+  contains
+    subroutine get(name, fld)
+      character(len=*), intent(in) :: name
+      real, intent(inout) :: fld(XSTART:XEND,YSTART:YEND)
+      if (nf90_inq_varid(ncid, name, varid) /= NF90_NOERR) return
+      call lake1d_get2d(ncid, flnm, name, XSTART, XEND, YSTART, YEND, a)
+      where (lakemask == 1) fld = a
+      n = n + 1
+    end subroutine get
+  end subroutine lake1d_read_restart_sfc
+
+  subroutine lake1d_get2d(ncid, flnm, name, XSTART, XEND, YSTART, YEND, a)
+    implicit none                  ! file: (west_east, south_north, Time)
+    integer,          intent(in)  :: ncid, XSTART, XEND, YSTART, YEND
+    character(len=*), intent(in)  :: flnm, name
+    real,             intent(out) :: a(XSTART:XEND,YSTART:YEND)
+    integer :: varid, ierr
+    ierr = nf90_inq_varid(ncid, name, varid)
+    if (ierr == NF90_NOERR) ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,YSTART,1/), &
+                                                count=(/XEND-XSTART+1,YEND-YSTART+1,1/))
+    if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d restart: cannot read '//name//' from '//trim(flnm))
+  end subroutine lake1d_get2d
+
+  subroutine lake1d_get3d(ncid, flnm, name, XSTART, YSTART, a)
+    implicit none                  ! file: (west_east, layers, south_north, Time)
+    integer,          intent(in)  :: ncid, XSTART, YSTART
+    character(len=*), intent(in)  :: flnm, name
+    real,             intent(out) :: a(:,:,:)
+    integer :: varid, ierr
+    ierr = nf90_inq_varid(ncid, name, varid)
+    if (ierr == NF90_NOERR) ierr = nf90_get_var(ncid, varid, a, start=(/XSTART,1,YSTART,1/), &
+                                                count=(/size(a,1),size(a,2),size(a,3),1/))
+    if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d restart: cannot read '//name//' from '//trim(flnm))
+  end subroutine lake1d_get3d
+
+!-------------------------------------------------------------------------------
+! Write LAKE_RST.<date>_DOMAIN<hgrid> (date: YYYY-MM-DD_HH:MM): the lake state
+! and the lake surface fields (values on lake cells, 0 elsewhere).  Called when
+! WRF-Hydro writes a HYDRO_RST, so the lake and reservoir restarts are paired.
+! Collective over the WRF-Hydro ranks; the IO rank writes.
+!-------------------------------------------------------------------------------
+  subroutine lake1d_write_restart(date, XSTART, XEND, YSTART, YEND, &
+                                  tsk, hfx, lh, qfx, grdflx, albedo, emiss)
+    implicit none
+    character(len=*), intent(in) :: date
+    integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    real, dimension(XSTART:XEND,YSTART:YEND), intent(in) :: tsk, hfx, lh, qfx, grdflx, albedo, emiss
     character(len=256) :: flnm
     integer :: ncid, ierr, nxg, nyg, k
     integer :: d_t, d_s, d_x, d_y, d_lk, d_lss, d_ls, d_lss2, vid
     logical :: io
 
-    flnm = 'LAKE_RST.'//date(1:16)//'_DOMAIN'//trim(hgrid)
+    flnm = 'LAKE_RST.'//date(1:16)//'_DOMAIN'//trim(nlst(1)%hgrid)
 #ifdef MPP_LAND
     nxg = global_nx; nyg = global_ny; io = (my_id == IO_id)
 #else
@@ -1012,7 +1079,7 @@ contains
 #endif
     if (io) then
        ierr = nf90_create(trim(flnm), ior(NF90_CLOBBER, NF90_64BIT_OFFSET), ncid)
-       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot create '//trim(flnm))
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_write_restart: cannot create '//trim(flnm))
        ierr = nf90_def_dim(ncid, 'Time', NF90_UNLIMITED, d_t)
        ierr = nf90_def_dim(ncid, 'DateStrLen', 19, d_s)
        ierr = nf90_def_dim(ncid, 'west_east', nxg, d_x)
@@ -1021,7 +1088,7 @@ contains
        ierr = nf90_def_dim(ncid, 'lakesoilsnow_layers', nlevsnow+nlevsoil, d_lss)
        ierr = nf90_def_dim(ncid, 'lakesoil_layers', nlevsoil, d_ls)
        ierr = nf90_def_dim(ncid, 'lakesoilsnow_layers2', nlevsnow+nlevsoil+1, d_lss2)
-       ierr = nf90_def_var(ncid, 'Times', NF90_CHAR, (/d_s,d_t/), k)
+       ierr = nf90_def_var(ncid, 'Times', NF90_CHAR, (/d_s,d_t/), vid)
        do k = 1, 6
           ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_y,d_t/), vid)
        end do
@@ -1035,12 +1102,14 @@ contains
           ierr = nf90_def_var(ncid, trim(lake_rst_vars(k)), NF90_FLOAT, (/d_x,d_ls,d_y,d_t/), vid)
        end do
        ierr = nf90_def_var(ncid, 'LAKE_ZI', NF90_FLOAT, (/d_x,d_lss2,d_y,d_t/), vid)
-       ierr = nf90_put_att(ncid, NF90_GLOBAL, 'TITLE', &
-                           '1-D lake model restart (WRF-Hydro NUOPC cap), HRLDAS RESTART lake variables')
+       do k = 1, size(lake_rst_sfc_vars)
+          ierr = nf90_def_var(ncid, trim(lake_rst_sfc_vars(k)), NF90_FLOAT, (/d_x,d_y,d_t/), vid)
+       end do
+       ierr = nf90_put_att(ncid, NF90_GLOBAL, 'TITLE', 'WRF-Hydro 1-D lake model restart')
        ierr = nf90_enddef(ncid)
-       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot define '//trim(flnm))
-       ierr = nf90_inq_varid(ncid, 'Times', k)
-       ierr = nf90_put_var(ncid, k, (/ date(1:16)//':00' /), start=(/1,1/), count=(/19,1/))
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_write_restart: cannot define '//trim(flnm))
+       ierr = nf90_inq_varid(ncid, 'Times', vid)
+       ierr = nf90_put_var(ncid, vid, (/ date(1:16)//':00' /), start=(/1,1/), count=(/19,1/))
     end if
 
     call lake1d_put2d(ncid, io, 'LAKE_DEPTH', lakedepth2d)
@@ -1065,16 +1134,40 @@ contains
     call lake1d_put3d(ncid, io, 'LAKE_TKDRY', tkdry3d)
     call lake1d_put3d(ncid, io, 'LAKE_TKSATU', tksatu3d)
     call lake1d_put3d(ncid, io, 'LAKE_ZI', zi3d)
+    call put_sfc('LAKE_TSK', tsk);       call put_sfc('LAKE_HFX', hfx)
+    call put_sfc('LAKE_LH', lh);         call put_sfc('LAKE_QFX', qfx)
+    call put_sfc('LAKE_GRDFLX', grdflx); call put_sfc('LAKE_ALBEDO', albedo)
+    call put_sfc('LAKE_EMISS', emiss);   call put_sfc('LAKE_T2', t2)
+    call put_sfc('LAKE_TH2', th2);       call put_sfc('LAKE_Q2', q2)
 
     if (io) then
        ierr = nf90_close(ncid)
-       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_cpl_write_restart: cannot write '//trim(flnm))
-       write(6,*) 'lake1d_cpl_write_restart: wrote ', trim(flnm)
+       if (ierr /= NF90_NOERR) call lake1d_fatal('lake1d_write_restart: cannot write '//trim(flnm))
+       write(6,*) 'lake1d_write_restart: wrote ', trim(flnm)
     end if
 #ifdef MPP_LAND
     call mpp_land_sync()
 #endif
+  contains
+    subroutine put_sfc(name, fld)
+      character(len=*), intent(in) :: name
+      real, intent(in) :: fld(XSTART:XEND,YSTART:YEND)
+      real :: a(XSTART:XEND,YSTART:YEND)
+      a = 0.0
+      where (lakemask == 1) a = fld
+      call lake1d_put2d(ncid, io, name, a)
+    end subroutine put_sfc
+  end subroutine lake1d_write_restart
 
+!-------------------------------------------------------------------------------
+! Coupled (NUOPC cap): LAKE_RST with the coupled lake surface fields
+!-------------------------------------------------------------------------------
+  subroutine lake1d_cpl_write_restart(date, XSTART, XEND, YSTART, YEND)
+    implicit none
+    character(len=*), intent(in) :: date
+    integer,          intent(in) :: XSTART, XEND, YSTART, YEND
+    call lake1d_write_restart(date, XSTART, XEND, YSTART, YEND, &
+                              cpl_tsk, cpl_hfx, cpl_lh, cpl_qfx, cpl_grdflx, cpl_albedo, cpl_emiss)
   end subroutine lake1d_cpl_write_restart
 
 !-------------------------------------------------------------------------------
