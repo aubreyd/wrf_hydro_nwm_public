@@ -20,6 +20,10 @@ For more in-depth instructions see the [project website](https://ral.ucar.edu/pr
 
 ## CMake Build
 
+CMake is required: the legacy Makefile build (`configure` and `make` in `src/`,
+`compile_offline_*.sh`) is not supported and does not build the stream
+temperature model or the 1-D lake model (`src/Land_models/Lake1D`).
+
 ```
 $ mkdir build
 $ cd build

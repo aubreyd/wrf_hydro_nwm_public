@@ -1,3 +1,8 @@
+NOTE: CMake is required to build WRF-Hydro (see docs/BUILD.md). The Makefile
+build described below (configure, make, compile_offline_*.sh) is no longer
+supported: it does not build the stream temperature model or the 1-D lake
+model (Land_models/Lake1D).
+
 This README provides a brief description of how to build WRF-Hydro as a standalone
 modeling system.
 
