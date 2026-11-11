@@ -19,12 +19,16 @@ components are coupled:
    temperature set by air temperature and solar radiation, over the time the
    water spends in the reach.
 #. **Source-water temperatures**: surface runoff enters at the temperature
-   computed by Noah-MP, and groundwater (bucket) outflow at a bucket water
-   temperature that is tracked through time.
-#. **Lake and reservoir temperature**: the 1-D multi-layer lake model in
-   Noah-MP (``module_sf_lake``) runs on the lake grid cells. Rivers carry heat
+   computed by the land model (Noah-MP), and groundwater (bucket) outflow at a
+   bucket water temperature that is tracked through time.
+#. **Lake and reservoir temperature**: the 1-D multi-layer lake model from WRF
+   (``module_sf_lake``) runs on the lake grid cells. Rivers carry heat
    into each lake, and the lake's outflow enters the downstream river at the
    temperature of the lake at its outlet (withdrawal) depth.
+
+The land model can be WRF-Hydro's own Noah-MP (offline HRLDAS driver) or an
+external land model coupled through the NUOPC cap, such as LIS Noah-MP 4.0.1
+in the NASA Land Coupler (see `Coupled runs with LIS (NUOPC cap)`_).
 
 The capability is switched on with ``water_temperature = 2`` in
 ``hydro.namelist``. With ``water_temperature = 0`` (the default), the model
@@ -35,8 +39,8 @@ Data flow::
 
    forcing (T2, SWDOWN) --catchment mean--> reach air temperature, shortwave
                                               |
-   Noah-MP runoff temp. (infxsrt_t) ----------+--> lateral inflow temperature --+
-   Noah-MP drainage temp. --> GW bucket temperature --> baseflow temperature -----+
+   land model runoff temp. (infxsrt_t) -------+--> lateral inflow temperature --+
+   land model drainage temp. --> GW bucket temperature --> baseflow temperature --+
                                                                                   v
    upstream reaches (Q, T) -----------------------------> volume-weighted mixing (T_in)
                                                                                   |
@@ -56,7 +60,10 @@ Supported configuration
   model stops with an error if ``water_temperature = 2`` is used without
   ``UDMP_OPT = 1``. It has been tested with Muskingum-Cunge routing
   (``channel_option = 2``).
-- Noah-MP land model (HRLDAS driver).
+- Noah-MP land model: WRF-Hydro's Noah-MP (offline HRLDAS driver), or LIS
+  Noah-MP 4.0.1 coupled through the NUOPC cap (NASA Land Coupler).
+- CMake build (see ``docs/BUILD.md``). The Makefile build does not compile the
+  stream temperature model or the 1-D lake model.
 - For lakes and reservoirs: level-pool reservoirs (``route_lake_f``) and the
   1-D lake model (``SF_LAKE_PHYSICS = 1``).
 - Groundwater: the reach-based bucket model (``GWBASESWCRT = 1`` with
@@ -94,7 +101,13 @@ namelist.hrldas (lakes)
     USE_LAKEDEPTH     = 1        ! use LAKE_DEPTH from the setup file
     LAKEDEPTH_DEFAULT = 24       ! [m] depth where LAKE_DEPTH is missing
     LAKE_MIN_ELEV     = 5.0      ! [m] cells below this elevation are not lakes
+    LAKE_RESTART_FILE = "./RESTART/LAKE_RST.2018-10-01_00:00_DOMAIN1"  ! optional, see Restarts
    /
+
+In coupled runs (NUOPC cap), namelist.hrldas is still read for these lake
+settings, ``HRLDAS_SETUP_FILE`` and ``OUTPUT_TIMESTEP`` (lake output
+interval); its other settings (dates, forcing, Noah-MP options, the land
+restart) are not used.
 
 Input requirements for lakes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -233,12 +246,18 @@ Lake and reservoir temperature
 The 1-D lake model
 ~~~~~~~~~~~~~~~~~~
 
-Source: ``src/Land_models/NoahMP/phys/module_sf_lake.F`` (the CLM-based lake
-scheme from WRF), called from the HRLDAS driver
-(``module_NoahMP_hrldas_driver.F``). Each lake grid cell is a column of 10
-water layers (plus snow and sediment layers). The model computes surface energy
-fluxes, ice, snow and the vertical temperature profile with eddy and convective
-mixing.
+Source: ``src/Land_models/Lake1D/``: ``module_sf_lake.F`` (the CLM-based
+lake scheme from WRF) and ``module_lake1d.F``, the WRF-Hydro driver of the lake
+model (state, initialization, stepping, coupling to the reservoirs, restart and
+output). The same driver is used by the offline HRLDAS driver
+(``module_NoahMP_hrldas_driver.F``) and by the NUOPC cap. Each lake grid cell
+is a column of 10 water layers (plus snow and sediment layers). The model
+computes surface energy fluxes, ice, snow and the vertical temperature profile
+with eddy and convective mixing.
+
+Snow on an unfrozen lake melts into, or freezes part of, the top lake layer
+(as in CLM4.5). A fatal error in the lake model (e.g. an out-of-range snow or
+ground temperature) stops all MPI ranks.
 
 Coupling with the level-pool reservoirs (all with ``SF_LAKE_PHYSICS = 1``,
 independent of ``water_temperature``):
@@ -391,8 +410,8 @@ In ``module_stream_temperature_eq.F``: the fallback groundwater temperature
 (12 °C), the surface-runoff temperature option (``surf_temp_opt = 2``:
 Noah-MP runoff temperature; 1: instantaneous air temperature), the
 temperature bounds, the minimum depth (0.02 m) and the minimum flow
-(10\ :sup:`-4` m\ :sup:`3` s\ :sup:`-1`). In the HRLDAS driver: the lake
-sub-step (600 s).
+(10\ :sup:`-4` m\ :sup:`3` s\ :sup:`-1`). In ``module_lake1d.F``: the lake
+sub-step (``lake_dt_max`` = 600 s) and the minimum lake depth (1 m).
 
 Output
 ------
@@ -414,9 +433,12 @@ LAKEOUT     T_inflow          flow-weighted temperature of the lake's inflow
 LAKEOUT     T_outflow         lake outflow temperature (at OutletDepth)
 =========== ================= ============================================================
 
-The 1-D lake state is in LDASOUT when ``SF_LAKE_PHYSICS = 1``:
-``LAKE_T3D`` (layer temperatures, K), ``LAKE_ICE3D``, ``LAKE_DEPTH2D``,
-``LAKE_PRECIP2D`` and ``LAKE_EVAP2D`` (mm h\ :sup:`-1`).
+The 1-D lake state is written every ``OUTPUT_TIMESTEP`` (namelist.hrldas) when
+``SF_LAKE_PHYSICS = 1``: ``LAKE_T3D`` (layer temperatures, K), ``LAKE_ICE3D``,
+``LAKE_DEPTH2D``, ``LAKE_PRECIP2D`` and ``LAKE_EVAP2D`` (mm h\ :sup:`-1`).
+Offline they are in LDASOUT. Coupled runs write them, with ``LAKE_TSK2D``
+(lake surface temperature, K) and ``LAKE_Z3D`` (layer depths, m), to
+``YYYYMMDDHHMM.LAKE1D_DOMAIN1``; values are −9999 off lake cells.
 
 Restarts
 --------
@@ -429,13 +451,84 @@ accumulated variable.
   temperature), ``lake_inflow_temp``, ``lake_resht_lsm`` (lake depth
   reference elevation), ``infxsrt_t``, ``infxsrt_t_rt``, ``soldrain_t``,
   ``z_gwsubbas_t`` (bucket temperature).
-- ``RESTART`` (HRLDAS): the lake columns (``LAKE_T_LAKE``,
-  ``LAKE_ICEFRAC``, ``LAKE_Z_LAKE``, ``LAKE_DEPTH``, snow on lakes, ...).
+- ``LAKE_RST.YYYY-MM-DD_HH:MM_DOMAIN1``: the 1-D lake model, written with every
+  ``HYDRO_RST`` (offline and coupled), since the lake depth follows the
+  level-pool reservoir. It holds the lake columns (``LAKE_T_LAKE``,
+  ``LAKE_ICEFRAC``, ``LAKE_Z_LAKE``, ``LAKE_DEPTH``, snow on lakes, ...) and the
+  lake surface fields that a coupled atmosphere receives over lake cells
+  (``LAKE_TSK``, ``LAKE_HFX``, ``LAKE_LH``, ``LAKE_QFX``, ``LAKE_GRDFLX``,
+  ``LAKE_ALBEDO``, ``LAKE_EMISS``, ``LAKE_T2``, ``LAKE_TH2``, ``LAKE_Q2``).
 
-Restart files written without these variables can still be read. Missing
-temperature states are re-seeded (air-temperature smoothing from the current
-forcing, buckets from soil temperature, and the lake from its initial profile
-if the lake variables are missing).
+To restart, give ``HYDRO_RST`` in hydro.namelist (``RESTART_FILE``) and the
+lake file in namelist.hrldas:
+
+- ``LAKE_RESTART_FILE``: a ``LAKE_RST`` file, or an HRLDAS ``RESTART`` file of
+  earlier versions, which held the lake state (same variable names). It may be
+  used with a cold land start, e.g. to start a run with a spun-up lake. A file
+  without the complete lake state is a fatal error.
+- Without ``LAKE_RESTART_FILE``, offline runs read the lake state from the
+  lake variables of ``RESTART_FILENAME_REQUESTED`` if it has them (earlier
+  versions; deprecated) and otherwise cold-start the lake model. Coupled runs
+  cold-start the lake model.
+
+HRLDAS ``RESTART`` files no longer hold the lake state. Restart files written
+without the temperature variables can still be read. Missing temperature
+states are re-seeded (air-temperature smoothing from the current forcing and
+buckets from soil temperature).
+
+Coupled runs with LIS (NUOPC cap)
+---------------------------------
+
+In the NASA Land Coupler (NLC), LIS runs the land model and WRF-Hydro the
+routing, connected by a mediator through the WRF-Hydro NUOPC cap
+(``src/CPL/NUOPC_cpl``). The water temperature model and the 1-D lake model run
+in WRF-Hydro as offline; the cap supplies the land-model inputs that the HRLDAS
+driver otherwise provides. This requires LIS with the matching exports (the
+``water_temperature`` branches of LISF and NLC).
+
+Fields imported by the cap, in addition to the usual runoff and soil fields:
+
+================================== ========== ==========================================
+Standard name                      Units      Use
+================================== ========== ==========================================
+temperature_of_infiltration_excess K          surface runoff temperature (``infxsrt_t``)
+lsm_forcing_air_temperature        K          reach air temperature; lake forcing
+lsm_forcing_downward_shortwave     W m-2      reach shortwave; lake forcing
+lsm_forcing_specific_humidity      kg kg-1    lake forcing
+lsm_forcing_surface_pressure       Pa         lake forcing
+lsm_forcing_wind_speed             m s-1      lake forcing
+lsm_forcing_downward_longwave      W m-2      lake forcing
+lsm_forcing_precipitation_rate     kg m-2 s-1 lake forcing
+================================== ========== ==========================================
+
+- LIS Noah-MP 4.0.1 computes the runoff temperature as WRF-Hydro's Noah-MP
+  does (0 °C under snow, otherwise the ground temperature). The drainage
+  temperature for the groundwater buckets is the bottom-layer soil temperature
+  imported from LIS.
+- LIS provides no forcing on water and lake cells. Each lake cell gets the mean
+  forcing of the land cells along its lake's shoreline (lakes grouped by
+  ``LAKE_ID``, whether or not they are LAKEPARM reservoirs); lake cells without
+  shoreline land cells get the mean over all land cells. LIS exports physical
+  fill values (273.15 K, 10\ :sup:`5` Pa, 0) on cells without land tiles, so
+  that bilinear remapping does not spread missing values onto shoreline cells.
+- When the LIS and WRF-Hydro grids coincide, set ``RemapExtrap = nearest`` in
+  the mediator attributes of the NLC run configuration: otherwise bilinear
+  remapping leaves the edge points of the grid unmapped.
+- The lake model runs before and its reservoir hand-off after each WRF-Hydro
+  step, as in the HRLDAS driver. Lake restart and output: see `Restarts`_ and
+  `Output`_.
+
+Lake Lanier coupled with LIS (NLDAS-2 forcing, cold start 1 October 2017;
+LIS uses the SOILPARM table soils), evaluated as above: bias / RMSE
++1.43 / 2.90 °C above the reservoir, −0.02 / 1.94 °C below Buford Dam (Buford
+Dam gauge RMSE 1.19 °C, offline 1.12 °C). The lake and the release are close to
+the offline run; the warm bias of the unregulated streams comes from the land
+side (forcing and soils), not from the coupling.
+
+Restarts of coupled runs reproduce the lake state exactly. The coupled
+LIS/WRF-Hydro system as a whole does not restart exactly (an NLC limitation that
+predates the temperature model): soil moisture and streamflow differ slightly
+after a restart, and so do stream temperatures.
 
 Evaluation tools
 ----------------
@@ -515,6 +608,9 @@ Limitations
   inflow of their upstream reaches.
 - Persistence and RFC-forecast reservoir types do not include lake
   precipitation and evaporation, and are not supported for water temperature.
+- Coupled runs (NUOPC cap): lake cells are forced with shoreline means of the
+  land model's forcing, not with forcing over the water; coupled LIS/WRF-Hydro
+  restarts are not exact (see `Coupled runs with LIS (NUOPC cap)`_).
 
 References
 ----------
@@ -547,4 +643,8 @@ forcing; Noah-MP runoff temperatures; groundwater bucket temperature tracking;
 per-reach, per-bucket and per-lake parameters; river inflow heat into lakes;
 lake precipitation and evaporation coupling; lake sub-stepping; deep-cell
 outflow sampling; lake mixing parameters; restart and MPI consistency; new
-diagnostic output; and evaluation at two test domains.
+diagnostic output; and evaluation at two test domains. The 1-D lake model was
+then moved into its own component (``Land_models/Lake1D``) with its own restart
+file, the snow treatment over unfrozen lakes was corrected, and the
+temperature and lake models were coupled to LIS through the NUOPC cap for the
+NASA Land Coupler.
