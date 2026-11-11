@@ -45,7 +45,8 @@ module wrfhydro_nuopc_gluecode
   use module_rt_data, only: &
     rt_domain
   use module_lsm_forcing, only: &
-    read_ldasout
+    read_ldasout, &
+    weather2d
   use config_base, only: &
     nlst, &
     init_namelist_rt_field
@@ -286,6 +287,27 @@ contains
       ! Use wrfinput vegetation type and soil type
       call HYDRO_ini(ntime=1,did=did,ix0=nx_local,jx0=ny_local)
     endif
+
+    ! Near-surface weather used by the water temperature model
+    ! (water_temperature = 2) on the LSM grid.  Offline, the forcing reader
+    ! or the Noah-MP driver allocates and fills these; coupled, the air
+    ! temperature and downward shortwave are imported from the LSM (fields
+    ! tair and swdown point at these arrays), so allocate them here.
+    if (.not. allocated(weather2d%T2)) &
+      allocate(weather2d%T2(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%short)) &
+      allocate(weather2d%short(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%q2x)) &
+      allocate(weather2d%q2x(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%wind)) &
+      allocate(weather2d%wind(rt_domain(did)%ix,rt_domain(did)%jx))
+    if (.not. allocated(weather2d%sfcp)) &
+      allocate(weather2d%sfcp(rt_domain(did)%ix,rt_domain(did)%jx))
+    weather2d%T2    = 288.0
+    weather2d%short = 0.0
+    weather2d%q2x   = 0.0
+    weather2d%wind  = 0.0
+    weather2d%sfcp  = 100000.0
 #ifdef DEBUG
     call ESMF_LogWrite(MODNAME//": Exit HYDRO_ini", ESMF_LOGMSG_INFO)
     call WRFHYDRO_domainLog(did,MODNAME,rc=rc)
@@ -444,6 +466,11 @@ contains
           infxsrt=rt_domain(did)%infxsrt,soldrain=rt_domain(did)%soldrain)
       endif
     endif
+
+    ! Drainage (soldrain) temperature for the water temperature model.
+    ! Offline, Noah-MP sets it to the bottom-layer soil temperature; coupled,
+    ! take the bottom layer of the imported soil temperature.
+    rt_domain(did)%soldrain_t = rt_domain(did)%stc(:,:,nlst(did)%nsoil)
 
     ! Call the WRF-HYDRO run routine
     call HYDRO_exe(did=did)

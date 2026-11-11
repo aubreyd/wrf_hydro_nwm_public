@@ -18,6 +18,7 @@ module wrfhydro_nuopc_fields
   use WRFHydro_NUOPC_Flags
   use config_base,      only: nlst
   use module_rt_data,   only: rt_domain
+  use module_lsm_forcing, only: weather2d
   use overland_data,    only: overland_struct
   use overland_control, only: overland_control_struct
 
@@ -37,7 +38,7 @@ module wrfhydro_nuopc_fields
     logical                     :: rl_export = .FALSE. ! realize export
   end type cap_fld_type
 
-  type(cap_fld_type),target,dimension(20) :: cap_fld_list = (/          &
+  type(cap_fld_type),target,dimension(23) :: cap_fld_list = (/          &
     cap_fld_type("inst_total_soil_moisture_content        ","smc     ", &
                  "m3 m-3",.TRUE. ,.TRUE. ,0.20d0),                      &
     cap_fld_type("inst_soil_moisture_content              ","slc     ", &
@@ -77,7 +78,14 @@ module wrfhydro_nuopc_fields
     cap_fld_type("time_step_infiltration_excess           ","infxsrt ", &
                  "mm    ",.TRUE. ,.FALSE.,0.00d0),                      &
     cap_fld_type("soil_column_drainage                    ","soldrain", &
-                 "mm    ",.TRUE. ,.FALSE.,0.00d0)                       &
+                 "mm    ",.TRUE. ,.FALSE.,0.00d0),                      &
+    ! water temperature model (water_temperature = 2) inputs from the LSM
+    cap_fld_type("temperature_of_infiltration_excess      ","infxsrtt", &
+                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+    cap_fld_type("lsm_forcing_air_temperature             ","tair    ", &
+                 "K     ",.TRUE. ,.FALSE.,288.d0),                      &
+    cap_fld_type("lsm_forcing_downward_shortwave          ","swdown  ", &
+                 "W m-2 ",.TRUE. ,.FALSE.,0.00d0)                       &
     /)
 
   public cap_fld_list
@@ -766,6 +774,21 @@ module wrfhydro_nuopc_fields
             farray=rt_domain(did)%soldrain, &
             indexflag=ESMF_INDEX_DELOCAL, rc=rc)
           if (ESMF_STDERRORCHECK(rc)) return
+        case ('infxsrtt')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=rt_domain(did)%infxsrt_t, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('tair')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%T2, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
+        case ('swdown')
+          field_create = ESMF_FieldCreate(name=fld_name, grid=grid, &
+            farray=weather2d%short, &
+            indexflag=ESMF_INDEX_DELOCAL, rc=rc)
+          if (ESMF_STDERRORCHECK(rc)) return
         case default
           call ESMF_LogSetError(ESMF_FAILURE, &
             msg=METHOD//": Field hookup missing: "//trim(fld_name), &
@@ -1062,6 +1085,12 @@ module wrfhydro_nuopc_fields
             rt_domain(did)%infxsrt = farrayPtr2d
           case ('soldrain')
             rt_domain(did)%soldrain = farrayPtr2d
+          case ('infxsrtt')
+            rt_domain(did)%infxsrt_t = farrayPtr2d
+          case ('tair')
+            weather2d%T2 = farrayPtr2d
+          case ('swdown')
+            weather2d%short = farrayPtr2d
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1174,6 +1203,12 @@ module wrfhydro_nuopc_fields
             farrayPtr2d = rt_domain(did)%infxsrt
           case ('soldrain')
             farrayPtr2d = rt_domain(did)%soldrain
+          case ('infxsrtt')
+            farrayPtr2d = rt_domain(did)%infxsrt_t
+          case ('tair')
+            farrayPtr2d = weather2d%T2
+          case ('swdown')
+            farrayPtr2d = weather2d%short
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1267,6 +1302,12 @@ module wrfhydro_nuopc_fields
             missng = any(rt_domain(did)%infxsrt.eq.chkVal)
           case ('soldrain')
             missng = any(rt_domain(did)%soldrain.eq.chkVal)
+          case ('infxsrtt')
+            missng = any(rt_domain(did)%infxsrt_t.eq.chkVal)
+          case ('tair')
+            missng = any(weather2d%T2.eq.chkVal)
+          case ('swdown')
+            missng = any(weather2d%short.eq.chkVal)
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
@@ -1388,6 +1429,15 @@ module wrfhydro_nuopc_fields
           case ('soldrain')
             where (rt_domain(did)%soldrain.eq.chkVal) &
               rt_domain(did)%soldrain = filVal
+          case ('infxsrtt')
+            where (rt_domain(did)%infxsrt_t.eq.chkVal) &
+              rt_domain(did)%infxsrt_t = filVal
+          case ('tair')
+            where (weather2d%T2.eq.chkVal) &
+              weather2d%T2 = filVal
+          case ('swdown')
+            where (weather2d%short.eq.chkVal) &
+              weather2d%short = filVal
           case default
             call ESMF_LogSetError(ESMF_FAILURE, &
               msg=METHOD//": Field hookup missing: "//trim(itemNameList(n)), &
