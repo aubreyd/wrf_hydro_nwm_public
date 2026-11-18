@@ -729,6 +729,27 @@ CONTAINS
     NoahmpIO_sub%IOPT_IRR     = noahmp_io_singleton%IOPT_IRR
     NoahmpIO_sub%IOPT_IRRM    = noahmp_io_singleton%IOPT_IRRM
     NoahmpIO_sub%IOPT_INFDV   = noahmp_io_singleton%IOPT_INFDV
+    ! Options added in Noah-MP v5.1/v5.2. Without these the bridge leaves them
+    ! at 0, which matches no branch in the physics: snowpack compaction
+    ! (SnowWaterMain) and ground snow cover fraction (EnergyMain) were then
+    ! silently skipped.
+    !   IOPT_COMPACT: SNOW_COMPACTION_OPTION (1 Anderson1976, 2 Abolafia-Rosenzweig2024)
+    !   IOPT_SCF    : SNOW_COVER_OPTION      (1 Niu&Yang2007, 2 Abolafia-Rosenzweig2025)
+    NoahmpIO_sub%IOPT_COMPACT = noahmp_io_singleton%IOPT_COMPACT
+    NoahmpIO_sub%IOPT_SCF     = noahmp_io_singleton%IOPT_SCF
+    NoahmpIO_sub%IOPT_WETLAND = noahmp_io_singleton%IOPT_WETLAND
+    if (NoahmpIO_sub%IOPT_COMPACT < 1 .or. NoahmpIO_sub%IOPT_COMPACT > 2) &
+       call wrf_error_fatal('SNOW_COMPACTION_OPTION (IOPT_COMPACT) must be 1 or 2')
+    if (NoahmpIO_sub%IOPT_SCF < 1 .or. NoahmpIO_sub%IOPT_SCF > 2) &
+       call wrf_error_fatal('SNOW_COVER_OPTION (IOPT_SCF) must be 1 or 2')
+    ! The wetland model and SNICAR snow albedo carry per-cell state (wetland
+    ! storage; snow grain radius and aerosol mass by layer) that the 1x1
+    ! bridge does not copy in/out, and SNICAR also needs its optics files and
+    ! aerosol forcing. Neither is wired up for WRF-Hydro yet.
+    if (NoahmpIO_sub%IOPT_WETLAND /= 0) &
+       call wrf_error_fatal('WETLAND_OPTION > 0 is not yet supported with WRF-Hydro; set WETLAND_OPTION = 0')
+    if (NoahmpIO_sub%IOPT_ALB == 3) &
+       call wrf_error_fatal('SNOW_ALBEDO_OPTION = 3 (SNICAR) is not yet supported with WRF-Hydro')
 ! -----------------------------------------------------------------
 
     JLOOP : DO J=jts,jte
