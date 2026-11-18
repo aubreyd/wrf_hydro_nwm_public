@@ -31,8 +31,7 @@ surfex/%.o:
 #
 # Dependencies:
 #
-module_sf_noahmpdrv.o:	module_sf_noahmplsm.o module_sf_noahmp_glacier.o module_sf_noahmp_groundwater.o $(SUR_OBJS)
-module_sf_noahmp_groundwater.o: module_sf_noahmplsm.o
+module_sf_noahmpdrv.o:	module_sf_noahmplsm.o module_sf_noahmp_glacier.o $(SUR_OBJS)
 
 #
 # This command cleans up object (etc) files:

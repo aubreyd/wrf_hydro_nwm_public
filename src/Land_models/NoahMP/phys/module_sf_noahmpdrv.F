@@ -9,7 +9,8 @@ MODULE module_sf_noahmpdrv
   USE NoahmpIOVarType
   USE NoahmpIOVarInitMod, ONLY: NoahmpIOVarInitDefault
   USE NoahmpReadTableMod, ONLY: NoahmpReadTable
-  USE GroundWaterMmfMod,  ONLY: WTABLE_mmf_noahmp_v5 => WTABLE_mmf_noahmp
+  USE GroundWaterMmfMod,  ONLY: WTABLE_mmf_noahmp_v5 => WTABLE_mmf_noahmp, &
+                                LATERALFLOW_v5 => LATERALFLOW
   ! Namelist-derived physics options now come straight from the NoahMP
   ! submodule's own namelist reader (see namelist_migration_plan.md) instead
   ! of being unpacked into individual dummy arguments by the WRF-Hydro driver
@@ -19,6 +20,7 @@ MODULE module_sf_noahmpdrv
 
   type(NoahmpIO_type), save :: NoahmpIO_sub
   logical, save :: submodule_initialized = .false.
+  integer, parameter :: NOAHMP_NSNOW = 3   ! number of snow layers fixed to 3
   character(len=256), save :: saved_landuse = 'USGS'
 
 !
@@ -500,7 +502,7 @@ CONTAINS
     INTEGER                             :: IST          ! surface type 1-soil; 2-lake
     INTEGER                             :: YEARLEN
 
-    INTEGER, PARAMETER                  :: NSNOW = 3    ! number of snow layers fixed to 3
+    INTEGER, PARAMETER                  :: NSNOW = NOAHMP_NSNOW ! number of snow layers fixed to 3
     REAL, PARAMETER                     :: undefined_value = -1.E36
 
     type(noahmp_parameters) :: parameters
@@ -644,30 +646,7 @@ CONTAINS
 		     IOPT_RSF  ,IOPT_SOIL ,IOPT_PEDO ,IOPT_CROP, IOPT_IMPERV )
 
 ! ---------- Initialize submodule NoahmpIO bridge (once) ----------
-    ! The submodule is driven one column at a time via a 1x1 NoahmpIO bridge.
-    ! All per-call assignments use (1,1)/(1,:,1) indices, so the bridge arrays
-    ! only need to be sized 1x1. Setting these to the full WRF-Hydro domain
-    ! (ids:ide, jds:jde) would cause NoahmpIOVarInitDefault to allocate ~200
-    ! full-domain arrays on every MPI rank, which exhausts memory on large
-    ! domains (e.g. CONUS) and produces heap corruption / NaN output.
-    if (.not. submodule_initialized) then
-       NoahmpIO_sub%XSTART = 1
-       NoahmpIO_sub%XEND   = 1
-       NoahmpIO_sub%YSTART = 1
-       NoahmpIO_sub%YEND   = 1
-       NoahmpIO_sub%KDS    = 1
-       NoahmpIO_sub%KDE    = 2                     ! P8W needs 2 interface levels (surface + next)
-       NoahmpIO_sub%KMS    = 1
-       NoahmpIO_sub%KME    = 1
-       NoahmpIO_sub%KTS    = 1
-       NoahmpIO_sub%KTE    = 1
-       NoahmpIO_sub%NSOIL  = NSOIL
-       NoahmpIO_sub%NSNOW  = NSNOW
-       NoahmpIO_sub%LLANDUSE = saved_landuse
-       call NoahmpIOVarInitDefault(NoahmpIO_sub)
-       call NoahmpReadTable(NoahmpIO_sub)
-       submodule_initialized = .true.
-    endif
+    CALL INIT_NOAHMPIO_BRIDGE(NSOIL)
 
     IPRINT    =  .false.                     ! debug printout
 
@@ -2825,7 +2804,6 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
 
   USE NOAHMP_TABLES, ONLY : BEXP_TABLE,SMCMAX_TABLE,PSISAT_TABLE,SMCWLT_TABLE,DWSAT_TABLE,DKSAT_TABLE, &
                                 ISURBAN_TABLE, ISICE_TABLE ,ISWATER_TABLE
-  USE module_sf_noahmp_groundwater, ONLY : LATERALFLOW
 #ifdef MPP_LAND
   USE module_mpp_land, ONLY : mpp_land_max_int1
 #endif
@@ -2878,9 +2856,13 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
 ! Derive WTD, RIVERCOND and PEXP from EQWTD, RECHCLIM and RIVERBED, following
 ! NoahmpGroundwaterInitMain in Noah-MP v5 (drivers/hrldas/NoahmpGroundwaterInitMod.F90).
 ! On input RIVERBED is an elevation (m above sea level); on output it is a depth
-! below the surface (m, <= 0). Under MPP_LAND, LATERALFLOW exchanges tile halos
-! and NCOUNT is reduced across ranks so all ranks iterate (and call the
-! collective halo exchange) the same number of times.
+! below the surface (m, <= 0). Lateral flow uses LATERALFLOW from Noah-MP v5
+! GroundWaterMmfMod (KLAT from the bridge's DKSAT_TABLE, i.e. NoahmpTable.TBL),
+! which does the MPP_LAND tile halo exchange; NCOUNT is reduced across ranks
+! so all ranks iterate (and call the collective halo exchange) the same
+! number of times.
+
+    CALL INIT_NOAHMPIO_BRIDGE(NSOIL)
 
     PEXP = 1.0
     DELTAT = 365. * 24. * 3600. ! 1 year
@@ -2892,7 +2874,8 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
     DO NITER = 1, 500
        IF ( (NCOUNT > 0) .OR. (NITER == 1) ) THEN
           QLAT = 0.
-          CALL LATERALFLOW(ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA       &
+          CALL LATERALFLOW_v5(NoahmpIO_sub                              &
+                          ,ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA &
                           ,ids,ide,jds,jde,kds,kde                      &
                           ,ims,ime,jms,jme,kms,kme                      &
                           ,its,ite,jts,jte,kts,kte                      )
@@ -2949,7 +2932,8 @@ SUBROUTINE PEDOTRANSFER_SR2006(nsoil,sand,clay,orgm,parameters)
 !Calculate lateral flow
 
     QLAT = 0.
-CALL LATERALFLOW(ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA       &
+    CALL LATERALFLOW_v5(NoahmpIO_sub                                &
+                        ,ISLTYP,WTD,QLAT,FDEPTH,TOPO,LANDMASK,DELTAT,AREA &
                         ,ids,ide,jds,jde,kds,kde                      &
                         ,ims,ime,jms,jme,kms,kme                      &
                         ,its,ite,jts,jte,kts,kte                      )
@@ -3140,7 +3124,7 @@ END  SUBROUTINE EQSMOISTURE
 ! ----------------------------------------------------------------------
 ! Per-timestep MMF groundwater (lateral flow, groundwater-river exchange,
 ! water table update) using the Noah-MP v5 GroundWaterMmfMod. Same argument
-! list as the legacy module_sf_noahmp_groundwater WTABLE_mmf_noahmp plus QLAT
+! list as the former WRF-Hydro WTABLE_mmf_noahmp (module_sf_noahmp_groundwater) plus QLAT
 ! (lateral flow this call [m], returned for output); the v5
 ! routine reads its soil parameters (BEXP/DKSAT/PSISAT/SMCMAX/SMCWLT_TABLE)
 ! and urban category from the NoahmpIO_sub bridge, which must already have
@@ -3186,5 +3170,45 @@ END  SUBROUTINE EQSMOISTURE
                                its,ite, jts,jte, kts,kte                             )
 
   END SUBROUTINE NOAHMP_WTABLE_MMF
+
+!
+! ==================================================================================================
+  SUBROUTINE INIT_NOAHMPIO_BRIDGE(NSOIL)
+! ----------------------------------------------------------------------
+! One-time setup of the 1x1 NoahmpIO_sub bridge: default-initialize it and
+! read NoahmpTable.TBL. Called from noahmplsm and, on cold start, from
+! GROUNDWATER_INIT (which runs inside NOAHMP_INIT before the first noahmplsm
+! call and needs DKSAT_TABLE for the Noah-MP v5 LATERALFLOW). saved_landuse
+! must already be set by NOAHMP_INIT.
+!
+! The submodule is driven one column at a time via a 1x1 NoahmpIO bridge.
+! All per-call assignments use (1,1)/(1,:,1) indices, so the bridge arrays
+! only need to be sized 1x1. Setting these to the full WRF-Hydro domain
+! (ids:ide, jds:jde) would cause NoahmpIOVarInitDefault to allocate ~200
+! full-domain arrays on every MPI rank, which exhausts memory on large
+! domains (e.g. CONUS) and produces heap corruption / NaN output.
+! ----------------------------------------------------------------------
+  IMPLICIT NONE
+  INTEGER, INTENT(IN) :: NSOIL
+
+    if (submodule_initialized) return
+    NoahmpIO_sub%XSTART = 1
+    NoahmpIO_sub%XEND   = 1
+    NoahmpIO_sub%YSTART = 1
+    NoahmpIO_sub%YEND   = 1
+    NoahmpIO_sub%KDS    = 1
+    NoahmpIO_sub%KDE    = 2                     ! P8W needs 2 interface levels (surface + next)
+    NoahmpIO_sub%KMS    = 1
+    NoahmpIO_sub%KME    = 1
+    NoahmpIO_sub%KTS    = 1
+    NoahmpIO_sub%KTE    = 1
+    NoahmpIO_sub%NSOIL  = NSOIL
+    NoahmpIO_sub%NSNOW  = NOAHMP_NSNOW
+    NoahmpIO_sub%LLANDUSE = saved_landuse
+    call NoahmpIOVarInitDefault(NoahmpIO_sub)
+    call NoahmpReadTable(NoahmpIO_sub)
+    submodule_initialized = .true.
+
+  END SUBROUTINE INIT_NOAHMPIO_BRIDGE
 
 END MODULE module_sf_noahmpdrv
