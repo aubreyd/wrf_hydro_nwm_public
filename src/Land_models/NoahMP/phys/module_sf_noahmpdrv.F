@@ -682,16 +682,14 @@ CONTAINS
 ! arguments above -- those are still passed in (module_NoahMP_hrldas_driver.F
 ! unpacks the same noah_lsm% fields into them) but are no longer used here.
 !
-! IOPT_RUNSUB intentionally mirrors IOPT_RUNSRF rather than reading
-! noahmp_io_singleton%IOPT_RUNSUB (i.e. SUBSURFACE_RUNOFF_OPTION): that
-! preserves a pre-existing quirk where the single IOPT_RUN argument fed both
-! fields and SUBSURFACE_RUNOFF_OPTION was silently unused. Not fixed here --
-! out of scope for a namelist-plumbing refactor; worth revisiting separately.
+! IOPT_RUNSUB is SUBSURFACE_RUNOFF_OPTION; when that is not set in the
+! namelist, NoahmpReadNamelist makes it follow SURFACE_RUNOFF_OPTION (or the
+! deprecated RUNOFF_OPTION), preserving the old single-option behavior.
     NoahmpIO_sub%IOPT_DVEG    = noahmp_io_singleton%IOPT_DVEG
     NoahmpIO_sub%IOPT_CRS     = noahmp_io_singleton%IOPT_CRS
     NoahmpIO_sub%IOPT_BTR     = noahmp_io_singleton%IOPT_BTR
     NoahmpIO_sub%IOPT_RUNSRF  = noahmp_io_singleton%IOPT_RUNSRF
-    NoahmpIO_sub%IOPT_RUNSUB  = noahmp_io_singleton%IOPT_RUNSRF
+    NoahmpIO_sub%IOPT_RUNSUB  = noahmp_io_singleton%IOPT_RUNSUB
     NoahmpIO_sub%IOPT_SFC     = noahmp_io_singleton%IOPT_SFC
     NoahmpIO_sub%IOPT_FRZ     = noahmp_io_singleton%IOPT_FRZ
     NoahmpIO_sub%IOPT_INF     = noahmp_io_singleton%IOPT_INF
@@ -750,6 +748,50 @@ CONTAINS
        call wrf_error_fatal('WETLAND_OPTION > 0 is not yet supported with WRF-Hydro; set WETLAND_OPTION = 0')
     if (NoahmpIO_sub%IOPT_ALB == 3) &
        call wrf_error_fatal('SNOW_ALBEDO_OPTION = 3 (SNICAR) is not yet supported with WRF-Hydro')
+    ! Surface/subsurface runoff consistency. Each of these combinations
+    ! would run without error but give inconsistent physics:
+    !  - MMF (5) must be used for both: WRF-Hydro's MMF groundwater setup,
+    !    lateral flow and restart I/O key off SURFACE_RUNOFF_OPTION = 5, and
+    !    the MMF water table is only updated by the MMF subsurface scheme.
+    !  - The TOPMODEL surface runoff options (1, 2) compute saturated area from
+    !    the water table depth, which only subsurface options 1 and 2 update.
+    !    With any other subsurface option it stays at its initial value.
+    !  - Dynamic VIC surface runoff (8) sets the water table depth itself, so it
+    !    conflicts with subsurface options 1 and 2, which also set it.
+    if (NoahmpIO_sub%IOPT_RUNSRF < 1 .or. NoahmpIO_sub%IOPT_RUNSRF > 8) &
+       call wrf_error_fatal('SURFACE_RUNOFF_OPTION must be 1..8')
+    if (NoahmpIO_sub%IOPT_RUNSUB < 1 .or. NoahmpIO_sub%IOPT_RUNSUB > 8) &
+       call wrf_error_fatal('SUBSURFACE_RUNOFF_OPTION must be 1..8')
+    if ((NoahmpIO_sub%IOPT_RUNSRF == 5) .neqv. (NoahmpIO_sub%IOPT_RUNSUB == 5)) &
+       call wrf_error_fatal('SURFACE_RUNOFF_OPTION and SUBSURFACE_RUNOFF_OPTION must both be 5 (MMF) when either is 5')
+    if ((NoahmpIO_sub%IOPT_RUNSRF == 1 .or. NoahmpIO_sub%IOPT_RUNSRF == 2) .and. &
+        .not. (NoahmpIO_sub%IOPT_RUNSUB == 1 .or. NoahmpIO_sub%IOPT_RUNSUB == 2)) &
+       call wrf_error_fatal('SURFACE_RUNOFF_OPTION = 1 or 2 (TOPMODEL) requires SUBSURFACE_RUNOFF_OPTION = 1 or 2')
+    if (NoahmpIO_sub%IOPT_RUNSRF == 8 .and. &
+        (NoahmpIO_sub%IOPT_RUNSUB == 1 .or. NoahmpIO_sub%IOPT_RUNSUB == 2)) &
+       call wrf_error_fatal('SURFACE_RUNOFF_OPTION = 8 (dynamic VIC) cannot be used with SUBSURFACE_RUNOFF_OPTION = 1 or 2')
+    ! Options whose inputs or per-cell state the 1x1 bridge does not pass yet.
+    !  - Soil data: the bridge always overrides the soil hydraulic parameters
+    !    with the per-cell values from the soil properties file. Options 2 and
+    !    3 need soil texture/composition fields that are never passed, and
+    !    option 4 makes Noah-MP read 2D/3D parameter arrays (soil, VIC,
+    !    irrigation, tile drainage) that are never filled.
+    !  - Crop: the bridge sets the crop type to 0, so the crop model never runs.
+    !  - Irrigation and tile drainage: their input fields (irrigation
+    !    fractions, tile drainage fraction) and irrigation state are not passed.
+    !  - Soil timestep: the bridge runs the soil solve every Noah-MP step.
+    if (NoahmpIO_sub%IOPT_SOIL /= 1) &
+       call wrf_error_fatal('SOIL_DATA_OPTION must be 1 with WRF-Hydro (soil properties come from the soil properties file)')
+    if (NoahmpIO_sub%IOPT_CROP /= 0) &
+       call wrf_error_fatal('CROP_OPTION > 0 is not yet supported with WRF-Hydro; set CROP_OPTION = 0')
+    if (NoahmpIO_sub%IOPT_IRR /= 0) &
+       call wrf_error_fatal('IRRIGATION_OPTION > 0 is not yet supported with WRF-Hydro; set IRRIGATION_OPTION = 0')
+    if (NoahmpIO_sub%IOPT_TDRN /= 0) &
+       call wrf_error_fatal('TILE_DRAINAGE_OPTION > 0 is not yet supported with WRF-Hydro; set TILE_DRAINAGE_OPTION = 0')
+    if (noahmp_io_singleton%soiltstep > 0.0) then
+       if (nint(noahmp_io_singleton%soiltstep / DT) > 1) &
+          call wrf_error_fatal('SOIL_TIMESTEP longer than NOAH_TIMESTEP is not yet supported with WRF-Hydro; set SOIL_TIMESTEP = 0')
+    endif
 ! -----------------------------------------------------------------
 
     JLOOP : DO J=jts,jte
