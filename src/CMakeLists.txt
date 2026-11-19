@@ -167,6 +167,8 @@ if (HYDRO_LSM MATCHES "NoahMP")
                 COMMAND cp ${PROJECT_SOURCE_DIR}/src/template/HYDRO/HYDRO.TBL ${CMAKE_BINARY_DIR}/Run
                 COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/run/*.TBL ${CMAKE_BINARY_DIR}/Run
                 COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/noahmp/parameters/NoahmpTable.TBL ${CMAKE_BINARY_DIR}/Run
+                # SNICAR snow albedo (SNOW_ALBEDO_OPTION = 3) optics and aging files
+                COMMAND cp ${PROJECT_SOURCE_DIR}/src/Land_models/NoahMP/noahmp/parameters/snicar_*.nc ${CMAKE_BINARY_DIR}/Run
                 # copy namelists
                 COMMAND bash -c "${BASH_CP_HRLDAS_NML}"
                 COMMAND bash -c "${BASH_CP_HYDRO_NML}"

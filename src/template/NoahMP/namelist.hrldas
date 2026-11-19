@@ -23,18 +23,49 @@ KHOUR = 24
 DYNAMIC_VEG_OPTION                = 4
 CANOPY_STOMATAL_RESISTANCE_OPTION = 1
 BTR_OPTION                        = 1
-RUNOFF_OPTION                     = 3
+SURFACE_RUNOFF_OPTION             = 3  ! RUNOFF_OPTION is a deprecated alias for this option
+SUBSURFACE_RUNOFF_OPTION          = 3  ! must be 5 if SURFACE_RUNOFF_OPTION = 5 (MMF), and vice versa
+DVIC_INFILTRATION_OPTION          = 1  ! only used with SURFACE_RUNOFF_OPTION = 8
 SURFACE_DRAG_OPTION               = 1
 FROZEN_SOIL_OPTION                = 1
 SUPERCOOLED_WATER_OPTION          = 1
 RADIATIVE_TRANSFER_OPTION         = 3
-SNOW_ALBEDO_OPTION                = 2
+SNOW_ALBEDO_OPTION                = 2  ! 3 (SNICAR) uses the SNICAR options below
+SNOW_COMPACTION_OPTION            = 2
+SNOW_COVER_OPTION                 = 1
 PCP_PARTITION_OPTION              = 1
+SNOW_THERMAL_CONDUCTIVITY         = 1
 TBOT_OPTION                       = 2
 TEMP_TIME_SCHEME_OPTION           = 3
 GLACIER_OPTION                    = 2
 SURFACE_RESISTANCE_OPTION         = 4
-IMPERV_OPTION                     = 9  !(0->none; 1->total; 2->Alley&Veenhuis; 9->orig)
+IMPERV_OPTION                     = 9  ! WRF-Hydro only (0->none; 1->total; 2->Alley&Veenhuis; 9->orig)
+SOIL_DATA_OPTION                  = 1  ! only 1 is supported with WRF-Hydro
+PEDOTRANSFER_OPTION               = 1  ! only used with SOIL_DATA_OPTION = 3, so no effect with WRF-Hydro
+
+! The following options are not yet supported with WRF-Hydro and must be 0
+CROP_OPTION                       = 0
+IRRIGATION_OPTION                 = 0
+IRRIGATION_METHOD                 = 0  ! only used when IRRIGATION_OPTION > 0
+TILE_DRAINAGE_OPTION              = 0
+WETLAND_OPTION                    = 0
+
+! The following options are only used with the SNICAR snow albedo scheme (SNOW_ALBEDO_OPTION = 3).
+! The SNICAR optics and aging files are in src/Land_models/NoahMP/noahmp/parameters/
+! and are copied into the Run directory by the CMake build.
+SNICAR_BANDNUMBER_OPTION          = 1  ! 1: 5 bands; 2 (480 bands) can stop on Noah-MP's single-precision energy balance check
+SNICAR_SOLARSPEC_OPTION           = 1
+SNICAR_SNOWOPTICS_OPTION          = 3
+SNICAR_DUSTOPTICS_OPTION          = 1
+SNICAR_RTSOLVER_OPTION            = 2
+SNICAR_SNOWSHAPE_OPTION           = 3
+SNICAR_USE_AEROSOL                = .true.
+SNICAR_SNOWBC_INTMIX              = .true.
+SNICAR_SNOWDUST_INTMIX            = .false.
+SNICAR_USE_OC                     = .false.
+SNICAR_AEROSOL_READTABLE          = .true.  ! must be .true. with WRF-Hydro (deposition rates from NoahmpTable.TBL)
+SNICAR_OPTIC_FLNM                 = "snicar_optics_5bnd_c013122.nc"  ! use snicar_optics_480bnd_c012422.nc with SNICAR_BANDNUMBER_OPTION = 2
+SNICAR_AGE_FLNM                   = "snicar_drdt_bst_fit_60_c070416.nc"
 
 ! Timesteps in units of seconds
 FORCING_TIMESTEP = 3600
