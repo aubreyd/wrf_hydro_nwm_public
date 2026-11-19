@@ -1,10 +1,12 @@
 module module_NoahMP_hrldas_driver
 
   USE module_hrldas_netcdf_io
-  USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm, noahmp_wtable_mmf
+  USE module_sf_noahmpdrv, only: noahmp_init, noahmplsm, noahmp_wtable_mmf, &
+                                 SNICAR_STATE, SNICAR_STATE_INIT, SNICAR_MASSCONC_INIT, &
+                                 NUM_SNICAR_RST_VARS, SNICAR_RST_NAMES
   USE module_date_utilities
   USE orchestrator_base
-  USE config_base, only: wrf_hydro, noah_lsm
+  USE config_base, only: wrf_hydro, noah_lsm, noahmp_io_singleton
   USE modi_ini_csts
 #ifdef MPP_LAND
   use module_mpp_land, only: MPP_LAND_PAR_INI, mpp_land_init, getLocalXY, mpp_land_bcast_char, mpp_land_sync
@@ -428,6 +430,7 @@ module module_NoahMP_hrldas_driver
      use state_module, only: state_type
      implicit  none
      integer, intent(out) :: NTIME_out
+     integer :: isnicar
      integer, parameter :: did=1
      integer :: khour
      type(state_type), intent(out) :: state
@@ -945,6 +948,8 @@ module module_NoahMP_hrldas_driver
      ALLOCATE ( PSNOWDZXY      (XSTART:XEND,1:act_lev,YSTART:YEND) )
      ALLOCATE ( PSNOWHISTXY    (XSTART:XEND,1:act_lev,YSTART:YEND) )
    end if ! crocus_opt /= 0
+  ! SNICAR snow albedo per-snow-layer state (zeroed = cold-start values)
+  if (noahmp_io_singleton%IOPT_ALB == 3) call SNICAR_STATE_INIT(XSTART, XEND, YSTART, YEND)
 
 #ifdef WRF_HYDRO
    allocate( greenfrac   (XSTART:XEND,YSTART:YEND))
@@ -1380,6 +1385,22 @@ module module_NoahMP_hrldas_driver
      if(checkRstV("ACCEDIR") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCEDIR"  ,ACCEDIR    )
      if(checkRstV("ACCETRAN") .eq. 0) call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "ACCETRAN" ,ACCETRAN    )
 #endif
+     ! SNICAR snow albedo state (HRLDAS restart names). Unlike HRLDAS, a
+     ! variable missing from the restart (e.g. a restart from a non-SNICAR
+     ! run) is not fatal: it keeps its cold-start value of zero, and a zero
+     ! snow grain radius is raised to SnowRadiusMin on the first step.
+     if (noahmp_io_singleton%IOPT_ALB == 3) then
+        do isnicar = 1, NUM_SNICAR_RST_VARS
+           if (checkRstV(trim(SNICAR_RST_NAMES(isnicar))) .eq. 0) then
+              call get_from_restart(xstart, xend, xstart, ixfull, jxfull, trim(SNICAR_RST_NAMES(isnicar)), &
+                                    SNICAR_STATE(:,:,:,isnicar))
+           else
+              if (my_id .eq. IO_id) write(*,'("WARNING: SNICAR variable ",A," not in restart file; initialized to 0")') &
+                                         trim(SNICAR_RST_NAMES(isnicar))
+           endif
+        enddo
+        call SNICAR_MASSCONC_INIT(state%SNICEXY, state%SNLIQXY)
+     endif
 ! below for opt_run = 5
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "SMOISEQ"   , SMOISEQ    )
      call get_from_restart(xstart, xend, xstart, ixfull, jxfull, "AREAXY"    , AREAXY     )
@@ -2345,6 +2366,7 @@ subroutine lsm_restart(state)
   use state_module, only: state_type
   implicit none
   type(state_type) :: state
+  integer :: isnicar
   character(len=256):: tmpStr
   integer :: ncid
 
@@ -2434,6 +2456,11 @@ subroutine lsm_restart(state)
      call add_to_restart(ncid, FLOW_ICE      , "FLOW_ICE"    )
      call add_to_restart(ncid, FLOW_SNOW     , "FLOW_SNOW"   )
   end if ! crocus_opt /= 0
+  if (noahmp_io_singleton%IOPT_ALB == 3) then   ! SNICAR snow albedo state
+     do isnicar = 1, NUM_SNICAR_RST_VARS
+        call add_to_restart(ncid, SNICAR_STATE(:,:,:,isnicar), trim(SNICAR_RST_NAMES(isnicar)), layers="SNOW")
+     enddo
+  end if
 #ifdef WRF_HYDRO
   call add_to_restart(ncid,ACCPRCP   , "ACCPRCP" )
   call add_to_restart(ncid,ACCECAN   , "ACCECAN" )
@@ -2471,6 +2498,7 @@ subroutine lsm_rst_bi_out(state)
   use state_module, only: state_type
   implicit none
   type(state_type) :: state
+  integer :: isnicar
   integer :: iunit, ierr
   character(len=256) :: output_flnm, str_tmp
   integer  :: i0,ie, i, istep, mkdirStatus
@@ -2570,6 +2598,11 @@ subroutine lsm_rst_bi_out(state)
      write(iunit,ERR=101) FLOW_SNOW
      write(iunit,ERR=101) FLOW_ICE
   end if ! crocus_opt /= 0
+  if (noahmp_io_singleton%IOPT_ALB == 3) then   ! SNICAR snow albedo state
+     do isnicar = 1, NUM_SNICAR_RST_VARS
+        write(iunit,ERR=101) SNICAR_STATE(:,:,:,isnicar)
+     enddo
+  end if
 ! #ifndef REALTIME
 ! #ifdef WRF_HYDRO
 !   write(iunit,ERR=101) ACCPRCP
@@ -2626,6 +2659,7 @@ subroutine lsm_rst_bi_in(state)
   use state_module, only: state_type
   implicit none
   type(state_type) :: state
+  integer :: isnicar
   integer :: iunit, ierr
   character(len=256):: str_tmp
   integer  :: i0,ie, i, istep
@@ -2718,6 +2752,12 @@ subroutine lsm_rst_bi_in(state)
      read(iunit,ERR=101) FLOW_SNOW
      read(iunit,ERR=101) FLOW_ICE
   end if ! crocus_opt /= 0
+  if (noahmp_io_singleton%IOPT_ALB == 3) then   ! SNICAR snow albedo state
+     do isnicar = 1, NUM_SNICAR_RST_VARS
+        read(iunit,ERR=101) SNICAR_STATE(:,:,:,isnicar)
+     enddo
+     call SNICAR_MASSCONC_INIT(state%SNICEXY, state%SNLIQXY)
+  end if
 
   ! read(iunit,ERR=101) PSNOWLIQXY
 ! #ifndef REALTIME
@@ -2772,6 +2812,7 @@ subroutine define_rst_variables(ncid, state)
   use state_module, only: state_type
   implicit none
   type(state_type) :: state
+  integer :: isnicar
   integer ncid
   !      character(len=*) :: tmpStr
 
@@ -2843,6 +2884,11 @@ subroutine define_rst_variables(ncid, state)
      call define_rst_var(ncid,FLOW_SNOW     , "FLOW_SNOW"   )
      call define_rst_var(ncid,FLOW_ICE      , "FLOW_ICE"    )
   end if ! crocus_opt /= 0
+  if (noahmp_io_singleton%IOPT_ALB == 3) then   ! SNICAR snow albedo state
+     do isnicar = 1, NUM_SNICAR_RST_VARS
+        call define_rst_var(ncid, SNICAR_STATE(:,:,:,isnicar), trim(SNICAR_RST_NAMES(isnicar)), layers="SNOW")
+     enddo
+  end if
 #ifdef WRF_HYDRO
   call define_rst_var(ncid,ACCPRCP   , "ACCPRCP" )
   call define_rst_var(ncid,ACCECAN   , "ACCECAN" )

@@ -18,10 +18,40 @@ MODULE module_sf_noahmpdrv
   ! change needed here or in module_NoahMP_hrldas_driver.F.
   USE config_base, ONLY: noahmp_io_singleton
 
+  USE SnowInputSnicarMod, ONLY: SnowInputSnicar
+
   type(NoahmpIO_type), save :: NoahmpIO_sub
   logical, save :: submodule_initialized = .false.
   integer, parameter :: NOAHMP_NSNOW = 3   ! number of snow layers fixed to 3
   character(len=256), save :: saved_landuse = 'USGS'
+
+  ! SNICAR snow albedo (SNOW_ALBEDO_OPTION = 3) per-snow-layer state on the
+  ! driver grid: SNICAR_STATE(XSTART:XEND, -NSNOW+1:0, YSTART:YEND, var).
+  ! HRLDAS keeps these in its full-domain NoahmpIO (SNRDSXY, SNFRXY, BCPHIXY,
+  ! ...); the WRF-Hydro bridge NoahmpIO is 1x1, so they live here instead.
+  ! Allocated and zeroed by SNICAR_STATE_INIT (cold start, as in
+  ! NoahmpSnowInitMod), restart I/O in module_NoahMP_hrldas_driver.F under
+  ! the HRLDAS restart names, and copied in/out per column in noahmplsm.
+  ! Variables 1..NUM_SNICAR_RST_VARS are in the restart (same set as HRLDAS);
+  ! the aerosol mass concentrations (12..20) are not: they are rebuilt from
+  ! the masses at startup by SNICAR_MASSCONC_INIT, as NoahmpInitMain does.
+  ! They are carried between steps because SnowRadiationSnicar reads the
+  ! previous step's values before SnowAerosolSnicar updates them.
+  integer, parameter :: NUM_SNICAR_VARS = 20, NUM_SNICAR_RST_VARS = 11
+  integer, parameter :: SNICAR_SNRDS = 1, SNICAR_SNFR  = 2,                  &
+                        SNICAR_BCPHI = 3, SNICAR_BCPHO = 4,                  &
+                        SNICAR_OCPHI = 5, SNICAR_OCPHO = 6,                  &
+                        SNICAR_DUST1 = 7, SNICAR_DUST2 = 8, SNICAR_DUST3 = 9, &
+                        SNICAR_DUST4 = 10, SNICAR_DUST5 = 11,                 &
+                        SNICAR_MCBCPHI = 12, SNICAR_MCBCPHO = 13,             &
+                        SNICAR_MCOCPHI = 14, SNICAR_MCOCPHO = 15,             &
+                        SNICAR_MCDUST1 = 16, SNICAR_MCDUST2 = 17,             &
+                        SNICAR_MCDUST3 = 18, SNICAR_MCDUST4 = 19,             &
+                        SNICAR_MCDUST5 = 20
+  character(len=5), parameter :: SNICAR_RST_NAMES(NUM_SNICAR_RST_VARS) =    &
+       [ 'SNRDS', 'SNFR ', 'BCPHI', 'BCPHO', 'OCPHI', 'OCPHO',              &
+         'DUST1', 'DUST2', 'DUST3', 'DUST4', 'DUST5' ]
+  real, allocatable, save :: SNICAR_STATE(:,:,:,:)
 
 !
 CONTAINS
@@ -740,14 +770,20 @@ CONTAINS
        call wrf_error_fatal('SNOW_COMPACTION_OPTION (IOPT_COMPACT) must be 1 or 2')
     if (NoahmpIO_sub%IOPT_SCF < 1 .or. NoahmpIO_sub%IOPT_SCF > 2) &
        call wrf_error_fatal('SNOW_COVER_OPTION (IOPT_SCF) must be 1 or 2')
-    ! The wetland model and SNICAR snow albedo carry per-cell state (wetland
-    ! storage; snow grain radius and aerosol mass by layer) that the 1x1
-    ! bridge does not copy in/out, and SNICAR also needs its optics files and
-    ! aerosol forcing. Neither is wired up for WRF-Hydro yet.
+    ! The wetland model carries per-cell state (wetland storage) that the 1x1
+    ! bridge does not copy in/out; it is not wired up for WRF-Hydro yet.
     if (NoahmpIO_sub%IOPT_WETLAND /= 0) &
        call wrf_error_fatal('WETLAND_OPTION > 0 is not yet supported with WRF-Hydro; set WETLAND_OPTION = 0')
-    if (NoahmpIO_sub%IOPT_ALB == 3) &
-       call wrf_error_fatal('SNOW_ALBEDO_OPTION = 3 (SNICAR) is not yet supported with WRF-Hydro')
+    ! SNICAR (SNOW_ALBEDO_OPTION = 3): optics/aging tables are read in
+    ! INIT_NOAHMPIO_BRIDGE and the per-layer state is in SNICAR_STATE.
+    ! Aerosol deposition must come from NoahmpTable.TBL: the gridded
+    ! deposition forcing fields (BCPHI ... DUST5) are not read by WRF-Hydro.
+    if (NoahmpIO_sub%IOPT_ALB == 3) then
+       if (.not. NoahmpIO_sub%SNICAR_AEROSOL_READTABLE) &
+          call wrf_error_fatal('SNOW_ALBEDO_OPTION = 3 (SNICAR) with WRF-Hydro requires SNICAR_AEROSOL_READTABLE = .true. (gridded aerosol deposition forcing is not yet supported)')
+       if (.not. allocated(SNICAR_STATE)) &
+          call wrf_error_fatal('SNOW_ALBEDO_OPTION = 3 (SNICAR): SNICAR_STATE was not allocated by the driver')
+    endif
     ! Surface/subsurface runoff consistency. Each of these combinations
     ! would run without error but give inconsistent physics:
     !  - MMF (5) must be used for both: WRF-Hydro's MMF groundwater setup,
@@ -1549,6 +1585,30 @@ CONTAINS
          NoahmpIO_sub%ZWATBLE2D(1,1)  = 0.0
 #endif
 
+         ! SNICAR per-layer state (WaterVarInTransfer reads it when IOPT_ALB = 3)
+         if (NoahmpIO_sub%IOPT_ALB == 3) then
+            NoahmpIO_sub%SNRDSXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_SNRDS)
+            NoahmpIO_sub%SNFRXY (1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_SNFR )
+            NoahmpIO_sub%BCPHIXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_BCPHI)
+            NoahmpIO_sub%BCPHOXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_BCPHO)
+            NoahmpIO_sub%OCPHIXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_OCPHI)
+            NoahmpIO_sub%OCPHOXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_OCPHO)
+            NoahmpIO_sub%DUST1XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST1)
+            NoahmpIO_sub%DUST2XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST2)
+            NoahmpIO_sub%DUST3XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST3)
+            NoahmpIO_sub%DUST4XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST4)
+            NoahmpIO_sub%DUST5XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST5)
+            NoahmpIO_sub%MassConcBCPHIXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCBCPHI)
+            NoahmpIO_sub%MassConcBCPHOXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCBCPHO)
+            NoahmpIO_sub%MassConcOCPHIXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCOCPHI)
+            NoahmpIO_sub%MassConcOCPHOXY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCOCPHO)
+            NoahmpIO_sub%MassConcDUST1XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST1)
+            NoahmpIO_sub%MassConcDUST2XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST2)
+            NoahmpIO_sub%MassConcDUST3XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST3)
+            NoahmpIO_sub%MassConcDUST4XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST4)
+            NoahmpIO_sub%MassConcDUST5XY(1,-NSNOW+1:0,1) = SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST5)
+         endif
+
          ! Call submodule Init+Transfer chain and NoahmpMain
          call ConfigVarInitDefault(noahmp_col)
          call ConfigVarInTransfer(noahmp_col, NoahmpIO_sub)
@@ -1806,6 +1866,30 @@ CONTAINS
          SNICE(-NSNOW+1:0)  = noahmp_col%water%state%SnowIce(-NSNOW+1:0)
          SNLIQ(-NSNOW+1:0)  = noahmp_col%water%state%SnowLiqWater(-NSNOW+1:0)
          ZSNSO(-NSNOW+1:NSOIL) = noahmp_col%config%domain%DepthSnowSoilLayer(-NSNOW+1:NSOIL)
+
+         ! SNICAR per-layer state (as in WaterVarOutTransfer)
+         if (NoahmpIO_sub%IOPT_ALB == 3) then
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_SNRDS) = noahmp_col%water%state%SnowRadius    (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_SNFR ) = noahmp_col%water%flux%SnowFreezeRate (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_BCPHI) = noahmp_col%water%state%MassBChydrophi(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_BCPHO) = noahmp_col%water%state%MassBChydropho(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_OCPHI) = noahmp_col%water%state%MassOChydrophi(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_OCPHO) = noahmp_col%water%state%MassOChydropho(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST1) = noahmp_col%water%state%MassDust1     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST2) = noahmp_col%water%state%MassDust2     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST3) = noahmp_col%water%state%MassDust3     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST4) = noahmp_col%water%state%MassDust4     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_DUST5) = noahmp_col%water%state%MassDust5     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCBCPHI) = noahmp_col%water%state%MassConcBChydrophi(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCBCPHO) = noahmp_col%water%state%MassConcBChydropho(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCOCPHI) = noahmp_col%water%state%MassConcOChydrophi(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCOCPHO) = noahmp_col%water%state%MassConcOChydropho(-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST1) = noahmp_col%water%state%MassConcDust1     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST2) = noahmp_col%water%state%MassConcDust2     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST3) = noahmp_col%water%state%MassConcDust3     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST4) = noahmp_col%water%state%MassConcDust4     (-NSNOW+1:0)
+            SNICAR_STATE(I,-NSNOW+1:0,J,SNICAR_MCDUST5) = noahmp_col%water%state%MassConcDust5     (-NSNOW+1:0)
+         endif
 
          ! Biochem states
          LFMASS = noahmp_col%biochem%state%LeafMass
@@ -3268,10 +3352,81 @@ END  SUBROUTINE EQSMOISTURE
     NoahmpIO_sub%NSOIL  = NSOIL
     NoahmpIO_sub%NSNOW  = NOAHMP_NSNOW
     NoahmpIO_sub%LLANDUSE = saved_landuse
+    ! NoahmpIOVarInitDefault allocates the SNICAR arrays only when IOPT_ALB = 3,
+    ! sized by SNICAR_BANDNUMBER_OPT, so these must be set before it runs.
+    ! The remaining SNICAR options and file names are needed by
+    ! SnowInputSnicar and ConfigVarInTransfer.
+    NoahmpIO_sub%IOPT_ALB                 = noahmp_io_singleton%IOPT_ALB
+    NoahmpIO_sub%SNICAR_BANDNUMBER_OPT    = noahmp_io_singleton%SNICAR_BANDNUMBER_OPT
+    NoahmpIO_sub%SNICAR_SOLARSPEC_OPT     = noahmp_io_singleton%SNICAR_SOLARSPEC_OPT
+    NoahmpIO_sub%SNICAR_SNOWOPTICS_OPT    = noahmp_io_singleton%SNICAR_SNOWOPTICS_OPT
+    NoahmpIO_sub%SNICAR_DUSTOPTICS_OPT    = noahmp_io_singleton%SNICAR_DUSTOPTICS_OPT
+    NoahmpIO_sub%SNICAR_RTSOLVER_OPT      = noahmp_io_singleton%SNICAR_RTSOLVER_OPT
+    NoahmpIO_sub%SNICAR_SNOWSHAPE_OPT     = noahmp_io_singleton%SNICAR_SNOWSHAPE_OPT
+    NoahmpIO_sub%SNICAR_USE_AEROSOL       = noahmp_io_singleton%SNICAR_USE_AEROSOL
+    NoahmpIO_sub%SNICAR_SNOWBC_INTMIX     = noahmp_io_singleton%SNICAR_SNOWBC_INTMIX
+    NoahmpIO_sub%SNICAR_SNOWDUST_INTMIX   = noahmp_io_singleton%SNICAR_SNOWDUST_INTMIX
+    NoahmpIO_sub%SNICAR_USE_OC            = noahmp_io_singleton%SNICAR_USE_OC
+    NoahmpIO_sub%SNICAR_AEROSOL_READTABLE = noahmp_io_singleton%SNICAR_AEROSOL_READTABLE
+    NoahmpIO_sub%snicar_optic_flnm        = noahmp_io_singleton%snicar_optic_flnm
+    NoahmpIO_sub%snicar_age_flnm          = noahmp_io_singleton%snicar_age_flnm
     call NoahmpIOVarInitDefault(NoahmpIO_sub)
     call NoahmpReadTable(NoahmpIO_sub)
+    ! SNICAR snow/aerosol optics and snow aging lookup tables (as HRLDAS does
+    ! in its driver init). Every rank reads its own copy: the WRF-Hydro build
+    ! does not define _PARALLEL_, so SnowInputSnicar uses serial nf90_open.
+    if (NoahmpIO_sub%IOPT_ALB == 3) call SnowInputSnicar(NoahmpIO_sub)
     submodule_initialized = .true.
 
   END SUBROUTINE INIT_NOAHMPIO_BRIDGE
+
+  SUBROUTINE SNICAR_STATE_INIT(XS, XE, YS, YE)
+! ----------------------------------------------------------------------
+! Allocate the SNICAR per-snow-layer state on the driver grid and zero it
+! (cold-start values, as in NoahmpSnowInitMod). Called by the driver when
+! SNOW_ALBEDO_OPTION = 3, before any restart read. On a restart, variables
+! missing from the restart file keep these zeros; a zero grain radius is
+! raised to SnowRadiusMin by SnowAgingSnicar on the first step.
+! ----------------------------------------------------------------------
+  IMPLICIT NONE
+  INTEGER, INTENT(IN) :: XS, XE, YS, YE
+
+    if (allocated(SNICAR_STATE)) return
+    allocate(SNICAR_STATE(XS:XE, -NOAHMP_NSNOW+1:0, YS:YE, NUM_SNICAR_VARS))
+    SNICAR_STATE = 0.0
+
+  END SUBROUTINE SNICAR_STATE_INIT
+
+  SUBROUTINE SNICAR_MASSCONC_INIT(SNICEXY, SNLIQXY)
+! ----------------------------------------------------------------------
+! Rebuild the aerosol mass concentrations from the aerosol masses and snow
+! layer mass, as NoahmpInitMain does for HRLDAS. Called by the driver after
+! the initial state is set (cold start or restart read).
+! ----------------------------------------------------------------------
+  IMPLICIT NONE
+  REAL, DIMENSION(:,:,:), INTENT(IN) :: SNICEXY, SNLIQXY  ! (x, -NSNOW+1:0, y)
+  INTEGER :: I, J, IZ, K, N, I0, J0
+  REAL    :: SNOWMASS
+
+    if (.not. allocated(SNICAR_STATE)) return
+    I0 = lbound(SNICAR_STATE,1) - 1
+    J0 = lbound(SNICAR_STATE,3) - 1
+    do J = lbound(SNICAR_STATE,3), ubound(SNICAR_STATE,3)
+       do K = 1, NOAHMP_NSNOW
+          IZ = K - NOAHMP_NSNOW            ! snow layer index -NSNOW+1..0
+          do I = lbound(SNICAR_STATE,1), ubound(SNICAR_STATE,1)
+             SNOWMASS = SNICEXY(I-I0,K,J-J0) + SNLIQXY(I-I0,K,J-J0)
+             do N = 0, 8                   ! BCPHI,BCPHO,OCPHI,OCPHO,DUST1..5
+                if (SNOWMASS > 0.0) then
+                   SNICAR_STATE(I,IZ,J,SNICAR_MCBCPHI+N) = SNICAR_STATE(I,IZ,J,SNICAR_BCPHI+N) / SNOWMASS
+                else
+                   SNICAR_STATE(I,IZ,J,SNICAR_MCBCPHI+N) = 0.0
+                endif
+             enddo
+          enddo
+       enddo
+    enddo
+
+  END SUBROUTINE SNICAR_MASSCONC_INIT
 
 END MODULE module_sf_noahmpdrv
