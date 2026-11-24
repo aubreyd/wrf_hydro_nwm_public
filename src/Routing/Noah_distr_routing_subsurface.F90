@@ -46,7 +46,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
     !DJG Second, Call subsurface routing routine...
 #ifdef HYDRO_D
     print *, "Beginning SUB_routing..."
-    print *, "Routing method is ",subrt_static%rt_option, " direction."
+    print *, "Routing method is ",subrt_static%subrt_option, " direction."
 #endif
 
     !!!! Find saturated layer depth...
@@ -234,33 +234,38 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
 
     !!!! Call subsurface routing subroutine...
 #ifdef HYDRO_D
-    print *, "calling subsurface routing subroutine...Opt. ",subrt_static%rt_option
+    print *, "calling subsurface routing subroutine...Opt. ",subrt_static%subrt_option
 #endif
 
-    ! ADCHANGE: IMPORTANT!
-    ! 2D subsurface option currently has bug so forcing to option 1 in this routine to
-    ! allow users to still have option to use 2d overland (both are controlled by same
-    ! rt_option flag). Remove this hard-coded option when rt_option=2 is fixed for subsurface.
-    !     if(subrt_static%rt_option .eq. 1) then
-    CALL ROUTE_SUBSURFACE1(subrt_data%properties%distance_to_neighbor, &
-                           subrt_data%properties%zwattablrt, &
-                           subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
-                           subrt_data%properties%soldeprt, &
-                           subrt_static%IXRT, subrt_static%JXRT, &
-                           subrt_data%properties%surface_slope, &
-                           subrt_data%properties%max_surface_slope_index, &
-                           CWATAVAIL, SUBDT, &
-                           subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
-                           subrt_data%state%qsubrt)
-    !     else
-    !        CALL ROUTE_SUBSURFACE2(subrt_data%properties%distance_to_neighbor,subrt_data%properties%zwattablrt, &
-        !               subrt_data%state%qsubrt, subrt_data%properties%surface_slope_x, subrt_data%properties%surface_slope_y, &
-        !               subrt_data%properties%lksatrt, subrt_data%properties%soldeprt, subrt_static%IXRT, subrt_static%JXRT, subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
-        !               CWATAVAIL,SUBDT)
-    !     end if
+    ! Subsurface routing method is selected by subrt_option in hydro.namelist
+    ! (independent of ovrt_option, which controls overland routing):
+    !   1 = steepest descent (D8) single-direction routing
+    !   2 = 2-D routing across the 4 cell faces (x and y directions)
+    if (subrt_static%subrt_option .eq. 2) then
+       CALL ROUTE_SUBSURFACE2(subrt_data%properties%distance_to_neighbor, &
+                              subrt_data%properties%zwattablrt, &
+                              subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
+                              subrt_data%properties%soldeprt, &
+                              subrt_static%IXRT, subrt_static%JXRT, &
+                              subrt_data%properties%surface_slope, &
+                              CWATAVAIL, SUBDT, &
+                              subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
+                              subrt_data%state%qsubrt)
+    else
+       CALL ROUTE_SUBSURFACE1(subrt_data%properties%distance_to_neighbor, &
+                              subrt_data%properties%zwattablrt, &
+                              subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
+                              subrt_data%properties%soldeprt, &
+                              subrt_static%IXRT, subrt_static%JXRT, &
+                              subrt_data%properties%surface_slope, &
+                              subrt_data%properties%max_surface_slope_index, &
+                              CWATAVAIL, SUBDT, &
+                              subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
+                              subrt_data%state%qsubrt)
+    end if
 
 #ifdef HYDRO_D
-    write(6,*) "finish calling ROUTE_SUBSURFACE ", subrt_static%rt_option
+    write(6,*) "finish calling ROUTE_SUBSURFACE ", subrt_static%subrt_option
 #endif
 
 
@@ -741,201 +746,178 @@ end subroutine ROUTE_SUBSURFACE1
 
 
 
-!DJG ----------------------------------------------------------------
-!DJG     SUBROUTINE ROUTE_SUBSURFACE2
-!DJG ----------------------------------------------------------------
-
-SUBROUTINE ROUTE_SUBSURFACE2(                                 &
-        dist,z,qsub,sox,soy,                                   &
-        latksat,soldep,XX,YY,QSUBDRY,QSUBDRYT,CWATAVAIL,   &
-        SUBDT)
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !
-    !  Subroutine to route subsurface flow through the watershed
-    !DJG ----------------------------------------------------------------
-    !
-    !  Called from: main.f (Noah_router_driver)
-    !
-    !  Returns: qsub=DQSUB   which in turn becomes SUBFLO in head calc.
-    !
-    !  Created:    D. Gochis                           3/27/03
-    !              Adaptded from Wigmosta, 1994
-    !
-    !  Modified:   D. Gochis                           1/05/04
-    !
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!===================================================================================================
+! Subroutine Name:
+!   subroutine ROUTE_SUBSURFACE2
+! Author(s)/Contact(s):
+!   D. Gochis <gochis><ucar><edu> (original), rewritten 2026
+! Abstract:
+!   Calculates 2-D subsurface flow across the four faces (N, E, S, W) of each cell.
+!   Flux across each face follows the Dupuit-Forchheimer / DHSVM (Wigmosta, 1994)
+!   transmissivity form used by ROUTE_SUBSURFACE1:
+!      q = T * beta * w,   T = (ksat * soldep / n) * (1 - z/soldep)**n
+!   where beta is the total head slope across the face (terrain slope minus the
+!   water-table-depth gradient), w is the face width, and T is taken from the upwind
+!   (higher head) cell. Each face flux is computed once, by its upwind cell, so mass is
+!   exchanged pairwise and conserved.
+! History Log:
+!   3/27/03 -Created, DG.
+!   1/05/04 -Modified, DG.
+!   2026    -Rewritten: fixed head-slope sign (was terrain slope PLUS water-table-depth
+!            gradient), upwind transmissivity uses upwind cell soil depth and n exponent
+!            (was hard-coded n=1), face width now perpendicular cell dimension, added
+!            CWATAVAIL limit on total cell outflow, boundary handling consistent with
+!            ROUTE_SUBSURFACE1. Selected with subrt_option = 2 in hydro.namelist.
+! Usage:
+! Parameters:
+! Input Files:
+! Output Files:
+! Condition codes:
+! User controllable options: None.
+! Notes:
+!  - Only interior cells (2..XX-1, 2..YY-1) act as sources, matching ROUTE_SUBSURFACE1.
+!    Flux into a cell on the outer domain boundary is removed as boundary flux (QSUBDRY).
+!  - If a cell's total outflow over SUBDT would exceed its available water (CWATAVAIL),
+!    all of its face outflows are scaled down proportionally.
+!  - Returns qsub (net flux into cell, m3/s), which becomes SUBFLO in SUBSFC_RTNG.
+!===================================================================================================
+SUBROUTINE ROUTE_SUBSURFACE2(dist, z, latksat, nexp, soldep, &
+                             XX, YY, SO8RT, &
+                             CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
-    use module_mpp_land, only: left_id,down_id,right_id,&
-        up_id,mpp_land_com_real,MPP_LAND_UB_COM, &
-        MPP_LAND_LR_COM,mpp_land_com_integer
+   use module_mpp_land, only: left_id, down_id, right_id, up_id, &
+                              mpp_land_com_real8, mpp_land_com_real
 #endif
-    use module_hydro_stop, only:HYDRO_stop
+   use module_hydro_stop, only:HYDRO_stop
 
-    IMPLICIT NONE
+   implicit none
 
+   ! Passed variables
+   integer, intent(in) :: XX,YY
+   ! Passed arrays
+   real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m), 9 = cell area (m2)
+   real, intent(in), dimension(XX,YY)      :: z ! depth to water table (m)
+   real, intent(in), dimension(XX,YY)      :: latksat
+                                              ! lateral saturated hydraulic conductivity (m/s)
+   real, intent(in), dimension(XX,YY)      :: nexp ! latksat decay coefficient
+   real, intent(in), dimension(XX,YY)      :: soldep ! soil depth (m)
+   real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
+   real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
+   real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
+   real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
+   real, intent(inout)                     :: QSUBDRYT
+                                              ! total subsurface flow outside of domain (m3/s)
+   real, intent(out), dimension(XX,YY)     :: qsub ! net subsurface flow into cell (m3/s)
 
-    !! Declare Passed variables
+   ! Local parameters: face neighbors N, E, S, W and their index in dist/SO8RT
+   integer, parameter :: nface = 4
+   integer, parameter :: faceDI(nface) = (/ 0, 1, 0, -1 /)
+   integer, parameter :: faceDJ(nface) = (/ 1, 0, -1, 0 /)
+   integer, parameter :: faceK(nface)  = (/ 1, 3, 5, 7 /)
 
-    INTEGER, INTENT(IN) :: XX,YY
+   ! Local variables
+   integer :: i, j, f, ni, nj ! indices
+   real    :: area ! cell area (m2)
+   real    :: hh ! relative saturated thickness term (1 - z/D)**n (dimensionless)
+   real    :: trans ! transmissivity of this (upwind) cell (m2/s)
+   real    :: beta ! total head slope across a face (m/m), > 0 means flow out of cell
+   real    :: width ! face width (m)
+   real    :: qout(nface) ! outflow across each face (m3/s, positive out)
+   real    :: qouttot ! total outflow from cell (m3/s)
+   real    :: scl ! scale factor to limit outflow to available water
+   real    :: qq ! signed face flux (m3/s, negative = out of this cell)
+   logical :: onBoundary
+   ! Local arrays
+   real*8, dimension(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
 
-    !! Declare passed arrays
+   qsub_tmp = 0.
+   QSUBDRY_tmp = 0.
 
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: z
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: sox
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: soy
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: latksat
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: CWATAVAIL
-    REAL, INTENT(IN), DIMENSION(XX,YY) :: soldep
-    REAL, INTENT(OUT), DIMENSION(XX,YY) :: qsub
-    REAL, INTENT(INOUT), DIMENSION(XX,YY) :: QSUBDRY
-    REAL, INTENT(INOUT) :: QSUBDRYT
-    REAL, INTENT(IN) :: SUBDT
-    real, intent(in), dimension(xx,yy,9) :: dist
+   do j = 2, YY-1
+      do i = 2, XX-1
 
-    !!! Declare Local Variables
+         if (soldep(i,j) .le. 0.) then
+            call hydro_stop("In ROUTE_SUBSURFACE2() - soldep is <= zero")
+         endif
 
-    REAL :: dzdx,dzdy,beta,gamma
-    REAL :: qqsub,hh,ksat, gsize
+         hh = 1.0 - z(i,j) / soldep(i,j)
+         if (hh .lt. 0.) then
+            print *, "hsub<0 at gridcell...", i, j, hh, z(i,j), soldep(i,j)
+            call hydro_stop("In ROUTE_SUBSURFACE2() - hsub<0 at gridcell")
+         endif
+         hh = hh ** nexp(i,j)
+         trans = latksat(i,j) * soldep(i,j) / nexp(i,j) * hh
 
-    INTEGER :: i,j
-    !!! Initialize variables
-    REAL, PARAMETER :: nexp=1.0      ! local power law exponent
-    qsub = 0.                        ! initialize flux = 0. !DJG 5 May 2014
+         area = dist(i,j,9)
+         qout = 0.
+         if (trans .gt. 0. .and. CWATAVAIL(i,j) .gt. 0.) then
+            do f = 1, nface
+               ni = i + faceDI(f)
+               nj = j + faceDJ(f)
+               if (dist(i,j,faceK(f)) .le. 0.) then
+                  call hydro_stop("In ROUTE_SUBSURFACE2() - dist(i,j,face) is <= zero")
+               endif
+               ! Total head slope = terrain slope - water-table-depth gradient
+               ! (head = elev - z, so a deeper water table here lowers outflow)
+               beta = SO8RT(i,j,faceK(f)) - (z(i,j) - z(ni,nj)) / dist(i,j,faceK(f))
+               if (beta .gt. 0.) then
+                  ! face width = cell dimension perpendicular to the flow direction
+                  width = area / dist(i,j,faceK(f))
+                  qout(f) = trans * beta * width
+               endif
+            end do
+         endif
 
-    !yw        soldep = 2.
+         qouttot = sum(qout)
+         if (qouttot .le. 0.) cycle
 
+         ! Limit total outflow over the timestep to the water available in the cell
+         scl = 1.0
+         if (qouttot * SUBDT / area .gt. CWATAVAIL(i,j)) then
+            scl = CWATAVAIL(i,j) * area / SUBDT / qouttot
+         endif
 
-    ! Begin Subsurface routing
+         do f = 1, nface
+            if (qout(f) .le. 0.) cycle
+            ni = i + faceDI(f)
+            nj = j + faceDJ(f)
+            qq = -1.0 * qout(f) * scl   ! negative = out of cell (i,j)
 
-    !!! Loop to route water in x-direction
-    do j=1,YY
-        do i=1,XX
-            ! check for boundary grid point?
-            if (i.eq.XX) GOTO 998
-            gsize = dist(i,j,3)
+            qsub_tmp(i,j)   = qsub_tmp(i,j)   + qq
+            qsub_tmp(ni,nj) = qsub_tmp(ni,nj) - qq
 
-            dzdx= (z(i,j) - z(i+1,j))/gsize
-            beta=sox(i,j) + dzdx + 1E-30
-            if (abs(beta) .lt. 1E-20) beta=1E-20
-            if (beta.lt.0) then
-                !yw            hh=(1-(z(i+1,j)/soldep(i,j)))**nexp
-                hh=(1-(z(i+1,j)/soldep(i+1,j)))**nexp
-                ! Change later to use mean Ksat of two cells
-                ksat=latksat(i+1,j)
-            else
-                hh=(1-(z(i,j)/soldep(i,j)))**nexp
-                ksat=latksat(i,j)
-            end if
-
-            if (hh .lt. 0.) then
-                print *, "hsub<0 at gridcell...", i,j,hh,z(i+1,j),z(i,j), &
-                    soldep(i,j),nexp
-                call hydro_stop("In ROUTE_SUBSURFACE2() - hsub<0 at gridcell")
-            end if
-
-            !Err. tan slope          gamma=-1.*((gsize*ksat*soldep(i,j))/nexp)*tan(beta)
-            !AD_CHANGE: beta is already a slope so no tan (consistent with ROUTE_SUBSURFACE1)
-            gamma=-1.*((gsize*ksat*soldep(i,j))/nexp)*beta
-            !DJG lacks tan(beta) of original Wigmosta version          gamma=-1.*((gsize*ksat*soldep(i,j))/nexp)*beta
-
-            qqsub = gamma * hh
-            qsub(i,j) = qsub(i,j) + qqsub
-            qsub(i+1,j) = qsub(i+1,j) - qqsub
-
-            ! Boundary adjustments
+            ! Flux into a cell on the outer domain boundary leaves the domain
 #ifdef MPP_LAND
-            if ((i.eq.1).AND.(beta.lt.0.).and.(left_id.lt.0)) then
+            onBoundary = ((ni .eq. XX) .and. (right_id .lt. 0)) .or. &
+                         ((ni .eq. 1)  .and. (left_id  .lt. 0)) .or. &
+                         ((nj .eq. 1)  .and. (down_id  .lt. 0)) .or. &
+                         ((nj .eq. YY) .and. (up_id    .lt. 0))
 #else
-                if ((i.eq.1).AND.(beta.lt.0.)) then
+            onBoundary = (ni .eq. 1) .or. (ni .eq. XX) .or. (nj .eq. 1) .or. (nj .eq. YY)
 #endif
-                    qsub(i,j) = qsub(i,j) - qqsub
-                    QSUBDRY(i,j) = QSUBDRY(i,j) - qqsub
-                    QSUBDRYT = QSUBDRYT - qqsub
-#ifdef MPP_LAND
-                else if ((i.eq.(xx-1)).AND.(beta.gt.0.) &
-                        .and.(right_id.lt.0) ) then
-#else
-                else if ((i.eq.(xx-1)).AND.(beta.gt.0.)) then
-#endif
-                    qsub(i+1,j) = qsub(i+1,j) + qqsub
-                    QSUBDRY(i+1,j) = QSUBDRY(i+1,j) + qqsub
-                    QSUBDRYT = QSUBDRYT + qqsub
-                end if
+            if (onBoundary) then
+               qsub_tmp(ni,nj)    = qsub_tmp(ni,nj) + qq
+               QSUBDRY_tmp(ni,nj) = QSUBDRY_tmp(ni,nj) + qq
+               QSUBDRYT           = QSUBDRYT + qq
+            endif
+         end do
 
-                998       continue
-
-                !! End loop to route sfc water in x-direction
-        end do
-    end do
+      end do
+   end do
 
 #ifdef MPP_LAND
-    call MPP_LAND_LR_COM(qsub,XX,YY,99)
-    call MPP_LAND_LR_COM(QSUBDRY,XX,YY,99)
+   ! Sum flux contributions written into halo cells back onto their owning tiles
+   call MPP_LAND_COM_REAL8(qsub_tmp,XX,YY,1)
+   call MPP_LAND_COM_REAL8(QSUBDRY_tmp,XX,YY,1)
 #endif
 
-
-    !!! Loop to route water in y-direction
-    do j=1,YY
-        do i=1,XX
-            ! check for boundary grid point?
-            if (j.eq.YY) GOTO 999
-            gsize = dist(i,j,1)
-
-            dzdy= (z(i,j) - z(i,j+1))/gsize
-            beta=soy(i,j) + dzdy + 1E-30
-            if (abs(beta) .lt. 1E-20) beta=1E-20
-            if (beta.lt.0) then
-                !yw            hh=(1-(z(i,j+1)/soldep(i,j)))**nexp
-                hh=(1-(z(i,j+1)/soldep(i,j+1)))**nexp
-                ksat=latksat(i,j+1)
-            else
-                hh=(1-(z(i,j)/soldep(i,j)))**nexp
-                ksat=latksat(i,j)
-            end if
-
-            if (hh .lt. 0.) GOTO 999
-
-            !Err. tan slope          gamma=-1.*((gsize*ksat*soldep(i,j))/nexp)*tan(beta)
-            gamma=-1.*((gsize*ksat*soldep(i,j))/nexp)*beta
-
-            qqsub = gamma * hh
-            qsub(i,j) = qsub(i,j) + qqsub
-            qsub(i,j+1) = qsub(i,j+1) - qqsub
-
-            ! Boundary adjustments
+   qsub = qsub_tmp
+   QSUBDRY = QSUBDRY + QSUBDRY_tmp
 
 #ifdef MPP_LAND
-            if ((j.eq.1).AND.(beta.lt.0.).and.(down_id.lt.0)) then
-#else
-            if ((j.eq.1).AND.(beta.lt.0.)) then
-#endif
-                qsub(i,j) = qsub(i,j) - qqsub
-                QSUBDRY(i,j) = QSUBDRY(i,j) - qqsub
-                QSUBDRYT = QSUBDRYT - qqsub
-#ifdef MPP_LAND
-            else if ((j.eq.(yy-1)).AND.(beta.gt.0.)  &
-                .and. (up_id.lt.0) ) then
-#else
-            else if ((j.eq.(yy-1)).AND.(beta.gt.0.)) then
-#endif
-                qsub(i,j+1) = qsub(i,j+1) + qqsub
-                QSUBDRY(i,j+1) = QSUBDRY(i,j+1) + qqsub
-                QSUBDRYT = QSUBDRYT + qqsub
-            end if
-
-            999       continue
-
-                !! End loop to route sfc water in y-direction
-        end do
-    end do
-
-#ifdef MPP_LAND
-    call MPP_LAND_UB_COM(qsub,XX,YY,99)
-    call MPP_LAND_UB_COM(QSUBDRY,XX,YY,99)
+   call MPP_LAND_COM_REAL(qsub,XX,YY,99)
+   call MPP_LAND_COM_REAL(QSUBDRY,XX,YY,99)
 #endif
 
-    return
-    !DJG------------------------------------------------------------
 end subroutine ROUTE_SUBSURFACE2
-!DJG------------------------------------------------------------
+!===================================================================================================

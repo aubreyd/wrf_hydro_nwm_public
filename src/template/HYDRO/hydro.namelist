@@ -130,9 +130,13 @@ SUBRTSWCRT = 1
 ! Switch to activate surface overland flow routing...(0=no, 1=yes)
 OVRTSWCRT = 1
 
-! Specify overland flow routing option: 1=Seepest Descent (D8) 2=CASC2D (not active)
-! NOTE: Currently subsurface flow is only steepest descent
-rt_option = 1
+! Specify overland flow routing option: 1=Steepest Descent (D8) 2=CASC2D (not active)
+! (ovrt_option replaces the deprecated name rt_option, which is still accepted)
+ovrt_option = 1
+
+! Specify subsurface flow routing option (used when SUBRTSWCRT = 1):
+! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces)
+subrt_option = 1
 
 ! Specify whether to adjust overland flow parameters based on imperviousness
 imperv_adj = 0

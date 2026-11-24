@@ -43,6 +43,7 @@
             "rt_option": 1,
             "rtout_domain": 1,
             "split_output_count": 1,
+            "subrt_option": 1,
             "subrtswcrt": 1,
             "sys_cpl": 1,
             "t0outputflag": 1,

@@ -113,7 +113,7 @@ module config_base
      integer :: channel_only, channelBucket_only
      integer :: output_channelBucket_influx ! used for FORCE_TYPE 9 and 10
 
-     integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
+     integer:: OVRT_OPTION, CHANRTSWCRT, channel_option, &
           SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, &
           GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
           sys_cpl, gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
@@ -176,6 +176,7 @@ module config_base
      integer            :: nLastObs
      integer            :: bucket_loss
      integer            :: imperv_adj
+     integer            :: subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
 
      logical            :: channel_bypass = .FALSE.
 
@@ -385,10 +386,15 @@ contains
       call hydro_stop('hydro.namelist ERROR: Invalid OVRTSWCRT specified')
    endif
 
-   if ((self%OVRTSWCRT .eq. 1 ) .or. (self%SUBRTSWCRT .eq. 1) ) then
-      if( (self%rt_option .lt. 1 ) .or. (self%rt_option .gt. 2) ) then
-      !if(self%rt_option .ne. 1) then
-         call hydro_stop('hydro.namelist ERROR: Invalid rt_option specified')
+   if (self%OVRTSWCRT .eq. 1) then
+      if( (self%ovrt_option .lt. 1 ) .or. (self%ovrt_option .gt. 2) ) then
+         call hydro_stop('hydro.namelist ERROR: Invalid ovrt_option specified')
+      endif
+   endif
+
+   if (self%SUBRTSWCRT .eq. 1) then
+      if ((self%subrt_option .lt. 1) .or. (self%subrt_option .gt. 2)) then
+         call hydro_stop('hydro.namelist ERROR: Invalid subrt_option specified')
       endif
    endif
 
@@ -542,12 +548,12 @@ contains
     integer ierr
     character(len=512) :: msg
 
-    integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
+    integer:: RT_OPTION, OVRT_OPTION, CHANRTSWCRT, channel_option, &
          SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, &
          GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
          sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
          gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj
+         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option
     real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
     character(len=256) :: route_topo_f=""
     character(len=256) :: route_chan_f=""
@@ -627,7 +633,7 @@ contains
          land_spatial_meta_flnm, &
          out_dt, rst_dt, &
          DEEPGWSPIN, SOLVEG_INITSWC, &
-         RT_OPTION, CHANRTSWCRT, channel_option, &
+         RT_OPTION, OVRT_OPTION, CHANRTSWCRT, channel_option, &
          SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
          GwSpinCycles, GwPreCycles, GwSpinUp, GwPreDiag, GwPreDiagInterval, gwIhShift, &
          GWBASESWCRT, gwChanCondSw, gwChanCondConstIn, gwChanCondConstOut , &
@@ -638,7 +644,8 @@ contains
          CHRTOUT_DOMAIN,CHANOBS_DOMAIN,CHRTOUT_GRID,LSMOUT_DOMAIN,&
          RTOUT_DOMAIN, output_gw, outlake, &
          frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
-         io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj
+         io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, &
+         subrt_option
 
    namelist /reservoir_nlist/ &
       reservoir_persistence_usgs, reservoir_persistence_usace, reservoir_parameter_file, reservoir_usgs_timeslice_path, &
@@ -682,6 +689,9 @@ contains
     reservoir_rfc_forecasts_lookback_hours = 24
     reservoir_type_specified = .FALSE.
     imperv_adj = 0
+    subrt_option = 1
+    rt_option = -999
+    ovrt_option = -999
 
 #ifdef WRF_HYDRO_NUDGING
     ! Default values for NUDGING_nlist
@@ -710,6 +720,18 @@ contains
 #endif
     read(12, HYDRO_nlist, iostat=ierr, iomsg=msg)
     if(ierr .ne. 0) call hydro_stop("HYDRO_nlst namelist error in read_rt_nlst: " // trim(msg))
+
+    ! rt_option is the deprecated name for ovrt_option (overland routing option)
+    if (ovrt_option .eq. -999) then
+       if (rt_option .ne. -999) then
+          print *, "WARNING: rt_option is deprecated, please use ovrt_option. Setting ovrt_option = rt_option."
+          ovrt_option = rt_option
+       else
+          ovrt_option = 1
+       end if
+    else if ((rt_option .ne. -999) .and. (rt_option .ne. ovrt_option)) then
+       call hydro_stop("hydro.namelist ERROR: rt_option (deprecated) and ovrt_option are both set and differ")
+    end if
 
     if (lake_option == 3) then
       read(12, reservoir_nlist, iostat=ierr, iomsg=msg)
@@ -821,7 +843,7 @@ contains
     nlst(did)%CHRTOUT_GRID = CHRTOUT_GRID
     nlst(did)%LSMOUT_DOMAIN = LSMOUT_DOMAIN
     nlst(did)%RTOUT_DOMAIN = RTOUT_DOMAIN
-    nlst(did)%RT_OPTION = RT_OPTION
+    nlst(did)%OVRT_OPTION = OVRT_OPTION
     nlst(did)%CHANRTSWCRT = CHANRTSWCRT
     nlst(did)%GW_RESTART  = GW_RESTART
     nlst(did)%RSTRT_SWC   = RSTRT_SWC
@@ -877,6 +899,7 @@ contains
     nlst(did)%compound_channel = compound_channel
     nlst(did)%channel_loss_option = channel_loss_option
     nlst(did)%imperv_adj = imperv_adj
+    nlst(did)%subrt_option = subrt_option
     ! files
     nlst(did)%route_topo_f = route_topo_f
     nlst(did)%route_chan_f = route_chan_f

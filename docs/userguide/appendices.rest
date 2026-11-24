@@ -1214,11 +1214,18 @@ description in the namelist which precedes the option.
    OVRTSWCRT = 1 !<-- Turn on/off overland routing module.
 
    ! Specify overland flow routing option:
-   ! 1=Seepest Descent (D8) 2=CASC2D (not active)
-   ! NOTE: Currently subsurface flow is only steepest descent
-   rt_option = 1 !<-- For both terrain routing modules, specify whether flow should follow the
-                 ! steepest path (option 1) or multi-directional (option 2).
-                 ! Option 2 is currently unsupported.
+   ! 1=Steepest Descent (D8) 2=CASC2D (not active)
+   ovrt_option = 1 !<-- For overland routing, specify whether flow should follow the
+                   ! steepest path (option 1) or multi-directional (option 2).
+                   ! Option 2 is currently unsupported. This option was previously
+                   ! named rt_option; rt_option is deprecated but still accepted.
+
+   ! Specify subsurface flow routing option (used when SUBRTSWCRT = 1):
+   ! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces)
+   subrt_option = 1 !<-- Option 1 sends all lateral flow from a cell to its steepest
+                    ! (terrain + water table) neighbor. Option 2 computes flow across
+                    ! each of the four cell faces from the head gradient, using the
+                    ! upwind cell's transmissivity. Independent of ovrt_option.
 
    ! Specify whether to adjust overland flow parameters based on imperviousness
    imperv_adj = 0 !<-- When overland routing is active and an imperviousness grid is

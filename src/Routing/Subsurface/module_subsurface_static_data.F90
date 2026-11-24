@@ -7,7 +7,7 @@ module module_subsurface_static_data
     integer :: jxrt
     integer :: nsoil
     real :: dt
-    integer :: rt_option
+    integer :: subrt_option
 
     contains
         procedure :: init => subsurface_static_data_init
@@ -16,14 +16,14 @@ module module_subsurface_static_data
 
     contains
 
-    subroutine subsurface_static_data_init(this, ixrt, jxrt, nsoil, dt, rt_option)
+    subroutine subsurface_static_data_init(this, ixrt, jxrt, nsoil, dt, subrt_option)
         implicit none
         class(subsurface_static_interface), intent(inout) :: this ! the type object being initialized
         integer, intent(in) :: ixrt                     ! x routing grid size
         integer, intent(in) :: jxrt                     ! y routing grid size
         integer, intent(in) :: nsoil                    ! nsoil
         real, intent(in) :: dt
-        integer, intent(in) :: rt_option
+        integer, intent(in) :: subrt_option
 
         logical :: allocation_error = .false.
 
@@ -31,7 +31,7 @@ module module_subsurface_static_data
         this%jxrt = jxrt
         this%nsoil = nsoil
         this%dt = dt
-        this%rt_option = rt_option
+        this%subrt_option = subrt_option
 
         if ( allocation_error ) &
             write(0,*) "attempt to allocate data in members of subsurface io structure&

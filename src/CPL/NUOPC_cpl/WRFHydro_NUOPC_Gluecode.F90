@@ -1141,7 +1141,7 @@ contains
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
     write (logMsg,"(A,I0)") ": GW Baseflow RT = ",nlst(did)%GWBASESWCRT
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
-    write (logMsg,"(A,I0)") ": Routing Option = ",nlst(did)%RT_OPTION
+    write (logMsg,"(A,I0)") ": Overland Routing Option = ",nlst(did)%OVRT_OPTION
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)
     write (logMsg,"(A,I0)") ": Channel Option = ",nlst(did)%channel_option
     call ESMF_LogWrite(trim(l_label)//logMsg,ESMF_LOGMSG_INFO)

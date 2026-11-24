@@ -31,11 +31,12 @@ module module_namelist_inc
        integer :: channel_only, channelBucket_only
        integer :: output_channelBucket_influx ! used for FORCE_TYPE 9 and 10
 
-          integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
+          integer:: OVRT_OPTION, CHANRTSWCRT, channel_option, &
                   SUBRTSWCRT, OVRTSWCRT, AGGFACTRT, &
                   GWBASESWCRT, GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                   sys_cpl, gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
-                  gwsoilcpl, UDMP_OPT, bucket_loss, imperv_adj
+                  gwsoilcpl, UDMP_OPT, bucket_loss, imperv_adj, &
+                  subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
           logical:: GwPreDiag, GwSpinUp
           real:: DTRT_TER,DTRT_CH, DTCT, dxrt0,  gwChanCondConstIn, gwChanCondConstOut, gwIhShift
           character(len=256) :: route_topo_f=""

@@ -2,7 +2,7 @@
 !DJG   SUBROUTINE OverlandRouting
 !DJG ------------------------------------------------
 
-!subroutine OverlandRouting (DT, DTRT_TER, rt_option, ixrt, jxrt,LAKE_MSKRT, &
+!subroutine OverlandRouting (DT, DTRT_TER, ovrt_option, ixrt, jxrt,LAKE_MSKRT, &
     !           INFXSUBRT, RETDEPRT,OVROUGHRT,SOXRT, SOYRT, SFCHEADSUBRT,DHRT, &
     !           CH_NETRT, QSTRMVOLRT,LAKE_INFLORT,QBDRYRT, &
     !           QSTRMVOLTRT,QBDRYTRT, LAKE_INFLOTRT, q_sfcflx_x,q_sfcflx_y, &
@@ -14,7 +14,7 @@ subroutine OverlandRouting( &
     ovrt_data, & ! overland data structure
     DT, &
     DTRT_TER, &
-    rt_option, &
+    ovrt_option, &
     ixrt, &       ! routing grid x size
     jxrt, &      ! routing grid y size
     q_sfcflx_x, &! accumulated x flux
@@ -28,7 +28,7 @@ subroutine OverlandRouting( &
 
     type (overland_struct), intent(inout) :: ovrt_data
     REAL, INTENT(IN) :: DT, DTRT_TER
-    integer, INTENT(IN) :: ixrt, jxrt, rt_option
+    integer, INTENT(IN) :: ixrt, jxrt, ovrt_option
     !REAL, INTENT(out), DIMENSION(IXRT,JXRT)   :: SFCHEADSUBRT  ! moved into overland_data%control
     real, dimension(IXRT,JXRT), intent(inout) :: q_sfcflx_x,q_sfcflx_y
 
@@ -62,7 +62,7 @@ subroutine OverlandRouting( &
     !DJG Third, Call Overland Flow Routing Routine...
 #ifdef HYDRO_D
     print *, "Beginning OV_routing..."
-    print *, "Routing method is ",rt_option, " direction."
+    print *, "Routing method is ",ovrt_option, " direction."
 #endif
 
     !DJG debug...OV Routing...
@@ -123,7 +123,7 @@ subroutine OverlandRouting( &
             DTRT_TER,             &
             IXRT,                 &
             JXRT,                 &
-            rt_option,            &
+            ovrt_option,            &
             q_sfcflx_x,           &
             q_sfcflx_y)
     else
@@ -200,7 +200,7 @@ end subroutine OverlandRouting
     !  SFCHEADSUBRT,DHRT,CH_NETRT,RETDEPRT,OVROUGHRT,      &
     !  QSTRMVOLRT,QBDRYRT,QSTRMVOLTRT,QBDRYTRT,SOXRT,     &
     !  SOYRT,dist,LAKE_MSKRT,LAKE_INFLORT,LAKE_INFLOTRT,  &
-    !  SO8RT,SO8RT_D,rt_option,q_sfcflx_x,q_sfcflx_y)
+    !  SO8RT,SO8RT_D,ovrt_option,q_sfcflx_x,q_sfcflx_y)
 
 subroutine ov_rtng( &
         ovrt_data, &
@@ -208,7 +208,7 @@ subroutine ov_rtng( &
         DTRT_TER, &
         IXRT, &
         JXRT, &
-        rt_option, &
+        ovrt_option, &
         q_sfcflx_x, &
         q_sfcflx_y &
         )
@@ -227,7 +227,7 @@ subroutine ov_rtng( &
     type (overland_struct), intent(inout) :: ovrt_data
     INTEGER, INTENT(IN)			:: IXRT,JXRT
     REAL, INTENT(IN)			:: DT,DTRT_TER
-    integer, intent(in) :: rt_option
+    integer, intent(in) :: ovrt_option
 
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: CH_NETRT
     !INTEGER, INTENT(IN), DIMENSION(IXRT,JXRT) :: LAKE_MSKRT
@@ -254,7 +254,7 @@ subroutine ov_rtng( &
 
     REAL, DIMENSION(IXRT,JXRT)	:: INFXS_FRAC
     REAL	:: DT_FRAC,SUM_INFXS,sum_head
-    !INTEGER SO8RT_D(IXRT,JXRT,3), rt_option
+    !INTEGER SO8RT_D(IXRT,JXRT,3), ovrt_option
 
     !DJG ----------------------------------------------------------------------
     ! DJG BEGIN 1-D or 2-D OVERLAND FLOW ROUTING LOOP
@@ -372,7 +372,7 @@ subroutine ov_rtng( &
         !DJG Debug...
 
 
-        if(rt_option .eq. 1) then
+        if(ovrt_option .eq. 1) then
             CALL ROUTE_OVERLAND1(DTRT_TER, &
                 ovrt_data%properties%distance_to_neighbor, &
                 ovrt_data%control%surface_water_head_routing, &

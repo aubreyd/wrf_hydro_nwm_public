@@ -63,7 +63,7 @@ CONTAINS
       call rt_domain(did)%subsurface%init(ixrt, jxrt, nsoil, rt_domain(did)%overland)
 
       ! allocate susurface static data structure
-      call rt_domain(did)%subsurface_static%init(ixrt, jxrt, nsoil, nlst(did)%DT, nlst(did)%rt_option)
+      call rt_domain(did)%subsurface_static%init(ixrt, jxrt, nsoil, nlst(did)%DT, nlst(did)%subrt_option)
 
       ! allocate subsurface input structure
       call rt_domain(did)%subsurface_output%init(ixrt, jxrt, rt_domain(did)%overland%control%infiltration_excess)
@@ -1102,7 +1102,7 @@ subroutine LandRT_ini(did)
            rt_domain(did)%overland%properties%surface_slope_x(i,j)=(rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i+1,j))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,3)
            rt_domain(did)%overland%properties%surface_slope_y(i,j)=(rt_domain(did)%ELRT(i,j)-rt_domain(did)%ELRT(i,j+1))/rt_domain(did)%overland%properties%distance_to_neighbor(i,j,1)
            !DJG Introduce reduction in retention depth as a linear function of terrain slope
-           if (nlst(did)%RT_OPTION.eq.2) then
+           if (nlst(did)%OVRT_OPTION.eq.2) then
               if (rt_domain(did)%overland%properties%surface_slope_x(i,j).gt.rt_domain(did)%overland%properties%surface_slope_y(i,j)) then
                  Vmax=rt_domain(did)%overland%properties%surface_slope_x(i,j)
               else
@@ -1189,7 +1189,7 @@ subroutine LandRT_ini(did)
            end if
 
            !DJG Introduce reduction in retention depth as a linear function of terrain slope
-           if (nlst(did)%RT_OPTION.eq.1) then
+           if (nlst(did)%OVRT_OPTION.eq.1) then
               if (Vmax.gt.0.75) then
                  rt_domain(did)%overland%properties%retention_depth(i,j)=0.
               else

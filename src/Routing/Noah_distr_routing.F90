@@ -1283,7 +1283,7 @@ subroutine OverlandRouting_drv(did)
             rt_domain(did)%overland, &
             nlst(did)%DT, &
             nlst(did)%DTRT_TER, &
-            nlst(did)%rt_option, &
+            nlst(did)%ovrt_option, &
             rt_domain(did)%ixrt, &
             rt_domain(did)%jxrt, &
             rt_domain(did)%q_sfcflx_x, &

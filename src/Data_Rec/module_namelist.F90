@@ -19,12 +19,12 @@ contains
           TYPE(namelist_rt_field) nlst
 
           integer ierr
-          integer:: RT_OPTION, CHANRTSWCRT, channel_option, &
+          integer:: RT_OPTION, OVRT_OPTION, CHANRTSWCRT, channel_option, &
                     SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, &
                     GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                     sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
                     gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj
+                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option
           real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
           character(len=256) :: route_topo_f=""
           character(len=256) :: route_chan_f=""
@@ -103,7 +103,7 @@ contains
             land_spatial_meta_flnm, &
             out_dt, rst_dt, &
             DEEPGWSPIN, SOLVEG_INITSWC, &
-            RT_OPTION, CHANRTSWCRT, channel_option, &
+            RT_OPTION, OVRT_OPTION, CHANRTSWCRT, channel_option, &
                     SUBRTSWCRT,OVRTSWCRT,AGGFACTRT, dtrt_ter,dtrt_ch,dxrt,&
                     GwSpinCycles, GwPreCycles, GwSpinUp, GwPreDiag, GwPreDiagInterval, gwIhShift, &
                     GWBASESWCRT, gwChanCondSw, gwChanCondConstIn, gwChanCondConstOut, &
@@ -117,7 +117,8 @@ contains
                     CHRTOUT_DOMAIN,CHANOBS_DOMAIN,CHRTOUT_GRID,LSMOUT_DOMAIN,&
                     RTOUT_DOMAIN, output_gw, outlake, &
                     frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
-                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj
+                    io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, &
+                    subrt_option
 
 #ifdef WRF_HYDRO_NUDGING
    namelist /NUDGING_nlist/ nudgingParamFile,       netwkReExFile,          &
@@ -153,6 +154,9 @@ contains
    reservoir_rfc_forecasts_lookback_hours = 24
    reservoir_type_specified = .FALSE.
    imperv_adj = 0
+   subrt_option = 1
+   rt_option = -999
+   ovrt_option = -999
 
 #ifdef WRF_HYDRO_NUDGING
    ! Default values for NUDGING_nlist
@@ -181,6 +185,18 @@ contains
 #endif
           read(12, HYDRO_nlist, iostat=ierr)
           if(ierr .ne. 0) call hydro_stop("HYDRO_nlst namelist error in read_rt_nlst")
+
+          ! rt_option is the deprecated name for ovrt_option (overland routing option)
+          if (ovrt_option .eq. -999) then
+             if (rt_option .ne. -999) then
+                print *, "WARNING: rt_option is deprecated, please use ovrt_option. Setting ovrt_option = rt_option."
+                ovrt_option = rt_option
+             else
+                ovrt_option = 1
+             end if
+          else if ((rt_option .ne. -999) .and. (rt_option .ne. ovrt_option)) then
+             call hydro_stop("hydro.namelist ERROR: rt_option (deprecated) and ovrt_option are both set and differ")
+          end if
 
 #ifdef WRF_HYDRO_NUDGING
           read(12, NUDGING_nlist, iostat=ierr)
@@ -301,7 +317,7 @@ contains
 
 #ifdef MPP_LAND
   !bcast namelist variable.
-  call mpp_land_bcast_int1(rt_option)
+  call mpp_land_bcast_int1(ovrt_option)
   call mpp_land_bcast_int1(CHANRTSWCRT)
   call mpp_land_bcast_int1(channel_option)
   call mpp_land_bcast_int1(SUBRTSWCRT)
@@ -341,6 +357,7 @@ contains
   call mpp_land_bcast_int1(UDMP_OPT)
   call mpp_land_bcast_int1(reservoir_data_ingest)
   call mpp_land_bcast_int1(imperv_adj)
+  call mpp_land_bcast_int1(subrt_option)
 #ifdef WRF_HYDRO_NUDGING
   call mpp_land_bcast_char(256, nudgingParamFile  )
   call mpp_land_bcast_char(256, netwkReExFile     )
@@ -375,7 +392,7 @@ contains
     nlst%CHRTOUT_GRID = CHRTOUT_GRID
     nlst%LSMOUT_DOMAIN = LSMOUT_DOMAIN
     nlst%RTOUT_DOMAIN = RTOUT_DOMAIN
-    nlst%RT_OPTION = RT_OPTION
+    nlst%OVRT_OPTION = OVRT_OPTION
     nlst%CHANRTSWCRT = CHANRTSWCRT
     nlst%GW_RESTART  = GW_RESTART
     nlst%RSTRT_SWC   = RSTRT_SWC
@@ -433,6 +450,7 @@ contains
     nlst%order_to_write = order_to_write
     nlst%compound_channel = compound_channel
     nlst%imperv_adj = imperv_adj
+    nlst%subrt_option = subrt_option
 
 ! files
     nlst%route_topo_f   =  route_topo_f
@@ -472,7 +490,7 @@ contains
      write(6,*) "output of the namelist file "
     write(6,*) "nlst%udmap_file ", trim(nlst%udmap_file)
     write(6,*) "nlst%UDMP_OPT ", nlst%UDMP_OPT
-    write(6,*) " nlst%RT_OPTION ", RT_OPTION
+    write(6,*) " nlst%OVRT_OPTION ", OVRT_OPTION
     write(6,*) " nlst%CHANRTSWCRT ", CHANRTSWCRT
     write(6,*) " nlst%GW_RESTART  ", GW_RESTART
     write(6,*) " nlst%RSTRT_SWC   ", RSTRT_SWC
@@ -517,6 +535,7 @@ contains
     write(6,*) " nlst%geo_finegrid_flnm ",  geo_finegrid_flnm
     write(6,*) " nlst%reservoir_data_ingest ", reservoir_data_ingest
     write(6,*) " nlst%imperv_adj ", imperv_adj
+    write(6,*) " nlst%subrt_option ", subrt_option
 #ifdef WRF_HYDRO_NUDGING
     write(6,*) " nlst%nudgingParamFile      ",  trim(nudgingParamFile)
     write(6,*) " nlst%netWkReExFile         ",  trim(netWkReExFile)
@@ -694,9 +713,8 @@ subroutine rt_nlst_check(nlst)
       call hydro_stop('hydro.namelist ERROR: Invalid OVRTSWCRT specified')
    endif
    if( (nlst%OVRTSWCRT .eq. 1 ) .or. (nlst%SUBRTSWCRT .eq. 1) ) then
-      if( (nlst%rt_option .lt. 1 ) .or. (nlst%rt_option .gt. 2) ) then
-      !if(nlst%rt_option .ne. 1) then
-         call hydro_stop('hydro.namelist ERROR: Invalid rt_option specified')
+      if( (nlst%ovrt_option .lt. 1 ) .or. (nlst%ovrt_option .gt. 2) ) then
+         call hydro_stop('hydro.namelist ERROR: Invalid ovrt_option specified')
       endif
    endif
    if( (nlst%CHANRTSWCRT .lt. 0 ) .or. (nlst%CHANRTSWCRT .gt. 1) ) then
@@ -769,6 +787,11 @@ subroutine rt_nlst_check(nlst)
    endif
    if( (nlst%imperv_adj .lt. 0 ) .or. (nlst%imperv_adj .gt. 1) ) then
       call hydro_stop('hydro.namelist ERROR: Invalid imperv_adj specified')
+   endif
+   if (nlst%SUBRTSWCRT .eq. 1) then
+      if ((nlst%subrt_option .lt. 1) .or. (nlst%subrt_option .gt. 2)) then
+         call hydro_stop('hydro.namelist ERROR: Invalid subrt_option specified')
+      endif
    endif
    ! Only allow lakes to be ran with gridded routing or NWM routing
    if(len(trim(nlst%route_lake_f)) .ne. 0) then

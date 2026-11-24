@@ -562,7 +562,8 @@ effects of topography, saturated soil depth (in this case layers), and
 saturated hydraulic conductivity. Hydraulic gradients are approximated
 as the slope of the water table between adjacent grid cells in the x-
 and y-directions or in an eight direction (D8) steepest descent
-methodology that is specified by the user in the model namelist. In each
+methodology that is specified by the user with ``subrt_option`` in
+:file:`hydro.namelist` (1 = D8 steepest descent, 2 = 2-dimensional). In each
 cell, the flux of water from one cell to its down-gradient neighbor on
 each timestep is approximated as a steady-state solution. The looping
 structure through the model grid performs flux calculations separately
@@ -688,8 +689,12 @@ parameter file). See Appendices :ref:`section-a6` and :ref:`section-a7` for a
 description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
 
 .. note::
-   Currently subsurface routing is only supported in the steepest slope (D8) formulation.
-   The 2-dimensional solution will be reactivated in a future release.
+   Subsurface routing defaults to the steepest slope (D8) formulation (``subrt_option = 1``).
+   The 2-dimensional formulation (``subrt_option = 2``) computes flow across the four
+   faces (N, E, S, W) of each cell using the head gradient across the face and the
+   transmissivity of the upwind cell, limiting each cell's total outflow to its water
+   available for routing. ``subrt_option`` is independent of ``ovrt_option``, which
+   controls overland routing.
 
 .. rubric:: Relevant code modules:
 
@@ -889,7 +894,8 @@ OVROUGHRT = 1 / ((1/0.02)*impervfrac + (1/OVROUGHRT)*(1-impervfrac))
 
 -  ``DTRT_TER`` - Overland routing grid time step
 
--  ``rt_option`` - Overland flow routing option (steepest descent or 2-dimensional)
+-  ``ovrt_option`` - Overland flow routing option (steepest descent or 2-dimensional);
+   previously named ``rt_option``, which is deprecated but still accepted
 
 .. rubric:: Relevant domain and parameter files/variables:
 
