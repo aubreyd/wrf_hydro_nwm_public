@@ -801,7 +801,7 @@ subroutine rt_nlst_check(nlst)
       call hydro_stop('hydro.namelist ERROR: Invalid imperv_adj specified')
    endif
    if (nlst%SUBRTSWCRT .eq. 1) then
-      if ((nlst%subrt_option .lt. 1) .or. (nlst%subrt_option .gt. 2)) then
+      if ((nlst%subrt_option .lt. 1) .or. (nlst%subrt_option .gt. 3)) then
          call hydro_stop('hydro.namelist ERROR: Invalid subrt_option specified')
       endif
       if ((nlst%subrt_gradient .lt. 1) .or. (nlst%subrt_gradient .gt. 2)) then

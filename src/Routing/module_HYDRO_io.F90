@@ -11198,6 +11198,7 @@ subroutine hdtbl_out(did)
       call hdtbl_out_nc(did,ncid, count,count_flag,"OV_ROUGH2D",rt_domain(did)%OV_ROUGH2D,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"LKSAT",rt_domain(did)%LKSAT,"",ixd,jxd)
       call hdtbl_out_nc(did,ncid, count,count_flag,"NEXP",rt_domain(did)%NEXP,"",ixd,jxd)
+      call hdtbl_out_nc(did,ncid, count,count_flag,"MFDEXP",rt_domain(did)%MFDEXP,"",ixd,jxd)
    end do
 end subroutine hdtbl_out
 
@@ -11215,6 +11216,13 @@ subroutine hdtbl_in_nc(did)
    if (ierr /= 0) then
      write(6,*)  "WARNING (hydtbl_in_nc): NEXP not found so setting to global 1.0"
      rt_domain(did)%NEXP = 1.0
+   endif
+   ! Multi-direction D8 slope exponent (subrt_option = 3); optional, default 4.0
+   call read2dlsm(did,trim(nlst(did)%hydrotbl_f),"MFDEXP",rt_domain(did)%MFDEXP,ierr)
+   if (ierr /= 0) then
+     if (nlst(did)%SUBRTSWCRT .eq. 1 .and. nlst(did)%subrt_option .eq. 3) &
+       write(6,*)  "WARNING (hydtbl_in_nc): MFDEXP not found so setting to global 4.0"
+     rt_domain(did)%MFDEXP = 4.0
    endif
 end subroutine hdtbl_in_nc
 

@@ -259,6 +259,7 @@ module module_rt_inc
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
       !REAL,    allocatable, DIMENSION(:)   :: SLDPTH
       REAL,    allocatable, DIMENSION(:,:)   :: NEXP
+      REAL,    allocatable, DIMENSION(:,:)   :: MFDEXP ! multi-direction D8 slope exponent (subrt_option = 3)
 
 !!! define constant/parameter
     real ::   ov_rough(50)!, ZSOIL(100) ! ZSOIL moved to subsurface properties module

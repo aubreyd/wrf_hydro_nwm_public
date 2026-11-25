@@ -50,6 +50,9 @@ module module_subsurface_properties
         ! disaggregated lksat decay exponent
         real, allocatable, dimension(:,:) :: nexprt
 
+        ! disaggregated multi-direction D8 slope exponent (subrt_option = 3)
+        real, allocatable, dimension(:,:) :: mfdexprt
+
     contains
 
         procedure :: init => subsurface_properties_init
@@ -142,6 +145,14 @@ contains
             allocation_error = .true.
         end if
 
+        ! allocate the array only if not already allocated
+        if ( .not. allocated(this%mfdexprt) ) then
+            allocate( this%mfdexprt(ix,jx) )
+            this%mfdexprt = 4.0
+        else
+            allocation_error = .true.
+        end if
+
         if ( allocation_error ) &
             write(0,*) "attempt to allocate data in members of subsurface properties structure&
             &that where already allocated. The allocated members where not changed"
@@ -211,6 +222,13 @@ contains
 
         if ( associated(this%distance_to_neighbor) ) then
             this%distance_to_neighbor => null()
+        else
+            allocation_error = .true.
+        end if
+
+        ! only deallocated if already allocated
+        if ( allocated(this%mfdexprt) ) then
+            deallocate( this%mfdexprt)
         else
             allocation_error = .true.
         end if

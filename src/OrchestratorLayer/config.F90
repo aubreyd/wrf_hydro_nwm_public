@@ -176,7 +176,8 @@ module config_base
      integer            :: nLastObs
      integer            :: bucket_loss
      integer            :: imperv_adj
-     integer            :: subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
+     integer            :: subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces),
+                                        ! 3 = multi-direction D8 (D8 total split by slope**MFDEXP)
      integer            :: subrt_gradient ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
      integer            :: subrt_wtable ! subsurface water table depth: 1 = top of saturated layer, 2 = continuous from storage
      integer            :: subrt_soilprops ! routing soil moisture limits: 1 = 2-D routing table, 2 = LSM per-layer values when available
@@ -396,7 +397,7 @@ contains
    endif
 
    if (self%SUBRTSWCRT .eq. 1) then
-      if ((self%subrt_option .lt. 1) .or. (self%subrt_option .gt. 2)) then
+      if ((self%subrt_option .lt. 1) .or. (self%subrt_option .gt. 3)) then
          call hydro_stop('hydro.namelist ERROR: Invalid subrt_option specified')
       endif
       if ((self%subrt_gradient .lt. 1) .or. (self%subrt_gradient .gt. 2)) then

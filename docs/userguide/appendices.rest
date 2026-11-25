@@ -1221,10 +1221,14 @@ description in the namelist which precedes the option.
                    ! named rt_option; rt_option is deprecated but still accepted.
 
    ! Specify subsurface flow routing option (used when SUBRTSWCRT = 1):
-   ! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces)
+   ! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces),
+   ! 3=Multi-direction D8
    subrt_option = 1 !<-- Option 1 sends all lateral flow from a cell to its steepest
                     ! downslope neighbor. Option 2 computes flow across each of the
-                    ! four cell faces, using the upwind cell's transmissivity.
+                    ! four cell faces, using the upwind cell's transmissivity. Option 3
+                    ! computes the same total outflow as option 1 and splits it among
+                    ! all downslope neighbors (of 8) in proportion to slope**MFDEXP,
+                    ! where MFDEXP is read from HYDROTBL_F (default 4 if absent).
                     ! Independent of ovrt_option.
 
    ! Specify subsurface hydraulic gradient (used when SUBRTSWCRT = 1):
@@ -2088,6 +2092,11 @@ within these files are described in the tables below.
    +-----------------------+----------------------------------------------+
    | NEXP                  | Exponent in the decay function for lateral   |
    |                       | Ksat over depth                              |
+   +-----------------------+----------------------------------------------+
+   | MFDEXP                | Slope exponent for partitioning subsurface   |
+   |                       | flow among downslope neighbors with the      |
+   |                       | multi-direction D8 option (subrt_option = 3).|
+   |                       | Optional; defaults to 4 if not present.      |
    +-----------------------+----------------------------------------------+
 
 

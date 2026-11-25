@@ -241,10 +241,22 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     ! (independent of ovrt_option, which controls overland routing):
     !   1 = steepest descent (D8) single-direction routing
     !   2 = 2-D routing across the 4 cell faces (x and y directions)
+    !   3 = multi-direction D8 (D8 total outflow split among downslope neighbors)
     ! The hydraulic gradient is selected by subrt_gradient:
     !   1 = terrain slope (kinematic; flow directions fixed by terrain)
     !   2 = water table (terrain slope adjusted by water-table-depth gradient)
-    if (subrt_static%subrt_option .eq. 2) then
+    if (subrt_static%subrt_option .eq. 3) then
+       CALL ROUTE_SUBSURFACE3(subrt_data%properties%distance_to_neighbor, &
+                              subrt_data%properties%zwattablrt, &
+                              subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
+                              subrt_data%properties%soldeprt, &
+                              subrt_data%properties%mfdexprt, &
+                              subrt_static%IXRT, subrt_static%JXRT, &
+                              subrt_data%properties%surface_slope, &
+                              CWATAVAIL, SUBDT, subrt_static%subrt_gradient, &
+                              subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
+                              subrt_data%state%qsubrt)
+    else if (subrt_static%subrt_option .eq. 2) then
        CALL ROUTE_SUBSURFACE2(subrt_data%properties%distance_to_neighbor, &
                               subrt_data%properties%zwattablrt, &
                               subrt_data%properties%lksatrt, subrt_data%properties%nexprt, &
@@ -978,4 +990,188 @@ SUBROUTINE ROUTE_SUBSURFACE2(dist, z, latksat, nexp, soldep, &
 #endif
 
 end subroutine ROUTE_SUBSURFACE2
+!===================================================================================================
+
+!===================================================================================================
+! Subroutine Name:
+!   subroutine ROUTE_SUBSURFACE3
+! Author(s)/Contact(s):
+!   WRF-Hydro team, 2026
+! Abstract:
+!   Multi-direction D8 subsurface flow. The total outflow from each cell is computed
+!   exactly as in ROUTE_SUBSURFACE1 (steepest slope, D8 flow width, same water-available
+!   limit), and is then partitioned among all downslope neighbors (of 8) with weights
+!      f_k = beta_k**p / sum(beta_j**p),   beta_k > 0
+!   where beta_k is the hydraulic gradient to neighbor k (terrain slope, or terrain slope
+!   minus water-table-depth gradient, per gradOpt) and p is the slope exponent MFDEXP
+!   (read from HYDROTBL_F; default 4). As p -> infinity this reduces to single-direction
+!   D8; smaller p spreads flow more. Because the weights change smoothly with the
+!   gradients, flow does not switch abruptly between nearly equal neighbors.
+! Usage:
+!   Selected with subrt_option = 3 in hydro.namelist.
+! Notes:
+!  - Only interior cells (2..XX-1, 2..YY-1) act as sources; flux into a cell on the outer
+!    domain boundary is removed as boundary flux (QSUBDRY), as in ROUTE_SUBSURFACE1.
+!  - Weights are computed as (beta_k/beta_max)**p to avoid overflow/underflow at large p.
+!  - The last receiving neighbor gets the remainder of the total, so mass is conserved
+!    exactly.
+!===================================================================================================
+SUBROUTINE ROUTE_SUBSURFACE3(dist, z, latksat, nexp, soldep, mfdexp, &
+                             XX, YY, SO8RT, &
+                             CWATAVAIL, SUBDT, gradOpt, QSUBDRY, QSUBDRYT, qsub)
+#ifdef MPP_LAND
+   use module_mpp_land, only: left_id, down_id, right_id, up_id, &
+                              mpp_land_com_real8, mpp_land_com_real
+#endif
+   use module_hydro_stop, only:HYDRO_stop
+
+   implicit none
+
+   ! Passed variables
+   integer, intent(in) :: XX,YY
+   ! Passed arrays
+   real, intent(in), dimension(XX,YY,9)    :: dist ! distance to neighbor cells (m), 9 = cell area (m2)
+   real, intent(in), dimension(XX,YY)      :: z ! depth to water table (m)
+   real, intent(in), dimension(XX,YY)      :: latksat
+                                              ! lateral saturated hydraulic conductivity (m/s)
+   real, intent(in), dimension(XX,YY)      :: nexp ! latksat decay coefficient
+   real, intent(in), dimension(XX,YY)      :: soldep ! soil depth (m)
+   real, intent(in), dimension(XX,YY)      :: mfdexp ! slope exponent for flow partitioning
+   real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
+   real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
+   real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
+   integer, intent(in)                     :: gradOpt
+                                              ! hydraulic gradient: 1 = terrain slope (kinematic),
+                                              ! 2 = water table (terrain + water-table-depth gradient)
+   real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
+   real, intent(inout)                     :: QSUBDRYT
+                                              ! total subsurface flow outside of domain (m3/s)
+   real, intent(out), dimension(XX,YY)     :: qsub ! net subsurface flow into cell (m3/s)
+
+   ! Neighbor offsets, N first and clockwise (same order as SO8RT and dist)
+   integer, parameter :: nbDI(8) = (/ 0, 1, 1, 1, 0, -1, -1, -1 /)
+   integer, parameter :: nbDJ(8) = (/ 1, 1, 0, -1, -1, -1, 0, 1 /)
+
+   ! Local variables
+   integer :: i, j, k, ni, nj, kmax, klast
+   real    :: betaK(8) ! hydraulic gradient to each neighbor (m/m)
+   real    :: beta ! steepest gradient (m/m)
+   real    :: hh, ksat, gamma, width, waterToRoute
+   real    :: qqsub ! total outflow from cell (m3/s, negative = out of cell)
+   real*8  :: wgt(8), wsum, qk, qrem
+   logical :: onBoundary
+   real*8, dimension(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
+
+   qsub_tmp = 0.
+   QSUBDRY_tmp = 0.
+   qsub = 0.
+
+   do j = 2, YY-1
+      do i = 2, XX-1
+
+         ! Hydraulic gradient to each neighbor
+         do k = 1, 8
+            if (gradOpt .eq. 2) then
+               betaK(k) = SO8RT(i,j,k) - (z(i,j) - z(i+nbDI(k),j+nbDJ(k))) / dist(i,j,k)
+            else
+               betaK(k) = SO8RT(i,j,k)
+            endif
+         end do
+
+         ! Steepest neighbor (first one wins ties, as in ROUTE_SUBSURFACE1)
+         kmax = 1
+         do k = 2, 8
+            if (betaK(k) .gt. betaK(kmax)) kmax = k
+         end do
+         beta = betaK(kmax)
+
+         if (dist(i,j,kmax) .le. 0) then
+            call hydro_stop("In ROUTE_SUBSURFACE3() - dist(i,j,index) is <= zero ")
+         endif
+         if (soldep(i,j) .eq. 0) then
+            call hydro_stop("In ROUTE_SUBSURFACE3() - soldep is = zero")
+         endif
+
+         if (beta .le. 0) cycle  ! no downslope neighbor
+         if (beta .lt. 1E-20) beta = 1E-20
+
+         ! Total outflow: identical to ROUTE_SUBSURFACE1
+         hh = ( 1 - ( z(i,j) / soldep(i,j) ) ) ** nexp(i,j)
+         ksat = latksat(i,j)
+         if (hh .lt. 0.) then
+            print *, "hsub<0 at gridcell...", i, j, hh, z(i,j), soldep(i,j)
+            call hydro_stop("In ROUTE_SUBSURFACE3() - hsub<0 at gridcell ")
+         endif
+         width = dist(i,j,9) / dist(i,j,kmax)
+         gamma = -1.0 * ( (width * ksat * soldep(i,j)) / nexp(i,j) ) * beta
+         qqsub = gamma * hh
+         waterToRoute = ABS(qqsub) / dist(i,j,9) * SUBDT
+         if ( (qqsub .le. 0.0) .and. (CWATAVAIL(i,j) .lt. waterToRoute) ) THEN
+            qqsub = -1.0 * CWATAVAIL(i,j) * dist(i,j,9) / SUBDT
+         endif
+         if (qqsub .ge. 0.) cycle
+
+         ! Partition weights over downslope neighbors
+         wgt = 0.d0
+         klast = 0
+         do k = 1, 8
+            if (betaK(k) .gt. 0.) then
+               wgt(k) = (dble(betaK(k)) / dble(beta)) ** dble(mfdexp(i,j))
+               if (wgt(k) .gt. 0.d0) klast = k
+            endif
+         end do
+         wsum = sum(wgt)
+
+         ! Remove total from this cell
+         qsub(i,j) = qsub(i,j) + qqsub
+
+         ! Distribute to neighbors (qqsub negative = out of cell (i,j));
+         ! the last receiver gets the remainder so the shares sum exactly to qqsub
+         qrem = dble(qqsub)
+         do k = 1, 8
+            if (wgt(k) .le. 0.d0) cycle
+            if (k .eq. klast) then
+               qk = qrem
+            else
+               qk = dble(qqsub) * (wgt(k) / wsum)
+               qrem = qrem - qk
+            endif
+            ni = i + nbDI(k)
+            nj = j + nbDJ(k)
+            qsub_tmp(ni,nj) = qsub_tmp(ni,nj) - qk
+
+            ! Flux into a cell on the outer domain boundary leaves the domain
+#ifdef MPP_LAND
+            onBoundary = ((ni .eq. XX) .and. (right_id .lt. 0)) .or. &
+                         ((ni .eq. 1)  .and. (left_id  .lt. 0)) .or. &
+                         ((nj .eq. 1)  .and. (down_id  .lt. 0)) .or. &
+                         ((nj .eq. YY) .and. (up_id    .lt. 0))
+#else
+            onBoundary = (ni .eq. 1) .or. (ni .eq. XX) .or. (nj .eq. 1) .or. (nj .eq. YY)
+#endif
+            if (onBoundary) then
+               qsub_tmp(ni,nj)    = qsub_tmp(ni,nj) + qk
+               QSUBDRY_tmp(ni,nj) = QSUBDRY_tmp(ni,nj) + qk
+               QSUBDRYT           = QSUBDRYT + qk
+            endif
+         end do
+
+      end do
+   end do
+
+#ifdef MPP_LAND
+   ! Sum flux contributions written into halo cells back onto their owning tiles
+   call MPP_LAND_COM_REAL8(qsub_tmp,XX,YY,1)
+   call MPP_LAND_COM_REAL8(QSUBDRY_tmp,XX,YY,1)
+#endif
+
+   qsub = qsub + qsub_tmp
+   QSUBDRY = QSUBDRY + QSUBDRY_tmp
+
+#ifdef MPP_LAND
+   call MPP_LAND_COM_REAL(qsub,XX,YY,99)
+   call MPP_LAND_COM_REAL(QSUBDRY,XX,YY,99)
+#endif
+
+end subroutine ROUTE_SUBSURFACE3
 !===================================================================================================

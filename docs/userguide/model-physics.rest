@@ -713,8 +713,14 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
    The 2-dimensional formulation (``subrt_option = 2``) computes flow across the four
    faces (N, E, S, W) of each cell using the head gradient across the face and the
    transmissivity of the upwind cell, limiting each cell's total outflow to its water
-   available for routing. ``subrt_option`` is independent of ``ovrt_option``, which
-   controls overland routing.
+   available for routing. The multi-direction D8 formulation (``subrt_option = 3``)
+   computes the same total outflow from each cell as the D8 formulation, and splits it
+   among all downslope neighbors (of 8) with weights proportional to `\beta_k^p`, where
+   `\beta_k` is the hydraulic gradient to neighbor `k` and `p` is the slope exponent
+   ``MFDEXP`` (a calibratable parameter in :file:`hydro2dtbl.nc`, default 4). As `p`
+   increases the method approaches single-direction D8; smaller values spread flow
+   more evenly. ``subrt_option`` is independent of ``ovrt_option``, which controls
+   overland routing.
 
    The hydraulic gradient used by either formulation is set with ``subrt_gradient``.
    The default (``subrt_gradient = 1``) uses the terrain slope, so flow directions are
@@ -729,8 +735,9 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
    (``subrt_option = 1``). Because D8 sends all of a cell's flow to its single
    steepest neighbor, and that flow raises the neighbor's water table, cells with
    two nearly equal downslope neighbors can switch receivers every timestep, even
-   with the continuous water table. The 2-dimensional formulation distributes flow
-   across all downslope faces and does not have this problem.
+   with the continuous water table. The 2-dimensional and multi-direction D8
+   formulations distribute flow across all downslope neighbors and do not have this
+   problem.
 
 .. rubric:: Relevant code modules:
 
@@ -770,6 +777,10 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
 
 -  ``NEXP`` in :file:`hydro2dtbl.nc` - Local power law exponent that
    dictates the rate of decay of saturated hydraulic conductivity with depth.
+
+-  ``MFDEXP`` in :file:`hydro2dtbl.nc` - Slope exponent for partitioning subsurface
+   flow among downslope neighbors with the multi-direction D8 option
+   (``subrt_option = 3``). Optional; defaults to 4.
 
 .. _section-3.5:
 

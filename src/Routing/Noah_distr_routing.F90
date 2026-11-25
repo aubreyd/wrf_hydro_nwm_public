@@ -857,7 +857,7 @@ subroutine disaggregateDomain_drv(did)
                             RT_DOMAIN(did)%INFXSRT, rt_domain(did)%dist_lsm(:,:,9), &
                             RT_DOMAIN(did)%SMCMAX1, RT_DOMAIN(did)%SMCREF1, &
                             RT_DOMAIN(did)%SMCWLT1, RT_DOMAIN(did)%VEGTYP, RT_DOMAIN(did)%LKSAT, &
-                            RT_DOMAIN(did)%NEXP, &
+                            RT_DOMAIN(did)%NEXP, RT_DOMAIN(did)%MFDEXP, &
                             rt_domain(did)%overland%properties%distance_to_neighbor, &
                             RT_DOMAIN(did)%INFXSWGT, &
                             RT_DOMAIN(did)%LKSATFAC, &
@@ -871,6 +871,7 @@ subroutine disaggregateDomain_drv(did)
                             rt_domain(did)%overland%streams_and_lakes%lake_mask, &
                             rt_domain(did)%subsurface%properties%lksatrt, &
                             rt_domain(did)%subsurface%properties%nexprt, &
+                            rt_domain(did)%subsurface%properties%mfdexprt, &
                             RT_DOMAIN(did)%subsurface%properties%sldpth, &
                             RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, &
                             rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater, &
@@ -897,9 +898,9 @@ end subroutine disaggregateDomain_drv
 !===================================================================================================
 subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                               SICE, SMC, SH2OX, INFXSRT, area_lsm, SMCMAX1, SMCREF1, &
-                              SMCWLT1, VEGTYP, LKSAT, NEXP, dist, INFXSWGT, &
+                              SMCWLT1, VEGTYP, LKSAT, NEXP, MFDEXP, dist, INFXSWGT, &
                               LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
-                              SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT,  &
+                              SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT, MFDEXPRT, &
                               SLDPTH, soiltypRT, soiltyp, elrt, iswater, impervfrac, imperv_adj, &
                               soilpropsLSM, SMCMAX_LSM, SMCREF_LSM, SMCWLT_LSM)
 #ifdef MPP_LAND
@@ -934,6 +935,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(in),  dimension(IX,JX,NSOIL)     :: SMCWLT_LSM ! per-layer wilting point from LSM
    real, intent(in),  dimension(IX,JX)           :: LKSAT ! coarse grid lateral ksat (m/s)
    real, intent(in),  dimension(IX,JX)           :: NEXP ! coarse grid n exponent
+   real, intent(in),  dimension(IX,JX)           :: MFDEXP ! coarse grid multi-direction D8 exponent
    ! LSM states:
    real, intent(in),  dimension(IX,JX,NSOIL)     :: SMC ! total soil moisture (m3/m3)
    real, intent(in),  dimension(IX,JX,NSOIL)     :: SH2OX ! liquid soil moisture (m3/m3)
@@ -962,6 +964,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCWLTRT ! wilting point on routing grid
    real, intent(out), dimension(IXRT,JXRT)       :: LKSATRT ! lateral ksat on the routing grid (m/s)
    real, intent(out), dimension(IXRT,JXRT)       :: NEXPRT ! n exponent on the routing grid
+   real, intent(out), dimension(IXRT,JXRT)       :: MFDEXPRT ! multi-direction D8 exponent on routing grid
    ! States:
    real, intent(out), dimension(IX,JX,NSOIL)     :: SICE ! soil ice content on coarse grid (m3/m3)
    real, intent(out), dimension(IXRT,JXRT,NSOIL) :: SMCRT
@@ -1179,6 +1182,9 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                ! n exponent for subsurface routing
                nexprt(ixxrt,jyyrt) = nexp(i,j)
 
+               ! slope exponent for multi-direction D8 subsurface routing
+               mfdexprt(ixxrt,jyyrt) = mfdexp(i,j)
+
                ! Lake mask
                !DJG set up lake mask...
                !--- modify to make lake mask large here, but not one of the routed lakes!!!
@@ -1251,6 +1257,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    call MPP_LAND_COM_REAL(INFXSUBRT,IXRT,JXRT,99)
    call MPP_LAND_COM_REAL(LKSATRT,IXRT,JXRT,99)
    call MPP_LAND_COM_REAL(NEXPRT,IXRT,JXRT,99)
+   call MPP_LAND_COM_REAL(MFDEXPRT,IXRT,JXRT,99)
    call MPP_LAND_COM_INTEGER(LAKE_MSKRT,IXRT,JXRT,99)
    do i = 1, NSOIL
       call MPP_LAND_COM_REAL(SMCMAXRT(:,:,i),IXRT,JXRT,99)

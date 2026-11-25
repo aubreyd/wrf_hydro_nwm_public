@@ -286,6 +286,8 @@ CONTAINS
 
   allocate( rt_domain(did)%NEXP   (IX,JX) )
             rt_domain(did)%NEXP    = 1.0
+  allocate( rt_domain(did)%MFDEXP (IX,JX) )
+            rt_domain(did)%MFDEXP  = 4.0
 
   end if ! neither channel_only nor channelBucket_only
 

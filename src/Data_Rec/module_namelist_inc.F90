@@ -36,7 +36,7 @@ module module_namelist_inc
                   GWBASESWCRT, GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                   sys_cpl, gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
                   gwsoilcpl, UDMP_OPT, bucket_loss, imperv_adj, &
-                  subrt_option, & ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
+                  subrt_option, & ! subsurface routing: 1 = D8, 2 = 2-D (x/y faces), 3 = multi-direction D8
                   subrt_gradient, & ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
                   subrt_wtable, & ! subsurface water table depth: 1 = top of saturated layer, 2 = continuous from storage
                   subrt_soilprops ! routing soil moisture limits: 1 = 2-D routing table, 2 = LSM per-layer values when available
