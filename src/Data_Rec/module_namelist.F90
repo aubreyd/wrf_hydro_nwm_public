@@ -24,7 +24,7 @@ contains
                     GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
                     sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
                     gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option, subrt_gradient
+                    UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option, subrt_gradient, subrt_wtable
           real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
           character(len=256) :: route_topo_f=""
           character(len=256) :: route_chan_f=""
@@ -118,7 +118,7 @@ contains
                     RTOUT_DOMAIN, output_gw, outlake, &
                     frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
                     io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, &
-                    subrt_option, subrt_gradient
+                    subrt_option, subrt_gradient, subrt_wtable
 
 #ifdef WRF_HYDRO_NUDGING
    namelist /NUDGING_nlist/ nudgingParamFile,       netwkReExFile,          &
@@ -156,6 +156,7 @@ contains
    imperv_adj = 0
    subrt_option = 1
    subrt_gradient = 1
+   subrt_wtable = 2
    rt_option = -999
    ovrt_option = -999
 
@@ -360,6 +361,7 @@ contains
   call mpp_land_bcast_int1(imperv_adj)
   call mpp_land_bcast_int1(subrt_option)
   call mpp_land_bcast_int1(subrt_gradient)
+  call mpp_land_bcast_int1(subrt_wtable)
 #ifdef WRF_HYDRO_NUDGING
   call mpp_land_bcast_char(256, nudgingParamFile  )
   call mpp_land_bcast_char(256, netwkReExFile     )
@@ -454,6 +456,7 @@ contains
     nlst%imperv_adj = imperv_adj
     nlst%subrt_option = subrt_option
     nlst%subrt_gradient = subrt_gradient
+    nlst%subrt_wtable = subrt_wtable
 
 ! files
     nlst%route_topo_f   =  route_topo_f
@@ -540,6 +543,7 @@ contains
     write(6,*) " nlst%imperv_adj ", imperv_adj
     write(6,*) " nlst%subrt_option ", subrt_option
     write(6,*) " nlst%subrt_gradient ", subrt_gradient
+    write(6,*) " nlst%subrt_wtable ", subrt_wtable
 #ifdef WRF_HYDRO_NUDGING
     write(6,*) " nlst%nudgingParamFile      ",  trim(nudgingParamFile)
     write(6,*) " nlst%netWkReExFile         ",  trim(netWkReExFile)
@@ -798,6 +802,14 @@ subroutine rt_nlst_check(nlst)
       endif
       if ((nlst%subrt_gradient .lt. 1) .or. (nlst%subrt_gradient .gt. 2)) then
          call hydro_stop('hydro.namelist ERROR: Invalid subrt_gradient specified')
+      endif
+      if ((nlst%subrt_wtable .lt. 1) .or. (nlst%subrt_wtable .gt. 2)) then
+         call hydro_stop('hydro.namelist ERROR: Invalid subrt_wtable specified')
+      endif
+      if ((nlst%subrt_option .eq. 1) .and. (nlst%subrt_gradient .eq. 2)) then
+         print *, "WARNING: subrt_option = 1 (D8) with subrt_gradient = 2 (water table) is not recommended: ", &
+                  "single-direction flow can alternate between neighbors each timestep. ", &
+                  "Consider subrt_gradient = 1 or subrt_option = 2."
       endif
    endif
    ! Only allow lakes to be ran with gridded routing or NWM routing

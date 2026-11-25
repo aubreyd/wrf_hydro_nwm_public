@@ -178,6 +178,7 @@ module config_base
      integer            :: imperv_adj
      integer            :: subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
      integer            :: subrt_gradient ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
+     integer            :: subrt_wtable ! subsurface water table depth: 1 = top of saturated layer, 2 = continuous from storage
 
      logical            :: channel_bypass = .FALSE.
 
@@ -400,6 +401,14 @@ contains
       if ((self%subrt_gradient .lt. 1) .or. (self%subrt_gradient .gt. 2)) then
          call hydro_stop('hydro.namelist ERROR: Invalid subrt_gradient specified')
       endif
+      if ((self%subrt_wtable .lt. 1) .or. (self%subrt_wtable .gt. 2)) then
+         call hydro_stop('hydro.namelist ERROR: Invalid subrt_wtable specified')
+      endif
+      if ((self%subrt_option .eq. 1) .and. (self%subrt_gradient .eq. 2)) then
+         print *, "WARNING: subrt_option = 1 (D8) with subrt_gradient = 2 (water table) is not recommended: ", &
+                  "single-direction flow can alternate between neighbors each timestep. ", &
+                  "Consider subrt_gradient = 1 or subrt_option = 2."
+      endif
    endif
 
    if ((self%CHANRTSWCRT .lt. 0 ) .or. (self%CHANRTSWCRT .gt. 1) ) then
@@ -557,7 +566,7 @@ contains
          GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
          sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
          gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option, subrt_gradient
+         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option, subrt_gradient, subrt_wtable
     real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
     character(len=256) :: route_topo_f=""
     character(len=256) :: route_chan_f=""
@@ -649,7 +658,7 @@ contains
          RTOUT_DOMAIN, output_gw, outlake, &
          frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
          io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, &
-         subrt_option, subrt_gradient
+         subrt_option, subrt_gradient, subrt_wtable
 
    namelist /reservoir_nlist/ &
       reservoir_persistence_usgs, reservoir_persistence_usace, reservoir_parameter_file, reservoir_usgs_timeslice_path, &
@@ -695,6 +704,7 @@ contains
     imperv_adj = 0
     subrt_option = 1
     subrt_gradient = 1
+    subrt_wtable = 2
     rt_option = -999
     ovrt_option = -999
 
@@ -906,6 +916,7 @@ contains
     nlst(did)%imperv_adj = imperv_adj
     nlst(did)%subrt_option = subrt_option
     nlst(did)%subrt_gradient = subrt_gradient
+    nlst(did)%subrt_wtable = subrt_wtable
     ! files
     nlst(did)%route_topo_f = route_topo_f
     nlst(did)%route_chan_f = route_chan_f

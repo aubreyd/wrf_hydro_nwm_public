@@ -37,7 +37,8 @@ module module_namelist_inc
                   sys_cpl, gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, &
                   gwsoilcpl, UDMP_OPT, bucket_loss, imperv_adj, &
                   subrt_option, & ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
-                  subrt_gradient ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
+                  subrt_gradient, & ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
+                  subrt_wtable ! subsurface water table depth: 1 = top of saturated layer, 2 = continuous from storage
           logical:: GwPreDiag, GwSpinUp
           real:: DTRT_TER,DTRT_CH, DTCT, dxrt0,  gwChanCondConstIn, gwChanCondConstOut, gwIhShift
           character(len=256) :: route_topo_f=""

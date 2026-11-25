@@ -674,12 +674,27 @@ has no explicit information on soil layer structure, as the method treats
 the soil as a single homogeneous column (with an assumed exponential decay of
 saturated hydraulic conductivity). Therefore, changes in water table
 depth (`\Delta z`) need to be remapped to the land surface model soil layers.
-WRF-Hydro specifies the water table depth according to the depth of the
-top of the highest (i.e. nearest to the surface) saturated layer. The
-residual saturated water above the uppermost, saturated soil layer is
-then added to the overall soil water content of the overlying
-unsaturated layer. This computational structure requires accounting
-steps to be performed prior to calculating `Q_{net}`.
+Soil layers at or above field capacity (``SMCREF``), contiguous from the
+bottom of the soil column, are treated as the saturated zone, and the water
+above field capacity in those layers is available for lateral routing. By
+default (``subrt_wtable = 2``) the water table depth is computed continuously
+from that mobile water, by expressing it as an equivalent saturated thickness:
+
+.. rst-class:: center
+.. math::
+
+   z_{i,j} = D_{i,j} - \sum_{k} \frac{\theta_{k} - \theta_{ref,k}}{\theta_{max,k} - \theta_{ref,k}} \Delta z_{k}
+
+where the sum is over the saturated layers, `\theta` is the soil moisture,
+`\theta_{ref}` and `\theta_{max}` are the field capacity and porosity, and
+`\Delta z_{k}` is the layer thickness. The water table then changes smoothly
+with storage. With ``subrt_wtable = 1`` (the method used prior to this option),
+the water table depth is the depth of the top of the highest (i.e. nearest to
+the surface) saturated layer, so it changes in steps of a full layer thickness.
+In both cases, lateral inflow is added to the saturated layers from the bottom
+up, and any residual is passed to the surface as infiltration excess. This
+computational structure requires accounting steps to be performed prior to
+calculating `Q_{net}`.
 
 Given the timescale for groundwater movement and limitations in the
 model structure there is significant uncertainty in the time it takes to
@@ -705,9 +720,17 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
    The default (``subrt_gradient = 1``) uses the terrain slope, so flow directions are
    fixed by the terrain (a kinematic approximation). ``subrt_gradient = 2`` uses the
    terrain slope adjusted by the water-table-depth gradient and re-evaluates flow
-   directions every timestep. Because the water table depth is resolved only to soil
-   layer boundaries, it changes in discrete jumps, which can cause flow to oscillate
-   between timesteps in low-relief terrain or with high lateral conductivity.
+   directions every timestep. With the layer-based water table (``subrt_wtable = 1``)
+   the water table depth changes in discrete jumps, which can cause flow to oscillate
+   between timesteps in low-relief terrain or with high lateral conductivity; the
+   continuous water table (``subrt_wtable = 2``, the default) avoids these jumps.
+
+   ``subrt_gradient = 2`` is not recommended with the D8 formulation
+   (``subrt_option = 1``). Because D8 sends all of a cell's flow to its single
+   steepest neighbor, and that flow raises the neighbor's water table, cells with
+   two nearly equal downslope neighbors can switch receivers every timestep, even
+   with the continuous water table. The 2-dimensional formulation distributes flow
+   across all downslope faces and does not have this problem.
 
 .. rubric:: Relevant code modules:
 

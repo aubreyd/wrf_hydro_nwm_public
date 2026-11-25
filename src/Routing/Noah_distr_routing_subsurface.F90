@@ -35,7 +35,7 @@ subroutine subsurfaceRouting ( subrt_data, subrt_static, subrt_input, subrt_outp
         subrt_data%grid_transform%smcmaxrt, &
         subrt_data%grid_transform%smcrefrt, &
         subrt_data%grid_transform%smcwltrt, subrt_data%properties%zsoil,SATLYRCHK,subrt_data%properties%zwattablrt, &
-        CWATAVAIL,subrt_data%properties%sldpth)
+        CWATAVAIL,subrt_data%properties%sldpth, subrt_static%subrt_wtable)
 #ifdef MPP_LAND
     call MPP_LAND_COM_REAL(subrt_data%properties%zwattablrt,subrt_static%ixrt,subrt_static%jxrt,99)
     call MPP_LAND_COM_REAL(CWATAVAIL,subrt_static%ixrt,subrt_static%jxrt,99)
@@ -462,9 +462,19 @@ END SUBROUTINE SUBSFC_RTNG
 !DJG ------------------------------------------------------------------------
 !DJG  SUBSURFACE FINDZWAT
 !DJG ------------------------------------------------------------------------
+! Finds the contiguous stack of layers (from the bottom up) with soil moisture at or
+! above field capacity (SMCREF), the water available for lateral routing in that stack
+! (CWATAVAIL, water above SMCREF), and the water table depth (ZWATTABLRT):
+!   WTOPT = 1: depth to the top of the highest layer in the stack (layer-based; the
+!              water table jumps by a full layer thickness as layers cross SMCREF)
+!   WTOPT = 2: continuous; the mobile water in the stack is expressed as an equivalent
+!              saturated thickness, hsat = sum((SMC - SMCREF) / (SMCMAX - SMCREF) * dz),
+!              and the water table depth is soil depth - hsat. The water table then
+!              changes smoothly with storage (specific yield = SMCMAX - SMCREF).
+! SATLYRCHK and CWATAVAIL are the same for both options.
 SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
         SMCWLTRT,ZSOIL,SATLYRCHK,ZWATTABLRT,CWATAVAIL,&
-        SLDPTH)
+        SLDPTH,WTOPT)
 
     IMPLICIT NONE
 
@@ -480,9 +490,12 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
     REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: ZWATTABLRT
     REAL, INTENT(OUT), DIMENSION(IXRT,JXRT)   :: CWATAVAIL
     INTEGER, INTENT(OUT), DIMENSION(IXRT,JXRT) :: SATLYRCHK
+    INTEGER, INTENT(IN) :: WTOPT ! 1 = top of saturated layer, 2 = continuous from storage
 
     !DJG Local Variables
     INTEGER :: KK,i,j
+    REAL    :: hsat ! equivalent saturated thickness of mobile water (m)
+    REAL    :: drainPor ! drainable porosity, SMCMAX - SMCREF (m3/m3)
 
     !!!! Find saturated layer depth...
     ! Loop through domain to determine sat. layers and assign wat tbl depth...
@@ -538,6 +551,22 @@ SUBROUTINE FINDZWAT(IXRT,JXRT,NSOIL,SMCRT,SMCMAXRT,SMCREFRT, &
                     CWATAVAIL(I,J) = CWATAVAIL(I,J)+(SMCRT(I,J,KK)- &
                         SMCREFRT(I,J,KK))*SLDPTH(KK)
                 END DO
+
+                ! Continuous water table from mobile storage in the saturated stack
+                IF (WTOPT .eq. 2) THEN
+                    hsat = 0.
+                    DO KK=SATLYRCHK(I,J),NSOIL
+                        drainPor = SMCMAXRT(I,J,KK) - SMCREFRT(I,J,KK)
+                        IF (drainPor .gt. 1.e-6) THEN
+                            hsat = hsat + SLDPTH(KK) * &
+                                min(1., max(0., (SMCRT(I,J,KK) - SMCREFRT(I,J,KK)) / drainPor))
+                        ELSE
+                            ! no drainable pore space: layer at/above SMCREF counts as saturated
+                            hsat = hsat + SLDPTH(KK)
+                        END IF
+                    END DO
+                    ZWATTABLRT(I,J) = min(-ZSOIL(NSOIL), max(0., -ZSOIL(NSOIL) - hsat))
+                END IF
             ELSE  ! no saturated layers...
                 ZWATTABLRT(I,J) = -ZSOIL(NSOIL)
                 SATLYRCHK(I,J) = NSOIL + 1

@@ -140,9 +140,15 @@ subrt_option = 1
 
 ! Specify subsurface hydraulic gradient (used when SUBRTSWCRT = 1):
 ! 1=Terrain slope (kinematic, flow directions fixed by terrain)
-! 2=Water table (terrain slope adjusted by water table depth gradient; can be unstable
-!   in low-relief areas or with high lateral conductivity)
+! 2=Water table (terrain slope adjusted by water table depth gradient; with
+!   subrt_wtable = 1 it can be unstable in low-relief areas or with high lateral conductivity;
+!   not recommended with subrt_option = 1, where flow can alternate between neighbors)
 subrt_gradient = 1
+
+! Specify how the subsurface water table depth is computed (used when SUBRTSWCRT = 1):
+! 1=Top of the highest saturated (>= field capacity) soil layer (layer-based, previous method)
+! 2=Continuous, from the water above field capacity in the saturated layers
+subrt_wtable = 2
 
 ! Specify whether to adjust overland flow parameters based on imperviousness
 imperv_adj = 0

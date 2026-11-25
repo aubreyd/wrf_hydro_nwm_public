@@ -1232,10 +1232,26 @@ description in the namelist which precedes the option.
    subrt_gradient = 1 !<-- Option 1 uses the terrain slope as the hydraulic gradient, so
                       ! flow directions are fixed by the terrain. Option 2 uses the
                       ! terrain slope adjusted by the water-table-depth gradient, with
-                      ! directions re-evaluated each timestep. Because the water table is
-                      ! resolved only to soil layer boundaries, option 2 can oscillate in
-                      ! low-relief areas or with high lateral conductivity (LKSATFAC).
-                      ! Applies to both subrt_option values.
+                      ! directions re-evaluated each timestep. With the layer-based water
+                      ! table (subrt_wtable = 1), option 2 can oscillate in low-relief
+                      ! areas or with high lateral conductivity (LKSATFAC). Option 2 is
+                      ! not recommended with subrt_option = 1 (D8): sending all of a
+                      ! cell's flow to its single steepest neighbor can alternate between
+                      ! nearly equal neighbors each timestep, even with the continuous
+                      ! water table. Applies to both subrt_option values.
+
+   ! Specify how the subsurface water table depth is computed (used when SUBRTSWCRT = 1):
+   ! 1=Top of highest saturated layer 2=Continuous from storage
+   subrt_wtable = 2 !<-- Option 1 places the water table at the top of the highest soil
+                    ! layer in the saturated stack (layers at or above field capacity),
+                    ! so it jumps by a full layer thickness as layers cross field
+                    ! capacity. Option 2 converts the water above field capacity into
+                    ! an equivalent saturated thickness, so the water table changes
+                    ! smoothly with storage. The water table sets the transmissivity
+                    ! and, with subrt_gradient = 2, the hydraulic gradient. Option 2
+                    ! generally gives deeper water tables and lower lateral flow than
+                    ! option 1, so parameters calibrated with option 1 (e.g. LKSATFAC)
+                    ! may need adjustment.
 
    ! Specify whether to adjust overland flow parameters based on imperviousness
    imperv_adj = 0 !<-- When overland routing is active and an imperviousness grid is
