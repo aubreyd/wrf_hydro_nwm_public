@@ -584,7 +584,11 @@ flow at time `t` can be calculated as:
 
 where, `q_{i,j}` is the flow rate from cell `(i,j)`, `T_{i,j}` is the
 transmissivity of cell `(i,j)`, `\beta_{i,j}` is the water table slope and
-`w_{i,j}` is the width of the cell which is fixed for a regular grid.
+`w_{i,j}` is the flow width, computed as the cell area divided by the
+flow length to the receiving neighbor. On a square grid this is the cell
+width for flow to a side neighbor and the cell width divided by
+`\sqrt{2}` for diagonal flow in the steepest descent (D8) method (the
+spacing between adjacent diagonal flow paths).
 `\beta_{i,j}` is calculated as the difference in water table depths between
 two adjacent grid cells divided by the grid spacing. The method by which
 the water table depth is determined is provided below. Transmissivity is

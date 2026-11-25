@@ -1253,8 +1253,7 @@ subroutine SubsurfaceRouting_drv(did)
         call subsurfaceRouting ( rt_domain(did)%subsurface, &
             rt_domain(did)%subsurface_static, &
             rt_domain(did)%subsurface_input, &
-            rt_domain(did)%subsurface_output, &
-            rt_domain(did)%overland%control%infiltration_excess)
+            rt_domain(did)%subsurface_output)
     endif
 
 end subroutine SubsurfaceRouting_drv

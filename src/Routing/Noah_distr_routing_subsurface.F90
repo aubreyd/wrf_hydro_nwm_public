@@ -607,6 +607,7 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    real    :: ksat ! saturated hydraulic conductivity (m/s)
    real    :: qqsub ! net subsurface flow out of cell (m3/s?)
    real    :: waterToRoute ! total water to route from cell (m)
+   real    :: width ! flow width perpendicular to the flow direction (m)
    ! Local arrays
    real*8, DIMENSION(XX,YY) :: qsub_tmp, QSUBDRY_tmp ! temp trackers for fluxes (m3/s)
    ! Local parameters
@@ -668,7 +669,12 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
 
                ! Calculate flux from cell
                ! AD_NOTE: gamma and qqsub are negative when flow is out of cell
-               gamma = -1.0 * ( (dist(i,j,index) * ksat * soldep(i,j)) / nexp(i,j) ) * beta
+               ! Flow width is cell area / flow length (dx for cardinal flow, dx/sqrt(2)
+               ! for diagonal flow on a square grid), i.e. the spacing between adjacent
+               ! D8 flow paths. Previously the flow length dist(i,j,index) was used as
+               ! the width, which doubled diagonal fluxes.
+               width = dist(i,j,9) / dist(i,j,index)
+               gamma = -1.0 * ( (width * ksat * soldep(i,j)) / nexp(i,j) ) * beta
                qqsub = gamma * hh
 
                ! AD_NOTE: Moved this water available constraint from outside qsub calc loop
