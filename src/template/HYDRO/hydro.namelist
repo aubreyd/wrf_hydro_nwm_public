@@ -138,6 +138,12 @@ ovrt_option = 1
 ! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces)
 subrt_option = 1
 
+! Specify subsurface hydraulic gradient (used when SUBRTSWCRT = 1):
+! 1=Terrain slope (kinematic, flow directions fixed by terrain)
+! 2=Water table (terrain slope adjusted by water table depth gradient; can be unstable
+!   in low-relief areas or with high lateral conductivity)
+subrt_gradient = 1
+
 ! Specify whether to adjust overland flow parameters based on imperviousness
 imperv_adj = 0
 

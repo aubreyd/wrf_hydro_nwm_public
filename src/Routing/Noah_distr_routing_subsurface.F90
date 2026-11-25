@@ -241,6 +241,9 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
     ! (independent of ovrt_option, which controls overland routing):
     !   1 = steepest descent (D8) single-direction routing
     !   2 = 2-D routing across the 4 cell faces (x and y directions)
+    ! The hydraulic gradient is selected by subrt_gradient:
+    !   1 = terrain slope (kinematic; flow directions fixed by terrain)
+    !   2 = water table (terrain slope adjusted by water-table-depth gradient)
     if (subrt_static%subrt_option .eq. 2) then
        CALL ROUTE_SUBSURFACE2(subrt_data%properties%distance_to_neighbor, &
                               subrt_data%properties%zwattablrt, &
@@ -248,7 +251,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                               subrt_data%properties%soldeprt, &
                               subrt_static%IXRT, subrt_static%JXRT, &
                               subrt_data%properties%surface_slope, &
-                              CWATAVAIL, SUBDT, &
+                              CWATAVAIL, SUBDT, subrt_static%subrt_gradient, &
                               subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
                               subrt_data%state%qsubrt)
     else
@@ -259,7 +262,7 @@ SUBROUTINE SUBSFC_RTNG(subrt_data, subrt_static, subrt_input, subrt_output, CWAT
                               subrt_static%IXRT, subrt_static%JXRT, &
                               subrt_data%properties%surface_slope, &
                               subrt_data%properties%max_surface_slope_index, &
-                              CWATAVAIL, SUBDT, &
+                              CWATAVAIL, SUBDT, subrt_static%subrt_gradient, &
                               subrt_data%state%qsubbdryrt, subrt_data%state%qsubbdrytrt, &
                               subrt_data%state%qsubrt)
     end if
@@ -559,6 +562,8 @@ END SUBROUTINE FINDZWAT
 !   3/27/03 -Created, DG.
 !   1/05/04 -Modified, DG.
 !   1/07/19 -Modified, AD.
+!   2026    -Added gradOpt: 1 = kinematic (terrain slope, fixed direction),
+!            2 = water-table gradient (direction re-evaluated each step, as since 2019).
 ! Usage:
 ! Parameters:
 ! Input Files:
@@ -571,7 +576,7 @@ END SUBROUTINE FINDZWAT
 !===================================================================================================
 SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
                              XX, YY, SO8RT, SO8RT_D, &
-                             CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub)
+                             CWATAVAIL, SUBDT, gradOpt, QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id, down_id, right_id, up_id, &
                               mpp_land_com_real8, my_id, mpp_land_com_real
@@ -593,6 +598,9 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
    integer, intent(in), dimension(XX,YY,3) :: SO8RT_D ! steepest terrain slope cell (i, j, index)
    real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
    real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
+   integer, intent(in)                     :: gradOpt
+                                              ! hydraulic gradient: 1 = terrain slope (kinematic),
+                                              ! 2 = water table (terrain + water-table-depth gradient)
    real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
    real, intent(inout)                     :: QSUBDRYT
                                               ! total subsurface flow outside of domain (m3/s)
@@ -628,18 +636,23 @@ SUBROUTINE ROUTE_SUBSURFACE1(dist, z, latksat, nexp, soldep, &
          if (i.ge.2.AND.i.le.XX-1.AND.j.ge.2.AND.j.le.YY-1) then !if grdcl chk
             ! check for boundary grid point?
 
-            ! Set initial guess values for steepest slope neighbor based on terrain
+            ! Steepest terrain slope neighbor
             IXX0 = SO8RT_D(i,j,1)
             JYY0 = SO8RT_D(i,j,2)
             index = SO8RT_D(i,j,3)
-            !beta = -1.0
 
-            ! ADCHANGE: Always call routine to check for steepest elev+head slope
-            ! Updates IXX0, JYY0, index, and beta for steepest slope neighbor.
-            ! Note that beta will be -1 if steepest slope cannot be found.
-            tmp_dist = dist(i,j,:)
-            call GETSUB8(i, j, XX, YY, Z, so8rt, tmp_dist, &
-                         IXX0, JYY0, index, beta)
+            if (gradOpt .eq. 2) then
+               ! Water-table gradient: find the neighbor with the steepest terrain+head
+               ! slope. Updates IXX0, JYY0, index, and beta for that neighbor.
+               ! Note that beta will be -1 if steepest slope cannot be found.
+               tmp_dist = dist(i,j,:)
+               call GETSUB8(i, j, XX, YY, Z, so8rt, tmp_dist, &
+                            IXX0, JYY0, index, beta)
+            else
+               ! Kinematic: hydraulic gradient = terrain slope, direction fixed by terrain
+               ! (no flow from cells with no downslope neighbor, beta <= 0)
+               beta = SO8RT(i,j,index)
+            endif
 
             if (dist(i,j,index) .le. 0) then
                 write(6,*) "FATAL ERROR: dist(i,j,index) is <= zero "
@@ -762,9 +775,9 @@ end subroutine ROUTE_SUBSURFACE1
 !   Flux across each face follows the Dupuit-Forchheimer / DHSVM (Wigmosta, 1994)
 !   transmissivity form used by ROUTE_SUBSURFACE1:
 !      q = T * beta * w,   T = (ksat * soldep / n) * (1 - z/soldep)**n
-!   where beta is the total head slope across the face (terrain slope minus the
-!   water-table-depth gradient), w is the face width, and T is taken from the upwind
-!   (higher head) cell. Each face flux is computed once, by its upwind cell, so mass is
+!   where beta is the hydraulic gradient across the face (the terrain slope for the
+!   kinematic option, or the terrain slope minus the water-table-depth gradient for the
+!   water-table option), w is the face width, and T is taken from the upwind cell. Each face flux is computed once, by its upwind cell, so mass is
 !   exchanged pairwise and conserved.
 ! History Log:
 !   3/27/03 -Created, DG.
@@ -781,6 +794,8 @@ end subroutine ROUTE_SUBSURFACE1
 ! Condition codes:
 ! User controllable options: None.
 ! Notes:
+!  - gradOpt selects the hydraulic gradient: 1 = terrain slope across each face
+!    (kinematic), 2 = terrain slope minus the water-table-depth gradient.
 !  - Only interior cells (2..XX-1, 2..YY-1) act as sources, matching ROUTE_SUBSURFACE1.
 !    Flux into a cell on the outer domain boundary is removed as boundary flux (QSUBDRY).
 !  - If a cell's total outflow over SUBDT would exceed its available water (CWATAVAIL),
@@ -789,7 +804,7 @@ end subroutine ROUTE_SUBSURFACE1
 !===================================================================================================
 SUBROUTINE ROUTE_SUBSURFACE2(dist, z, latksat, nexp, soldep, &
                              XX, YY, SO8RT, &
-                             CWATAVAIL, SUBDT, QSUBDRY, QSUBDRYT, qsub)
+                             CWATAVAIL, SUBDT, gradOpt, QSUBDRY, QSUBDRYT, qsub)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id, down_id, right_id, up_id, &
                               mpp_land_com_real8, mpp_land_com_real
@@ -810,6 +825,9 @@ SUBROUTINE ROUTE_SUBSURFACE2(dist, z, latksat, nexp, soldep, &
    real, intent(in), dimension(XX,YY,8)    :: SO8RT ! terrain slope in all directions (m/m)
    real, intent(in), dimension(XX,YY)      :: CWATAVAIL ! water available for routing (m)
    real, intent(in)                        :: SUBDT ! subsurface routing timestep (s)
+   integer, intent(in)                     :: gradOpt
+                                              ! hydraulic gradient: 1 = terrain slope (kinematic),
+                                              ! 2 = water table (terrain + water-table-depth gradient)
    real, intent(inout), dimension(XX,YY)   :: QSUBDRY ! subsurface flow at domain boundary (m3/s)
    real, intent(inout)                     :: QSUBDRYT
                                               ! total subsurface flow outside of domain (m3/s)
@@ -863,9 +881,14 @@ SUBROUTINE ROUTE_SUBSURFACE2(dist, z, latksat, nexp, soldep, &
                if (dist(i,j,faceK(f)) .le. 0.) then
                   call hydro_stop("In ROUTE_SUBSURFACE2() - dist(i,j,face) is <= zero")
                endif
-               ! Total head slope = terrain slope - water-table-depth gradient
-               ! (head = elev - z, so a deeper water table here lowers outflow)
-               beta = SO8RT(i,j,faceK(f)) - (z(i,j) - z(ni,nj)) / dist(i,j,faceK(f))
+               if (gradOpt .eq. 2) then
+                  ! Total head slope = terrain slope - water-table-depth gradient
+                  ! (head = elev - z, so a deeper water table here lowers outflow)
+                  beta = SO8RT(i,j,faceK(f)) - (z(i,j) - z(ni,nj)) / dist(i,j,faceK(f))
+               else
+                  ! Kinematic: hydraulic gradient = terrain slope across the face
+                  beta = SO8RT(i,j,faceK(f))
+               endif
                if (beta .gt. 0.) then
                   ! face width = cell dimension perpendicular to the flow direction
                   width = area / dist(i,j,faceK(f))

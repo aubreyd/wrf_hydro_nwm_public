@@ -1223,9 +1223,19 @@ description in the namelist which precedes the option.
    ! Specify subsurface flow routing option (used when SUBRTSWCRT = 1):
    ! 1=Steepest Descent (D8) single direction, 2=2-D (flow across N, E, S, W cell faces)
    subrt_option = 1 !<-- Option 1 sends all lateral flow from a cell to its steepest
-                    ! (terrain + water table) neighbor. Option 2 computes flow across
-                    ! each of the four cell faces from the head gradient, using the
-                    ! upwind cell's transmissivity. Independent of ovrt_option.
+                    ! downslope neighbor. Option 2 computes flow across each of the
+                    ! four cell faces, using the upwind cell's transmissivity.
+                    ! Independent of ovrt_option.
+
+   ! Specify subsurface hydraulic gradient (used when SUBRTSWCRT = 1):
+   ! 1=Terrain slope (kinematic) 2=Water table
+   subrt_gradient = 1 !<-- Option 1 uses the terrain slope as the hydraulic gradient, so
+                      ! flow directions are fixed by the terrain. Option 2 uses the
+                      ! terrain slope adjusted by the water-table-depth gradient, with
+                      ! directions re-evaluated each timestep. Because the water table is
+                      ! resolved only to soil layer boundaries, option 2 can oscillate in
+                      ! low-relief areas or with high lateral conductivity (LKSATFAC).
+                      ! Applies to both subrt_option values.
 
    ! Specify whether to adjust overland flow parameters based on imperviousness
    imperv_adj = 0 !<-- When overland routing is active and an imperviousness grid is

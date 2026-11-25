@@ -560,9 +560,10 @@ The method used to calculate the lateral flow of saturated soil moisture
 employs a quasi three-dimensional flow representation, which include the
 effects of topography, saturated soil depth (in this case layers), and
 saturated hydraulic conductivity. Hydraulic gradients are approximated
-as the slope of the water table between adjacent grid cells in the x-
-and y-directions or in an eight direction (D8) steepest descent
-methodology that is specified by the user with ``subrt_option`` in
+either by the terrain slope (kinematic, ``subrt_gradient = 1``, the default)
+or by the slope of the water table (``subrt_gradient = 2``) between adjacent
+grid cells, in the x- and y-directions or in an eight direction (D8) steepest
+descent methodology that is specified by the user with ``subrt_option`` in
 :file:`hydro.namelist` (1 = D8 steepest descent, 2 = 2-dimensional). In each
 cell, the flux of water from one cell to its down-gradient neighbor on
 each timestep is approximated as a steady-state solution. The looping
@@ -699,6 +700,14 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
    transmissivity of the upwind cell, limiting each cell's total outflow to its water
    available for routing. ``subrt_option`` is independent of ``ovrt_option``, which
    controls overland routing.
+
+   The hydraulic gradient used by either formulation is set with ``subrt_gradient``.
+   The default (``subrt_gradient = 1``) uses the terrain slope, so flow directions are
+   fixed by the terrain (a kinematic approximation). ``subrt_gradient = 2`` uses the
+   terrain slope adjusted by the water-table-depth gradient and re-evaluates flow
+   directions every timestep. Because the water table depth is resolved only to soil
+   layer boundaries, it changes in discrete jumps, which can cause flow to oscillate
+   between timesteps in low-relief terrain or with high lateral conductivity.
 
 .. rubric:: Relevant code modules:
 

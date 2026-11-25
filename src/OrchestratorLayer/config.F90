@@ -177,6 +177,7 @@ module config_base
      integer            :: bucket_loss
      integer            :: imperv_adj
      integer            :: subrt_option ! subsurface routing: 1 = steepest descent (D8), 2 = 2-D (x/y faces)
+     integer            :: subrt_gradient ! subsurface hydraulic gradient: 1 = terrain slope (kinematic), 2 = water table
 
      logical            :: channel_bypass = .FALSE.
 
@@ -396,6 +397,9 @@ contains
       if ((self%subrt_option .lt. 1) .or. (self%subrt_option .gt. 2)) then
          call hydro_stop('hydro.namelist ERROR: Invalid subrt_option specified')
       endif
+      if ((self%subrt_gradient .lt. 1) .or. (self%subrt_gradient .gt. 2)) then
+         call hydro_stop('hydro.namelist ERROR: Invalid subrt_gradient specified')
+      endif
    endif
 
    if ((self%CHANRTSWCRT .lt. 0 ) .or. (self%CHANRTSWCRT .gt. 1) ) then
@@ -553,7 +557,7 @@ contains
          GWBASESWCRT,  GW_RESTART,RSTRT_SWC,TERADJ_SOLAR, &
          sys_cpl, rst_typ, rst_bi_in, rst_bi_out, &
          gwChanCondSw, GwPreCycles, GwSpinCycles, GwPreDiagInterval, gwsoilcpl, &
-         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option
+         UDMP_OPT, io_form_outputs, bucket_loss, imperv_adj, subrt_option, subrt_gradient
     real:: DTRT_TER,DTRT_CH,dxrt, gwChanCondConstIn, gwChanCondConstOut, gwIhShift
     character(len=256) :: route_topo_f=""
     character(len=256) :: route_chan_f=""
@@ -645,7 +649,7 @@ contains
          RTOUT_DOMAIN, output_gw, outlake, &
          frxst_pts_out, udmap_file, UDMP_OPT, GWBUCKPARM_file, bucket_loss, &
          io_config_outputs, io_form_outputs, hydrotbl_f, t0OutputFlag, output_channelBucket_influx, imperv_adj, &
-         subrt_option
+         subrt_option, subrt_gradient
 
    namelist /reservoir_nlist/ &
       reservoir_persistence_usgs, reservoir_persistence_usace, reservoir_parameter_file, reservoir_usgs_timeslice_path, &
@@ -690,6 +694,7 @@ contains
     reservoir_type_specified = .FALSE.
     imperv_adj = 0
     subrt_option = 1
+    subrt_gradient = 1
     rt_option = -999
     ovrt_option = -999
 
@@ -900,6 +905,7 @@ contains
     nlst(did)%channel_loss_option = channel_loss_option
     nlst(did)%imperv_adj = imperv_adj
     nlst(did)%subrt_option = subrt_option
+    nlst(did)%subrt_gradient = subrt_gradient
     ! files
     nlst(did)%route_topo_f = route_topo_f
     nlst(did)%route_chan_f = route_chan_f

@@ -63,7 +63,8 @@ CONTAINS
       call rt_domain(did)%subsurface%init(ixrt, jxrt, nsoil, rt_domain(did)%overland)
 
       ! allocate susurface static data structure
-      call rt_domain(did)%subsurface_static%init(ixrt, jxrt, nsoil, nlst(did)%DT, nlst(did)%subrt_option)
+      call rt_domain(did)%subsurface_static%init(ixrt, jxrt, nsoil, nlst(did)%DT, nlst(did)%subrt_option, &
+           nlst(did)%subrt_gradient)
 
       ! allocate subsurface input structure
       call rt_domain(did)%subsurface_output%init(ixrt, jxrt, rt_domain(did)%overland%control%infiltration_excess)
