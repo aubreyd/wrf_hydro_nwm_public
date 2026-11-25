@@ -251,6 +251,13 @@ CONTAINS
             rt_domain(did)%SMCWLT1   = 0.0
   allocate( rt_domain(did)%SMCREF1  (IX,JX) )
             rt_domain(did)%SMCREF1   = 0.0
+  allocate( rt_domain(did)%SMCMAX_LSM (IX,JX,NSOIL) )
+  allocate( rt_domain(did)%SMCREF_LSM (IX,JX,NSOIL) )
+  allocate( rt_domain(did)%SMCWLT_LSM (IX,JX,NSOIL) )
+            rt_domain(did)%SMCMAX_LSM = 0.0
+            rt_domain(did)%SMCREF_LSM = 0.0
+            rt_domain(did)%SMCWLT_LSM = 0.0
+            rt_domain(did)%soilprops_lsm = .false.
   allocate( rt_domain(did)%VEGTYP   (IX,JX) )
             rt_domain(did)%VEGTYP    = 0
 

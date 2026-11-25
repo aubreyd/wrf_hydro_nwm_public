@@ -269,6 +269,32 @@ CONTAINS
 
      end subroutine hrldas_cpl_HYDRO_ini
 
+    ! Pass per-layer soil moisture limits (porosity, field capacity, wilting point) from
+    ! the LSM to routing. Used in place of the 2-D routing table values (SMCMAX1, SMCREF1,
+    ! SMCWLT1) when subrt_soilprops = 2. Call after hrldas_cpl_HYDRO_ini.
+    subroutine hrldas_cpl_HYDRO_soilprops(smcmax,smcref,smcwlt,ii,jj,kk)
+       implicit none
+       integer, intent(in) :: ii,jj,kk
+       real, dimension(ii,jj,kk), intent(in) :: smcmax, smcref, smcwlt
+       integer :: did
+
+       did = 1
+       if (nlst(did)%subrt_soilprops .ne. 2) return
+       if (.not. allocated(rt_domain(did)%SMCMAX_LSM)) return  ! routing not allocated
+
+       ! Same sanity limits as applied to the routing table values (HYDRO_ini)
+       rt_domain(did)%SMCMAX_LSM = min(smcmax, 1.0)
+       rt_domain(did)%SMCREF_LSM = max(min(smcref, rt_domain(did)%SMCMAX_LSM - 0.01), 0.0)
+       rt_domain(did)%SMCWLT_LSM = max(min(smcwlt, rt_domain(did)%SMCREF_LSM - 0.01), 0.0)
+       rt_domain(did)%soilprops_lsm = .true.
+
+#ifdef MPP_LAND
+       if (my_id .eq. IO_id) &
+#endif
+       write(6,*) "Routing using per-layer soil moisture limits from the LSM (subrt_soilprops = 2)"
+
+    end subroutine hrldas_cpl_HYDRO_soilprops
+
      subroutine open_print_mpp(iunit)
        implicit none
        integer iunit

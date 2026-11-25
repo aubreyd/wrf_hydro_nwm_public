@@ -45,6 +45,7 @@
             "split_output_count": 1,
             "subrt_gradient": 1,
             "subrt_option": 1,
+            "subrt_soilprops": 2,
             "subrt_wtable": 2,
             "subrtswcrt": 1,
             "sys_cpl": 1,

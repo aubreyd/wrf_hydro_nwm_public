@@ -760,6 +760,10 @@ description of :file:`GENPARM.TBL` and :file:`soil_properties.nc`.
 -  ``LKSATFAC`` in :file:`Fulldom_hires.nc` - Multiplier on saturated hydraulic
    conductivity in lateral flow direction.
 
+-  ``smcmax``, ``smcref``, ``smcwlt`` in :file:`soil_properties.nc` - Per-layer soil
+   moisture limits used on the routing grid when ``subrt_soilprops = 2`` (the default) and
+   Noah-MP is compiled with ``SPATIAL_SOIL=1``
+
 -  ``SATDK``, ``SMCMAX``, ``SMCREF`` in :file:`HYDRO.TBL` or :file:`hydro2dtbl.nc` - Soil properties
    (saturated hydraulic conductivity, porosity, field capacity) used in
    lateral flow routing.

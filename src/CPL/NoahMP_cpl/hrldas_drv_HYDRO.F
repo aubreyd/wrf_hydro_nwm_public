@@ -52,6 +52,21 @@
              call open_print_mpp(6)
        end subroutine hrldas_drv_HYDRO_ini
 
+       ! Pass per-layer LSM soil moisture limits (LSM (i,k,j) ordering) to routing
+       subroutine hrldas_drv_HYDRO_soilprops(smcmax_io,smcref_io,smcwlt_io,ii,jj,kk)
+          use module_hrldas_HYDRO, only: hrldas_cpl_HYDRO_soilprops
+          implicit none
+          integer:: ii,jj,kk, k
+          real,dimension(ii,kk,jj), intent(in) :: smcmax_io,smcref_io,smcwlt_io
+          real,dimension(ii,jj,kk) :: smcmax,smcref,smcwlt
+          do k = 1, kk
+              smcmax(:,:,k) = smcmax_io(:,k,:)
+              smcref(:,:,k) = smcref_io(:,k,:)
+              smcwlt(:,:,k) = smcwlt_io(:,k,:)
+          end do
+          call hrldas_cpl_HYDRO_soilprops(smcmax,smcref,smcwlt,ii,jj,kk)
+       end subroutine hrldas_drv_HYDRO_soilprops
+
        subroutine HYDRO_frocing_drv (indir,forc_typ, snow_assim,olddate,     &
           ixs, ixe,jxs,jxe,                       &
           forcing_name_T,forcing_name_Q,forcing_name_U,forcing_name_V,forcing_name_P, &

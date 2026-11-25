@@ -150,6 +150,13 @@ subrt_gradient = 1
 ! 2=Continuous, from the water above field capacity in the saturated layers
 subrt_wtable = 2
 
+! Specify the source of the soil moisture limits (porosity, field capacity, wilting point)
+! used on the routing grid:
+! 1=2-D routing table (SMCMAX1, SMCREF1, SMCWLT1 from HYDROTBL_F or HYDRO.TBL), same for all layers
+! 2=Per-layer values from the land model when available (Noah-MP offline driver compiled with
+!   SPATIAL_SOIL=1, from soil_properties.nc); otherwise falls back to option 1
+subrt_soilprops = 2
+
 ! Specify whether to adjust overland flow parameters based on imperviousness
 imperv_adj = 0
 

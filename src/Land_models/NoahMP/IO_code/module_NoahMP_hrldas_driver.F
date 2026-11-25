@@ -427,10 +427,19 @@ module module_NoahMP_hrldas_driver
      use module_rt_data, only: rt_domain
      use module_hrldas_HYDRO, only: open_print_mpp
      use state_module, only: state_type
+#if defined(WRF_HYDRO) && defined(SPATIAL_SOIL)
+     use noahmp_tables, only: ISURBAN_TABLE, LOW_DENSITY_RESIDENTIAL_TABLE, &
+                              HIGH_DENSITY_RESIDENTIAL_TABLE, HIGH_INTENSITY_INDUSTRIAL_TABLE
+#endif
      implicit  none
      integer, intent(out) :: NTIME_out
      integer, parameter :: did=1
      integer :: khour
+#if defined(WRF_HYDRO) && defined(SPATIAL_SOIL)
+     ! per-layer soil moisture limits passed to routing
+     real, allocatable, dimension(:,:,:) :: smcmax_hyd, smcref_hyd, smcwlt_hyd
+     integer :: ii_hyd, jj_hyd
+#endif
      type(state_type), intent(out) :: state
 
     ! initilization for stand alone parallel code.
@@ -1546,6 +1555,34 @@ module module_NoahMP_hrldas_driver
    call hrldas_drv_HYDRO_ini(TSLB(:,1:NSOIL,:),SMOIS(:,1:NSOIL,:),SH2O(:,1:NSOIL,:), &
          infxsrt,sfcheadrt,soldrain,ix,jx,NSOIL, SMOIS,real(noah_lsm%noah_timestep), &
          olddate,zsoil(1:NSOIL))
+
+#ifdef SPATIAL_SOIL
+   ! Pass per-layer soil moisture limits to routing (used when subrt_soilprops = 2).
+   ! Apply the same urban override Noah-MP applies internally (TRANSFER_MP_PARAMETERS)
+   ! so that routing sees the values the LSM actually uses.
+   allocate( smcmax_hyd(XSTART:XEND,1:NSOIL,YSTART:YEND) )
+   allocate( smcref_hyd(XSTART:XEND,1:NSOIL,YSTART:YEND) )
+   allocate( smcwlt_hyd(XSTART:XEND,1:NSOIL,YSTART:YEND) )
+   smcmax_hyd = SMCMAX_3D(:,1:NSOIL,:)
+   smcref_hyd = SMCREF_3D(:,1:NSOIL,:)
+   smcwlt_hyd = SMCWLT_3D(:,1:NSOIL,:)
+   if (IOPT_IMPERV .eq. 9) then
+      do jj_hyd = YSTART, YEND
+         do ii_hyd = XSTART, XEND
+            if (IVGTYP(ii_hyd,jj_hyd) == ISURBAN_TABLE                  .or. &
+                IVGTYP(ii_hyd,jj_hyd) == LOW_DENSITY_RESIDENTIAL_TABLE  .or. &
+                IVGTYP(ii_hyd,jj_hyd) == HIGH_DENSITY_RESIDENTIAL_TABLE .or. &
+                IVGTYP(ii_hyd,jj_hyd) == HIGH_INTENSITY_INDUSTRIAL_TABLE) then
+               smcmax_hyd(ii_hyd,:,jj_hyd) = 0.45
+               smcref_hyd(ii_hyd,:,jj_hyd) = 0.42
+               smcwlt_hyd(ii_hyd,:,jj_hyd) = 0.40
+            endif
+         end do
+      end do
+   endif
+   call hrldas_drv_HYDRO_soilprops(smcmax_hyd, smcref_hyd, smcwlt_hyd, ix, jx, NSOIL)
+   deallocate(smcmax_hyd, smcref_hyd, smcwlt_hyd)
+#endif
 
 call get_iocflag(1, io_config_outputs)
 call get_rstrt_swc(1, reset_flag)

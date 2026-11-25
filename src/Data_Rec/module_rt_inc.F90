@@ -251,6 +251,10 @@ module module_rt_inc
   !!! define land surface grid variables
       REAL,    allocatable, DIMENSION(:,:,:) :: SMC,STC,SH2OX
       REAL,    allocatable, DIMENSION(:,:)   :: SMCMAX1,SMCWLT1,SMCREF1
+      ! Per-layer soil moisture limits passed from the LSM (used when soilprops_lsm is true,
+      ! i.e. subrt_soilprops = 2 and the LSM provides per-layer values)
+      REAL,    allocatable, DIMENSION(:,:,:) :: SMCMAX_LSM,SMCWLT_LSM,SMCREF_LSM
+      LOGICAL :: soilprops_lsm = .false.
       INTEGER, allocatable, DIMENSION(:,:)   :: VEGTYP
       REAL, allocatable, DIMENSION(:,:)      :: OV_ROUGH2d
       !REAL,    allocatable, DIMENSION(:)   :: SLDPTH

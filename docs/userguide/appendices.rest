@@ -1253,6 +1253,18 @@ description in the namelist which precedes the option.
                     ! option 1, so parameters calibrated with option 1 (e.g. LKSATFAC)
                     ! may need adjustment.
 
+   ! Specify the source of the soil moisture limits used on the routing grid:
+   ! 1=2-D routing table 2=Per-layer land model values when available
+   subrt_soilprops = 2 !<-- Option 1 uses SMCMAX1, SMCREF1 and SMCWLT1 from HYDROTBL_F
+                       ! (or HYDRO.TBL) for all soil layers. Option 2 uses the per-layer
+                       ! porosity, field capacity and wilting point the land model uses
+                       ! (Noah-MP offline driver compiled with SPATIAL_SOIL=1, from
+                       ! soil_properties.nc), so routing and the land model agree on how
+                       ! much water each layer can hold. Where per-layer values are not
+                       ! available (other land models or couplers, or SPATIAL_SOIL=0),
+                       ! option 2 falls back to option 1. Lateral conductivity (LKSAT)
+                       ! and NEXP always come from HYDROTBL_F / HYDRO.TBL.
+
    ! Specify whether to adjust overland flow parameters based on imperviousness
    imperv_adj = 0 !<-- When overland routing is active and an imperviousness grid is
                   !    provided in Fulldom_hires.nc, you can use this option to reduce

@@ -874,7 +874,9 @@ subroutine disaggregateDomain_drv(did)
                             RT_DOMAIN(did)%subsurface%properties%sldpth, &
                             RT_DOMAIN(did)%soiltypRT, RT_DOMAIN(did)%soiltyp, &
                             rt_domain(did)%ELRT, RT_DOMAIN(did)%iswater, &
-                            rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj)
+                            rt_domain(did)%IMPERVFRAC, nlst(did)%imperv_adj, &
+                            rt_domain(did)%soilprops_lsm, rt_domain(did)%SMCMAX_LSM, &
+                            rt_domain(did)%SMCREF_LSM, rt_domain(did)%SMCWLT_LSM)
 end subroutine disaggregateDomain_drv
 
 !===================================================================================================
@@ -898,7 +900,8 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
                               SMCWLT1, VEGTYP, LKSAT, NEXP, dist, INFXSWGT, &
                               LKSATFAC, CH_NETRT, SH2OWGT, SMCREFRT, INFXSUBRT, SMCMAXRT, &
                               SMCWLTRT, SMCRT, LAKE_MSKRT, LKSATRT, NEXPRT,  &
-                              SLDPTH, soiltypRT, soiltyp, elrt, iswater, impervfrac, imperv_adj)
+                              SLDPTH, soiltypRT, soiltyp, elrt, iswater, impervfrac, imperv_adj, &
+                              soilpropsLSM, SMCMAX_LSM, SMCREF_LSM, SMCWLT_LSM)
 #ifdef MPP_LAND
    use module_mpp_land, only: left_id,down_id,right_id, &
                               up_id,mpp_land_com_real, my_id, io_id, numprocs, &
@@ -924,6 +927,11 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real, intent(in),  dimension(IX,JX)           :: SMCMAX1 ! coarse grid porosity
    real, intent(in),  dimension(IX,JX)           :: SMCREF1 ! coarse grid field capacity
    real, intent(in),  dimension(IX,JX)           :: SMCWLT1 ! coarse grid wilting point
+   logical, intent(in)                           :: soilpropsLSM
+                                                    ! use per-layer LSM limits below instead of SMC*1
+   real, intent(in),  dimension(IX,JX,NSOIL)     :: SMCMAX_LSM ! per-layer porosity from LSM
+   real, intent(in),  dimension(IX,JX,NSOIL)     :: SMCREF_LSM ! per-layer field capacity from LSM
+   real, intent(in),  dimension(IX,JX,NSOIL)     :: SMCWLT_LSM ! per-layer wilting point from LSM
    real, intent(in),  dimension(IX,JX)           :: LKSAT ! coarse grid lateral ksat (m/s)
    real, intent(in),  dimension(IX,JX)           :: NEXP ! coarse grid n exponent
    ! LSM states:
@@ -970,6 +978,7 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
    real                       :: SMCEXCS ! excess soil moisture (m3/m3)
    real                       :: WATHOLDCAP ! water holding capacity, smcmax - smcwlt (m3/m3)
    real                       :: smScaleFact ! soil moisture scaling factor for ksat (0-1)
+   real                       :: smcmaxK, smcrefK, smcwltK ! layer porosity, field capacity, wilting pt
    real, dimension(IXRT,JXRT) :: OCEAN_INFXSUBRT
                                  ! dummy variable to dump infiltration excess over ocean cells
 #ifdef HYDRO_D
@@ -1045,28 +1054,40 @@ subroutine disaggregateDomain(IX, JX, NSOIL, IXRT, JXRT, AGGFACTRT, &
 
                do KRT=1,NSOIL ! Soil layer loop
 
+                  ! Soil moisture limits for this layer: per-layer LSM values if provided
+                  ! (subrt_soilprops = 2), otherwise the 2-D routing table values
+                  if (soilpropsLSM) then
+                     smcmaxK = SMCMAX_LSM(I,J,KRT)
+                     smcrefK = SMCREF_LSM(I,J,KRT)
+                     smcwltK = SMCWLT_LSM(I,J,KRT)
+                  else
+                     smcmaxK = SMCMAX1(I,J)
+                     smcrefK = SMCREF1(I,J)
+                     smcwltK = SMCWLT1(I,J)
+                  endif
+
                   ! Adjustments for soil ice
                   IF (SICE(I,J,KRT) .gt. 0) then
                      !DJG Adjust SMCMAX for SICE when subsfc routing...make 3d variable
-                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J) - SICE(I,J,KRT)
-                     SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J) - SICE(I,J,KRT) !TODO: This can be negative! e.g., when almost saturated and fully frozen
-                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J)
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = smcmaxK - SICE(I,J,KRT)
+                     SMCREFRT(IXXRT,JYYRT,KRT) = smcrefK - SICE(I,J,KRT) !TODO: This can be negative! e.g., when almost saturated and fully frozen
+                     WATHOLDCAP = smcmaxK - smcwltK
                      IF (SICE(I,J,KRT) .le. WATHOLDCAP)    then
-                        SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
+                        SMCWLTRT(IXXRT,JYYRT,KRT) = smcwltK
                      else
-                        if (SICE(I,J,KRT) .lt. SMCMAX1(I,J)) then
-                           SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J) - &
+                        if (SICE(I,J,KRT) .lt. smcmaxK) then
+                           SMCWLTRT(IXXRT,JYYRT,KRT) = smcwltK - &
                                                        (SICE(I,J,KRT) - WATHOLDCAP)
                         endif
-                        if (SICE(I,J,KRT) .ge. SMCMAX1(I,J)) then
+                        if (SICE(I,J,KRT) .ge. smcmaxK) then
                            SMCWLTRT(IXXRT,JYYRT,KRT) = 0.
                         endif
                      endif
                   ELSE ! no ice
-                     SMCMAXRT(IXXRT,JYYRT,KRT) = SMCMAX1(I,J)
-                     SMCREFRT(IXXRT,JYYRT,KRT) = SMCREF1(I,J)
-                     WATHOLDCAP = SMCMAX1(I,J) - SMCWLT1(I,J) !TODO: Not used again so can delete
-                     SMCWLTRT(IXXRT,JYYRT,KRT) = SMCWLT1(I,J)
+                     SMCMAXRT(IXXRT,JYYRT,KRT) = smcmaxK
+                     SMCREFRT(IXXRT,JYYRT,KRT) = smcrefK
+                     WATHOLDCAP = smcmaxK - smcwltK !TODO: Not used again so can delete
+                     SMCWLTRT(IXXRT,JYYRT,KRT) = smcwltK
                   ENDIF   ! endif adjust for soil ice
 
                   !Now Adjust soil moisture
